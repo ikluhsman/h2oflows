@@ -220,6 +220,52 @@ Recreation.gov handles permit applications. H2OFlow tracks permit trips (plannin
 
 ---
 
+### Primary gauge designation per reach
+
+A reach can have multiple gauges bound to it (upstream context, downstream confirmation, tributaries), but exactly one is the **primary gauge** — the canonical CFS number paddlers quote for that run. "Numbers is at 850" means the Nathrop gauge specifically, not Granite or Parkdale.
+
+Implemented as `primary_gauge_id UUID REFERENCES gauges(id)` on the `reaches` table. This drives:
+- The headline CFS number on the reach page
+- Flow range band evaluation ("is this run on?")
+- User flow alerts (fire against primary gauge only unless user explicitly watches another)
+- The multi-gauge aggregate dashboard default view
+
+Supporting gauges remain bound to the reach via `gauges.reach_id` and appear as contextual readings ("upstream at Granite: 1,200 cfs ↑"). They don't trigger alerts or determine run status.
+
+Some reaches use an upstream or downstream gauge as primary because no gauge sits at the put-in. Flow ranges on that gauge are calibrated by community experience to account for the offset. The architecture handles this implicitly — `primary_gauge_id` points to whatever gauge the community agrees is the reference, regardless of location.
+
+*March 2026*
+
+---
+
+### Gauge prominence model
+
+Two independent axes determine how prominently a gauge appears in search results and discovery:
+
+**Source tier** (derived from `source` column, not stored separately):
+- Tier 1: `usgs` — satellite/radio telemetry, federally maintained
+- Tier 2: `dwr`, `cdec`, `usbr` — telemetry, state/federal but smaller networks
+- Tier 3: `community` — scraped HTTP resources (e.g. PoudreRockReport), valuable but fragile
+- Tier 4: `manual` — human-entered readings, infrequent
+
+**Community prominence** (nightly computed `prominence_score` on `gauges`):
+```
+source_tier_base              (usgs=100, dwr=80, scraped=50, manual=20)
++ featured × 200              (manually elevated; beats source tier)
++ dashboard_saves × 5
++ trip_report_refs × 10
++ reach_bound × 50
++ uptime_30d_pct × 1
+```
+
+The `featured` boolean allows a community maintainer to elevate a tier-3 scraped gauge above a tier-1 USGS gauge for a specific reach — e.g. the Poudre rock gauge is more useful to paddlers for that run than the nearest USGS site, even though it's less technically reliable. `featured` is the explicit override.
+
+Search results default to `ORDER BY prominence_score DESC`. Established community gauges surface naturally; obscure or new gauges are available but don't clutter discovery.
+
+*March 2026*
+
+---
+
 *This document should be updated when significant decisions are revisited or new decisions are made. Date and context every entry.*
 
 *Initial decisions: March 2026*
