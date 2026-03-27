@@ -1,0 +1,2 @@
+ALTER TABLE gauges DROP COLUMN IF EXISTS state_abbr;
+ALTER TABLE gauges DROP COLUMN IF EXISTS basin_name;

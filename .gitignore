@@ -10,6 +10,11 @@
 apps/api/bin/
 apps/discord-bot/bin/
 
+# Built seed tool binaries (run with `go run` instead)
+seed-reaches
+seed-state-reaches
+apps/api/seed-reaches
+
 # Node / Nuxt
 node_modules/
 .nuxt/

@@ -14,7 +14,6 @@ CREATE TABLE reach_conditions (
 CREATE INDEX reach_conditions_reach_id_idx  ON reach_conditions (reach_id);
 CREATE INDEX reach_conditions_expires_at_idx ON reach_conditions (expires_at);
 
--- Purge expired conditions efficiently
+-- Index for active conditions queries (filter by expires_at in queries, not index predicate)
 CREATE INDEX reach_conditions_active_idx
-    ON reach_conditions (reach_id, created_at DESC)
-    WHERE expires_at > NOW();
+    ON reach_conditions (reach_id, expires_at DESC, created_at DESC);

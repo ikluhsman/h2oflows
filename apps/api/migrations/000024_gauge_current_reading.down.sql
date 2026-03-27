@@ -1,0 +1,1 @@
+ALTER TABLE gauges DROP COLUMN IF EXISTS current_cfs, DROP COLUMN IF EXISTS flow_status;
