@@ -172,17 +172,17 @@ The goal is maximum adoption and contribution, not license enforcement. Apache 2
 
 ---
 
-### Why no social login (Google, GitHub OAuth)
+### Auth: Google / Apple / magic-link, not email/password
 
-Several reasons:
+The original decision was email/password with JWT for simplicity and self-hosting purity. That decision was revisited when thinking concretely about the beta pilot audience.
 
-**Privacy.** The whitewater community skews toward people who are outdoorsy, privacy-conscious, and skeptical of big tech data collection. "Sign in with Google" sends a signal that conflicts with the FOSS/community-owned positioning.
+The Front Range paddling community is 30-50 year old adults who will not remember a new password for a whitewater app they use a few times a month. Password reset flows create support burden before there are any support resources. And the privacy argument against social login is weakest for Google and Apple — the people signing up for the beta already trust those providers with far more sensitive data.
 
-**Dependency.** Social login creates a dependency on a third-party auth provider. If Google changes their OAuth terms or a provider goes down, login breaks.
+**The revised plan:** Google / Apple OAuth for the hosted instance. Magic-link (email, no password) for users who prefer not to use social login and as the fallback for self-hosted instances that can't register OAuth apps.
 
-**Simplicity.** Email/password with JWT is straightforward to implement, straightforward to self-host, and has no external dependencies. Self-hosted instances don't need to register OAuth apps.
+This removes friction at the exact moment it matters most — first login during the beta pilot. The self-hosting story is preserved via magic-link. Auth is deferred entirely until after the Phase 1 pilot completes; the dashboard is fully functional without an account.
 
-The tradeoff is slightly more friction at signup. This is judged acceptable — the people who will use H2OFlow are motivated enough to create an account with an email address.
+*March 2026*
 
 ---
 
@@ -487,6 +487,59 @@ The DWR telemetry API (`telemetrytimeseriesraw`, `telemetrystations`) uses the A
 The ABBREV is also well-known to experienced Colorado paddlers. "PLAWATCO" shows up in trip reports, Discord, and in the community's mental model of Colorado gauge coverage. Making it the `external_id` keeps it visible in the API response without requiring a separate `abbrev` field.
 
 Co-located USGS stations (where the numeric ID exists) are tracked as separate `gauges` rows with `source='usgs'`. Both rows will typically bind to the same reach, with one designated `primary_gauge_id` based on which source the community trusts more for that run.
+
+*March 2026*
+
+---
+
+---
+
+### gauge_reach_associations — many-to-many, not a single foreign key
+
+Early schema had `gauges.reach_id` as the only reach relationship: one gauge, one reach. This broke immediately on the N Fork South Platte corridor where a single upstream gauge (PLAGRACO at Grant) is the practical reference for both Bailey and Foxton — two distinct reaches separated by miles of canyon.
+
+The fix is a proper many-to-many association table with a typed `relationship` column:
+
+```
+gauge_reach_associations (gauge_id, reach_id, relationship)
+  relationship: primary | upstream_indicator | downstream_indicator | tributary
+```
+
+`gauges.reach_id` stays as a display pointer — first-come-first-served, used for the LEFT JOIN that returns a single reach name in the simple case. The association table is authoritative for search, grouping, and relationship labeling.
+
+**Concrete effect on the dashboard:** PLAGRACO's section header reads "Bailey / Foxton" — its combined primary reach label is computed from `gauge_reach_associations` at query time, not from the single `gauges.reach_id`. A gauge serving N primary reaches shows up under one combined group, capped at 3 names with a `/ …` ellipsis for pathological cases.
+
+**The rule of thumb:** `gauges.reach_id` is a UX shortcut for the single-reach common case. `gauge_reach_associations` is the truth.
+
+*March 2026*
+
+---
+
+### AI seeder uses training knowledge, not live scraping
+
+The initial instinct was to scrape American Whitewater pages for rapids, access, and flow ranges before generating content. This was rejected for several reasons:
+
+**AW data is proprietary.** H2OFlow's positioning is explicitly that it does not build on AW's proprietary dataset. Scraping it to feed into our own database would contradict that principle even if technically legal.
+
+**Training knowledge is good enough for well-documented runs.** Claude's training data includes published guidebooks (Caudill, Stohlquist, Nealy), AW trip reports indexed before the training cutoff, and years of community beta on classic runs. For Browns Canyon, Gore Canyon, the Numbers, and the other marquee Colorado runs, the AI-seeded data is accurate and confident (85–95+ confidence scores).
+
+**Provenance is cleaner.** AI-seeded content is clearly labeled `data_source='ai_seed'` with a confidence score. Content that came from a live AW scrape would require a different provenance label and legal consideration. Training-derived content is original synthesis, not reproduction.
+
+**Live search is Phase 2.** The `WebSearcher` interface in `FlowRangeSeeder` is already there — a hook to pre-fetch AW pages before the Claude call and flip `data_source` to `'ai_web'`. This gets wired in once the legal and attribution questions are worked out, or replaced with a different live data source.
+
+*March 2026*
+
+---
+
+### Watchlist is the root context — derive everything silently
+
+The dashboard has no explicit "watershed" or "region" selector. The user's watchlist is the root context for every computation: flow comparisons, section headers, the aggregate graph picker, the poll tier calculation.
+
+This means the app must silently derive reach associations, watershed groupings, and gauge relationships from the watchlist state — never asking the user to re-declare what they already told us when they added a gauge.
+
+**Practical implication:** when a gauge is added from search results, it arrives with its reach association already resolved. The section header on the dashboard groups it correctly without any user input. The aggregate graph defaults to the most-watched watershed. The poll tier elevates on first view.
+
+The watchlist is persisted to localStorage (Pinia persist plugin) and refreshed via BatchGet on every mount. It is the single source of truth for the dashboard state.
 
 *March 2026*
 

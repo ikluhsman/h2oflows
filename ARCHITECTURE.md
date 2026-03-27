@@ -86,14 +86,15 @@ The open geographic data layer that doesn't currently exist in open form.
 
 | Layer | Choice |
 |---|---|
-| Language | Go |
+| Language | Go 1.26 |
 | Router | Chi |
-| Database | PostgreSQL + PostGIS |
+| Database | PostgreSQL 16 + PostGIS |
 | Migrations | golang-migrate |
-| Cache | Redis |
+| AI | Anthropic Claude (anthropic-sdk-go) |
+| Cache | Redis (planned — not required for Phase 1) |
 | Object storage | Cloudflare R2 (hosted) / any S3-compatible (self-hosted) |
-| Reverse proxy | Traefik |
-| Auth | JWT + email/password (no social login) |
+| Reverse proxy | Traefik (planned) |
+| Auth | Google / Apple / magic-link (Phase 3 — anonymous until beta pilot completes) |
 
 Go was chosen for single-binary deployment (critical for self-hosting), excellent concurrency for gauge polling across multiple sources, and a strong FOSS contributor ecosystem. The `gauge-core` package implements a plugin interface — adding a new data source is writing one adapter file.
 
@@ -126,66 +127,67 @@ Small Go service in the same monorepo. Phase 1 uses simple incoming webhooks (no
 ```
 h2oflow/
 ├── apps/
-│   ├── api/                  Go backend
-│   │   ├── cmd/server/       main entrypoint
+│   ├── api/                      Go backend
+│   │   ├── cmd/
+│   │   │   ├── server/           Main entrypoint — Chi router, migrations, poller
+│   │   │   ├── seed-reaches/     Upserts Front Range reaches + AI content
+│   │   │   ├── seed-flow-ranges/ Seeds flow bands for gauge+reach pairs
+│   │   │   ├── seed-state-reaches/ Broader CO/surrounding-states inventory
+│   │   │   └── seed-usgs-states/ Bulk USGS gauge import by state
 │   │   ├── internal/
-│   │   │   ├── handlers/     Chi route handlers
-│   │   │   ├── models/       database models
-│   │   │   ├── poller/       gauge polling scheduler
-│   │   │   └── alerts/       threshold alert dispatch
-│   │   └── migrations/       golang-migrate SQL files
-│   ├── web/                  Nuxt 4 frontend
-│   │   ├── pages/
-│   │   ├── components/
-│   │   ├── composables/
-│   │   └── stores/           Pinia
-│   └── discord-bot/          Go webhook + slash command service
+│   │   │   ├── ai/               Claude seeder (reach data, flow ranges, search enrichment)
+│   │   │   ├── handlers/         Chi route handlers (gauges, reaches, trips)
+│   │   │   ├── poller/           Gauge polling scheduler (trusted/demand/cold tiers)
+│   │   │   └── config/           Environment config
+│   │   └── migrations/           golang-migrate SQL files (026 migrations)
+│   ├── web/                      Nuxt 4 frontend
+│   │   └── app/
+│   │       ├── pages/            Dashboard (index), reach detail (/reaches/[slug])
+│   │       ├── components/gauge/ GaugeCard, GaugeSearchModal, graphs, sparklines
+│   │       ├── composables/      useWatchlistRefresh, useGaugeGraph, useTripRecording
+│   │       └── stores/           Pinia — watchlist (persisted localStorage)
+│   └── discord-bot/              (planned — Phase 3)
 ├── packages/
-│   ├── gauge-core/           gauge source adapter implementations
-│   │   ├── usgs.go
-│   │   ├── dwr.go
-│   │   └── interface.go
-│   ├── river-data/           reach schema, seed data, OSM import tools
-│   └── ui/                   shared Vue components (if needed beyond Nuxt UI)
-├── infra/
-│   ├── docker-compose.yml
-│   └── traefik/
-└── docs/
-    ├── architecture.md       this file
-    ├── api.md                public API reference
-    └── contributing.md
+│   └── gauge-core/               Gauge source adapters
+│       ├── interface.go          GaugeReading type + adapter contracts
+│       ├── usgs.go               USGS NWIS IV adapter
+│       ├── dwr.go                Colorado DWR CDSS adapter
+│       └── huc.go                USGS HUC watershed lookup
+├── infra/                        (planned — Docker Compose, Traefik)
+└── ARCHITECTURE.md               this file
+    DECISIONS.md                  reasoning behind key choices
+    PROJECT.md                    project context and planning history
 ```
 
 ---
 
 ## Gauge plugin architecture
 
-All gauge sources implement a common Go interface.
+All gauge sources implement a common Go interface in `packages/gauge-core`.
 
 ```go
-type GaugeSource interface {
-    FetchReading(externalID string) (*Reading, error)
-    FetchHistory(externalID string, since time.Time) ([]*Reading, error)
-    Name() string
-    SourceType() SourceType
-}
-
-type Reading struct {
-    ExternalID string
-    Value      float64
-    Unit       string
-    Timestamp  time.Time
-    QualCode   string
+// GaugeReading is the normalized output of any gauge adapter.
+type GaugeReading struct {
+    ExternalID  string
+    CFS         *float64
+    FlowStatus  string    // runnable | caution | low | flood | unknown
+    ReadingAt   time.Time
 }
 ```
 
-Current adapters: `USGSSource`, `ColoradoDWRSource`
-Planned: `CDECSource`, `EnvironmentCanadaSource`, `ManualSource`, `CommunitySource`
+Adapters (`packages/gauge-core`):
+- `usgs.go` — USGS NWIS instantaneous values (`parameterCd=00060`, CFS discharge)
+- `dwr.go` — Colorado DWR CDSS telemetry API (ABBREV-based station IDs)
+- `huc.go` — USGS Hydrologic Unit lookup for watershed/basin name enrichment
 
-The poller runs on a configurable schedule per source, writes readings to PostgreSQL, invalidates Redis cache, and fires webhooks for threshold alerts.
+Planned: `CDECSource` (California), `EnvironmentCanadaSource`, `ManualSource`
+
+Adding a new gauge source = one file implementing the adapter interface.
 
 USGS base URL: `https://waterservices.usgs.gov/nwis/iv/`
-Key params: `sites={site_code}`, `parameterCd=00060` (CFS discharge), `00065` (stage), `format=json`
+Key params: `sites={site_code}`, `parameterCd=00060`, `format=json`
+
+The poller in `apps/api/internal/poller` runs on three tiers: trusted gauges polled every 15 minutes unconditionally, demand gauges polled while recently searched, cold gauges skipped until requested.
 
 ---
 
@@ -441,29 +443,42 @@ Self-hosted instances can optionally federate reach edits and hazard data back t
 
 ## Reach data bootstrap
 
-Seed from OpenStreetMap whitewater data (`whitewater:section_grade`). Colorado first. Top 50 Colorado runs manually verified by beta group in initial sprint. Passive detection fills in from there.
+Rather than OSM import (inconsistent tagging, requires human cleanup), H2OFlow uses an AI seeder backed by Claude's training knowledge, which includes American Whitewater data, published guidebooks (Caudill, Stohlquist, Nealy), and years of paddling trip reports.
+
+```
+Reach definition (slug, name, class, gauge IDs) → AI seeder → rapids + access + flow ranges + description
+                                                              ↓
+                                               Stored as data_source='ai_seed', confidence-scored
+                                               Items below confidence 50 are dropped at generation time
+                                               Items at or above 85 are auto-verified (well-known classics)
+                                               Items 50–84 stored as drafts pending community verification
+```
+
+The `cmd/seed-reaches` tool defines 19 hand-picked Front Range CO reaches with local knowledge notes embedded in the seed prompt (gauge math, rock gauge correlations, access quirks). The AI seeder generates reach content; humans provide the gauge associations and domain context.
+
+Community corrections and verified field data take precedence over AI-seeded content once contributed. The `verified` boolean and `data_source` column are surfaced in the API so consumers can filter by provenance.
 
 ---
 
 ## Build order
 
-**Phase 1 — Gauge dashboard (months 1–2)**
-Port USGS/DWR integrations to `gauge-core` Go package. Build public gauge dashboard in Nuxt 4 with Nuxt UI Pro — live CFS, sparklines, multi-gauge aggregate view, flow range bands. Deploy to h2oflow.org.
+**Phase 1 — Gauge dashboard ✓ complete**
+USGS/DWR/HUC adapters in `gauge-core`. Go API with chi: gauge search (AI-enriched), batch refresh, readings, seasonal stats. Nuxt 4 dashboard: watchlist with reach-grouped cards, CFS sparklines, aggregate graph, 48h trend, session tracking (Track It). Front Range CO reach registry seeded with AI-generated rapids, access, flow ranges.
 
-**Phase 2 — Reach registry (months 2–3)**
-Reach data model + PostGIS. Community editor. Seed Colorado reaches. Bind gauges to reaches. Flow ranges editable. Conditions board and hazard warnings on reach pages.
+**Phase 2 — Reach pages and reach detail (current)**
+Public reach pages at `/reaches/[slug]`. Rapids inventory, access points with coordinates, flow range bands, description. AI-seeded content surfaced with confidence badges. Community corrections UI.
 
-**Phase 3 — Accounts & community (months 3–4)**
-Email/password auth. Trip report filing with auto-stamped CFS. Saved dashboards and alerts. SMS/push notifications. Discord bot phase 1.
+**Phase 3 — Accounts (deferred until after beta pilot)**
+Google / Apple / magic-link auth (no passwords). Trip report filing with auto-stamped CFS. Saved dashboards and alert thresholds. SMS/push/Discord notifications. API token issuance.
 
-**Phase 4 — Trip planning (months 4–5)**
-Day trip and overnight planner. Roster. Basic food notes. Export (markdown, PDF, KML/GPX). AI post-trip extraction cards.
+**Phase 4 — Trip planning**
+Day trip and overnight planner. Roster management. Trip export (markdown, PDF, KML/GPX). AI post-trip extraction cards. Geotagged photo map.
 
-**Phase 5 — Permit trip module (months 5–6+)**
-Full permit coordination. Outfitter integration. Food planner with dietary restrictions and shopping list. Gear matrix. Cost splitting. Shuttle coordination. Hosted trip page.
+**Phase 5 — Permit trip module**
+Full permit coordination. Outfitter integration. Food planner. Gear matrix. Cost splitting. Shuttle coordination. Hosted trip page.
 
 **Phase 6 — Public API (parallel to phase 3+)**
-Token issuance. Rate limiting. Public API docs at h2oflow.org/developers.
+Token issuance. Rate limiting. Public API docs.
 
 ---
 

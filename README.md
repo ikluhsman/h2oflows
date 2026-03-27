@@ -1,8 +1,8 @@
 # H2OFlow
 
-A streamflow data platform for whitewater paddlers. Live gauge dashboards, community flow ranges, reach registry, and a free API — all in one place.
+A streamflow data platform for whitewater paddlers. Snap in your favorite gauges, get live CFS with flow status bands, compare rivers side by side, and track sessions. Backed by a free open reach registry and public API built from community data.
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for full technical design and [PROJECT.md](PROJECT.md) for project context and roadmap.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for full technical design and [DECISIONS.md](DECISIONS.md) for the reasoning behind key choices.
 
 ---
 
@@ -10,27 +10,60 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full technical design and [PROJECT.md
 
 | Layer | Technology |
 |---|---|
-| Backend | Go, Chi, PostgreSQL + PostGIS, Redis |
-| Frontend | Nuxt 4, Nuxt UI Pro, uPlot, MapLibre GL |
-| Infrastructure | Docker, Traefik |
+| Backend | Go 1.26, Chi, PostgreSQL 16 + PostGIS |
+| AI | Anthropic Claude (reach seeding, search enrichment) |
+| Frontend | Nuxt 4, Nuxt UI v4, Tailwind CSS, uPlot, Pinia |
+| Maps | MapLibre GL (planned) |
+
+Redis and Docker Compose are planned for production deployment but not required for local development.
 
 ---
 
 ## Running locally
 
-### Dependencies only (recommended for development)
+### Prerequisites
 
-Runs PostgreSQL/PostGIS and Redis in containers. Build and run the Go API and Nuxt frontend natively.
+- Go 1.26+ (`/usr/local/go/bin/go version`)
+- PostgreSQL 16 + PostGIS (`sudo apt install postgresql-16-postgis-3`)
+- Node 20+ + npm
+
+### Setup
 
 ```sh
-docker compose up
+# 1. Create the database
+sudo -u postgres createdb h2oflow
+
+# 2. Copy and fill in environment variables
+cp apps/api/.env.example apps/api/.env
+# Required: DATABASE_URL, ANTHROPIC_API_KEY
+
+# 3. Start the API (auto-runs migrations on startup)
+cd apps/api
+set -a && source .env && set +a
+go run ./cmd/server
+
+# 4. In a separate terminal, start the frontend
+cd apps/web
+npm install
+npm run dev
 ```
 
-### Environment
+API runs on `:8080`, web on `:3000`.
+
+### Seeding reach data
 
 ```sh
-cp .env.example .env
-# edit .env with your local values
+cd apps/api
+set -a && source .env && set +a
+
+# Seed the 19 hand-picked Front Range CO reaches + AI-generated content
+go run ./cmd/seed-reaches
+
+# Re-seed a reach (overwrites AI content, keeps community data)
+RESEED=true go run ./cmd/seed-reaches
+
+# Bulk import USGS gauges by state
+go run ./cmd/seed-usgs-states
 ```
 
 ---
@@ -39,15 +72,35 @@ cp .env.example .env
 
 ```
 apps/
-  api/              Go backend
-  web/              Nuxt 4 frontend
-  discord-bot/      Discord webhook + slash command service
+  api/                Go backend
+    cmd/
+      server/         Main entrypoint (Chi router, migrations, poller)
+      seed-reaches/   Upserts Front Range reaches + AI-generated content
+      seed-flow-ranges/  Seeds flow bands for gauge+reach pairs
+      seed-state-reaches/ Broader CO inventory
+      seed-usgs-states/   Bulk USGS gauge import
+    internal/
+      ai/             Claude seeder (reach descriptions, rapids, access, flow ranges)
+      handlers/       HTTP route handlers
+      poller/         Gauge polling scheduler (trusted/demand/cold tiers)
+      config/         Environment config
+    migrations/       golang-migrate SQL files (026 migrations)
+  web/                Nuxt 4 frontend
+    app/
+      pages/          Dashboard (index), reach detail
+      components/     GaugeCard, GaugeSearchModal, graphs, sparklines
+      composables/    useWatchlistRefresh, useGaugeGraph, useTripRecording
+      stores/         Pinia — watchlist (persisted to localStorage)
 packages/
-  gauge-core/       Gauge source adapter interface + USGS/DWR implementations
-  river-data/       Reach schema, seed data, OSM import tools
-infra/
-  traefik/          Reverse proxy config
-docs/
-  api.md            Public API reference
-  contributing.md
+  gauge-core/         Gauge source adapter interface + USGS/DWR/HUC implementations
 ```
+
+---
+
+## Data sources
+
+- **USGS Water Services API** — no API key, covers most of the US
+- **Colorado DWR telemetry** — CDSS API, abbreviation-based station IDs
+- **AI seeder (Claude)** — generates reach descriptions, rapid inventories, access points, and flow ranges from training knowledge; all output is marked `data_source='ai_seed'` and confidence-scored
+
+Community corrections and verified data take precedence over AI-seeded content once contributed.
