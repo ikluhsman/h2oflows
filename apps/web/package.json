@@ -1,0 +1,27 @@
+{
+  "name": "h2oflow-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^4.6.0",
+    "@pinia-plugin-persistedstate/nuxt": "^1.2.1",
+    "@pinia/nuxt": "^0.11.3",
+    "gsap": "^3.14.2",
+    "maplibre-gl": "^5.0.0",
+    "nuxt": "^4.4.2",
+    "pinia": "^3.0.0",
+    "uplot": "^1.6.31",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@iconify-json/heroicons": "^1.2.3",
+    "@nuxt/eslint": "^1.0.0",
+    "typescript": "^5.0.0"
+  }
+}

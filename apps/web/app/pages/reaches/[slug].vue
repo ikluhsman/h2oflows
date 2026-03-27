@@ -1,0 +1,334 @@
+<template>
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+
+    <!-- Nav bar -->
+    <header class="sticky top-0 z-20 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm">
+      <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+        <NuxtLink to="/" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Dashboard
+        </NuxtLink>
+        <span class="text-gray-300 dark:text-gray-700">/</span>
+        <span class="text-sm font-medium truncate">{{ reach?.name }}</span>
+      </div>
+    </header>
+
+    <div v-if="pending" class="max-w-3xl mx-auto px-4 py-12 text-center text-gray-400">
+      Loading…
+    </div>
+
+    <div v-else-if="!reach" class="max-w-3xl mx-auto px-4 py-12 text-center text-gray-400">
+      Reach not found.
+    </div>
+
+    <main v-else class="max-w-3xl mx-auto px-4 py-6 space-y-8">
+
+      <!-- Hero -->
+      <section>
+        <div class="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 class="text-2xl font-bold">{{ reach.name }}</h1>
+            <p class="text-gray-500 text-sm mt-0.5">
+              {{ reach.region }}
+              <span v-if="reach.length_mi"> · {{ reach.length_mi }} mi</span>
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <!-- Class badge -->
+            <span class="rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 font-bold text-sm">
+              {{ classLabel }}
+            </span>
+            <!-- Flow status -->
+            <UBadge v-if="reach.gauge.flow_status" :color="statusColor" variant="subtle" size="sm">
+              {{ statusLabel }}
+            </UBadge>
+          </div>
+        </div>
+
+        <!-- Current CFS — prominent if we have a live reading -->
+        <div v-if="reach.gauge.current_cfs != null" class="mt-4 flex items-end gap-2">
+          <span class="text-4xl font-bold tabular-nums" :class="cfsClass">
+            {{ reach.gauge.current_cfs.toLocaleString() }}
+          </span>
+          <span class="text-gray-500 mb-1">cfs</span>
+          <span v-if="reach.gauge.last_reading_at" class="text-xs text-gray-400 mb-1.5">
+            · {{ lastReadingRelative }}
+          </span>
+        </div>
+        <div v-else class="mt-4 text-gray-400 text-sm">No recent gauge reading</div>
+      </section>
+
+      <!-- 48h graph + diurnal banner -->
+      <section v-if="reach.gauge.id" class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">48-Hour Flow</h2>
+        <GaugeGraph :gauge-id="reach.gauge.id" :current-cfs="reach.gauge.current_cfs" />
+      </section>
+
+      <!-- Description -->
+      <section v-if="reach.description">
+        <div class="flex items-center gap-2 mb-2">
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">About</h2>
+          <DataSourceBadge
+            :source="(reach.description_source as any) ?? 'ai_seed'"
+            :verified="reach.description_verified"
+            :confidence="reach.description_ai_confidence ?? undefined"
+          />
+        </div>
+        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line">
+          {{ reach.description }}
+        </div>
+      </section>
+
+      <!-- Rapids -->
+      <section v-if="reach.rapids.length > 0">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Rapids ({{ reach.rapids.length }})
+        </h2>
+        <div class="space-y-3">
+          <div
+            v-for="rapid in reach.rapids"
+            :key="rapid.id"
+            class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-semibold">{{ rapid.name }}</span>
+                  <span v-if="rapid.class_rating" class="text-xs bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 font-bold">
+                    Class {{ formatClass(rapid.class_rating) }}
+                  </span>
+                  <span
+                    v-if="rapid.is_portage_recommended"
+                    class="text-xs bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 rounded px-1.5 py-0.5 font-medium"
+                  >
+                    Portage recommended
+                  </span>
+                </div>
+                <p v-if="rapid.river_mile != null" class="text-xs text-gray-400 mt-0.5">
+                  Mile {{ rapid.river_mile }}
+                </p>
+              </div>
+              <DataSourceBadge
+                :source="(rapid.data_source as any)"
+                :verified="rapid.verified"
+                :confidence="rapid.ai_confidence ?? undefined"
+              />
+            </div>
+
+            <p v-if="rapid.description" class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+              {{ rapid.description }}
+            </p>
+
+            <!-- Class at different flows -->
+            <div v-if="rapid.class_at_low || rapid.class_at_high" class="mt-2 flex gap-3 text-xs text-gray-400">
+              <span v-if="rapid.class_at_low">Low: Class {{ formatClass(rapid.class_at_low) }}</span>
+              <span v-if="rapid.class_at_high">High: Class {{ formatClass(rapid.class_at_high) }}</span>
+            </div>
+
+            <div v-if="rapid.portage_description" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+              Portage: {{ rapid.portage_description }}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Access points -->
+      <section v-if="reach.access.length > 0">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Access</h2>
+        <div class="space-y-3">
+          <div
+            v-for="a in reach.access"
+            :key="a.id"
+            class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-bold uppercase tracking-wide" :class="accessTypeClass(a.access_type)">
+                    {{ accessTypeLabel(a.access_type) }}
+                  </span>
+                  <span class="font-semibold">{{ a.name ?? '—' }}</span>
+                  <span v-if="a.entry_style" class="text-xs bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 capitalize">
+                    {{ a.entry_style.replace('_', ' ') }}
+                  </span>
+                </div>
+              </div>
+              <DataSourceBadge
+                :source="(a.data_source as any)"
+                :verified="a.verified"
+                :confidence="a.ai_confidence ?? undefined"
+              />
+            </div>
+
+            <p v-if="a.directions" class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+              {{ a.directions }}
+            </p>
+
+            <!-- Approach info for trail/technical -->
+            <p v-if="a.approach_notes" class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {{ a.approach_notes }}
+            </p>
+
+            <!-- Metadata row -->
+            <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
+              <span v-if="a.road_type">Road: {{ a.road_type }}</span>
+              <span v-if="a.approach_dist_mi">Walk: {{ a.approach_dist_mi }} mi</span>
+              <span v-if="a.hike_to_water_min">~{{ a.hike_to_water_min }} min to water</span>
+              <span v-if="a.parking_fee != null">Parking: {{ a.parking_fee === 0 ? 'Free' : `$${a.parking_fee}/day` }}</span>
+              <span v-if="a.permit_required" class="text-amber-500">Permit required</span>
+            </div>
+
+            <p v-if="a.permit_info" class="text-xs text-amber-600 dark:text-amber-400 mt-1">
+              {{ a.permit_info }}
+              <a v-if="a.permit_url" :href="a.permit_url" target="_blank" class="underline ml-1">More info</a>
+            </p>
+
+            <p v-if="a.notes" class="text-xs text-gray-400 mt-1 italic">{{ a.notes }}</p>
+
+            <!-- Waypoints for trail/technical access -->
+            <div v-if="a.waypoints.length > 0" class="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3 space-y-1.5">
+              <p class="text-xs font-medium text-gray-500">Approach route:</p>
+              <div
+                v-for="wp in a.waypoints"
+                :key="wp.sequence"
+                class="flex gap-2 text-xs"
+              >
+                <span class="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center font-bold text-gray-500">
+                  {{ wp.sequence }}
+                </span>
+                <div>
+                  <span class="font-medium">{{ wp.label }}</span>
+                  <span v-if="wp.description" class="text-gray-400"> — {{ wp.description }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Gauge attribution -->
+      <section v-if="reach.gauge.external_id" class="text-xs text-gray-400 pb-6">
+        Flow data: {{ reach.gauge.source?.toUpperCase() }} gauge {{ reach.gauge.external_id }}
+        <span v-if="reach.gauge.name"> · {{ reach.gauge.name }}</span>
+      </section>
+
+    </main>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+
+const route  = useRoute()
+const config = useRuntimeConfig()
+
+// ---- Data -------------------------------------------------------------------
+
+const { data: reach, pending } = await useAsyncData(
+  `reach-${route.params.slug}`,
+  () => $fetch(`${config.public.apiBase}/api/v1/reaches/${route.params.slug}`)
+)
+
+// ---- SEO --------------------------------------------------------------------
+
+const metaTitle = computed(() => {
+  if (!reach.value) return 'H2OFlow'
+  const cfs = reach.value.gauge?.current_cfs
+  const status = statusLabel.value
+  const cls = classLabel.value
+  return `${reach.value.name} | ${cls} | ${cfs != null ? `${cfs.toLocaleString()} cfs — ${status}` : reach.value.region}`
+})
+
+const metaDesc = computed(() => {
+  if (!reach.value) return ''
+  const cfs = reach.value.gauge?.current_cfs
+  const parts = [
+    reach.value.region,
+    classLabel.value,
+    reach.value.length_mi ? `${reach.value.length_mi} miles` : null,
+    cfs != null ? `Currently ${cfs.toLocaleString()} cfs — ${statusLabel.value}` : null,
+  ].filter(Boolean)
+  return parts.join(' · ')
+})
+
+useSeoMeta({
+  title:           () => metaTitle.value,
+  ogTitle:         () => metaTitle.value,
+  description:     () => metaDesc.value,
+  ogDescription:   () => metaDesc.value,
+})
+
+// ---- Derived display --------------------------------------------------------
+
+const classLabel = computed(() => {
+  const r = reach.value
+  if (!r?.class_min && !r?.class_max) return 'Unknown class'
+  if (r.class_min === r.class_max)     return `Class ${romanClass(r.class_min!)}`
+  return `Class ${romanClass(r.class_min!)}–${romanClass(r.class_max!)}`
+})
+
+function romanClass(n: number): string {
+  const map: Record<number, string> = {
+    1: 'I', 1.5: 'I+', 2: 'II', 2.5: 'II+',
+    3: 'III', 3.5: 'III+', 4: 'IV', 4.5: 'IV+',
+    5: 'V', 5.5: 'V+', 6: 'VI',
+  }
+  return map[n] ?? String(n)
+}
+
+function formatClass(n: number): string {
+  return romanClass(n)
+}
+
+const statusColor = computed(() => {
+  switch (reach.value?.gauge.flow_status) {
+    case 'runnable': return 'success'
+    case 'caution':  return 'warning'
+    case 'low':
+    case 'flood':    return 'error'
+    default:         return 'neutral'
+  }
+})
+
+const statusLabel = computed(() => {
+  switch (reach.value?.gauge.flow_status) {
+    case 'runnable': return 'Runnable'
+    case 'caution':  return 'Caution'
+    case 'low':      return 'Too Low'
+    case 'flood':    return 'Flood Stage'
+    default:         return 'Unknown'
+  }
+})
+
+const cfsClass = computed(() => ({
+  'text-emerald-500': reach.value?.gauge.flow_status === 'runnable',
+  'text-yellow-500':  reach.value?.gauge.flow_status === 'caution',
+  'text-red-500':     ['low','flood'].includes(reach.value?.gauge.flow_status ?? ''),
+  'text-gray-300':    reach.value?.gauge.flow_status === 'unknown',
+}))
+
+const lastReadingRelative = computed(() => {
+  const t = reach.value?.gauge.last_reading_at
+  if (!t) return ''
+  const ms = Date.now() - new Date(t).getTime()
+  const m = Math.floor(ms / 60_000)
+  if (m < 1)  return 'just now'
+  if (m < 60) return `${m}m ago`
+  return `${Math.floor(m / 60)}h ${m % 60}m ago`
+})
+
+function accessTypeLabel(t: string): string {
+  return { put_in: 'Put-in', take_out: 'Take-out', intermediate: 'Intermediate', shuttle_drop: 'Shuttle', camp: 'Camp' }[t] ?? t
+}
+
+function accessTypeClass(t: string): string {
+  return {
+    put_in:       'text-emerald-600 dark:text-emerald-400',
+    take_out:     'text-blue-500 dark:text-blue-400',
+    intermediate: 'text-gray-500',
+    shuttle_drop: 'text-purple-500 dark:text-purple-400',
+    camp:         'text-amber-500 dark:text-amber-400',
+  }[t] ?? 'text-gray-500'
+}
+</script>
