@@ -191,10 +191,11 @@ type dwrResponse[T any] struct {
 // Python exporter (measValue confirmed). Verify measDateTime format and
 // qualityType name against the live API when first testing.
 type dwrReading struct {
-	MeasValue    float64 `json:"measValue"`
-	MeasDateTime string  `json:"measDateTime"` // "YYYY-MM-DD HH:MM" or RFC3339 — see parseDWRDateTime
-	MeasUnit     string  `json:"measUnit"`     // typically "cfs"
-	QualityType  string  `json:"qualityType"`  // e.g. "Approved", "Provisional"
+	MeasValue    float64  `json:"measValue"`
+	MeasDateTime string   `json:"measDateTime"` // "2006-01-02T15:04:05" Mountain Time (no zone offset)
+	MeasUnit     string   `json:"measUnit"`     // typically "cfs"
+	FlagA        *string  `json:"flagA"`        // "A"=approved, "O"=observed, etc.
+	FlagB        *string  `json:"flagB"`
 }
 
 func (r *dwrReading) toReading(externalID string) (*Reading, error) {
@@ -203,14 +204,18 @@ func (r *dwrReading) toReading(externalID string) (*Reading, error) {
 		return nil, fmt.Errorf("parsing DWR timestamp %q: %w", r.MeasDateTime, err)
 	}
 
-	provisional := r.QualityType == "Provisional" || r.QualityType == "provisional"
+	qualCode := ""
+	if r.FlagA != nil {
+		qualCode = *r.FlagA
+	}
+	provisional := qualCode != "A" && qualCode != "a" // "O"=observed (provisional), "A"=approved
 
 	return &Reading{
 		ExternalID:  externalID,
 		Value:       r.MeasValue,
 		Unit:        normalizeUnit(r.MeasUnit),
 		Timestamp:   ts,
-		QualCode:    r.QualityType,
+		QualCode:    qualCode,
 		Provisional: provisional,
 	}, nil
 }
@@ -256,15 +261,20 @@ func (st *dwrStation) toSiteMetadata() *SiteMetadata {
 // "YYYY-MM-DD HH:MM" in most responses (no seconds, no timezone — Mountain
 // Time implied). Falls back to RFC3339 in case the API is updated.
 func parseDWRDateTime(s string) (time.Time, error) {
-	// Primary DWR format
-	if t, err := time.ParseInLocation("2006-01-02 15:04", s, mountainTime()); err == nil {
+	mt := mountainTime()
+	// ISO 8601 without timezone — actual live format as of 2026
+	if t, err := time.ParseInLocation("2006-01-02T15:04:05", s, mt); err == nil {
 		return t, nil
 	}
-	// With seconds
-	if t, err := time.ParseInLocation("2006-01-02 15:04:05", s, mountainTime()); err == nil {
+	// Space-separated variant
+	if t, err := time.ParseInLocation("2006-01-02 15:04:05", s, mt); err == nil {
 		return t, nil
 	}
-	// RFC3339 fallback
+	// Space-separated without seconds
+	if t, err := time.ParseInLocation("2006-01-02 15:04", s, mt); err == nil {
+		return t, nil
+	}
+	// RFC3339 with explicit offset (future-proofing)
 	if t, err := time.Parse(time.RFC3339, s); err == nil {
 		return t, nil
 	}

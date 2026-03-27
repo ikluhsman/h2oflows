@@ -47,14 +47,20 @@ func (s *USGSSource) Name() string           { return "USGS Water Services" }
 func (s *USGSSource) SourceType() SourceType { return SourceUSGS }
 
 // FetchReading returns the most recent instantaneous discharge reading for the
-// given USGS site number (e.g. "09361500"). Uses the USGS OGC API.
+// given USGS site number (e.g. "09361500"). Uses the NWIS IV service with a
+// 2-hour lookback window and returns the most recent value.
+//
+// Note: The USGS OGC API (latest-continuous endpoint) requires an API key and
+// has tight rate limits on the free tier. NWIS IV is free and has no key
+// requirement for individual site queries.
 func (s *USGSSource) FetchReading(ctx context.Context, externalID string) (*Reading, error) {
 	params := url.Values{
-		"monitoring_location_id": {fmt.Sprintf("USGS-%s", externalID)},
-		"parameter_code":         {"00060"},
-		"statistic_id":           {"00011"}, // instantaneous value
+		"sites":       {externalID},
+		"parameterCd": {"00060"},
+		"period":      {"PT2H"}, // last 2 hours — always catches the most recent 15-min reading
+		"format":      {"json"},
 	}
-	endpoint := fmt.Sprintf("%s/collections/latest-continuous/items?%s", s.ogcBase, params.Encode())
+	endpoint := fmt.Sprintf("%s/iv/?%s", s.nwisBase, params.Encode())
 
 	resp, err := s.get(ctx, endpoint)
 	if err != nil {
@@ -71,15 +77,20 @@ func (s *USGSSource) FetchReading(ctx context.Context, externalID string) (*Read
 		return nil, fmt.Errorf("%w: HTTP %d", ErrSourceUnavailable, resp.StatusCode)
 	}
 
-	var fc ogcFeatureCollection
-	if err := json.NewDecoder(resp.Body).Decode(&fc); err != nil {
-		return nil, fmt.Errorf("decoding OGC response: %w", err)
-	}
-	if len(fc.Features) == 0 {
-		return nil, ErrNoReadings
+	var iv nwisIVResponse
+	if err := json.NewDecoder(resp.Body).Decode(&iv); err != nil {
+		return nil, fmt.Errorf("decoding NWIS IV response: %w", err)
 	}
 
-	return fc.Features[0].toReading(externalID)
+	readings, err := iv.toReadings(externalID)
+	if err != nil {
+		return nil, err
+	}
+	if len(readings) == 0 {
+		return nil, ErrNoReadings
+	}
+	// toReadings returns oldest-first — take the last entry for the most recent value.
+	return readings[len(readings)-1], nil
 }
 
 // FetchHistory returns all instantaneous discharge readings since the given
@@ -126,10 +137,19 @@ func (s *USGSSource) FetchHistory(ctx context.Context, externalID string, since 
 // routine syncs.
 func (s *USGSSource) DiscoverSites(ctx context.Context, opts DiscoverOptions) ([]*SiteMetadata, error) {
 	params := url.Values{
-		"format":           {"rdb"},
-		"siteType":         {"ST"},  // streams only
-		"hasDataTypeCd":    {"iv"},  // must have instantaneous values
-		"outputDataTypeCd": {"iv"},  // include begin/end date columns in output
+		"format":   {"rdb"},
+		"siteType": {"ST"}, // streams only
+	}
+
+	// When fetching specific sites for metadata, use expanded output which
+	// includes state_cd, drain_area_va, and other site attributes.
+	// When doing a bulk discovery, use iv output to get begin/end dates for
+	// active/retired detection.
+	if len(opts.SiteIDs) > 0 {
+		params.Set("siteOutput", "expanded")
+	} else {
+		params.Set("hasDataTypeCd", "iv")
+		params.Set("outputDataTypeCd", "iv")
 	}
 
 	if len(opts.Parameters) > 0 {
@@ -144,8 +164,10 @@ func (s *USGSSource) DiscoverSites(ctx context.Context, opts DiscoverOptions) ([
 		params.Set("siteStatus", "all")
 	}
 
-	// BoundingBox takes precedence over StateCodes
-	if opts.BoundingBox != nil {
+	// SiteIDs takes precedence over all spatial filters.
+	if len(opts.SiteIDs) > 0 {
+		params.Set("sites", strings.Join(opts.SiteIDs, ","))
+	} else if opts.BoundingBox != nil {
 		params.Set("bBox", fmt.Sprintf("%.6f,%.6f,%.6f,%.6f",
 			opts.BoundingBox.West, opts.BoundingBox.South,
 			opts.BoundingBox.East, opts.BoundingBox.North))

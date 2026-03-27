@@ -122,6 +122,10 @@ type SiteDiscoverer interface {
 // DiscoverOptions controls which sites a SiteDiscoverer returns.
 // All fields are optional — zero value returns everything the source has.
 type DiscoverOptions struct {
+	// SiteIDs fetches metadata for specific site numbers only.
+	// When set, StateCodes and BoundingBox are ignored.
+	SiteIDs []string
+
 	// StateCodes filters by US state. Empty slice means all states.
 	// Not all sources support this (DWR is Colorado-only regardless).
 	StateCodes []string
