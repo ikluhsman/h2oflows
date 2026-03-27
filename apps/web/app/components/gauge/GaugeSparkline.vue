@@ -115,9 +115,9 @@ const areaPath = computed(() => {
 
 const strokeColor = computed(() => ({
   runnable: '#10b981', // emerald — go paddle
-  caution:  '#1f2937', // near-black — minimum, marginal
-  low:      '#9ca3af', // gray — muted, not worth running
-  flood:    '#3b82f6', // blue — too much water
-  unknown:  '#6b7280',
+  caution:  '#f59e0b', // amber  — marginal, proceed with caution
+  low:      '#ef4444', // red    — too low, don't bother
+  flood:    '#3b82f6', // blue   — too much water
+  unknown:  '#6b7280', // gray   — no data
 }[props.flowStatus]))
 </script>

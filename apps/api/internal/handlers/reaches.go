@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -246,6 +247,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			  AND craft_type = 'general'
 			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
 			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
+			ORDER BY min_cfs ASC NULLS FIRST
 			LIMIT 1
 		) fr ON TRUE
 		WHERE r.slug = $1
@@ -264,6 +266,10 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, http.StatusNotFound, "reach not found")
 		return
 	}
+
+	// Ensure arrays serialize as [] not null when empty
+	reach.Rapids = make([]rapidRow, 0)
+	reach.Access = make([]accessRow, 0)
 
 	// ---- Rapids -------------------------------------------------------------
 	rapidRows, err := h.db.Query(r.Context(), `
@@ -337,6 +343,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			continue
 		}
+		a.Waypoints = make([]waypointRow, 0)
 		reach.Access = append(reach.Access, a)
 		accessByID[a.ID] = &reach.Access[len(reach.Access)-1]
 	}
@@ -405,7 +412,7 @@ type gaugeSnippet struct {
 	Name          *string    `json:"name"`
 	Featured      *bool      `json:"featured"`
 	CurrentCFS    *float64   `json:"current_cfs"`
-	LastReadingAt *string    `json:"last_reading_at"`
+	LastReadingAt *time.Time `json:"last_reading_at"`
 	FlowStatus    string     `json:"flow_status"`
 }
 

@@ -207,6 +207,29 @@
         </div>
       </section>
 
+      <!-- Flow ranges -->
+      <section v-if="(flowRanges?.length ?? 0) > 0">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Flow Bands</h2>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div
+            v-for="band in (flowRanges ?? [])"
+            :key="band.label"
+            class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-0 transition-colors"
+            :class="band.label === activeBand ? activeBandClass(band.label) : 'bg-white dark:bg-gray-900'"
+          >
+            <div class="flex items-center gap-2">
+              <span
+                class="text-xs font-bold uppercase tracking-wide"
+                :class="bandLabelClass(band.label)"
+              >{{ bandDisplayLabel(band.label) }}</span>
+              <span v-if="band.label === activeBand" class="text-xs text-gray-400">← now</span>
+              <span v-if="!band.verified" class="text-xs text-gray-400 italic">est.</span>
+            </div>
+            <span class="text-sm tabular-nums text-gray-500">{{ bandRange(band) }}</span>
+          </div>
+        </div>
+      </section>
+
       <!-- Gauge attribution -->
       <section v-if="reach.gauge.external_id" class="text-xs text-gray-400 pb-6">
         Flow data: {{ reach.gauge.source?.toUpperCase() }} gauge {{ reach.gauge.external_id }}
@@ -230,14 +253,78 @@ const { data: reach, pending } = await useAsyncData(
   () => $fetch(`${config.public.apiBase}/api/v1/reaches/${route.params.slug}`)
 )
 
+// Flow ranges — secondary fetch once we have the gauge ID
+const { data: flowRanges } = await useAsyncData(
+  `flow-ranges-${route.params.slug}`,
+  async () => {
+    const gaugeId = (reach.value as any)?.gauge?.id
+    if (!gaugeId) return []
+    return $fetch(`${config.public.apiBase}/api/v1/gauges/${gaugeId}/flow-ranges`)
+  },
+  { default: () => [] }
+)
+
+// ---- Derived display --------------------------------------------------------
+// Declared before SEO so metaTitle/metaDesc can reference them without TDZ errors.
+
+function romanClass(n: number): string {
+  const map: Record<number, string> = {
+    1: 'I', 1.5: 'I+', 2: 'II', 2.5: 'II+',
+    3: 'III', 3.5: 'III+', 4: 'IV', 4.5: 'IV+',
+    5: 'V', 5.5: 'V+', 6: 'VI',
+  }
+  return map[n] ?? String(n)
+}
+
+function formatClass(n: number): string { return romanClass(n) }
+
+const classLabel = computed(() => {
+  const r = reach.value
+  if (!r?.class_min && !r?.class_max) return 'Unknown class'
+  if (r.class_min === r.class_max)     return `Class ${romanClass(r.class_min!)}`
+  return `Class ${romanClass(r.class_min!)}–${romanClass(r.class_max!)}`
+})
+
+const statusColor = computed(() => {
+  switch (reach.value?.gauge.flow_status) {
+    case 'runnable': return 'success'
+    case 'caution':  return 'warning'
+    case 'low':
+    case 'flood':    return 'error'
+    default:         return 'neutral'
+  }
+})
+
+// Which flow band is currently active (matches current CFS)
+const activeBand = computed(() => {
+  const cfs = (reach.value as any)?.gauge?.current_cfs
+  if (cfs == null) return null
+  const bands = (flowRanges.value as any[]) ?? []
+  for (const b of bands) {
+    const aboveMin = b.min_cfs == null || cfs >= b.min_cfs
+    const belowMax = b.max_cfs == null || cfs <  b.max_cfs
+    if (aboveMin && belowMax) return b.label
+  }
+  return null
+})
+
+const statusLabel = computed(() => {
+  if (activeBand.value) return bandDisplayLabel(activeBand.value)
+  switch (reach.value?.gauge.flow_status) {
+    case 'runnable': return 'Runnable'
+    case 'caution':  return 'Caution'
+    case 'low':      return 'Too Low'
+    case 'flood':    return 'Flood Stage'
+    default:         return 'Unknown'
+  }
+})
+
 // ---- SEO --------------------------------------------------------------------
 
 const metaTitle = computed(() => {
   if (!reach.value) return 'H2OFlow'
   const cfs = reach.value.gauge?.current_cfs
-  const status = statusLabel.value
-  const cls = classLabel.value
-  return `${reach.value.name} | ${cls} | ${cfs != null ? `${cfs.toLocaleString()} cfs — ${status}` : reach.value.region}`
+  return `${reach.value.name} | ${classLabel.value} | ${cfs != null ? `${cfs.toLocaleString()} cfs — ${statusLabel.value}` : reach.value.region}`
 })
 
 const metaDesc = computed(() => {
@@ -257,48 +344,6 @@ useSeoMeta({
   ogTitle:         () => metaTitle.value,
   description:     () => metaDesc.value,
   ogDescription:   () => metaDesc.value,
-})
-
-// ---- Derived display --------------------------------------------------------
-
-const classLabel = computed(() => {
-  const r = reach.value
-  if (!r?.class_min && !r?.class_max) return 'Unknown class'
-  if (r.class_min === r.class_max)     return `Class ${romanClass(r.class_min!)}`
-  return `Class ${romanClass(r.class_min!)}–${romanClass(r.class_max!)}`
-})
-
-function romanClass(n: number): string {
-  const map: Record<number, string> = {
-    1: 'I', 1.5: 'I+', 2: 'II', 2.5: 'II+',
-    3: 'III', 3.5: 'III+', 4: 'IV', 4.5: 'IV+',
-    5: 'V', 5.5: 'V+', 6: 'VI',
-  }
-  return map[n] ?? String(n)
-}
-
-function formatClass(n: number): string {
-  return romanClass(n)
-}
-
-const statusColor = computed(() => {
-  switch (reach.value?.gauge.flow_status) {
-    case 'runnable': return 'success'
-    case 'caution':  return 'warning'
-    case 'low':
-    case 'flood':    return 'error'
-    default:         return 'neutral'
-  }
-})
-
-const statusLabel = computed(() => {
-  switch (reach.value?.gauge.flow_status) {
-    case 'runnable': return 'Runnable'
-    case 'caution':  return 'Caution'
-    case 'low':      return 'Too Low'
-    case 'flood':    return 'Flood Stage'
-    default:         return 'Unknown'
-  }
 })
 
 const cfsClass = computed(() => ({
@@ -330,5 +375,42 @@ function accessTypeClass(t: string): string {
     shuttle_drop: 'text-purple-500 dark:text-purple-400',
     camp:         'text-amber-500 dark:text-amber-400',
   }[t] ?? 'text-gray-500'
+}
+
+// ---- Flow band helpers -------------------------------------------------------
+
+function bandDisplayLabel(label: string): string {
+  return label.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+}
+
+function bandLabelClass(label: string): string {
+  return {
+    too_low: 'text-gray-400',
+    minimum: 'text-gray-600 dark:text-gray-300',
+    fun:     'text-emerald-600 dark:text-emerald-400',
+    optimal: 'text-emerald-600 dark:text-emerald-400',
+    pushy:   'text-amber-500',
+    high:    'text-blue-500',
+    flood:   'text-blue-600',
+  }[label] ?? 'text-gray-500'
+}
+
+function activeBandClass(label: string): string {
+  return {
+    too_low: 'bg-gray-50 dark:bg-gray-800/60',
+    minimum: 'bg-gray-50 dark:bg-gray-800/60',
+    fun:     'bg-emerald-50/60 dark:bg-emerald-950/30',
+    optimal: 'bg-emerald-50/60 dark:bg-emerald-950/30',
+    pushy:   'bg-amber-50/60 dark:bg-amber-950/30',
+    high:    'bg-blue-50/60 dark:bg-blue-950/30',
+    flood:   'bg-blue-50/60 dark:bg-blue-950/30',
+  }[label] ?? 'bg-white dark:bg-gray-900'
+}
+
+function bandRange(band: any): string {
+  if (band.min_cfs == null && band.max_cfs == null) return '—'
+  if (band.min_cfs == null) return `< ${band.max_cfs.toLocaleString()} cfs`
+  if (band.max_cfs == null) return `${band.min_cfs.toLocaleString()}+ cfs`
+  return `${band.min_cfs.toLocaleString()}–${band.max_cfs.toLocaleString()} cfs`
 }
 </script>

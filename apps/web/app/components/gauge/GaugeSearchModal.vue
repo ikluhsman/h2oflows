@@ -99,8 +99,9 @@ async function search() {
       watershedName: f.properties.watershed_name ?? null,
       basinName:    f.properties.basin_name ?? null,
       stateAbbr:    f.properties.state_abbr ?? null,
-      currentCfs:   f.properties.current_cfs ?? null,
-      flowStatus:   f.properties.flow_status ?? 'unknown',
+      currentCfs:    f.properties.current_cfs ?? null,
+      flowStatus:    f.properties.flow_status ?? 'unknown',
+      flowBandLabel: f.properties.flow_band_label ?? null,
       lastReadingAt: f.properties.last_reading_at ?? null,
     }))
   } catch {

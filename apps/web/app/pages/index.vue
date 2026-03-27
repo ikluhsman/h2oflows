@@ -59,7 +59,14 @@
           class="mb-6"
         >
           <div class="flex items-center gap-2 mb-3">
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+            <NuxtLink
+              v-if="group.gauges[0]?.reachSlug"
+              :to="`/reaches/${group.gauges[0].reachSlug}`"
+              class="text-sm font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+            >
+              {{ group.reach }}
+            </NuxtLink>
+            <h2 v-else class="text-sm font-semibold text-gray-500 uppercase tracking-wide">
               {{ group.reach ?? 'Other Gauges' }}
             </h2>
             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />

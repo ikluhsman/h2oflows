@@ -71,7 +71,16 @@ func main() {
 			}
 		}
 
-		// 3. Write any domain-expert flow ranges we already know (before AI seeding).
+		// 3. Write any domain-expert rapids we already know (before AI seeding).
+		for _, r := range rd.KnownRapids {
+			if err := writeKnownRapid(ctx, pool, reachID, r); err != nil {
+				fmt.Printf("  ✗ rapid %q: %v\n", r.Name, err)
+			} else {
+				fmt.Printf("  ✓ rapid %q (manual, verified)\n", r.Name)
+			}
+		}
+
+		// 4. Write any domain-expert flow ranges we already know (before AI seeding).
 		for _, fr := range rd.KnownFlowRanges {
 			if err := writeKnownFlowRange(ctx, pool, rd.GaugeExtID, rd.GaugeSource, fr); err != nil {
 				fmt.Printf("  ✗ flow range %s: %v\n", fr.Label, err)
@@ -80,7 +89,7 @@ func main() {
 			}
 		}
 
-		// 4. Run ReachSeeder — skip description/rapids/access if already seeded.
+		// 5. Run ReachSeeder — skip description/rapids/access if already seeded.
 		// Flow ranges are seeded independently (step 8) so they always run.
 		// Override with RESEED=true to force full re-seeding.
 		var existingDesc *string
@@ -209,6 +218,7 @@ type reachDef struct {
 	RelatedGauges    []gaugeAssoc
 	// Notes passed to the AI seeder as extra context (gauge math, local knowledge, etc.)
 	Notes            string
+	KnownRapids      []knownRapid
 	KnownFlowRanges  []knownFlowRange
 }
 
@@ -226,6 +236,20 @@ type knownFlowRange struct {
 	MinCFS  *float64
 	MaxCFS  *float64
 	Notes   string
+}
+
+// knownRapid is a rapid entered from direct domain knowledge (guidebook, personal
+// scouting, community consensus). Written with data_source='manual' and verified=true.
+// An empty RiverMile, ClassRating, etc. means unknown — omit rather than guess.
+type knownRapid struct {
+	Name                 string
+	RiverMile            *float64
+	ClassRating          *float64 // primary class at typical flow
+	ClassAtLow           *float64
+	ClassAtHigh          *float64
+	Description          string   // lines, hazards, scouting notes
+	PortageDescription   string   // empty = no portage route known
+	IsPortageRecommended bool
 }
 
 func ptr(f float64) *float64 { return &f }
@@ -443,6 +467,50 @@ Gauge math: The PLAGRACO gauge at Grant is the best upstream indicator but does 
 		},
 	},
 
+	// ---- Eagle River -----------------------------------------------------------
+	// Dowd Chutes is the gorge section of the Eagle below Minturn — one of the
+	// most-paddled Class IV runs on the Western Slope. Put-in is near the Dowd
+	// Junction rest area off I-70; take-out is at Avon or Edwards.
+	// The gauge at Minturn (09064600) is essentially at the put-in, making it one
+	// of the better-situated gauges on any CO Front Range run.
+	// Gore Creek (09066510) enters below Minturn — its contribution is small but
+	// worth noting at high runoff. I-70 parallels the entire run; egress is easy.
+	{
+		Slug: "eagle-river-dowd-chutes", Name: "Dowd Chutes",
+		Region: "Eagle River, Colorado — Minturn to Edwards",
+		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 9.0,
+		GaugeExtID: "09064600", GaugeSource: "usgs",
+		RelatedGauges: []gaugeAssoc{
+			{ExtID: "09070000", Source: "usgs", Relationship: "downstream_indicator"},
+		},
+	},
+
+	// ---- Colorado River — Utah ------------------------------------------------
+	// Westwater Canyon is the premier permit whitewater run on the upper Colorado
+	// in Utah — 17 miles of Precambrian granite gorge with the river dropping
+	// through a narrow slot. Skull Rapid (Class IV+) is the crux and the most
+	// serious hydraulic on the upper Colorado outside flood stage.
+	// BLM permit required (recreation.gov). Launch ramp at Westwater, UT.
+	// The Cisco gauge (09180500) is just downstream of the take-out and is the
+	// universally accepted flow reference for this run. Optimal range roughly
+	// 3,000–15,000 cfs; becomes serious above 20,000.
+	// 09163500 (Colorado R near CO-UT state line) is a useful upstream indicator —
+	// water takes ~12-24 hours to travel from there to Westwater.
+	{
+		Slug: "westwater-canyon", Name: "Westwater Canyon",
+		Region: "Colorado River, Utah — Westwater to Cisco",
+		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 17.0,
+		GaugeExtID: "09180500", GaugeSource: "usgs",
+		RelatedGauges: []gaugeAssoc{
+			{ExtID: "09163500", Source: "usgs", Relationship: "upstream_indicator"},
+		},
+		Notes: `Permit required from the BLM (Moab Field Office). Launch at the Westwater put-in off Westwater Road, Grand County UT. Take-out at Cisco Landing.
+
+Skull Rapid is the crux — a Class IV+ hydraulic at most flows formed by a huge boulder garden in the Precambrian granite narrows. The river left line is most common; river right is a more technical alternative. High water (>20,000 cfs) flushes the features and turns the gorge into a fast continuous Class IV with few eddies.
+
+Cisco gauge (09180500) is the standard flow reference. Most parties target 4,000–12,000 cfs. The upstream state-line gauge (09163500) lags by 12–24 hours and is useful for predicting whether flow is rising or falling before departure.`,
+	},
+
 	// ---- Waterton Canyon -------------------------------------------------------
 	// Below the N/S fork confluence, the South Platte cuts through Waterton Canyon —
 	// a popular Front Range run with easy trail access and no shuttle needed from the
@@ -457,6 +525,37 @@ Gauge math: The PLAGRACO gauge at Grant is the best upstream indicator but does 
 		GaugeExtID: "PLASPLCO", GaugeSource: "dwr",
 		RelatedGauges: []gaugeAssoc{
 			{ExtID: "PLAWATCO", Source: "dwr", Relationship: "downstream_indicator"},
+		},
+	},
+
+	// ---- Strontia Springs to Chatfield -----------------------------------------
+	// Dam-regulated mellow float. Strontia Springs Dam impounds the South Platte;
+	// a gauge (PLASTRCO) sits just below the dam, then ~some distance downstream
+	// PLAWATCO sits at the Waterton Canyon trailhead parking lot — this is the put-in.
+	// Take-out is at the Chatfield gravel ponds, approximately 2 miles downstream.
+	// Not a whitewater run — suitable for recreational kayaks, canoes, tubes.
+	// Domain-expert data: 150 cfs minimum to float; 200 cfs is enjoyable.
+	{
+		Slug: "south-platte-strontia-chatfield", Name: "Strontia Springs to Chatfield",
+		Region: "South Platte River, Colorado — Waterton Canyon parking lot to Chatfield gravel ponds",
+		ClassMin: 1.0, ClassMax: 2.0, Character: "continuous", LengthMi: 2.0,
+		GaugeExtID: "PLAWATCO", GaugeSource: "dwr",
+		RelatedGauges: []gaugeAssoc{
+			// PLASTRCO sits just below Strontia Springs Dam, upstream of the put-in.
+			// Useful for monitoring dam release before driving out.
+			{ExtID: "PLASTRCO", Source: "dwr", Relationship: "upstream_indicator"},
+		},
+		Notes: `Put-in at the Waterton Canyon trailhead parking lot (PLAWATCO gauge). Take-out at the Chatfield gravel ponds, approximately 2 miles downstream before the inlet to Chatfield Reservoir.
+
+Flow is controlled by Strontia Springs Dam (Denver Water) upstream. The gauge just below the dam (PLASTRCO) is a useful upstream indicator — dam release directly determines what arrives at the parking lot put-in. Flows are more predictable year-round than snowmelt runs.
+
+Not a whitewater run — mellow and continuous, suitable for recreational kayaks, canoes, inflatables, and tubes. Limited public beta; most documentation focuses on Waterton Canyon above the dam rather than this lower stretch.
+
+Minimum floatable flow is approximately 150 cfs. Below that, expect dragging and rocky shallows. At 200 cfs and above the run has enough current to be genuinely enjoyable.`,
+		KnownFlowRanges: []knownFlowRange{
+			{Label: "too_low", MinCFS: nil,       MaxCFS: ptr(150), Notes: "Too shallow to float without dragging."},
+			{Label: "minimum", MinCFS: ptr(150),  MaxCFS: ptr(200), Notes: "Marginal but floatable; expect some scraping in shallows."},
+			{Label: "fun",     MinCFS: ptr(200),  MaxCFS: nil,      Notes: "Good current; enjoyable recreational float."},
 		},
 	},
 }

@@ -86,6 +86,12 @@ const statusColor = computed(() => {
 })
 
 const statusLabel = computed(() => {
+  if (props.gauge.flowBandLabel) {
+    return props.gauge.flowBandLabel
+      .split('_')
+      .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+  }
   switch (props.gauge.flowStatus) {
     case 'runnable': return 'Runnable'
     case 'caution':  return 'Caution'

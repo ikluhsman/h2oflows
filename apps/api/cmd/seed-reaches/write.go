@@ -101,6 +101,30 @@ func linkRelatedGauge(ctx context.Context, pool *pgxpool.Pool, reachID string, g
 	return nil
 }
 
+// writeKnownRapid inserts a domain-expert rapid with data_source='manual' and verified=true.
+// ON CONFLICT DO NOTHING — never overwrites an existing row for the same reach+name.
+func writeKnownRapid(ctx context.Context, pool *pgxpool.Pool, reachID string, r knownRapid) error {
+	_, err := pool.Exec(ctx, `
+		INSERT INTO rapids
+			(reach_id, name, river_mile, class_rating, class_at_low, class_at_high,
+			 description, portage_description, is_portage_recommended,
+			 data_source, verified)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'manual',TRUE)
+		ON CONFLICT (reach_id, name) DO NOTHING
+	`,
+		reachID,
+		r.Name,
+		r.RiverMile,
+		r.ClassRating,
+		r.ClassAtLow,
+		r.ClassAtHigh,
+		nullStr(r.Description),
+		nullStr(r.PortageDescription),
+		r.IsPortageRecommended,
+	)
+	return err
+}
+
 // writeKnownFlowRange inserts a domain-expert flow range with verified=true.
 // Uses ON CONFLICT DO NOTHING — never overwrites an existing verified row.
 func writeKnownFlowRange(ctx context.Context, pool *pgxpool.Pool, gaugeExtID, gaugeSource string, fr knownFlowRange) error {

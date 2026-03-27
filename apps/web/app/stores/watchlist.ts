@@ -18,6 +18,8 @@ export interface WatchedGauge {
   // Latest reading — refreshed by the dashboard poller
   currentCfs: number | null
   flowStatus: 'runnable' | 'caution' | 'low' | 'flood' | 'unknown'
+  // Named flow band from flow_ranges (e.g. "optimal", "fun") — null if no ranges seeded
+  flowBandLabel: string | null
   lastReadingAt: string | null
   // Watch state
   watchState: 'saved' | 'active'
@@ -149,6 +151,7 @@ export const useWatchlistStore = defineStore('watchlist', {
       gauge.stateAbbr     = fresh.stateAbbr
       gauge.currentCfs    = fresh.currentCfs
       gauge.flowStatus    = fresh.flowStatus
+      gauge.flowBandLabel = fresh.flowBandLabel
       gauge.lastReadingAt = fresh.lastReadingAt
     },
   },

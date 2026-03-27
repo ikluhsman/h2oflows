@@ -328,6 +328,7 @@ const resizeObserver = new ResizeObserver(() => {
 watch(hours, load)
 watch(readings, async () => { await nextTick(); buildChart() })
 watch(() => props.gaugeId, load)
+watch(() => props.currentCfs, async () => { await nextTick(); buildChart() })
 
 onMounted(() => {
   load()

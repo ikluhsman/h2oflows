@@ -59,8 +59,8 @@
     <!-- 12-hour sparkline -->
     <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" class="mb-2" />
 
-    <!-- Flow status badge — hidden when unknown (no flow ranges defined yet) -->
-    <div v-if="gauge.flowStatus !== 'unknown'" class="flex items-center gap-2">
+    <!-- Flow status badge — shown when status is known or a named band is available -->
+    <div v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" class="flex items-center gap-2">
       <UBadge :color="statusColor" variant="subtle" size="sm">{{ statusLabel }}</UBadge>
       <!-- Flood warning pulse -->
       <span v-if="gauge.flowStatus === 'flood'" class="relative flex h-2 w-2">
@@ -159,6 +159,13 @@ const statusColor = computed(() => {
   }
 })
 const statusLabel = computed(() => {
+  if (props.gauge.flowBandLabel) {
+    // "too_low" → "Too Low", "optimal" → "Optimal", etc.
+    return props.gauge.flowBandLabel
+      .split('_')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+  }
   switch (props.gauge.flowStatus) {
     case 'runnable': return 'Runnable'
     case 'caution':  return 'Minimum'

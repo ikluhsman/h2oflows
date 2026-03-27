@@ -92,13 +92,14 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 			watershedName       *string
 			currentCFS          *float64
 			flowStatus          string
+			flowBandLabel       *string
 			pollTier            string
 		)
 		if err := rows.Scan(
 			&id, &externalID, &source, &name, &status,
 			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlug, &reachRelationship, &lastReadingAt,
 			&lng, &lat, &stateAbbr, &basinName, &watershedName,
-			&currentCFS, &flowStatus, &pollTier,
+			&currentCFS, &flowStatus, &flowBandLabel, &pollTier,
 		); err != nil {
 			continue
 		}
@@ -124,6 +125,7 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 				"watershed_name":     watershedName,
 				"current_cfs":        currentCFS,
 				"flow_status":        flowStatus,
+				"flow_band_label":    flowBandLabel,
 				"poll_tier":          pollTier,
 			},
 		})
@@ -505,6 +507,16 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			g.watershed_name,
 			g.current_cfs,
 			g.flow_status,
+			(
+				SELECT fr.label
+				FROM flow_ranges fr
+				WHERE fr.gauge_id = g.id
+				  AND fr.craft_type = 'general'
+				  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
+				  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
+				ORDER BY fr.min_cfs ASC NULLS FIRST
+				LIMIT 1
+			) AS flow_band_label,
 			CASE
 				WHEN g.featured = TRUE                                          THEN 'trusted'
 				WHEN g.last_requested_at > NOW() - INTERVAL '7 days'           THEN 'demand'
@@ -591,6 +603,16 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			g.watershed_name,
 			g.current_cfs,
 			g.flow_status,
+			(
+				SELECT fr.label
+				FROM flow_ranges fr
+				WHERE fr.gauge_id = g.id
+				  AND fr.craft_type = 'general'
+				  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
+				  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
+				ORDER BY fr.min_cfs ASC NULLS FIRST
+				LIMIT 1
+			) AS flow_band_label,
 			CASE
 				WHEN g.featured = TRUE                                    THEN 'trusted'
 				WHEN g.last_requested_at > NOW() - INTERVAL '7 days'     THEN 'demand'
@@ -628,13 +650,14 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			watershedName     *string
 			currentCFS        *float64
 			flowStatus        string
+			flowBandLabel     *string
 			pollTier          string
 		)
 		if err := rows.Scan(
 			&id, &externalID, &source, &name, &status,
 			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlug, &reachRelationship, &lastReadingAt,
 			&lng, &lat, &stateAbbr, &basinName, &watershedName,
-			&currentCFS, &flowStatus, &pollTier,
+			&currentCFS, &flowStatus, &flowBandLabel, &pollTier,
 		); err != nil {
 			continue
 		}
@@ -659,6 +682,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				"watershed_name":     watershedName,
 				"current_cfs":        currentCFS,
 				"flow_status":        flowStatus,
+				"flow_band_label":    flowBandLabel,
 				"poll_tier":          pollTier,
 			},
 		})

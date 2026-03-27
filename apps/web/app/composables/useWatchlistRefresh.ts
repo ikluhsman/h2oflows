@@ -32,6 +32,7 @@ export function useWatchlistRefresh() {
           stateAbbr:     p.state_abbr ?? null,
           currentCfs:    p.current_cfs ?? null,
           flowStatus:    p.flow_status ?? 'unknown',
+          flowBandLabel: p.flow_band_label ?? null,
           lastReadingAt: p.last_reading_at ?? null,
         } satisfies Omit<WatchedGauge, 'watchState' | 'activeSince'>)
       }
