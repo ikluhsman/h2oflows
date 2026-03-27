@@ -10,10 +10,10 @@
 apps/api/bin/
 apps/discord-bot/bin/
 
-# Built seed tool binaries (run with `go run` instead)
-seed-reaches
-seed-state-reaches
-apps/api/seed-reaches
+# Built seed tool binaries at repo root (run with `go run ./cmd/... instead)
+/seed-reaches
+/seed-state-reaches
+/apps/api/seed-reaches
 
 # Node / Nuxt
 node_modules/
