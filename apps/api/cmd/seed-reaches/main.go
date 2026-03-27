@@ -257,28 +257,186 @@ func ptr(f float64) *float64 { return &f }
 var reaches = []reachDef{
 
 	// ---- Arkansas River -------------------------------------------------------
-	// Dam-regulated below Pueblo Reservoir; above Pueblo the river is snowmelt/runoff.
-	// The Numbers, Browns Canyon, and Royal Gorge are all classic commercial and
-	// private runs — nationally recognized, extensively documented.
+	// Flow is largely release-dependent: Twin Lakes Dam (transmountain diversion
+	// from the upper basin) drives the annual runoff cycle. Most gauges are
+	// seasonal — meaningful roughly April through August when releases are active.
+	// Corridor downstream order: Granite → BV → Nathrop → Parkdale.
+
+	// Pine Creek — the Class V gorge between Granite and Buena Vista.
+	// Gauge at Granite (07087050) is essentially at the put-in.
+	// Take-out is at the bottom of Pine Creek Rapid, which is also the
+	// put-in for The Numbers. Extremely committing — no egress through the gorge.
+	{
+		Slug: "arkansas-pine-creek", Name: "Pine Creek",
+		Region: "Arkansas River, Colorado — Granite to Pine Creek Rapid",
+		ClassMin: 5.0, ClassMax: 5.0, Character: "canyon", LengthMi: 5.0,
+		GaugeExtID: "07087050", GaugeSource: "usgs",
+		Notes: `Put-in at Granite off US-24. The run drops through a narrow granite gorge with no egress. Take-out is river left at the bottom of Pine Creek Rapid — a mandatory scout and the crux of the section.
+
+Flow is release-dependent from Twin Lakes Dam upstream. The Granite gauge (07087050) is at the put-in and is the primary reference. Typical runnable window is May–July depending on snowpack and release schedule.`,
+	},
+
+	// The Numbers — continuous Class IV below Pine Creek Rapid.
+	// Put-in at the bottom of Pine Creek Rapid (same point as Pine Creek take-out).
+	// Take-out at Fisherman's Bridge near Buena Vista.
+	// Nationally recognized, extensively documented. One of the most-paddled
+	// Class IV runs in Colorado. Gauge at Granite (07087050) is the reference.
 	{
 		Slug: "arkansas-the-numbers", Name: "The Numbers",
-		Region: "Arkansas River, Colorado — above Buena Vista",
-		ClassMin: 4.0, ClassMax: 5.0, Character: "continuous", LengthMi: 10.0,
+		Region: "Arkansas River, Colorado — Pine Creek Rapid to Fisherman's Bridge",
+		ClassMin: 4.0, ClassMax: 4.5, Character: "continuous", LengthMi: 8.0,
 		GaugeExtID: "07087050", GaugeSource: "usgs",
+		Notes: `Put-in at the bottom of Pine Creek Rapid (river left), which is also the take-out for Pine Creek Canyon above. Take-out at Fisherman's Bridge near Buena Vista.
+
+The run consists of a long sequence of numbered drops (roughly Numbers 1–8) separated by short pools. The drops are continuous Class IV at most flows with some bumping to IV+ at higher water. The Granite gauge (07087050) is upstream but is the accepted reference — paddlers check it before the drive. Flow is release-dependent from Twin Lakes Dam. Typical season May–July.`,
 	},
+
+	// Fractions — the mellow stretch immediately below The Numbers, before BV.
+	// Put-in at Fisherman's Bridge (Numbers take-out). Take-out approaching BV.
+	// Gauge at Granite (07087050) is still the upstream reference here.
+	{
+		Slug: "arkansas-fractions", Name: "Fractions",
+		Region: "Arkansas River, Colorado — Fisherman's Bridge to Buena Vista",
+		ClassMin: 3.0, ClassMax: 3.5, Character: "continuous", LengthMi: 4.0,
+		GaugeExtID: "07087050", GaugeSource: "usgs",
+		RelatedGauges: []gaugeAssoc{
+			{ExtID: "07087200", Source: "usgs", Relationship: "downstream_indicator"},
+		},
+		Notes: `Put-in at Fisherman's Bridge, the take-out for The Numbers immediately upstream. Take-out approaching Buena Vista. A step down in difficulty from The Numbers — a good option for paddlers not ready for the full Numbers sequence, or as a warm-down after it.
+
+The Granite gauge (07087050) is the upstream reference; the BV gauge (07087200) downstream is a useful indicator. Flow is release-dependent from Twin Lakes Dam.`,
+	},
+
+	// BV Whitewater Park — engineered play reach through downtown Buena Vista.
+	// Gauge at Buena Vista (07087200) is the reference.
+	{
+		Slug: "arkansas-bv-whitewater-park", Name: "Buena Vista Whitewater Park",
+		Region: "Arkansas River, Colorado — through downtown Buena Vista",
+		ClassMin: 2.0, ClassMax: 3.0, Character: "continuous", LengthMi: 1.5,
+		GaugeExtID: "07087200", GaugeSource: "usgs",
+		Notes: `Engineered whitewater park in the heart of Buena Vista. Accessible from downtown, used heavily by local paddlers and as a warm-up or warm-down for runs upstream and downstream.
+
+The BV gauge (07087200) is the reference. Flow is release-dependent from Twin Lakes Dam.`,
+	},
+
+	// Milk Run — beginner-friendly float below BV toward Browns Canyon.
+	// Put-in below BV; take-out at Ruby Mountain (Browns Canyon put-in).
+	// Gauge at BV (07087200) is the reference.
+	{
+		Slug: "arkansas-milk-run", Name: "Milk Run",
+		Region: "Arkansas River, Colorado — Buena Vista to Ruby Mountain",
+		ClassMin: 2.0, ClassMax: 2.5, Character: "continuous", LengthMi: 5.0,
+		GaugeExtID: "07087200", GaugeSource: "usgs",
+		RelatedGauges: []gaugeAssoc{
+			{ExtID: "07091200", Source: "usgs", Relationship: "downstream_indicator"},
+		},
+		Notes: `Put-in below Buena Vista. Take-out at Ruby Mountain, which is also the upper put-in for Browns Canyon immediately downstream. A mellow, beginner-friendly run through an open valley — popular with families, newer paddlers, and as a warm-up for Browns Canyon.
+
+The BV gauge (07087200) is the primary reference. The Nathrop gauge (07091200) downstream is a useful indicator for conditions approaching Browns Canyon.`,
+	},
+
+	// Browns Canyon — classic pool-drop Class III-IV through Browns Canyon NM.
+	// Put-in: Ruby Mountain / Fisherman's Bridge (near BV).
+	// Take-out: Hecla Junction (common confusion — Hecla is the take-out, not put-in).
+	// Gauge at Nathrop (07091200) is near the upper end of the run and is the
+	// accepted reference. Most commercially rafted reach on the Arkansas.
 	{
 		Slug: "arkansas-browns-canyon", Name: "Browns Canyon",
-		Region: "Arkansas River, Colorado — Buena Vista to Salida",
+		Region: "Arkansas River, Colorado — Fisherman's Bridge to Hecla Junction",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "pool-drop", LengthMi: 9.0,
 		GaugeExtID: "07091200", GaugeSource: "usgs",
-		// Put-in: Ruby Mountain / Fisherman's Bridge; Take-out: Hecla Junction.
-		// (Hecla is the take-out, not the put-in — common point of confusion.)
+		RelatedGauges: []gaugeAssoc{
+			{ExtID: "07087200", Source: "usgs", Relationship: "upstream_indicator"},
+		},
+		Notes: `Put-in at Ruby Mountain or Fisherman's Bridge, both near Buena Vista. Take-out at Hecla Junction — Hecla is the take-out, not the put-in (common confusion for first-timers setting shuttle).
+
+The Nathrop gauge (07091200) sits near the upper end of the run and is the primary reference for Browns Canyon. The BV gauge (07087200) is a useful upstream indicator — water takes roughly 1–2 hours to travel from BV to the canyon. Flow is release-dependent from Twin Lakes Dam. Most commercially rafted reach on the Arkansas; season typically May–August.`,
 	},
+
+	// Salida Whitewater Park — engineered park through downtown Salida.
+	// Gauge at Salida (07091500) is the reference.
+	{
+		Slug: "arkansas-salida-whitewater-park", Name: "Salida Whitewater Park",
+		Region: "Arkansas River, Colorado — through downtown Salida",
+		ClassMin: 2.0, ClassMax: 3.0, Character: "continuous", LengthMi: 1.5,
+		GaugeExtID: "07091500", GaugeSource: "usgs",
+		Notes: `Engineered whitewater park through downtown Salida. Similar character to the BV Whitewater Park upstream — accessible, beginner-friendly features. Good warm-up or warm-down for runs on either side.
+
+The Salida gauge (07091500) is the reference. Flow is release-dependent from Twin Lakes Dam.`,
+	},
+
+	// Salida to Rincon — the section below Salida running downstream toward Rincon.
+	// Exact put-in/take-out boundaries need local verification.
+	{
+		Slug: "arkansas-salida-to-rincon", Name: "Salida to Rincon",
+		Region: "Arkansas River, Colorado — Salida to Rincon",
+		ClassMin: 3.0, ClassMax: 3.5, Character: "continuous", LengthMi: 8.0,
+		GaugeExtID: "07091500", GaugeSource: "usgs",
+		RelatedGauges: []gaugeAssoc{
+			{ExtID: "07093700", Source: "usgs", Relationship: "downstream_indicator"},
+		},
+		Notes: `Put-in below Salida Whitewater Park. Take-out at Rincon. Exact put-in and take-out access points need local verification.
+
+The Salida gauge (07091500) is the primary reference. The Wellsville gauge (07093700) downstream is a useful indicator. Flow is release-dependent; season typically May–August.`,
+	},
+
+	// Rincon to Cotopaxi — continuing downstream through the open canyon.
+	// Exact boundaries need local verification.
+	{
+		Slug: "arkansas-rincon-to-cotopaxi", Name: "Rincon to Cotopaxi",
+		Region: "Arkansas River, Colorado — Rincon to Cotopaxi",
+		ClassMin: 3.0, ClassMax: 3.5, Character: "canyon", LengthMi: 10.0,
+		GaugeExtID: "07093700", GaugeSource: "usgs",
+		Notes: `Put-in at Rincon take-out. Take-out near Cotopaxi. Exact access points need local verification.
+
+The Wellsville gauge (07093700) is the primary reference for this section. Flow is release-dependent; season typically May–August.`,
+	},
+
+	// Texas Creek — the section around the Texas Creek confluence with the Arkansas.
+	// Exact boundaries and difficulty need local verification.
+	{
+		Slug: "arkansas-texas-creek", Name: "Texas Creek",
+		Region: "Arkansas River, Colorado — Cotopaxi to Texas Creek",
+		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 8.0,
+		GaugeExtID: "07093700", GaugeSource: "usgs",
+		RelatedGauges: []gaugeAssoc{
+			{ExtID: "07094500", Source: "usgs", Relationship: "downstream_indicator"},
+		},
+		Notes: `Put-in near Cotopaxi. Take-out near Texas Creek confluence with the Arkansas. Exact access points and difficulty ratings need local verification.
+
+The Wellsville gauge (07093700) is the primary reference. The Parkdale gauge (07094500) downstream is a useful indicator as the river approaches the Royal Gorge corridor. Flow is release-dependent; season typically May–August.`,
+	},
+
+	// Parkdale — the open canyon section upstream of the Royal Gorge narrows.
+	// Put-in near Wellsville/Coaldale area; take-out at Parkdale.
+	// Wellsville gauge (07093700) is near the upper end; Parkdale (07094500) at take-out.
+	{
+		Slug: "arkansas-parkdale", Name: "Parkdale",
+		Region: "Arkansas River, Colorado — Wellsville to Parkdale",
+		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 12.0,
+		GaugeExtID: "07093700", GaugeSource: "usgs",
+		RelatedGauges: []gaugeAssoc{
+			{ExtID: "07094500", Source: "usgs", Relationship: "downstream_indicator"},
+		},
+		Notes: `Put-in near the Wellsville/Coaldale area. Take-out at Parkdale, which is also the put-in for Royal Gorge immediately downstream. This section runs through Bighorn Sheep Canyon — open walls, good scenery, and a step up in difficulty approaching the gorge.
+
+The Wellsville gauge (07093700) is near the upper put-in and is the primary reference. The Parkdale gauge (07094500) at the take-out is a useful downstream indicator and is the accepted reference for Royal Gorge. Flow is release-dependent; season typically May–August.`,
+	},
+
+	// Royal Gorge — the dramatic canyon downstream of Cañon City.
+	// Gauge at Parkdale (07094500) is just above the gorge entrance and is the
+	// accepted reference. The canyon walls rise 1,000+ feet above the river.
 	{
 		Slug: "arkansas-royal-gorge", Name: "Royal Gorge",
-		Region: "Arkansas River, Colorado — below Cañon City",
-		ClassMin: 4.0, ClassMax: 5.0, Character: "continuous", LengthMi: 10.0,
+		Region: "Arkansas River, Colorado — Parkdale to Cañon City",
+		ClassMin: 4.0, ClassMax: 5.0, Character: "canyon", LengthMi: 10.0,
 		GaugeExtID: "07094500", GaugeSource: "usgs",
+		RelatedGauges: []gaugeAssoc{
+			{ExtID: "07093700", Source: "usgs", Relationship: "upstream_indicator"},
+		},
+		Notes: `Put-in at Parkdale, just above the gorge entrance. Take-out near Cañon City. The canyon walls rise over 1,000 feet — the gorge is dramatic and committing. Limited egress through the narrows.
+
+The Parkdale gauge (07094500) is at the put-in and is the primary flow reference. The Wellsville gauge (07093700) upstream is a useful early indicator. Flow at Royal Gorge is influenced by both Twin Lakes releases and dam operations at Pueblo Reservoir downstream. Season typically May–August.`,
 	},
 
 	// ---- Colorado River -------------------------------------------------------
