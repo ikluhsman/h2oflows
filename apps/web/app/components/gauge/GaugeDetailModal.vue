@@ -35,18 +35,21 @@
           Last reading {{ lastReadingRelative }}
         </p>
 
-        <!-- Reach link -->
-        <div v-if="gauge.reachName" class="border-t border-gray-100 dark:border-gray-800 pt-3">
+        <!-- Reach links — one per reach that uses this gauge -->
+        <div v-if="reachLinks.length > 0" class="border-t border-gray-100 dark:border-gray-800 pt-3 space-y-1.5">
+          <p class="text-xs text-gray-400 mb-2">{{ reachLinks.length === 1 ? 'Reach' : 'Reaches on this gauge' }}</p>
           <NuxtLink
-            :to="`/reaches/${gauge.reachSlug}`"
-            class="text-sm font-medium text-blue-500 hover:text-blue-400 flex items-center gap-1"
+            v-for="r in reachLinks"
+            :key="r.slug"
+            :to="`/reaches/${r.slug}`"
+            class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            @click="open = false"
           >
-            {{ gauge.reachName }}
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+            <span class="text-sm font-medium">{{ r.name }}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18l6-6-6-6"/>
             </svg>
           </NuxtLink>
-          <p class="text-xs text-gray-400 mt-0.5">View reach details, rapids, and access</p>
         </div>
       </div>
     </template>
@@ -63,6 +66,20 @@ const props = defineProps<{ gauge: WatchedGauge }>()
 const displayName = computed(() =>
   props.gauge.reachName ?? props.gauge.name ?? props.gauge.externalId
 )
+
+// Zip reachNames + reachSlugs into link objects. Falls back to the single
+// reachName/reachSlug fields for gauges loaded from an older persisted state.
+const reachLinks = computed(() => {
+  const names = props.gauge.reachNames ?? []
+  const slugs = props.gauge.reachSlugs ?? []
+  if (names.length > 0 && slugs.length > 0) {
+    return slugs.map((slug: string, i: number) => ({ slug, name: names[i] ?? slug }))
+  }
+  if (props.gauge.reachSlug && props.gauge.reachName) {
+    return [{ slug: props.gauge.reachSlug, name: props.gauge.reachName }]
+  }
+  return []
+})
 
 const sourceUrl = computed(() => {
   switch (props.gauge.source) {

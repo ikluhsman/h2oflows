@@ -82,7 +82,7 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 			prominenceScore     float64
 			reachID             *string
 			reachNamesRaw       []string
-			reachSlug           *string
+			reachSlugsRaw       []string
 			reachRelationship   *string
 			lastReadingAt       *time.Time
 			lng                 float64
@@ -97,7 +97,7 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 		)
 		if err := rows.Scan(
 			&id, &externalID, &source, &name, &status,
-			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlug, &reachRelationship, &lastReadingAt,
+			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlugsRaw, &reachRelationship, &lastReadingAt,
 			&lng, &lat, &stateAbbr, &basinName, &watershedName,
 			&currentCFS, &flowStatus, &flowBandLabel, &pollTier,
 		); err != nil {
@@ -117,7 +117,9 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 				"prominence_score":   prominenceScore,
 				"reach_id":           reachID,
 				"reach_name":         combineReachNames(reachNamesRaw),
-				"reach_slug":         reachSlug,
+				"reach_names":        reachNamesRaw,
+				"reach_slug":         firstOrNil(reachSlugsRaw),
+				"reach_slugs":        reachSlugsRaw,
 				"reach_relationship": reachRelationship,
 				"last_reading_at":    lastReadingAt,
 				"state_abbr":         stateAbbr,
@@ -492,12 +494,15 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			g.prominence_score,
 			g.reach_id,
 			ARRAY(
-				SELECT ra.name FROM gauge_reach_associations gra
-				JOIN reaches ra ON ra.id = gra.reach_id
-				WHERE gra.gauge_id = g.id AND gra.relationship = 'primary'
+				SELECT ra.name FROM reaches ra
+				WHERE ra.primary_gauge_id = g.id
 				ORDER BY ra.name LIMIT 4
 			)                  AS reach_names,
-			r.slug             AS reach_slug,
+			ARRAY(
+				SELECT ra.slug FROM reaches ra
+				WHERE ra.primary_gauge_id = g.id
+				ORDER BY ra.name LIMIT 4
+			)                  AS reach_slugs,
 			%s                 AS reach_relationship,
 			g.last_reading_at,
 			COALESCE(ST_X(g.location::geometry), 0) AS lng,
@@ -523,7 +528,6 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 				ELSE                                                                 'cold'
 			END AS poll_tier
 		FROM gauges g
-		LEFT JOIN reaches r ON r.id = g.reach_id
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d
@@ -536,6 +540,13 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 
 // combineReachNames joins primary-associated reach names into a single display
 // string (e.g. "Bailey / Foxton"). Capped at 3 names; a 4th triggers " / …".
+func firstOrNil(ss []string) *string {
+	if len(ss) == 0 {
+		return nil
+	}
+	return &ss[0]
+}
+
 func combineReachNames(names []string) *string {
 	if len(names) == 0 {
 		return nil
@@ -588,12 +599,15 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			g.prominence_score,
 			g.reach_id,
 			ARRAY(
-				SELECT ra.name FROM gauge_reach_associations gra
-				JOIN reaches ra ON ra.id = gra.reach_id
-				WHERE gra.gauge_id = g.id AND gra.relationship = 'primary'
+				SELECT ra.name FROM reaches ra
+				WHERE ra.primary_gauge_id = g.id
 				ORDER BY ra.name LIMIT 4
 			)                  AS reach_names,
-			r.slug             AS reach_slug,
+			ARRAY(
+				SELECT ra.slug FROM reaches ra
+				WHERE ra.primary_gauge_id = g.id
+				ORDER BY ra.name LIMIT 4
+			)                  AS reach_slugs,
 			g.reach_relationship,
 			g.last_reading_at,
 			COALESCE(ST_X(g.location::geometry), 0) AS lng,
@@ -619,7 +633,6 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				ELSE                                                           'cold'
 			END AS poll_tier
 		FROM gauges g
-		LEFT JOIN reaches r ON r.id = g.reach_id
 		WHERE g.id = ANY($1)
 	`, ids)
 	if err != nil {
@@ -640,7 +653,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			prominenceScore   float64
 			reachID           *string
 			reachNamesRaw     []string
-			reachSlug         *string
+			reachSlugsRaw     []string
 			reachRelationship *string
 			lastReadingAt     *time.Time
 			lng               float64
@@ -655,7 +668,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 		)
 		if err := rows.Scan(
 			&id, &externalID, &source, &name, &status,
-			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlug, &reachRelationship, &lastReadingAt,
+			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlugsRaw, &reachRelationship, &lastReadingAt,
 			&lng, &lat, &stateAbbr, &basinName, &watershedName,
 			&currentCFS, &flowStatus, &flowBandLabel, &pollTier,
 		); err != nil {
@@ -674,7 +687,9 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				"prominence_score":   prominenceScore,
 				"reach_id":           reachID,
 				"reach_name":         combineReachNames(reachNamesRaw),
-				"reach_slug":         reachSlug,
+				"reach_names":        reachNamesRaw,
+				"reach_slug":         firstOrNil(reachSlugsRaw),
+				"reach_slugs":        reachSlugsRaw,
 				"reach_relationship": reachRelationship,
 				"last_reading_at":    lastReadingAt,
 				"state_abbr":         stateAbbr,

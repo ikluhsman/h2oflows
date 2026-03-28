@@ -29,10 +29,13 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"encoding/xml"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
@@ -72,83 +75,175 @@ func main() {
 
 	var centerlineReaches []string
 
-	for _, folder := range doc.Folders {
-		reachID, reachSlug, reachName, err := imp.matchReach(ctx, folder.Name)
-		if err != nil {
-			fmt.Printf("\n⚠  folder %q — no matching reach in DB, skipping\n", folder.Name)
-			continue
+	// Collect all (reach, placemark) pairs regardless of map style.
+	type assignment struct {
+		reachID    string
+		reachSlug  string
+		reachName  string
+		pm         kmlPlacemark
+		folderName string // category-map folder hint ("Rapids", "Access Points", …)
+	}
+	var pins []assignment
+
+	if isCategoryMap(doc.Folders) {
+		fmt.Println("(category-organized map — inferring reach from pin names + geography)")
+
+		// Flatten all placemarks first, carrying the folder name for type hints.
+		type pendingPin struct {
+			pm         kmlPlacemark
+			folderName string // e.g. "Rapids", "Access Points"
+			lon        float64
+			lat        float64
+			matched    bool
 		}
-		fmt.Printf("\n→ %s [%s]\n", reachName, reachSlug)
-
-		var rapids, putIns, takeOuts, parking, shuttle int
-		var hasPutIn, hasTakeOut bool
-
-		for _, pm := range folder.Placemarks {
-			if pm.Point == nil {
-				continue // skip lines/polygons
+		var pending []pendingPin
+		for _, folder := range doc.Folders {
+			for _, pm := range folder.Placemarks {
+				if pm.Point == nil {
+					continue
+				}
+				lon, lat, ok := parseCoords(pm.Point.Coordinates)
+				if !ok {
+					continue
+				}
+				pending = append(pending, pendingPin{pm: pm, folderName: folder.Name, lon: lon, lat: lat})
 			}
-			lon, lat, ok := parseCoords(pm.Point.Coordinates)
-			if !ok {
-				fmt.Printf("  ⚠  %q — could not parse coordinates, skipping\n", pm.Name)
+		}
+
+		// Pass 1: name-based matching — builds geographic anchors.
+		type geoAnchor struct {
+			id, slug, name string
+			lon, lat       float64
+		}
+		var anchors []geoAnchor
+		for i := range pending {
+			pp := &pending[i]
+			rid, rslug, rname, err := imp.inferReachFromText(ctx, pp.pm.Name+" "+pp.pm.Description)
+			if err != nil {
+				continue // will try pass 2
+			}
+			pp.matched = true
+			pins = append(pins, assignment{rid, rslug, rname, pp.pm, pp.folderName})
+			anchors = append(anchors, geoAnchor{rid, rslug, rname, pp.lon, pp.lat})
+		}
+
+		// Pass 2: assign unmatched pins to nearest geographic anchor.
+		for i := range pending {
+			pp := &pending[i]
+			if pp.matched {
 				continue
 			}
-
-			prefix, pinName := splitPrefix(pm.Name)
-			desc := strings.TrimSpace(pm.Description)
-
-			switch prefix {
-			case "rapid":
-				if err := imp.upsertRapidLocation(ctx, reachID, pinName, lon, lat); err != nil {
-					fmt.Printf("  ✗ rapid %q: %v\n", pinName, err)
-				} else {
-					fmt.Printf("  ✓ rapid: %s\n", pinName)
-					rapids++
+			if len(anchors) == 0 {
+				fmt.Printf("  ⚠  %q — no anchors yet, skipping\n", pp.pm.Name)
+				continue
+			}
+			best := anchors[0]
+			bestDist := (anchors[0].lon-pp.lon)*(anchors[0].lon-pp.lon) +
+				(anchors[0].lat-pp.lat)*(anchors[0].lat-pp.lat)
+			for _, a := range anchors[1:] {
+				d := (a.lon-pp.lon)*(a.lon-pp.lon) + (a.lat-pp.lat)*(a.lat-pp.lat)
+				if d < bestDist {
+					bestDist = d
+					best = a
 				}
-
-			case "put-in":
-				if err := imp.upsertAccess(ctx, reachID, "put_in", pinName, desc, lon, lat); err != nil {
-					fmt.Printf("  ✗ put-in %q: %v\n", pinName, err)
-				} else {
-					fmt.Printf("  ✓ put-in: %s\n", pinName)
-					putIns++
-					hasPutIn = true
-				}
-
-			case "take-out":
-				if err := imp.upsertAccess(ctx, reachID, "take_out", pinName, desc, lon, lat); err != nil {
-					fmt.Printf("  ✗ take-out %q: %v\n", pinName, err)
-				} else {
-					fmt.Printf("  ✓ take-out: %s\n", pinName)
-					takeOuts++
-					hasTakeOut = true
-				}
-
-			case "parking":
-				if err := imp.upsertParking(ctx, reachID, pinName, desc, lon, lat); err != nil {
-					fmt.Printf("  ✗ parking %q: %v\n", pinName, err)
-				} else {
-					fmt.Printf("  ✓ parking: %s\n", pinName)
-					parking++
-				}
-
-			case "shuttle":
-				if err := imp.upsertAccess(ctx, reachID, "shuttle_drop", pinName, desc, lon, lat); err != nil {
-					fmt.Printf("  ✗ shuttle %q: %v\n", pinName, err)
-				} else {
-					fmt.Printf("  ✓ shuttle: %s\n", pinName)
-					shuttle++
-				}
-
-			default:
-				fmt.Printf("  ⚠  %q — unknown prefix %q, skipping\n", pm.Name, prefix)
+			}
+			fmt.Printf("  ~ %q → %s (by proximity)\n", pp.pm.Name, best.name)
+			pins = append(pins, assignment{best.id, best.slug, best.name, pp.pm, pp.folderName})
+		}
+	} else {
+		for _, folder := range doc.Folders {
+			rid, rslug, rname, err := imp.matchReach(ctx, folder.Name)
+			if err != nil {
+				fmt.Printf("\n⚠  folder %q — no matching reach in DB, skipping\n", folder.Name)
+				continue
+			}
+			for _, pm := range folder.Placemarks {
+				pins = append(pins, assignment{rid, rslug, rname, pm, ""})
 			}
 		}
+	}
 
-		fmt.Printf("  rapids=%d put-ins=%d take-outs=%d parking=%d shuttle=%d\n",
-			rapids, putIns, takeOuts, parking, shuttle)
+	// Group pins by reach for reporting.
+	type reachStats struct {
+		name                                    string
+		rapids, putIns, takeOuts, parking, shuttle int
+		hasPutIn, hasTakeOut                    bool
+	}
+	stats := map[string]*reachStats{}
 
-		if hasPutIn && hasTakeOut {
-			centerlineReaches = append(centerlineReaches, reachSlug)
+	for _, a := range pins {
+		pm := a.pm
+		if pm.Point == nil {
+			continue // skip lines/polygons
+		}
+		lon, lat, ok := parseCoords(pm.Point.Coordinates)
+		if !ok {
+			fmt.Printf("  ⚠  %q — could not parse coordinates, skipping\n", pm.Name)
+			continue
+		}
+
+		if _, ok := stats[a.reachSlug]; !ok {
+			stats[a.reachSlug] = &reachStats{name: a.reachName}
+		}
+		st := stats[a.reachSlug]
+
+		prefix, pinName := splitPrefixWithHint(pm.Name, pm.Description, a.folderName)
+		desc := strings.TrimSpace(pm.Description)
+
+		switch prefix {
+		case "rapid":
+			if err := imp.upsertRapidLocation(ctx, a.reachID, pinName, lon, lat); err != nil {
+				fmt.Printf("  ✗ rapid %q: %v\n", pinName, err)
+			} else {
+				fmt.Printf("  ✓ [%s] rapid: %s\n", a.reachName, pinName)
+				st.rapids++
+			}
+
+		case "put-in":
+			if err := imp.upsertAccess(ctx, a.reachID, "put_in", pinName, desc, lon, lat); err != nil {
+				fmt.Printf("  ✗ put-in %q: %v\n", pinName, err)
+			} else {
+				fmt.Printf("  ✓ [%s] put-in: %s\n", a.reachName, pinName)
+				st.putIns++
+				st.hasPutIn = true
+			}
+
+		case "take-out":
+			if err := imp.upsertAccess(ctx, a.reachID, "take_out", pinName, desc, lon, lat); err != nil {
+				fmt.Printf("  ✗ take-out %q: %v\n", pinName, err)
+			} else {
+				fmt.Printf("  ✓ [%s] take-out: %s\n", a.reachName, pinName)
+				st.takeOuts++
+				st.hasTakeOut = true
+			}
+
+		case "parking":
+			if err := imp.upsertParking(ctx, a.reachID, pinName, desc, lon, lat); err != nil {
+				fmt.Printf("  ✗ parking %q: %v\n", pinName, err)
+			} else {
+				fmt.Printf("  ✓ [%s] parking: %s\n", a.reachName, pinName)
+				st.parking++
+			}
+
+		case "shuttle":
+			if err := imp.upsertAccess(ctx, a.reachID, "shuttle_drop", pinName, desc, lon, lat); err != nil {
+				fmt.Printf("  ✗ shuttle %q: %v\n", pinName, err)
+			} else {
+				fmt.Printf("  ✓ [%s] shuttle: %s\n", a.reachName, pinName)
+				st.shuttle++
+			}
+
+		default:
+			fmt.Printf("  ⚠  [%s] %q — unknown type, skipping\n", a.reachName, pm.Name)
+		}
+	}
+
+	fmt.Println()
+	for slug, st := range stats {
+		fmt.Printf("  %s — rapids=%d put-ins=%d take-outs=%d parking=%d shuttle=%d\n",
+			st.name, st.rapids, st.putIns, st.takeOuts, st.parking, st.shuttle)
+		if st.hasPutIn && st.hasTakeOut {
+			centerlineReaches = append(centerlineReaches, slug)
 		}
 	}
 
@@ -166,9 +261,17 @@ func main() {
 
 // ---- Importer ---------------------------------------------------------------
 
+type reachInfo struct {
+	id       string
+	slug     string
+	name     string
+	keywords []string // lowercased words to match in pin names
+}
+
 type importer struct {
-	pool   *pgxpool.Pool
-	dryRun bool
+	pool    *pgxpool.Pool
+	dryRun  bool
+	reaches []reachInfo // cached for category-map mode
 }
 
 // matchReach finds a reach by fuzzy-matching the folder name against
@@ -186,6 +289,86 @@ func (imp *importer) matchReach(ctx context.Context, folderName string) (id, slu
 		LIMIT 1
 	`, folderName).Scan(&id, &slug, &name)
 	return
+}
+
+// genericGeoWords are common geographic/descriptor words that appear in many
+// reach names but should NOT be used alone to identify a specific reach.
+var genericGeoWords = map[string]bool{
+	"river": true, "creek": true, "canyon": true, "falls": true,
+	"lake": true, "park": true, "south": true, "north": true,
+	"upper": true, "lower": true, "east": true, "west": true,
+	"fork": true, "run": true, "gorge": true, "section": true,
+	"whitewater": true, "town": true, "platte": true, "arkansas": true,
+	"rapids": true, "reach": true, "class": true, "buena": true,
+	"vista": true, "brown": true, "royal": true, "chutes": true,
+	"slide": true, "wave": true, "hole": true, "drop": true,
+}
+
+// loadReaches caches all reach names/slugs for category-map matching.
+func (imp *importer) loadReaches(ctx context.Context) ([]reachInfo, error) {
+	rows, err := imp.pool.Query(ctx, `SELECT id, slug, name FROM reaches ORDER BY LENGTH(name) DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []reachInfo
+	for rows.Next() {
+		var r reachInfo
+		if err := rows.Scan(&r.id, &r.slug, &r.name); err != nil {
+			return nil, err
+		}
+		// Build keyword list: full name + distinctive words only.
+		// Skip generic geographic words that would cause false positives
+		// (e.g. "park" matching "Whitewater Park", "creek" matching "Clear Creek Canyon").
+		lower := strings.ToLower(r.name)
+		r.keywords = []string{lower}
+		for _, w := range strings.Fields(lower) {
+			if len(w) >= 4 && !genericGeoWords[w] {
+				r.keywords = append(r.keywords, w)
+			}
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// inferReachFromText scans text for any known reach name keyword and returns
+// the best match. Loads and caches the reach list on first call.
+func (imp *importer) inferReachFromText(ctx context.Context, text string) (id, slug, name string, err error) {
+	if imp.reaches == nil {
+		imp.reaches, err = imp.loadReaches(ctx)
+		if err != nil {
+			return "", "", "", err
+		}
+	}
+	lower := strings.ToLower(text)
+	for _, r := range imp.reaches {
+		for _, kw := range r.keywords {
+			if strings.Contains(lower, kw) {
+				return r.id, r.slug, r.name, nil
+			}
+		}
+	}
+	return "", "", "", fmt.Errorf("no reach match found in %q", text)
+}
+
+// isCategoryMap returns true when all folders are generic type names rather
+// than reach names (e.g. "Access Points", "Rivers", "Rapids").
+func isCategoryMap(folders []kmlFolder) bool {
+	typeNames := map[string]bool{
+		"access points": true, "access": true,
+		"rivers": true, "waterways": true, "river lines": true,
+		"rapids": true, "features": true,
+	}
+	if len(folders) == 0 {
+		return false
+	}
+	for _, f := range folders {
+		if !typeNames[strings.ToLower(f.Name)] {
+			return false
+		}
+	}
+	return true
 }
 
 // upsertRapidLocation sets the location on an existing rapid, or inserts a
@@ -241,31 +424,42 @@ func (imp *importer) upsertParking(ctx context.Context, reachID, name, notes str
 		return nil
 	}
 	// Try to attach to nearest access point within 500m.
+	// PostgreSQL UPDATE doesn't support ORDER BY/LIMIT directly — use a CTE
+	// to identify the single row to update, then join on its primary key.
 	tag, err := imp.pool.Exec(ctx, `
+		WITH nearest AS (
+			SELECT id
+			FROM reach_access
+			WHERE reach_id = $1
+			  AND parking_location IS NULL
+			  AND ST_DWithin(
+			        location,
+			        ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
+			        500
+			      )
+			ORDER BY ST_Distance(location, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography)
+			LIMIT 1
+		)
 		UPDATE reach_access
-		SET parking_location = ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography
-		WHERE reach_id = $1
-		  AND ST_DWithin(
-		        location,
-		        ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
-		        500
-		      )
-		  AND parking_location IS NULL
-		ORDER BY ST_Distance(location, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography)
-		LIMIT 1
-	`, reachID, name, lon, lat)
+		SET parking_location = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
+		WHERE id IN (SELECT id FROM nearest)
+	`, reachID, lon, lat)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		// No nearby access point — insert standalone parking row.
+		// No access point nearby — insert as 'intermediate' access with
+		// parking_location set (schema has no standalone parking type).
 		_, err = imp.pool.Exec(ctx, `
 			INSERT INTO reach_access
 				(reach_id, access_type, name, notes,
-				 parking_location, data_source, verified)
+				 location, parking_location, data_source, verified)
 			VALUES
-				($1, 'put_in', $2, NULLIF($3, ''),
-				 ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography, 'import', true)
+				($1, 'intermediate', $2, NULLIF($3, ''),
+				 ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
+				 ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
+				 'import', true)
 			ON CONFLICT (reach_id, access_type, name) DO UPDATE
 			  SET parking_location = EXCLUDED.parking_location
 		`, reachID, name, notes, lon, lat)
@@ -424,18 +618,39 @@ type kmlPoint struct {
 }
 
 func parseKML(path string) (*kmlDoc, error) {
-	f, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+
+	// KMZ is a ZIP archive — extract doc.kml from inside it.
+	if strings.HasSuffix(strings.ToLower(path), ".kmz") {
+		zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
+		if err != nil {
+			return nil, fmt.Errorf("open kmz: %w", err)
+		}
+		for _, f := range zr.File {
+			if strings.HasSuffix(strings.ToLower(f.Name), ".kml") {
+				rc, err := f.Open()
+				if err != nil {
+					return nil, fmt.Errorf("open %s inside kmz: %w", f.Name, err)
+				}
+				data, err = io.ReadAll(rc)
+				rc.Close()
+				if err != nil {
+					return nil, fmt.Errorf("read %s inside kmz: %w", f.Name, err)
+				}
+				break
+			}
+		}
+	}
 
 	type xmlPoint struct {
 		Coordinates string `xml:"coordinates"`
 	}
 	type xmlPlacemark struct {
-		Name        string   `xml:"name"`
-		Description string   `xml:"description"`
+		Name        string    `xml:"name"`
+		Description string    `xml:"description"`
 		Point       *xmlPoint `xml:"Point"`
 	}
 	type xmlFolder struct {
@@ -451,7 +666,7 @@ func parseKML(path string) (*kmlDoc, error) {
 	}
 
 	var raw xmlKML
-	if err := xml.NewDecoder(f).Decode(&raw); err != nil {
+	if err := xml.NewDecoder(bytes.NewReader(data)).Decode(&raw); err != nil {
 		return nil, err
 	}
 
@@ -473,15 +688,82 @@ func parseKML(path string) (*kmlDoc, error) {
 	return doc, nil
 }
 
+// splitPrefixWithHint wraps splitPrefix, using the KML folder name and pin
+// description as fallback hints when the pin name alone is ambiguous.
+// folderHint is the category folder name (e.g. "Rapids", "Access Points").
+func splitPrefixWithHint(name, description, folderHint string) (prefix, rest string) {
+	prefix, rest = splitPrefix(name)
+	if prefix != "" {
+		return
+	}
+
+	// Check description for type keywords.
+	// Parking is checked before put-in since many access points mention both
+	// ("can park as well") but the primary use determines type.
+	descLower := strings.ToLower(description)
+	switch {
+	case strings.Contains(descLower, "parking") || strings.Contains(descLower, "can park") ||
+		strings.Contains(descLower, "park as well") || strings.Contains(descLower, "park here"):
+		return "parking", name
+	case strings.Contains(descLower, "take-out") || strings.Contains(descLower, "takeout") ||
+		strings.Contains(descLower, "take out"):
+		return "take-out", name
+	case strings.Contains(descLower, "put-in") || strings.Contains(descLower, "put in") ||
+		strings.Contains(descLower, "put_in"):
+		return "put-in", name
+	case strings.Contains(descLower, "class") || strings.Contains(descLower, "line is") ||
+		strings.Contains(descLower, "boof") || strings.Contains(descLower, "ledge"):
+		return "rapid", name
+	}
+
+	// Fall back to folder name hint.
+	switch strings.ToLower(folderHint) {
+	case "rapids":
+		return "rapid", name
+	case "access points", "access":
+		return "put-in", name // treat ambiguous access as put-in
+	}
+
+	return "", name
+}
+
 // splitPrefix splits "Rapid: Zoom Flume" into ("rapid", "Zoom Flume").
-// Returns ("", original) if no recognized prefix is found.
+// Falls back to keyword detection for maps without the colon convention
+// (e.g. "Put-In", "Take-out at Gravel Ponds", "Waterton Canyon Parking").
+// Returns ("", original) if no type can be determined.
 func splitPrefix(name string) (prefix, rest string) {
+	lower := strings.ToLower(name)
+
+	// Explicit colon prefix — highest priority.
 	for _, p := range []string{"Rapid", "Put-in", "Take-out", "Parking", "Shuttle"} {
-		if strings.HasPrefix(strings.ToLower(name), strings.ToLower(p)+":") {
+		if strings.HasPrefix(lower, strings.ToLower(p)+":") {
 			rest = strings.TrimSpace(name[len(p)+1:])
 			return strings.ToLower(p), rest
 		}
 	}
+
+	// Keyword fallback — order matters (check more specific terms first).
+	// Use Contains so "Deckers Put-in", "Standard Foxton Takeout", etc. work.
+	switch {
+	case strings.Contains(lower, "put-in") || strings.Contains(lower, "put in") ||
+		strings.Contains(lower, "putin") || strings.Contains(lower, "put_in"):
+		return "put-in", name
+
+	case strings.Contains(lower, "take-out") || strings.Contains(lower, "takeout") ||
+		strings.Contains(lower, "take out") || strings.Contains(lower, "takout"):
+		return "take-out", name
+
+	case strings.Contains(lower, "parking") || strings.Contains(lower, "trailhead"):
+		return "parking", name
+
+	case strings.Contains(lower, "shuttle"):
+		return "shuttle", name
+
+	case strings.Contains(lower, "rapid") || strings.Contains(lower, "falls") ||
+		strings.Contains(lower, "drop") || strings.Contains(lower, "hole"):
+		return "rapid", name
+	}
+
 	return "", name
 }
 

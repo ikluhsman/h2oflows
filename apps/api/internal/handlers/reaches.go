@@ -217,6 +217,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			r.description_verified,
 			r.aw_reach_id,
 			r.watershed_name,
+			ST_AsGeoJSON(r.centerline::geometry)::json AS centerline,
 			-- Primary gauge fields (all nullable — reach may not have a gauge yet)
 			g.id                AS gauge_id,
 			g.external_id       AS gauge_external_id,
@@ -257,6 +258,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&reach.Description, &reach.DescriptionSource,
 		&reach.DescriptionConfidence, &reach.DescriptionVerified,
 		&reach.AWReachID, &reach.WatershedName,
+		&reach.Centerline,
 		&reach.Gauge.ID, &reach.Gauge.ExternalID, &reach.Gauge.Source,
 		&reach.Gauge.Name, &reach.Gauge.Featured,
 		&reach.Gauge.CurrentCFS, &reach.Gauge.LastReadingAt,
@@ -276,7 +278,9 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		SELECT
 			id, name, river_mile, class_rating, class_at_low, class_at_high,
 			description, portage_description, is_portage_recommended,
-			data_source, ai_confidence, verified
+			data_source, ai_confidence, verified,
+			ST_X(location::geometry) AS lng,
+			ST_Y(location::geometry) AS lat
 		FROM rapids
 		WHERE reach_id = $1
 		ORDER BY river_mile ASC NULLS LAST, name ASC
@@ -293,6 +297,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			&rr.ClassRating, &rr.ClassAtLow, &rr.ClassAtHigh,
 			&rr.Description, &rr.PortageDescription, &rr.IsPortageRecommended,
 			&rr.DataSource, &rr.AIConfidence, &rr.Verified,
+			&rr.Lng, &rr.Lat,
 		); err != nil {
 			continue
 		}
@@ -386,23 +391,24 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 // ---- Response types ---------------------------------------------------------
 
 type reachDetail struct {
-	ID                      string       `json:"id"`
-	Slug                    string       `json:"slug"`
-	Name                    string       `json:"name"`
-	Region                  *string      `json:"region"`
-	ClassMin                *float64     `json:"class_min"`
-	ClassMax                *float64     `json:"class_max"`
-	Character               *string      `json:"character"`
-	LengthMi                *float64     `json:"length_mi"`
-	Description             *string      `json:"description"`
-	DescriptionSource       *string      `json:"description_source"`
-	DescriptionConfidence   *int         `json:"description_ai_confidence"`
-	DescriptionVerified     bool         `json:"description_verified"`
-	AWReachID               *string      `json:"aw_reach_id"`
-	WatershedName           *string      `json:"watershed_name"`
-	Gauge                   gaugeSnippet `json:"gauge"`
-	Rapids                  []rapidRow   `json:"rapids"`
-	Access                  []accessRow  `json:"access"`
+	ID                      string          `json:"id"`
+	Slug                    string          `json:"slug"`
+	Name                    string          `json:"name"`
+	Region                  *string         `json:"region"`
+	ClassMin                *float64        `json:"class_min"`
+	ClassMax                *float64        `json:"class_max"`
+	Character               *string         `json:"character"`
+	LengthMi                *float64        `json:"length_mi"`
+	Description             *string         `json:"description"`
+	DescriptionSource       *string         `json:"description_source"`
+	DescriptionConfidence   *int            `json:"description_ai_confidence"`
+	DescriptionVerified     bool            `json:"description_verified"`
+	AWReachID               *string         `json:"aw_reach_id"`
+	WatershedName           *string         `json:"watershed_name"`
+	Centerline              rawGeometry     `json:"centerline"`
+	Gauge                   gaugeSnippet    `json:"gauge"`
+	Rapids                  []rapidRow      `json:"rapids"`
+	Access                  []accessRow     `json:"access"`
 }
 
 type gaugeSnippet struct {
@@ -429,6 +435,8 @@ type rapidRow struct {
 	DataSource           string   `json:"data_source"`
 	AIConfidence         *int     `json:"ai_confidence"`
 	Verified             bool     `json:"verified"`
+	Lng                  *float64 `json:"lng"`
+	Lat                  *float64 `json:"lat"`
 }
 
 type accessRow struct {

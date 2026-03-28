@@ -7,8 +7,10 @@ export interface WatchedGauge {
   source: string
   name: string | null
   reachId: string | null
-  reachName: string | null
+  reachName: string | null          // combined display string e.g. "Bailey / Foxton"
+  reachNames: string[]              // individual reach names, parallel to reachSlugs
   reachSlug: string | null
+  reachSlugs: string[]              // all reaches that use this gauge as primary
   reachRelationship: string | null  // primary | upstream_indicator | downstream_indicator | tributary
   featured: boolean
   pollTier: 'trusted' | 'demand' | 'cold'
@@ -143,7 +145,9 @@ export const useWatchlistStore = defineStore('watchlist', {
       gauge.featured      = fresh.featured
       gauge.reachId           = fresh.reachId
       gauge.reachName         = fresh.reachName
+      gauge.reachNames        = fresh.reachNames
       gauge.reachSlug         = fresh.reachSlug
+      gauge.reachSlugs        = fresh.reachSlugs
       gauge.reachRelationship = fresh.reachRelationship
       gauge.pollTier      = fresh.pollTier
       gauge.watershedName = fresh.watershedName

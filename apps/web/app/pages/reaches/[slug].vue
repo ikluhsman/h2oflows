@@ -65,6 +65,16 @@
         <GaugeGraph :gauge-id="reach.gauge.id" :current-cfs="reach.gauge.current_cfs" />
       </section>
 
+      <!-- Reach map -->
+      <section v-if="reach.centerline || reach.rapids.some((r: any) => r.lng) || reach.access.some((a: any) => a.water_lng)">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Map</h2>
+        <MapReachMap
+          :centerline="reach.centerline"
+          :rapids="reach.rapids"
+          :access="reach.access"
+        />
+      </section>
+
       <!-- Description -->
       <section v-if="reach.description">
         <div class="flex items-center gap-2 mb-2">
