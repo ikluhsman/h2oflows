@@ -71,6 +71,7 @@ func main() {
 	gauges := handlers.NewGaugeHandler(pool, enricher, p)
 	reaches := handlers.NewReachHandler(pool)
 	trips   := handlers.NewTripHandler(pool)
+	imports := &handlers.Import{Pool: pool}
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/gauges/search", gauges.Search)
 		r.Get("/gauges/batch", gauges.BatchGet)
@@ -85,6 +86,8 @@ func main() {
 		r.Get("/reaches/{slug}/hazards", reaches.GetHazards)
 
 		r.Post("/trips", trips.Create)
+
+		r.Post("/import/kmz", imports.ImportKMZ)
 	})
 
 	srv := &http.Server{

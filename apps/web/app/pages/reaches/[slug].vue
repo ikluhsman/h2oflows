@@ -65,16 +65,6 @@
         <GaugeGraph :gauge-id="reach.gauge.id" :current-cfs="reach.gauge.current_cfs" />
       </section>
 
-      <!-- Reach map -->
-      <section v-if="reach.centerline || reach.rapids.some((r: any) => r.lng) || reach.access.some((a: any) => a.water_lng)">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Map</h2>
-        <MapReachMap
-          :centerline="reach.centerline"
-          :rapids="reach.rapids"
-          :access="reach.access"
-        />
-      </section>
-
       <!-- Description -->
       <section v-if="reach.description">
         <div class="flex items-center gap-2 mb-2">
@@ -90,57 +80,14 @@
         </div>
       </section>
 
-      <!-- Rapids -->
-      <section v-if="reach.rapids.length > 0">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Rapids ({{ reach.rapids.length }})
-        </h2>
-        <div class="space-y-3">
-          <div
-            v-for="rapid in reach.rapids"
-            :key="rapid.id"
-            class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-semibold">{{ rapid.name }}</span>
-                  <span v-if="rapid.class_rating" class="text-xs bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 font-bold">
-                    Class {{ formatClass(rapid.class_rating) }}
-                  </span>
-                  <span
-                    v-if="rapid.is_portage_recommended"
-                    class="text-xs bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 rounded px-1.5 py-0.5 font-medium"
-                  >
-                    Portage recommended
-                  </span>
-                </div>
-                <p v-if="rapid.river_mile != null" class="text-xs text-gray-400 mt-0.5">
-                  Mile {{ rapid.river_mile }}
-                </p>
-              </div>
-              <DataSourceBadge
-                :source="(rapid.data_source as any)"
-                :verified="rapid.verified"
-                :confidence="rapid.ai_confidence ?? undefined"
-              />
-            </div>
-
-            <p v-if="rapid.description" class="text-sm text-gray-600 dark:text-gray-400 mt-2">
-              {{ rapid.description }}
-            </p>
-
-            <!-- Class at different flows -->
-            <div v-if="rapid.class_at_low || rapid.class_at_high" class="mt-2 flex gap-3 text-xs text-gray-400">
-              <span v-if="rapid.class_at_low">Low: Class {{ formatClass(rapid.class_at_low) }}</span>
-              <span v-if="rapid.class_at_high">High: Class {{ formatClass(rapid.class_at_high) }}</span>
-            </div>
-
-            <div v-if="rapid.portage_description" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
-              Portage: {{ rapid.portage_description }}
-            </div>
-          </div>
-        </div>
+      <!-- Reach map -->
+      <section v-if="reach.centerline || reach.rapids.some((r: any) => r.lng) || reach.access.some((a: any) => a.water_lng)">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Map</h2>
+        <MapReachMap
+          :centerline="reach.centerline"
+          :rapids="reach.rapids"
+          :access="reach.access"
+        />
       </section>
 
       <!-- Access points -->
@@ -217,6 +164,58 @@
         </div>
       </section>
 
+      <!-- Rapids -->
+      <section v-if="reach.rapids.length > 0">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Rapids ({{ reach.rapids.length }})
+        </h2>
+        <div class="space-y-3">
+          <div
+            v-for="rapid in reach.rapids"
+            :key="rapid.id"
+            class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-semibold">{{ rapid.name }}</span>
+                  <span v-if="rapid.class_rating" class="text-xs bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 font-bold">
+                    Class {{ formatClass(rapid.class_rating) }}
+                  </span>
+                  <span
+                    v-if="rapid.is_portage_recommended"
+                    class="text-xs bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 rounded px-1.5 py-0.5 font-medium"
+                  >
+                    Portage recommended
+                  </span>
+                </div>
+                <p v-if="rapid.river_mile != null" class="text-xs text-gray-400 mt-0.5">
+                  Mile {{ rapid.river_mile }}
+                </p>
+              </div>
+              <DataSourceBadge
+                :source="(rapid.data_source as any)"
+                :verified="rapid.verified"
+                :confidence="rapid.ai_confidence ?? undefined"
+              />
+            </div>
+
+            <p v-if="rapid.description" class="text-sm text-gray-600 dark:text-gray-400 mt-2">
+              {{ rapid.description }}
+            </p>
+
+            <div v-if="rapid.class_at_low || rapid.class_at_high" class="mt-2 flex gap-3 text-xs text-gray-400">
+              <span v-if="rapid.class_at_low">Low: Class {{ formatClass(rapid.class_at_low) }}</span>
+              <span v-if="rapid.class_at_high">High: Class {{ formatClass(rapid.class_at_high) }}</span>
+            </div>
+
+            <div v-if="rapid.portage_description" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
+              Portage: {{ rapid.portage_description }}
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Flow ranges -->
       <section v-if="(flowRanges?.length ?? 0) > 0">
         <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Flow Bands</h2>
@@ -241,9 +240,58 @@
       </section>
 
       <!-- Gauge attribution -->
-      <section v-if="reach.gauge.external_id" class="text-xs text-gray-400 pb-6">
+      <section v-if="reach.gauge.external_id" class="text-xs text-gray-400">
         Flow data: {{ reach.gauge.source?.toUpperCase() }} gauge {{ reach.gauge.external_id }}
         <span v-if="reach.gauge.name"> · {{ reach.gauge.name }}</span>
+      </section>
+
+      <!-- KMZ Import -->
+      <section class="border-t border-gray-100 dark:border-gray-800 pt-6 pb-8">
+        <button
+          class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex items-center gap-1.5"
+          @click="showImport = !showImport"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+          </svg>
+          Import KMZ / KML
+        </button>
+
+        <div v-if="showImport" class="mt-3 space-y-3">
+          <p class="text-xs text-gray-400">
+            Upload a Google My Maps KMZ export. Folders named <strong>Access Points</strong>, <strong>Rivers</strong>, and <strong>Rapids</strong> are supported. Rapids and access pins are matched to reaches automatically.
+          </p>
+          <div class="flex items-center gap-3 flex-wrap">
+            <input
+              ref="kmzInput"
+              type="file"
+              accept=".kml,.kmz"
+              class="text-xs text-gray-500 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-gray-100 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 dark:hover:file:bg-gray-700 cursor-pointer"
+              @change="onKmzSelect"
+            />
+            <UButton
+              v-if="kmzFile"
+              size="xs"
+              color="primary"
+              :loading="importing"
+              @click="runImport"
+            >
+              Import
+            </UButton>
+          </div>
+
+          <!-- Result -->
+          <div v-if="importResult" class="rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 space-y-2">
+            <p class="text-xs font-semibold text-gray-600 dark:text-gray-300">{{ importResult.map_name }}</p>
+            <div v-for="(r, slug) in importResult.reaches" :key="slug" class="text-xs text-gray-500">
+              <span class="font-medium text-gray-700 dark:text-gray-200">{{ r.name }}</span>
+              — rapids: {{ r.rapids }}, put-ins: {{ r.put_ins }}, take-outs: {{ r.take_outs }}, parking: {{ r.parking }}
+              <span v-if="r.errors?.length" class="text-red-500"> · {{ r.errors.length }} error(s)</span>
+            </div>
+            <p v-if="importError" class="text-xs text-red-500">{{ importError }}</p>
+          </div>
+          <p v-if="importError && !importResult" class="text-xs text-red-500">{{ importError }}</p>
+        </div>
       </section>
 
     </main>
@@ -251,7 +299,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const route  = useRoute()
 const config = useRuntimeConfig()
@@ -422,5 +470,46 @@ function bandRange(band: any): string {
   if (band.min_cfs == null) return `< ${band.max_cfs.toLocaleString()} cfs`
   if (band.max_cfs == null) return `${band.min_cfs.toLocaleString()}+ cfs`
   return `${band.min_cfs.toLocaleString()}–${band.max_cfs.toLocaleString()} cfs`
+}
+
+// ---- KMZ import -------------------------------------------------------------
+
+const showImport  = ref(false)
+const kmzFile     = ref<File | null>(null)
+const kmzInput    = ref<HTMLInputElement>()
+const importing   = ref(false)
+const importResult = ref<any>(null)
+const importError  = ref<string | null>(null)
+
+function onKmzSelect(e: Event) {
+  const input = e.target as HTMLInputElement
+  kmzFile.value = input.files?.[0] ?? null
+  importResult.value = null
+  importError.value = null
+}
+
+async function runImport() {
+  if (!kmzFile.value) return
+  importing.value = true
+  importError.value = null
+  importResult.value = null
+  try {
+    const form = new FormData()
+    form.append('file', kmzFile.value)
+    const res = await fetch(`${config.public.apiBase}/api/v1/import/kmz`, {
+      method: 'POST',
+      body: form,
+    })
+    const json = await res.json()
+    if (!res.ok) {
+      importError.value = json.error ?? `Server error ${res.status}`
+    } else {
+      importResult.value = json
+    }
+  } catch (err: any) {
+    importError.value = err?.message ?? 'Network error'
+  } finally {
+    importing.value = false
+  }
 }
 </script>
