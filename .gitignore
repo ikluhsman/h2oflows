@@ -37,3 +37,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Claude memory — personal/feedback files stay local, project memories are committed
+.claude/memory/user_*.md
+.claude/memory/feedback_*.md
