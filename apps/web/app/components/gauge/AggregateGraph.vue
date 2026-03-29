@@ -85,11 +85,14 @@ async function buildChart() {
 onMounted(buildChart)
 watch(() => props.gauges, buildChart, { deep: true })
 
-const resizeObserver = new ResizeObserver(() => {
-  if (chart && container.value) {
-    chart.setSize({ width: container.value.clientWidth, height: 192 })
-  }
+let resizeObserver: ResizeObserver | null = null
+onMounted(() => {
+  resizeObserver = new ResizeObserver(() => {
+    if (chart && container.value) {
+      chart.setSize({ width: container.value.clientWidth, height: 192 })
+    }
+  })
+  if (container.value) resizeObserver.observe(container.value)
 })
-onMounted(() => container.value && resizeObserver.observe(container.value))
-onUnmounted(() => { resizeObserver.disconnect(); chart?.destroy() })
+onUnmounted(() => { resizeObserver?.disconnect(); chart?.destroy() })
 </script>

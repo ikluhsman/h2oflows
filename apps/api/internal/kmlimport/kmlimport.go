@@ -275,13 +275,18 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		desc := strings.TrimSpace(pm.Description)
 
 		switch prefix {
-		case "rapid":
-			if err := imp.upsertRapidLocation(ctx, a.reachID, pinName, desc, lon, lat); err != nil {
+		case "rapid", "wave":
+			isSurf := prefix == "wave"
+			if err := imp.upsertRapidLocation(ctx, a.reachID, pinName, desc, isSurf, lon, lat); err != nil {
 				st.Errors = append(st.Errors, fmt.Sprintf("rapid %q: %v", pinName, err))
 				res.Log = append(res.Log, fmt.Sprintf("✗ [%s] rapid %q: %v", a.reachName, pinName, err))
 			} else {
 				st.Rapids++
-				res.Log = append(res.Log, fmt.Sprintf("✓ [%s] rapid: %s", a.reachName, pinName))
+				if isSurf {
+					res.Log = append(res.Log, fmt.Sprintf("✓ [%s] wave: %s", a.reachName, pinName))
+				} else {
+					res.Log = append(res.Log, fmt.Sprintf("✓ [%s] rapid: %s", a.reachName, pinName))
+				}
 			}
 		case "put-in":
 			if err := imp.upsertAccess(ctx, a.reachID, "put_in", pinName, desc, lon, lat); err != nil {
@@ -405,7 +410,7 @@ func (imp *Importer) inferReachFromText(ctx context.Context, text string) (id, s
 
 // ── DB upserts ────────────────────────────────────────────────────────────────
 
-func (imp *Importer) upsertRapidLocation(ctx context.Context, reachID, name, desc string, lon, lat float64) error {
+func (imp *Importer) upsertRapidLocation(ctx context.Context, reachID, name, desc string, isSurfWave bool, lon, lat float64) error {
 	if imp.DryRun {
 		return nil
 	}
@@ -414,21 +419,23 @@ func (imp *Importer) upsertRapidLocation(ctx context.Context, reachID, name, des
 		UPDATE rapids
 		SET location     = ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
 		    description  = CASE WHEN $5 <> '' THEN $5 ELSE description END,
-		    class_rating = CASE WHEN $6::numeric IS NOT NULL THEN $6::numeric ELSE class_rating END
+		    class_rating = CASE WHEN $6::numeric IS NOT NULL THEN $6::numeric ELSE class_rating END,
+		    is_surf_wave = is_surf_wave OR $7
 		WHERE reach_id = $1 AND LOWER(name) = LOWER($2)
-	`, reachID, name, lon, lat, desc, classRating)
+	`, reachID, name, lon, lat, desc, classRating, isSurfWave)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		_, err = imp.pool.Exec(ctx, `
-			INSERT INTO rapids (reach_id, name, location, description, class_rating, data_source, verified)
-			VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, NULLIF($5,''), $6::numeric, 'import', true)
+			INSERT INTO rapids (reach_id, name, location, description, class_rating, is_surf_wave, data_source, verified)
+			VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, NULLIF($5,''), $6::numeric, $7, 'import', true)
 			ON CONFLICT (reach_id, name) DO UPDATE
 			  SET location     = EXCLUDED.location,
 			      description  = COALESCE(EXCLUDED.description, rapids.description),
-			      class_rating = COALESCE(EXCLUDED.class_rating, rapids.class_rating)
-		`, reachID, name, lon, lat, desc, classRating)
+			      class_rating = COALESCE(EXCLUDED.class_rating, rapids.class_rating),
+			      is_surf_wave = rapids.is_surf_wave OR EXCLUDED.is_surf_wave
+		`, reachID, name, lon, lat, desc, classRating, isSurfWave)
 	}
 	return err
 }
@@ -532,12 +539,15 @@ func SplitPrefixWithHint(name, description, folderHint string) (prefix, rest str
 	case strings.Contains(descLower, "put-in") || strings.Contains(descLower, "put in") ||
 		strings.Contains(descLower, "put_in"):
 		return "put-in", name
+	case strings.Contains(descLower, "surf wave") || strings.Contains(descLower, "surf spot") ||
+		strings.Contains(descLower, "surfable") || strings.Contains(descLower, "play wave"):
+		return "wave", name
 	case strings.Contains(descLower, "class") || strings.Contains(descLower, "line is") ||
 		strings.Contains(descLower, "boof") || strings.Contains(descLower, "ledge"):
 		return "rapid", name
 	}
 	switch strings.ToLower(folderHint) {
-	case "rapids":
+	case "rapids", "waves", "surf waves":
 		return "rapid", name
 	case "access points", "access":
 		return "put-in", name
@@ -548,9 +558,13 @@ func SplitPrefixWithHint(name, description, folderHint string) (prefix, rest str
 // SplitPrefix splits "Rapid: Zoom Flume" → ("rapid", "Zoom Flume").
 func SplitPrefix(name string) (prefix, rest string) {
 	lower := strings.ToLower(name)
-	for _, p := range []string{"Rapid", "Put-in", "Take-out", "Parking", "Shuttle"} {
+	for _, p := range []string{"Rapid", "Wave", "Surf", "Put-in", "Take-out", "Parking", "Shuttle"} {
 		if strings.HasPrefix(lower, strings.ToLower(p)+":") {
-			return strings.ToLower(p), strings.TrimSpace(name[len(p)+1:])
+			prefix := strings.ToLower(p)
+			if prefix == "surf" {
+				prefix = "wave"
+			}
+			return prefix, strings.TrimSpace(name[len(p)+1:])
 		}
 	}
 	switch {

@@ -511,23 +511,31 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			g.basin_name,
 			g.watershed_name,
 			g.current_cfs,
-			g.flow_status,
-			(
-				SELECT fr.label
-				FROM flow_ranges fr
-				WHERE fr.gauge_id = g.id
-				  AND fr.craft_type = 'general'
-				  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
-				  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
-				ORDER BY fr.min_cfs ASC NULLS FIRST
-				LIMIT 1
-			) AS flow_band_label,
+			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
+			fr_band.label                            AS flow_band_label,
 			CASE
 				WHEN g.featured = TRUE                                          THEN 'trusted'
 				WHEN g.last_requested_at > NOW() - INTERVAL '7 days'           THEN 'demand'
 				ELSE                                                                 'cold'
 			END AS poll_tier
 		FROM gauges g
+		LEFT JOIN LATERAL (
+			SELECT fr.label,
+			       CASE
+			           WHEN fr.label IN ('fun', 'optimal')   THEN 'runnable'
+			           WHEN fr.label IN ('minimum', 'pushy') THEN 'caution'
+			           WHEN fr.label = 'too_low'             THEN 'low'
+			           WHEN fr.label IN ('high', 'flood')    THEN 'flood'
+			           ELSE 'unknown'
+			       END AS flow_status
+			FROM flow_ranges fr
+			WHERE fr.gauge_id = g.id
+			  AND fr.craft_type = 'general'
+			  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
+			  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
+			ORDER BY fr.min_cfs ASC NULLS FIRST
+			LIMIT 1
+		) fr_band ON TRUE
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d
@@ -616,23 +624,31 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			g.basin_name,
 			g.watershed_name,
 			g.current_cfs,
-			g.flow_status,
-			(
-				SELECT fr.label
-				FROM flow_ranges fr
-				WHERE fr.gauge_id = g.id
-				  AND fr.craft_type = 'general'
-				  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
-				  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
-				ORDER BY fr.min_cfs ASC NULLS FIRST
-				LIMIT 1
-			) AS flow_band_label,
+			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
+			fr_band.label                            AS flow_band_label,
 			CASE
 				WHEN g.featured = TRUE                                    THEN 'trusted'
 				WHEN g.last_requested_at > NOW() - INTERVAL '7 days'     THEN 'demand'
 				ELSE                                                           'cold'
 			END AS poll_tier
 		FROM gauges g
+		LEFT JOIN LATERAL (
+			SELECT fr.label,
+			       CASE
+			           WHEN fr.label IN ('fun', 'optimal')   THEN 'runnable'
+			           WHEN fr.label IN ('minimum', 'pushy') THEN 'caution'
+			           WHEN fr.label = 'too_low'             THEN 'low'
+			           WHEN fr.label IN ('high', 'flood')    THEN 'flood'
+			           ELSE 'unknown'
+			       END AS flow_status
+			FROM flow_ranges fr
+			WHERE fr.gauge_id = g.id
+			  AND fr.craft_type = 'general'
+			  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
+			  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
+			ORDER BY fr.min_cfs ASC NULLS FIRST
+			LIMIT 1
+		) fr_band ON TRUE
 		WHERE g.id = ANY($1)
 	`, ids)
 	if err != nil {

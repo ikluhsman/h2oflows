@@ -3,7 +3,7 @@
 
     <!-- Nav bar -->
     <header class="sticky top-0 z-20 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm">
-      <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+      <div class="max-w-5xl mx-auto px-3 py-3 flex items-center gap-3">
         <NuxtLink to="/" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1">
           <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           Dashboard
@@ -13,15 +13,15 @@
       </div>
     </header>
 
-    <div v-if="pending" class="max-w-3xl mx-auto px-4 py-12 text-center text-gray-400">
+    <div v-if="pending" class="max-w-5xl mx-auto px-3 py-12 text-center text-gray-400">
       Loading…
     </div>
 
-    <div v-else-if="!reach" class="max-w-3xl mx-auto px-4 py-12 text-center text-gray-400">
+    <div v-else-if="!reach" class="max-w-5xl mx-auto px-3 py-12 text-center text-gray-400">
       Reach not found.
     </div>
 
-    <main v-else class="max-w-3xl mx-auto px-4 py-6 space-y-8">
+    <main v-else class="max-w-5xl mx-auto px-3 py-6 space-y-8">
 
       <!-- Hero -->
       <section>
@@ -59,12 +59,6 @@
         <div v-else class="mt-4 text-gray-400 text-sm">No recent gauge reading</div>
       </section>
 
-      <!-- 48h graph + diurnal banner -->
-      <section v-if="reach.gauge.id" class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">48-Hour Flow</h2>
-        <GaugeGraph :gauge-id="reach.gauge.id" :current-cfs="reach.gauge.current_cfs" />
-      </section>
-
       <!-- Description -->
       <section v-if="reach.description">
         <div class="flex items-center gap-2 mb-2">
@@ -80,162 +74,75 @@
         </div>
       </section>
 
+      <!-- 48h graph + diurnal banner -->
+      <section v-if="reach.gauge.id" class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">48-Hour Flow</h2>
+        <GaugeGraph :gauge-id="reach.gauge.id" :current-cfs="reach.gauge.current_cfs" />
+      </section>
+
       <!-- Reach map -->
-      <section v-if="reach.centerline || reach.rapids.some((r: any) => r.lng) || reach.access.some((a: any) => a.water_lng)">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Map</h2>
-        <MapReachMap
-          :centerline="reach.centerline"
-          :rapids="reach.rapids"
-          :access="reach.access"
-        />
-      </section>
-
-      <!-- Access points -->
-      <section v-if="reach.access.length > 0">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Access</h2>
-        <div class="space-y-3">
-          <div
-            v-for="a in reach.access"
-            :key="a.id"
-            class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4"
-          >
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="text-xs font-bold uppercase tracking-wide" :class="accessTypeClass(a.access_type)">
-                    {{ accessTypeLabel(a.access_type) }}
-                  </span>
-                  <span class="font-semibold">{{ a.name ?? '—' }}</span>
-                  <span v-if="a.entry_style" class="text-xs bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 capitalize">
-                    {{ a.entry_style.replace('_', ' ') }}
-                  </span>
-                </div>
-              </div>
-              <DataSourceBadge
-                :source="(a.data_source as any)"
-                :verified="a.verified"
-                :confidence="a.ai_confidence ?? undefined"
+      <section>
+        <div class="flex items-center gap-3 mb-3 flex-wrap">
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Map</h2>
+          <template v-if="!reach.centerline && !liveCenterline">
+            <!-- Coord inputs appear only after the server says no location is available -->
+            <div v-if="needsCoordsInput" class="flex items-center gap-1.5">
+              <input
+                v-model="manualLat"
+                type="text"
+                placeholder="lat (e.g. 39.38)"
+                class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-28 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
+              />
+              <input
+                v-model="manualLng"
+                type="text"
+                placeholder="lng (e.g. -105.35)"
+                class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-32 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
               />
             </div>
-
-            <p v-if="a.directions" class="text-sm text-gray-600 dark:text-gray-400 mt-2">
-              {{ a.directions }}
-            </p>
-
-            <!-- Approach info for trail/technical -->
-            <p v-if="a.approach_notes" class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {{ a.approach_notes }}
-            </p>
-
-            <!-- Metadata row -->
-            <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
-              <span v-if="a.road_type">Road: {{ a.road_type }}</span>
-              <span v-if="a.approach_dist_mi">Walk: {{ a.approach_dist_mi }} mi</span>
-              <span v-if="a.hike_to_water_min">~{{ a.hike_to_water_min }} min to water</span>
-              <span v-if="a.parking_fee != null">Parking: {{ a.parking_fee === 0 ? 'Free' : `$${a.parking_fee}/day` }}</span>
-              <span v-if="a.permit_required" class="text-amber-500">Permit required</span>
-            </div>
-
-            <p v-if="a.permit_info" class="text-xs text-amber-600 dark:text-amber-400 mt-1">
-              {{ a.permit_info }}
-              <a v-if="a.permit_url" :href="a.permit_url" target="_blank" class="underline ml-1">More info</a>
-            </p>
-
-            <p v-if="a.notes" class="text-xs text-gray-400 mt-1 italic">{{ a.notes }}</p>
-
-            <!-- Waypoints for trail/technical access -->
-            <div v-if="a.waypoints.length > 0" class="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3 space-y-1.5">
-              <p class="text-xs font-medium text-gray-500">Approach route:</p>
-              <div
-                v-for="wp in a.waypoints"
-                :key="wp.sequence"
-                class="flex gap-2 text-xs"
-              >
-                <span class="flex-shrink-0 w-5 h-5 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center font-bold text-gray-500">
-                  {{ wp.sequence }}
-                </span>
-                <div>
-                  <span class="font-medium">{{ wp.label }}</span>
-                  <span v-if="wp.description" class="text-gray-400"> — {{ wp.description }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+            <button
+              class="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1 disabled:opacity-50"
+              :disabled="fetchingCenterline || (needsCoordsInput && (!manualLat || !manualLng))"
+              @click="fetchCenterline"
+            >
+              <span v-if="fetchingCenterline">Fetching…</span>
+              <span v-else>+ Fetch river line from OSM</span>
+            </button>
+          </template>
+          <span v-if="centerlineError" class="text-xs text-red-500">{{ centerlineError }}</span>
         </div>
+        <ClientOnly>
+          <ReachMap
+            :name="reach.name"
+            :class-max="reach.class_max"
+            :centerline="liveCenterline ?? reach.centerline"
+            :rapids="reach.rapids"
+            :access="reach.access"
+            :gauge-lng="reach.gauge.lng"
+            :gauge-lat="reach.gauge.lat"
+          />
+        </ClientOnly>
       </section>
 
-      <!-- Rapids -->
-      <section v-if="reach.rapids.length > 0">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-          Rapids ({{ reach.rapids.length }})
-        </h2>
-        <div class="space-y-3">
-          <div
-            v-for="rapid in reach.rapids"
-            :key="rapid.id"
-            class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4"
+      <!-- Related reaches -->
+      <section v-if="reach.related?.length > 0">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Related Reaches</h2>
+        <div class="flex flex-wrap gap-2">
+          <NuxtLink
+            v-for="rel in reach.related"
+            :key="rel.slug"
+            :to="`/reaches/${rel.slug}`"
+            class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 px-3 py-2 transition-colors"
           >
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-semibold">{{ rapid.name }}</span>
-                  <span v-if="rapid.class_rating" class="text-xs bg-gray-100 dark:bg-gray-800 rounded px-1.5 py-0.5 font-bold">
-                    Class {{ formatClass(rapid.class_rating) }}
-                  </span>
-                  <span
-                    v-if="rapid.is_portage_recommended"
-                    class="text-xs bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 rounded px-1.5 py-0.5 font-medium"
-                  >
-                    Portage recommended
-                  </span>
-                </div>
-                <p v-if="rapid.river_mile != null" class="text-xs text-gray-400 mt-0.5">
-                  Mile {{ rapid.river_mile }}
-                </p>
-              </div>
-              <DataSourceBadge
-                :source="(rapid.data_source as any)"
-                :verified="rapid.verified"
-                :confidence="rapid.ai_confidence ?? undefined"
-              />
-            </div>
-
-            <p v-if="rapid.description" class="text-sm text-gray-600 dark:text-gray-400 mt-2">
-              {{ rapid.description }}
-            </p>
-
-            <div v-if="rapid.class_at_low || rapid.class_at_high" class="mt-2 flex gap-3 text-xs text-gray-400">
-              <span v-if="rapid.class_at_low">Low: Class {{ formatClass(rapid.class_at_low) }}</span>
-              <span v-if="rapid.class_at_high">High: Class {{ formatClass(rapid.class_at_high) }}</span>
-            </div>
-
-            <div v-if="rapid.portage_description" class="mt-2 text-xs text-amber-600 dark:text-amber-400">
-              Portage: {{ rapid.portage_description }}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Flow ranges -->
-      <section v-if="(flowRanges?.length ?? 0) > 0">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Flow Bands</h2>
-        <div class="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div
-            v-for="band in (flowRanges ?? [])"
-            :key="band.label"
-            class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 dark:border-gray-800 last:border-0 transition-colors"
-            :class="band.label === activeBand ? activeBandClass(band.label) : 'bg-white dark:bg-gray-900'"
-          >
-            <div class="flex items-center gap-2">
-              <span
-                class="text-xs font-bold uppercase tracking-wide"
-                :class="bandLabelClass(band.label)"
-              >{{ bandDisplayLabel(band.label) }}</span>
-              <span v-if="band.label === activeBand" class="text-xs text-gray-400">← now</span>
-              <span v-if="!band.verified" class="text-xs text-gray-400 italic">est.</span>
-            </div>
-            <span class="text-sm tabular-nums text-gray-500">{{ bandRange(band) }}</span>
-          </div>
+            <span class="text-xs text-gray-400">
+              <template v-if="rel.relationship === 'upstream'">↑</template>
+              <template v-else-if="rel.relationship === 'downstream'">↓</template>
+              <template v-else-if="rel.relationship === 'tributary'">⤷</template>
+              <template v-else>↔</template>
+            </span>
+            <span class="text-sm font-medium">{{ rel.name }}</span>
+            <span class="text-xs text-gray-400 capitalize">{{ rel.relationship }}</span>
+          </NuxtLink>
         </div>
       </section>
 
@@ -334,8 +241,6 @@ function romanClass(n: number): string {
   return map[n] ?? String(n)
 }
 
-function formatClass(n: number): string { return romanClass(n) }
-
 const classLabel = computed(() => {
   const r = reach.value
   if (!r?.class_min && !r?.class_max) return 'Unknown class'
@@ -421,55 +326,47 @@ const lastReadingRelative = computed(() => {
   return `${Math.floor(m / 60)}h ${m % 60}m ago`
 })
 
-function accessTypeLabel(t: string): string {
-  return { put_in: 'Put-in', take_out: 'Take-out', intermediate: 'Intermediate', shuttle_drop: 'Shuttle', camp: 'Camp' }[t] ?? t
-}
-
-function accessTypeClass(t: string): string {
-  return {
-    put_in:       'text-emerald-600 dark:text-emerald-400',
-    take_out:     'text-blue-500 dark:text-blue-400',
-    intermediate: 'text-gray-500',
-    shuttle_drop: 'text-purple-500 dark:text-purple-400',
-    camp:         'text-amber-500 dark:text-amber-400',
-  }[t] ?? 'text-gray-500'
-}
-
 // ---- Flow band helpers -------------------------------------------------------
 
 function bandDisplayLabel(label: string): string {
   return label.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
-function bandLabelClass(label: string): string {
-  return {
-    too_low: 'text-gray-400',
-    minimum: 'text-gray-600 dark:text-gray-300',
-    fun:     'text-emerald-600 dark:text-emerald-400',
-    optimal: 'text-emerald-600 dark:text-emerald-400',
-    pushy:   'text-amber-500',
-    high:    'text-blue-500',
-    flood:   'text-blue-600',
-  }[label] ?? 'text-gray-500'
-}
+// ---- OSM centerline fetch ---------------------------------------------------
 
-function activeBandClass(label: string): string {
-  return {
-    too_low: 'bg-gray-50 dark:bg-gray-800/60',
-    minimum: 'bg-gray-50 dark:bg-gray-800/60',
-    fun:     'bg-emerald-50/60 dark:bg-emerald-950/30',
-    optimal: 'bg-emerald-50/60 dark:bg-emerald-950/30',
-    pushy:   'bg-amber-50/60 dark:bg-amber-950/30',
-    high:    'bg-blue-50/60 dark:bg-blue-950/30',
-    flood:   'bg-blue-50/60 dark:bg-blue-950/30',
-  }[label] ?? 'bg-white dark:bg-gray-900'
-}
+const fetchingCenterline = ref(false)
+const centerlineError    = ref<string | null>(null)
+const liveCenterline     = ref<any>(null)
+const manualLat          = ref('')
+const manualLng          = ref('')
 
-function bandRange(band: any): string {
-  if (band.min_cfs == null && band.max_cfs == null) return '—'
-  if (band.min_cfs == null) return `< ${band.max_cfs.toLocaleString()} cfs`
-  if (band.max_cfs == null) return `${band.min_cfs.toLocaleString()}+ cfs`
-  return `${band.min_cfs.toLocaleString()}–${band.max_cfs.toLocaleString()} cfs`
+// Show the lat/lng input after the server tells us it has no location to work from.
+const needsCoordsInput = computed(() =>
+  centerlineError.value?.includes('no location available') ?? false
+)
+
+async function fetchCenterline() {
+  fetchingCenterline.value = true
+  centerlineError.value = null
+  try {
+    let url = `${config.public.apiBase}/api/v1/reaches/${route.params.slug}/fetch-centerline`
+    if (manualLat.value && manualLng.value) {
+      url += `?lat=${encodeURIComponent(manualLat.value)}&lng=${encodeURIComponent(manualLng.value)}`
+    }
+    const res = await fetch(url, { method: 'POST' })
+    const text = await res.text()
+    let json: any
+    try { json = JSON.parse(text) } catch { json = null }
+    if (!res.ok || !json) {
+      centerlineError.value = json?.error ?? `Server error ${res.status}`
+    } else {
+      liveCenterline.value = json.centerline
+    }
+  } catch (err: any) {
+    centerlineError.value = err?.message ?? 'Network error'
+  } finally {
+    fetchingCenterline.value = false
+  }
 }
 
 // ---- KMZ import -------------------------------------------------------------

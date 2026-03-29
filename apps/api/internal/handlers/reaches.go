@@ -2,11 +2,14 @@ package handlers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/h2oflow/h2oflow/apps/api/internal/osm"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -217,7 +220,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			r.description_verified,
 			r.aw_reach_id,
 			r.watershed_name,
-			ST_AsGeoJSON(r.centerline::geometry)::json AS centerline,
+			ST_AsGeoJSON(r.centerline::geometry) AS centerline,
 			-- Primary gauge fields (all nullable — reach may not have a gauge yet)
 			g.id                AS gauge_id,
 			g.external_id       AS gauge_external_id,
@@ -226,6 +229,8 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			g.featured          AS gauge_featured,
 			lr.value            AS current_cfs,
 			lr.timestamp        AS last_reading_at,
+			COALESCE(ST_X(g.location::geometry), NULL) AS gauge_lng,
+			COALESCE(ST_Y(g.location::geometry), NULL) AS gauge_lat,
 			CASE
 				WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
 				WHEN fr.label IN ('fun','optimal')         THEN 'runnable'
@@ -262,6 +267,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&reach.Gauge.ID, &reach.Gauge.ExternalID, &reach.Gauge.Source,
 		&reach.Gauge.Name, &reach.Gauge.Featured,
 		&reach.Gauge.CurrentCFS, &reach.Gauge.LastReadingAt,
+		&reach.Gauge.Lng, &reach.Gauge.Lat,
 		&reach.Gauge.FlowStatus,
 	)
 	if err != nil {
@@ -277,7 +283,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 	rapidRows, err := h.db.Query(r.Context(), `
 		SELECT
 			id, name, river_mile, class_rating, class_at_low, class_at_high,
-			description, portage_description, is_portage_recommended,
+			description, portage_description, is_portage_recommended, is_surf_wave,
 			data_source, ai_confidence, verified,
 			ST_X(location::geometry) AS lng,
 			ST_Y(location::geometry) AS lat
@@ -295,7 +301,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		if err := rapidRows.Scan(
 			&rr.ID, &rr.Name, &rr.RiverMile,
 			&rr.ClassRating, &rr.ClassAtLow, &rr.ClassAtHigh,
-			&rr.Description, &rr.PortageDescription, &rr.IsPortageRecommended,
+			&rr.Description, &rr.PortageDescription, &rr.IsPortageRecommended, &rr.IsSurfWave,
 			&rr.DataSource, &rr.AIConfidence, &rr.Verified,
 			&rr.Lng, &rr.Lat,
 		); err != nil {
@@ -385,6 +391,31 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// ---- Related reaches --------------------------------------------------------
+	reach.Related = make([]relatedReach, 0)
+	relRows, err := h.db.Query(r.Context(), `
+		SELECT t.slug, t.name, rr.relationship
+		FROM reach_relationships rr
+		JOIN reaches t ON t.id = rr.to_reach_id
+		WHERE rr.from_reach_id = $1
+		ORDER BY
+			CASE rr.relationship
+				WHEN 'upstream'     THEN 1
+				WHEN 'downstream'   THEN 2
+				WHEN 'tributary'    THEN 3
+				WHEN 'continuation' THEN 4
+			END, t.name
+	`, reach.ID)
+	if err == nil {
+		defer relRows.Close()
+		for relRows.Next() {
+			var rel relatedReach
+			if err := relRows.Scan(&rel.Slug, &rel.Name, &rel.Relationship); err == nil {
+				reach.Related = append(reach.Related, rel)
+			}
+		}
+	}
+
 	jsonResponse(w, http.StatusOK, reach)
 }
 
@@ -407,8 +438,9 @@ type reachDetail struct {
 	WatershedName           *string         `json:"watershed_name"`
 	Centerline              rawGeometry     `json:"centerline"`
 	Gauge                   gaugeSnippet    `json:"gauge"`
-	Rapids                  []rapidRow      `json:"rapids"`
-	Access                  []accessRow     `json:"access"`
+	Rapids          []rapidRow       `json:"rapids"`
+	Access          []accessRow      `json:"access"`
+	Related         []relatedReach   `json:"related"`
 }
 
 type gaugeSnippet struct {
@@ -420,6 +452,8 @@ type gaugeSnippet struct {
 	CurrentCFS    *float64   `json:"current_cfs"`
 	LastReadingAt *time.Time `json:"last_reading_at"`
 	FlowStatus    string     `json:"flow_status"`
+	Lng           *float64   `json:"lng"`
+	Lat           *float64   `json:"lat"`
 }
 
 type rapidRow struct {
@@ -432,6 +466,7 @@ type rapidRow struct {
 	Description          *string  `json:"description"`
 	PortageDescription   *string  `json:"portage_description"`
 	IsPortageRecommended bool     `json:"is_portage_recommended"`
+	IsSurfWave           bool     `json:"is_surf_wave"`
 	DataSource           string   `json:"data_source"`
 	AIConfidence         *int     `json:"ai_confidence"`
 	Verified             bool     `json:"verified"`
@@ -466,6 +501,12 @@ type accessRow struct {
 	Waypoints          []waypointRow `json:"waypoints"`
 }
 
+type relatedReach struct {
+	Slug         string `json:"slug"`
+	Name         string `json:"name"`
+	Relationship string `json:"relationship"` // upstream | downstream | tributary | continuation
+}
+
 type waypointRow struct {
 	Sequence    int      `json:"sequence"`
 	Label       string   `json:"label"`
@@ -485,6 +526,182 @@ func (h *ReachHandler) GetConditions(w http.ResponseWriter, r *http.Request) {
 // TODO: implement
 func (h *ReachHandler) GetHazards(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// FetchCenterline handles POST /api/v1/reaches/{slug}/fetch-centerline
+//
+// Queries the Overpass API for the longest river/stream waterway within a
+// ±0.05° bounding box around a centre point, stores it as the reach's
+// centerline, and returns the GeoJSON geometry.
+//
+// Centre point resolution order:
+//  1. lat/lng query params (explicit override)
+//  2. reach put_in / take_out midpoint
+//  3. access point coordinates (put_in / take_out types from reach_access)
+//  4. primary gauge location
+func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	// Parse optional explicit lat/lng override from query string.
+	var explicitLat, explicitLng *float64
+	if latStr := r.URL.Query().Get("lat"); latStr != "" {
+		if v, err := strconv.ParseFloat(latStr, 64); err == nil {
+			explicitLat = &v
+		}
+	}
+	if lngStr := r.URL.Query().Get("lng"); lngStr != "" {
+		if v, err := strconv.ParseFloat(lngStr, 64); err == nil {
+			explicitLng = &v
+		}
+	}
+
+	// Look up reach ID plus any stored geometry we can use as centre.
+	var (
+		reachID    string
+		putInLng   *float64
+		putInLat   *float64
+		takeOutLng *float64
+		takeOutLat *float64
+		gaugeLng   *float64
+		gaugeLat   *float64
+	)
+	err := h.db.QueryRow(r.Context(), `
+		SELECT r.id,
+		       ST_X(r.put_in::geometry)      AS put_in_lng,
+		       ST_Y(r.put_in::geometry)      AS put_in_lat,
+		       ST_X(r.take_out::geometry)    AS take_out_lng,
+		       ST_Y(r.take_out::geometry)    AS take_out_lat,
+		       ST_X(g.location::geometry)    AS gauge_lng,
+		       ST_Y(g.location::geometry)    AS gauge_lat
+		FROM reaches r
+		LEFT JOIN gauges g ON g.id = r.primary_gauge_id
+		WHERE r.slug = $1
+	`, slug).Scan(
+		&reachID,
+		&putInLng, &putInLat,
+		&takeOutLng, &takeOutLat,
+		&gaugeLng, &gaugeLat,
+	)
+	if err != nil {
+		errorResponse(w, http.StatusNotFound, "reach not found")
+		return
+	}
+
+	// Query access points: full bbox for Overpass, plus the single most-upstream
+	// put-in and most-downstream take-out as chain start/end anchors.
+	// "Most upstream" = largest ST_Distance from the take-out cluster; as a
+	// practical proxy we use the put-in with MIN(lng) and the take-out with MAX(lng)
+	// since most Colorado rivers flow west→east. A single sub-query returns all
+	// six values in one round-trip.
+	var (
+		accessMinLng, accessMinLat *float64
+		accessMaxLng, accessMaxLat *float64
+		putInCentreLng, putInCentreLat *float64
+		takeOutCentreLng, takeOutCentreLat *float64
+	)
+	_ = h.db.QueryRow(r.Context(), `
+		WITH pts AS (
+			SELECT access_type,
+			       ST_X(location::geometry) AS lng,
+			       ST_Y(location::geometry) AS lat
+			FROM reach_access
+			WHERE reach_id = $1 AND location IS NOT NULL
+		),
+		extremes AS (
+			-- Most-upstream put-in: smallest (most-negative) longitude
+			SELECT lng AS put_in_lng, lat AS put_in_lat
+			FROM pts WHERE access_type = 'put_in'
+			ORDER BY lng ASC LIMIT 1
+		),
+		extremes2 AS (
+			-- Most-downstream take-out: largest (least-negative) longitude
+			SELECT lng AS take_out_lng, lat AS take_out_lat
+			FROM pts WHERE access_type = 'take_out'
+			ORDER BY lng DESC LIMIT 1
+		)
+		SELECT
+			MIN(p.lng), MIN(p.lat), MAX(p.lng), MAX(p.lat),
+			e.put_in_lng,  e.put_in_lat,
+			e2.take_out_lng, e2.take_out_lat
+		FROM pts p, extremes e, extremes2 e2
+		GROUP BY e.put_in_lng, e.put_in_lat, e2.take_out_lng, e2.take_out_lat
+	`, reachID).Scan(
+		&accessMinLng, &accessMinLat,
+		&accessMaxLng, &accessMaxLat,
+		&putInCentreLng, &putInCentreLat,
+		&takeOutCentreLng, &takeOutCentreLat,
+	)
+
+	// Prefer access point geometry over the reaches.put_in / reaches.take_out
+	// columns (which are often NULL for seeded reaches).
+	if putInLng == nil && putInCentreLng != nil {
+		putInLng, putInLat = putInCentreLng, putInCentreLat
+	}
+	if takeOutLng == nil && takeOutCentreLng != nil {
+		takeOutLng, takeOutLat = takeOutCentreLng, takeOutCentreLat
+	}
+
+	// Resolve a single centre point for single-point fallback mode.
+	var centreLng, centreLat float64
+	switch {
+	case explicitLng != nil && explicitLat != nil:
+		centreLng, centreLat = *explicitLng, *explicitLat
+	case accessMinLng != nil:
+		centreLng = (*accessMinLng + *accessMaxLng) / 2
+		centreLat = (*accessMinLat + *accessMaxLat) / 2
+	case putInLng != nil:
+		centreLng, centreLat = *putInLng, *putInLat
+	case gaugeLng != nil:
+		centreLng, centreLat = *gaugeLng, *gaugeLat
+	default:
+		errorResponse(w, http.StatusBadRequest,
+			"no location available — pass ?lat=&lng= with the reach's approximate centre")
+		return
+	}
+
+	// When we have a full spatial extent from access points, fetch the river
+	// line using the tight bbox around all access points + put-in centroid as
+	// the upstream chain start.  Fall back to a ±0.05° single-centre bbox.
+	var lineJSON string
+	if accessMinLng != nil && putInLng != nil && takeOutLng != nil && explicitLng == nil {
+		lineJSON, err = osm.FetchReachLine(
+			r.Context(),
+			*accessMinLng, *accessMinLat,
+			*accessMaxLng, *accessMaxLat,
+			*putInLng, *putInLat,
+			*takeOutLng, *takeOutLat,
+		)
+	} else {
+		const pad = 0.05
+		lineJSON, err = osm.FetchRiverLine(
+			r.Context(),
+			centreLng-pad, centreLat-pad,
+			centreLng+pad, centreLat+pad,
+		)
+	}
+	if err != nil {
+		log.Printf("osm fetch for %s: %v", slug, err)
+		errorResponse(w, http.StatusBadGateway, "OSM fetch failed: "+err.Error())
+		return
+	}
+	if lineJSON == "" {
+		errorResponse(w, http.StatusNotFound, "no waterway found near gauge location")
+		return
+	}
+
+	// Store as PostGIS geography.
+	_, err = h.db.Exec(r.Context(), `
+		UPDATE reaches SET centerline = ST_GeomFromGeoJSON($1)::geography WHERE id = $2
+	`, lineJSON, reachID)
+	if err != nil {
+		log.Printf("centerline update for %s: %v", slug, err)
+		errorResponse(w, http.StatusInternalServerError, "failed to save centerline")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"centerline": rawGeometry([]byte(lineJSON)),
+	})
 }
 
 // --- Helpers ----------------------------------------------------------------

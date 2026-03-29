@@ -39,6 +39,12 @@
          Overlay states sit on top without removing the canvas from the DOM. -->
     <div class="relative w-full" style="height:200px">
       <div ref="container" class="w-full h-full" />
+      <!-- Hover tooltip -->
+      <div
+        ref="tooltipEl"
+        class="absolute pointer-events-none text-xs bg-gray-900/90 text-white rounded px-1.5 py-0.5 whitespace-nowrap translate-x-2 -translate-y-full"
+        style="display:none; z-index:10"
+      />
       <div
         v-if="loading"
         class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm bg-white/70 dark:bg-gray-900/70"
@@ -108,6 +114,7 @@ const props = defineProps<{
 // ---- State ------------------------------------------------------------------
 
 const container  = ref<HTMLElement | null>(null)
+const tooltipEl  = ref<HTMLElement | null>(null)
 const loading    = ref(true)
 const readings   = ref<Reading[]>([])
 const flowRanges = ref<FlowRange[]>([])
@@ -122,15 +129,17 @@ const hours = ref<12 | 24 | 48>(48)
 async function load() {
   loading.value = true
   try {
-    const limit = hours.value * 2 // ~30 min intervals
+    const since = new Date(Date.now() - hours.value * 3_600_000).toISOString()
     const [rdRes, frRes] = await Promise.all([
-      fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/readings?limit=${limit}`),
+      fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/readings?since=${since}&limit=500`),
       fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/flow-ranges`),
     ])
     if (rdRes.ok) readings.value = await rdRes.json()
     if (frRes.ok) flowRanges.value = await frRes.json()
   } finally {
     loading.value = false
+    await nextTick()
+    buildChart()
   }
 }
 
@@ -154,6 +163,7 @@ function buildChart() {
     height: 200,
     padding: [8, 0, 0, 0],
     cursor: { show: true },
+    legend: { show: false },   // we render our own legend below
     axes: [
       {
         stroke:  '#9ca3af',
@@ -161,7 +171,6 @@ function buildChart() {
         grid:    { stroke: '#1f2937', width: 1 },
       },
       {
-        label:   'cfs',
         stroke:  '#9ca3af',
         ticks:   { stroke: '#374151' },
         grid:    { stroke: '#1f2937', width: 1 },
@@ -170,10 +179,9 @@ function buildChart() {
     series: [
       {},
       {
-        label:  'Flow (cfs)',
         stroke: lineColor(ranges, currentCfs),
         width:  2,
-        fill:   lineColor(ranges, currentCfs) + '18', // 10% opacity fill under line
+        fill:   lineColor(ranges, currentCfs) + '18',
         spanGaps: false,
       },
     ],
@@ -182,6 +190,24 @@ function buildChart() {
       drawClear: [u => drawBands(u, ranges)],
       // Draw a horizontal marker for the current reading.
       draw: [u => drawCurrentMarker(u, currentCfs)],
+      // Hover tooltip
+      setCursor: [u => {
+        const el = tooltipEl.value
+        if (!el) return
+        const idx = u.cursor.idx
+        if (idx == null) { el.style.display = 'none'; return }
+        const val = u.data[1][idx]
+        if (val == null) { el.style.display = 'none'; return }
+        const x = u.valToPos(u.data[0][idx], 'x')
+        const y = u.valToPos(val, 'y')
+        const ts = new Date(u.data[0][idx] * 1000)
+        const timeStr = ts.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+        const dateStr = ts.toLocaleDateString([], { month: 'short', day: 'numeric' })
+        el.textContent = `${Math.round(val).toLocaleString()} cfs · ${dateStr} ${timeStr}`
+        el.style.display = 'block'
+        el.style.left = `${x}px`
+        el.style.top = `${y}px`
+      }],
     },
   }
 
@@ -190,15 +216,14 @@ function buildChart() {
 
 // ---- Canvas drawing helpers -------------------------------------------------
 
-// BAND_ALPHA: semi-transparent so the line is visible through the bands.
 const BAND_COLORS: Record<string, string> = {
-  too_low: 'rgba(239,68,68,0.12)',
-  minimum: 'rgba(249,115,22,0.12)',
-  fun:     'rgba(34,197,94,0.15)',
-  optimal: 'rgba(16,185,129,0.20)',
-  pushy:   'rgba(234,179,8,0.13)',
-  high:    'rgba(249,115,22,0.15)',
-  flood:   'rgba(239,68,68,0.18)',
+  too_low: 'rgba(239,68,68,0.22)',
+  minimum: 'rgba(249,115,22,0.22)',
+  fun:     'rgba(34,197,94,0.30)',
+  optimal: 'rgba(16,185,129,0.35)',
+  pushy:   'rgba(234,179,8,0.28)',
+  high:    'rgba(249,115,22,0.28)',
+  flood:   'rgba(239,68,68,0.30)',
 }
 
 // bandColor returns the fill color for a flow range label (used by legend too).
@@ -314,29 +339,27 @@ function labelDisplay(label: string): string {
   return LABEL_DISPLAY[label] ?? label
 }
 
-// ---- Resize handling --------------------------------------------------------
-
-const resizeObserver = new ResizeObserver(() => {
-  if (chart && container.value) {
-    chart.setSize({ width: container.value.clientWidth, height: 200 })
-  }
-})
-
 // ---- Lifecycle --------------------------------------------------------------
 
 // Declared after load + buildChart so references are unambiguous at setup time.
 watch(hours, load)
-watch(readings, async () => { await nextTick(); buildChart() })
 watch(() => props.gaugeId, load)
 watch(() => props.currentCfs, async () => { await nextTick(); buildChart() })
 
+let resizeObserver: ResizeObserver | null = null
+
 onMounted(() => {
   load()
+  resizeObserver = new ResizeObserver(() => {
+    if (chart && container.value) {
+      chart.setSize({ width: container.value.clientWidth, height: 200 })
+    }
+  })
   if (container.value) resizeObserver.observe(container.value)
 })
 
 onUnmounted(() => {
-  resizeObserver.disconnect()
+  resizeObserver?.disconnect()
   chart?.destroy()
 })
 </script>

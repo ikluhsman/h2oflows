@@ -95,8 +95,8 @@ const sourceUrl = computed(() => {
 const statusColor = computed(() => {
   switch (props.gauge.flowStatus) {
     case 'runnable': return 'success'
-    case 'caution':  return 'neutral'
-    case 'low':      return 'neutral'
+    case 'caution':  return 'warning'
+    case 'low':      return 'error'
     case 'flood':    return 'info'
     default:         return 'neutral'
   }
@@ -119,11 +119,11 @@ const statusLabel = computed(() => {
 })
 
 const cfsClass = computed(() => ({
-  'text-emerald-500':                 props.gauge.flowStatus === 'runnable',
-  'text-gray-900 dark:text-gray-100': props.gauge.flowStatus === 'caution',
-  'text-gray-400':                    props.gauge.flowStatus === 'low',
-  'text-blue-500':                    props.gauge.flowStatus === 'flood',
-  'text-gray-300':                    props.gauge.flowStatus === 'unknown',
+  'text-emerald-500': props.gauge.flowStatus === 'runnable',
+  'text-amber-400':   props.gauge.flowStatus === 'caution',
+  'text-red-500':     props.gauge.flowStatus === 'low',
+  'text-blue-500':    props.gauge.flowStatus === 'flood',
+  'text-gray-400':    props.gauge.flowStatus === 'unknown',
 }))
 
 const lastReadingRelative = computed(() => {

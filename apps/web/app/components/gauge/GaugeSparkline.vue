@@ -56,8 +56,8 @@ const readings = ref<{ cfs: number; timestamp: string }[]>([])
 async function fetchReadings() {
   loading.value = true
   try {
-    const limit = hours.value * 2
-    const res = await fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/readings?limit=${limit}`)
+    const since = new Date(Date.now() - hours.value * 3_600_000).toISOString()
+    const res = await fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/readings?since=${since}&limit=500`)
     if (res.ok) readings.value = ([...(await res.json())]).reverse()
   } catch { /* fall through */ } finally {
     loading.value = false
@@ -119,5 +119,5 @@ const strokeColor = computed(() => ({
   low:      '#ef4444', // red    — too low, don't bother
   flood:    '#3b82f6', // blue   — too much water
   unknown:  '#6b7280', // gray   — no data
-}[props.flowStatus]))
+}[props.flowStatus] ?? '#6b7280'))
 </script>

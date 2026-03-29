@@ -11,8 +11,11 @@ import (
 )
 
 // readingRetention is how long gauge readings are kept in the DB.
-// gauge_readings is a rolling cache — historical graphs proxy to source APIs directly.
-const readingRetention = 48 * time.Hour
+// 7 days gives the graph enough history for the 12/24/48h windows plus context.
+const readingRetention = 7 * 24 * time.Hour
+
+// backfillWindow is how far back to seed readings for a gauge that has none.
+const backfillWindow = 7 * 24 * time.Hour
 
 // pollConcurrency is the max number of parallel FetchReading calls per source.
 // Keeps us from hammering USGS or DWR with hundreds of simultaneous requests.
@@ -50,6 +53,9 @@ func (p *Poller) Run(ctx context.Context) {
 	// Sync gauge metadata (location, HUC, basin, watershed) on startup.
 	// Runs in background — doesn't block the first poll cycle.
 	go p.syncAllMetadata(ctx)
+
+	// Backfill 7 days of history for any gauges with no recent readings.
+	go p.backfillAll(ctx)
 
 	// One goroutine per source, plus the pruner.
 	for _, sc := range p.sources {
@@ -136,10 +142,27 @@ func (p *Poller) writeReading(ctx context.Context, gaugeID string, r gauge.Readi
 	if err != nil {
 		return err
 	}
-	// Keep gauges.current_cfs in sync — only advance forward in time.
+	// Keep gauges.current_cfs and flow_status in sync — only advance forward in time.
 	_, err = p.db.Exec(ctx, `
 		UPDATE gauges
-		SET current_cfs = $2
+		SET current_cfs = $2,
+		    flow_status  = COALESCE(
+		        (SELECT CASE
+		                    WHEN fr.label IN ('fun', 'optimal')   THEN 'runnable'
+		                    WHEN fr.label IN ('minimum', 'pushy') THEN 'caution'
+		                    WHEN fr.label = 'too_low'             THEN 'low'
+		                    WHEN fr.label IN ('high', 'flood')    THEN 'flood'
+		                    ELSE 'unknown'
+		                END
+		         FROM flow_ranges fr
+		         WHERE fr.gauge_id = $1
+		           AND fr.craft_type = 'general'
+		           AND (fr.min_cfs IS NULL OR $2 >= fr.min_cfs)
+		           AND (fr.max_cfs IS NULL OR $2 <  fr.max_cfs)
+		         ORDER BY fr.min_cfs ASC NULLS FIRST
+		         LIMIT 1),
+		        'unknown'
+		    )
 		WHERE id = $1
 		  AND (last_reading_at IS NULL OR last_reading_at <= $3)
 	`, gaugeID, r.Value, r.Timestamp)
@@ -224,6 +247,159 @@ func (p *Poller) TouchRequested(ctx context.Context, gaugeID string) {
 	if err != nil {
 		log.Printf("poller: touch requested for %s: %v", gaugeID, err)
 	}
+}
+
+// --- Historical backfill ----------------------------------------------------
+
+// backfillAll seeds readings for gauges with no data or with gaps in their
+// recent history. Runs once on startup in the background.
+// Safe to re-run — ON CONFLICT DO NOTHING skips already-stored readings.
+func (p *Poller) backfillAll(ctx context.Context) {
+	for _, sc := range p.sources {
+		p.backfillSource(ctx, sc)
+	}
+}
+
+type backfillTarget struct {
+	dbGauge
+	since time.Time
+}
+
+func (p *Poller) backfillSource(ctx context.Context, sc sourceConfig) {
+	sourceType := string(sc.source.SourceType())
+
+	// Find gauges that either:
+	//   (a) have no readings in the last 7 days, OR
+	//   (b) have a gap > 2 hours anywhere in the last 7 days
+	// For (b) we fetch from just before the earliest gap so we only pull what's missing.
+	rows, err := p.db.Query(ctx, `
+		WITH window_readings AS (
+		    SELECT gauge_id, timestamp,
+		           LEAD(timestamp) OVER (PARTITION BY gauge_id ORDER BY timestamp) AS next_ts
+		    FROM   gauge_readings
+		    WHERE  timestamp > NOW() - INTERVAL '7 days'
+		),
+		earliest_gaps AS (
+		    -- Mid-stream gap: two consecutive readings more than 2 h apart
+		    SELECT gauge_id, MIN(timestamp) - INTERVAL '5 minutes' AS since
+		    FROM   window_readings
+		    WHERE  EXTRACT(EPOCH FROM (next_ts - timestamp)) > 7200
+		    GROUP  BY gauge_id
+		),
+		trailing_gap AS (
+		    -- Trailing gap: most recent reading was > 2 h ago (e.g. backend was down)
+		    -- LEAD returns NULL for the last row so the earliest_gaps CTE misses this case.
+		    SELECT gauge_id, MAX(timestamp) - INTERVAL '5 minutes' AS since
+		    FROM   gauge_readings
+		    WHERE  timestamp > NOW() - INTERVAL '7 days'
+		    GROUP  BY gauge_id
+		    HAVING MAX(timestamp) < NOW() - INTERVAL '2 hours'
+		)
+		SELECT g.id, g.external_id,
+		       COALESCE(
+		           LEAST(eg.since, tg.since),
+		           eg.since,
+		           tg.since,
+		           NOW() - INTERVAL '7 days'
+		       ) AS fetch_since
+		FROM   gauges g
+		LEFT   JOIN earliest_gaps eg ON eg.gauge_id = g.id
+		LEFT   JOIN trailing_gap  tg ON tg.gauge_id = g.id
+		WHERE  g.source = $1
+		  AND  g.status NOT IN ('retired', 'inactive')
+		  AND  (
+		           -- no readings at all in the window
+		           NOT EXISTS (
+		               SELECT 1 FROM gauge_readings gr
+		               WHERE  gr.gauge_id = g.id
+		                 AND  gr.timestamp > NOW() - INTERVAL '7 days'
+		               LIMIT 1
+		           )
+		           OR eg.gauge_id IS NOT NULL
+		           OR tg.gauge_id IS NOT NULL
+		       )
+	`, sourceType)
+	if err != nil {
+		log.Printf("poller: backfill query [%s]: %v", sourceType, err)
+		return
+	}
+	defer rows.Close()
+
+	var targets []backfillTarget
+	for rows.Next() {
+		var t backfillTarget
+		if err := rows.Scan(&t.id, &t.externalID, &t.since); err != nil {
+			continue
+		}
+		targets = append(targets, t)
+	}
+	if err := rows.Err(); err != nil {
+		return
+	}
+	if len(targets) == 0 {
+		return
+	}
+
+	log.Printf("poller: backfilling %d %s gauges", len(targets), sourceType)
+
+	for _, t := range targets {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		readings, err := sc.source.FetchHistory(ctx, t.externalID, t.since)
+		if err != nil {
+			log.Printf("poller: backfill fetch %s/%s: %v", sourceType, t.externalID, err)
+			continue
+		}
+		if len(readings) == 0 {
+			continue
+		}
+
+		if err := p.bulkWriteReadings(ctx, t.id, readings); err != nil {
+			log.Printf("poller: backfill write %s/%s: %v", sourceType, t.externalID, err)
+		} else {
+			log.Printf("poller: backfilled %d readings for %s/%s", len(readings), sourceType, t.externalID)
+		}
+
+		// Small pause to avoid hammering the source API.
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// bulkWriteReadings inserts a batch of historical readings in a single transaction
+// and updates current_cfs / flow_status from the most recent one.
+// Readings must be oldest-first (as returned by FetchHistory).
+func (p *Poller) bulkWriteReadings(ctx context.Context, gaugeID string, readings []*gauge.Reading) error {
+	if len(readings) == 0 {
+		return nil
+	}
+
+	tx, err := p.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	for _, r := range readings {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO gauge_readings (gauge_id, value, unit, timestamp, qual_code, provisional)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			ON CONFLICT (gauge_id, timestamp) DO NOTHING
+		`, gaugeID, r.Value, string(r.Unit), r.Timestamp, r.QualCode, r.Provisional); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
+	// Update current_cfs with the most recent reading (oldest-first slice → last element).
+	last := readings[len(readings)-1]
+	return p.writeReading(ctx, gaugeID, *last)
 }
 
 // --- Metadata sync ----------------------------------------------------------

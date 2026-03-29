@@ -84,6 +84,7 @@ func main() {
 		r.Get("/reaches/{slug}", reaches.Get)
 		r.Get("/reaches/{slug}/conditions", reaches.GetConditions)
 		r.Get("/reaches/{slug}/hazards", reaches.GetHazards)
+		r.Post("/reaches/{slug}/fetch-centerline", reaches.FetchCenterline)
 
 		r.Post("/trips", trips.Create)
 
