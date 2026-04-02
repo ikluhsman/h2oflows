@@ -327,6 +327,46 @@ func writeWaypoints(ctx context.Context, pool *pgxpool.Pool, accessID string, wa
 
 // ---- Helpers ----------------------------------------------------------------
 
+// writeKnownAccess inserts a domain-expert access point with data_source='manual' and verified=true.
+// ON CONFLICT DO NOTHING — never overwrites an existing row for the same reach+name.
+func writeKnownAccess(ctx context.Context, pool *pgxpool.Pool, reachID string, a knownAccess) error {
+	var accessID string
+	err := pool.QueryRow(ctx, `
+		INSERT INTO reach_access
+			(reach_id, access_type, name, directions, data_source, ai_confidence, verified)
+		VALUES ($1,$2,$3,$4,'manual',100,TRUE)
+		ON CONFLICT (reach_id, name) DO NOTHING
+		RETURNING id
+	`, reachID, a.AccessType, a.Name, nullStr(a.Directions)).Scan(&accessID)
+	if err != nil {
+		return err
+	}
+	if accessID == "" {
+		return nil // conflict — already exists, skip coordinate update
+	}
+	if a.WaterLat != nil && a.WaterLon != nil {
+		_, err = pool.Exec(ctx, `
+			UPDATE reach_access
+			SET water_point = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
+			WHERE id = $1
+		`, accessID, *a.WaterLon, *a.WaterLat)
+		if err != nil {
+			return fmt.Errorf("water_point: %w", err)
+		}
+	}
+	if a.ParkingLat != nil && a.ParkingLon != nil {
+		_, err = pool.Exec(ctx, `
+			UPDATE reach_access
+			SET parking_point = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
+			WHERE id = $1
+		`, accessID, *a.ParkingLon, *a.ParkingLat)
+		if err != nil {
+			return fmt.Errorf("parking_point: %w", err)
+		}
+	}
+	return nil
+}
+
 func nullStr(s string) *string {
 	if s == "" {
 		return nil

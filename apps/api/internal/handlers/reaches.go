@@ -708,6 +708,18 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ClearCenterline handles DELETE /api/v1/reaches/{slug}/centerline
+// Nulls out the stored centerline so it can be re-fetched from OSM.
+func (h *ReachHandler) ClearCenterline(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	_, err := h.db.Exec(r.Context(), `UPDATE reaches SET centerline = NULL WHERE slug = $1`, slug)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "failed to clear centerline")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // --- Helpers ----------------------------------------------------------------
 
 // flowColor maps a flow status to its hex color for MapLibre line-color expressions.

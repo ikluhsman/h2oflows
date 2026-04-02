@@ -195,7 +195,7 @@ const hasCoords = computed(() =>
 const container  = ref<HTMLDivElement>()
 const mapReady   = ref(false)
 const selectedId = ref<string | null>(null)
-const basemap = ref<'street' | 'topo' | 'satellite'>('topo')
+const basemap = ref<'street' | 'topo' | 'satellite'>('street')
 const BASEMAP_OPTIONS = [
   { value: 'street',    label: 'Street'    },
   { value: 'topo',      label: 'Topo'      },
@@ -244,8 +244,8 @@ onMounted(async () => {
         },
       },
       layers: [
-        { id: 'street-tiles', type: 'raster', source: 'street', layout: { visibility: 'none'    } },
-        { id: 'topo-tiles',   type: 'raster', source: 'topo',   layout: { visibility: 'visible' } },
+        { id: 'street-tiles', type: 'raster', source: 'street', layout: { visibility: 'visible' } },
+        { id: 'topo-tiles',   type: 'raster', source: 'topo',   layout: { visibility: 'none'    } },
         { id: 'esri-tiles',   type: 'raster', source: 'esri',   layout: { visibility: 'none'    } },
       ],
     },

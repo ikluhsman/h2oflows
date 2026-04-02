@@ -43,6 +43,10 @@ Thumbs.db
 # Logs
 *.log
 
+# KMZ/KML reach data files — seeded into DB, not committed to repo
+apps/web/*.kmz
+apps/web/*.kml
+
 # Claude memory — all memory files stay local
 .claude/memory/
 

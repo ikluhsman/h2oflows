@@ -80,6 +80,15 @@ func main() {
 			}
 		}
 
+		// 3b. Write any domain-expert access points we already know.
+		for _, a := range rd.KnownAccess {
+			if err := writeKnownAccess(ctx, pool, reachID, a); err != nil {
+				fmt.Printf("  ✗ access %q: %v\n", a.Name, err)
+			} else {
+				fmt.Printf("  ✓ access %q %s (manual, verified)\n", a.Name, a.AccessType)
+			}
+		}
+
 		// 4. Write any domain-expert flow ranges we already know (before AI seeding).
 		for _, fr := range rd.KnownFlowRanges {
 			if err := writeKnownFlowRange(ctx, pool, rd.GaugeExtID, rd.GaugeSource, fr); err != nil {
@@ -220,6 +229,7 @@ type reachDef struct {
 	Notes            string
 	KnownRapids      []knownRapid
 	KnownFlowRanges  []knownFlowRange
+	KnownAccess      []knownAccess
 }
 
 // gaugeAssoc links a gauge to a reach with an explicit relationship type.
@@ -236,6 +246,19 @@ type knownFlowRange struct {
 	MinCFS  *float64
 	MaxCFS  *float64
 	Notes   string
+}
+
+// knownAccess is an access point entered from direct domain knowledge with
+// GPS-verified coordinates. Written with data_source='manual' and verified=true.
+// WaterLat/WaterLon are the water-entry point; ParkingLat/ParkingLon are the lot.
+type knownAccess struct {
+	AccessType  string  // put_in / take_out / shuttle_drop / intermediate
+	Name        string
+	Directions  string
+	WaterLat    *float64
+	WaterLon    *float64
+	ParkingLat  *float64
+	ParkingLon  *float64
 }
 
 // knownRapid is a rapid entered from direct domain knowledge (guidebook, personal
@@ -324,6 +347,22 @@ The BV gauge (07087200) is the reference. Flow is release-dependent from Twin La
 	// Gauge at BV (07087200) is the reference.
 	{
 		Slug: "arkansas-milk-run", Name: "Milk Run",
+		KnownAccess: []knownAccess{
+			{
+				AccessType: "put_in",
+				Name:       "Centennial Park",
+				Directions: "From downtown Buena Vista, take US-24 south to Centennial Park on river left. Paved parking area with river access.",
+				WaterLat:   ptr(38.8782), WaterLon: ptr(-106.1277),
+				ParkingLat: ptr(38.8785), ParkingLon: ptr(-106.1280),
+			},
+			{
+				AccessType: "take_out",
+				Name:       "Ruby Mountain / Fisherman's Bridge",
+				Directions: "Take US-285 south from BV, turn right on County Road 45 toward Ruby Mountain Recreation Area. Large BLM parking area. This is also the put-in for Browns Canyon.",
+				WaterLat:   ptr(38.8697), WaterLon: ptr(-106.1181),
+				ParkingLat: ptr(38.8700), ParkingLon: ptr(-106.1190),
+			},
+		},
 		Region: "Arkansas River, Colorado — Buena Vista to Ruby Mountain",
 		ClassMin: 2.0, ClassMax: 2.5, Character: "continuous", LengthMi: 5.0,
 		GaugeExtID: "07087200", GaugeSource: "usgs",
@@ -342,6 +381,22 @@ The BV gauge (07087200) is the primary reference. The Nathrop gauge (07091200) d
 	// accepted reference. Most commercially rafted reach on the Arkansas.
 	{
 		Slug: "arkansas-browns-canyon", Name: "Browns Canyon",
+		KnownAccess: []knownAccess{
+			{
+				AccessType: "put_in",
+				Name:       "Ruby Mountain / Fisherman's Bridge",
+				Directions: "Take US-285 south from Buena Vista, turn right on County Road 45 toward Ruby Mountain Recreation Area. Large BLM parking area. This is also the take-out for Milk Run.",
+				WaterLat:   ptr(38.8697), WaterLon: ptr(-106.1181),
+				ParkingLat: ptr(38.8700), ParkingLon: ptr(-106.1190),
+			},
+			{
+				AccessType: "take_out",
+				Name:       "Hecla Junction",
+				Directions: "From Salida, take US-285 north to County Road 194 (Hecla Junction). Turn left and follow the road down to the river. BLM parking area at river level.",
+				WaterLat:   ptr(38.7897), WaterLon: ptr(-106.0572),
+				ParkingLat: ptr(38.7900), ParkingLon: ptr(-106.0578),
+			},
+		},
 		Region: "Arkansas River, Colorado — Fisherman's Bridge to Hecla Junction",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "pool-drop", LengthMi: 9.0,
 		GaugeExtID: "07091200", GaugeSource: "usgs",
@@ -623,6 +678,45 @@ Gauge math: The PLAGRACO gauge at Grant is the best upstream indicator but does 
 		RelatedGauges: []gaugeAssoc{
 			{ExtID: "PLASPLCO", Source: "dwr", Relationship: "downstream_indicator"},
 		},
+	},
+
+	// ---- South Platte — Waterton to Chatfield -----------------------------------
+	// Mellow flatwater float through Waterton Canyon, above Chatfield Reservoir.
+	// Popular with SUP, tubing, and beginner paddlers. No significant rapids.
+	// KMZ source: "S Platte River Above Chatfield Reservoir.kmz"
+	// Gauge: DWR PLAWATCO (S Platte at Waterton). ~200 CFS is ideal per local notes.
+	// Note: do not paddle into Chatfield Reservoir — take out at Gravel Ponds Bridge.
+	{
+		Slug: "south-platte-waterton-chatfield", Name: "S Platte: Waterton to Chatfield",
+		Region: "South Platte River, Colorado — Waterton Canyon to Chatfield Reservoir",
+		ClassMin: 1.0, ClassMax: 1.0, Character: "flatwater", LengthMi: 4.5,
+		GaugeExtID: "PLAWATCO", GaugeSource: "dwr",
+		KnownAccess: []knownAccess{
+			{
+				AccessType: "put_in",
+				Name:       "Waterton Road",
+				Directions: "From C-470, take Wadsworth Blvd south to Waterton Road. Turn left and follow to the trailhead/parking area. The river access is a short trail from Waterton Canyon Parking.",
+				WaterLat:   ptr(39.4882552), WaterLon: ptr(-105.0930302),
+				ParkingLat: ptr(39.4913718), ParkingLon: ptr(-105.0935551),
+			},
+			{
+				AccessType: "take_out",
+				Name:       "Gravel Ponds Bridge",
+				Directions: "Take out river right at the Gravel Ponds Bridge before the reservoir. Gravel Ponds Parking is a short walk up the trail. Do not continue into Chatfield Reservoir.",
+				WaterLat:   ptr(39.520579), WaterLon: ptr(-105.0794508),
+				ParkingLat: ptr(39.519381), ParkingLon: ptr(-105.0817401),
+			},
+		},
+		KnownFlowRanges: []knownFlowRange{
+			{Label: "too_low", MinCFS: nil,       MaxCFS: ptr(100.0), Notes: "Too shallow for comfortable paddling."},
+			{Label: "minimum", MinCFS: ptr(100.0), MaxCFS: ptr(150.0), Notes: "Runnable but scratchy in spots."},
+			{Label: "fun",     MinCFS: ptr(150.0), MaxCFS: ptr(300.0), Notes: "Ideal. ~200 CFS is the sweet spot — current moves well, no hazards."},
+			{Label: "pushy",   MinCFS: ptr(300.0), MaxCFS: ptr(500.0), Notes: "Faster current, still appropriate for intermediate paddlers."},
+			{Label: "flood",   MinCFS: ptr(500.0), MaxCFS: nil,        Notes: "High — use caution."},
+		},
+		Notes: `Relaxed flatwater float through Waterton Canyon, suitable for SUP, tubing, and beginners. No significant rapids. ~200 CFS on the PLAWATCO gauge (averaging ~1.5 ft) is reported as the ideal level for recreational paddling.
+
+Stop at Gravel Ponds Bridge — paddling into Chatfield Reservoir is not recommended (water quality, boat traffic, no easy egress). Alternative take-out is Platte River Parking just east of Gravel Ponds Bridge. The put-in is a short trail from Waterton Canyon Parking.`,
 	},
 
 	// ---- Eagle River -----------------------------------------------------------

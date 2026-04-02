@@ -63,22 +63,22 @@
       <section>
         <div class="flex items-center gap-3 mb-3 flex-wrap">
           <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Map</h2>
+          <!-- Coord inputs when no location is available -->
+          <div v-if="needsCoordsInput" class="flex items-center gap-1.5">
+            <input
+              v-model="manualLat"
+              type="text"
+              placeholder="lat (e.g. 39.38)"
+              class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-28 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
+            />
+            <input
+              v-model="manualLng"
+              type="text"
+              placeholder="lng (e.g. -105.35)"
+              class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-32 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
+            />
+          </div>
           <template v-if="!reach.centerline && !liveCenterline">
-            <!-- Coord inputs appear only after the server says no location is available -->
-            <div v-if="needsCoordsInput" class="flex items-center gap-1.5">
-              <input
-                v-model="manualLat"
-                type="text"
-                placeholder="lat (e.g. 39.38)"
-                class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-28 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
-              />
-              <input
-                v-model="manualLng"
-                type="text"
-                placeholder="lng (e.g. -105.35)"
-                class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-32 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
-              />
-            </div>
             <button
               class="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1 disabled:opacity-50"
               :disabled="fetchingCenterline || (needsCoordsInput && (!manualLat || !manualLng))"
@@ -88,13 +88,29 @@
               <span v-else>+ Fetch river line from OSM</span>
             </button>
           </template>
+          <template v-else>
+            <button
+              class="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1 disabled:opacity-50"
+              :disabled="fetchingCenterline || (needsCoordsInput && (!manualLat || !manualLng))"
+              @click="fetchCenterline"
+            >
+              <span v-if="fetchingCenterline">Fetching…</span>
+              <span v-else>↺ Re-fetch river line</span>
+            </button>
+            <button
+              class="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 flex items-center gap-1"
+              @click="clearCenterline"
+            >
+              × Clear line
+            </button>
+          </template>
           <span v-if="centerlineError" class="text-xs text-red-500">{{ centerlineError }}</span>
         </div>
         <ClientOnly>
           <ReachMap
             :name="reach.name"
             :class-max="reach.class_max"
-            :centerline="liveCenterline ?? reach.centerline"
+            :centerline="displayCenterline"
             :rapids="reach.rapids"
             :access="reach.access"
             :gauge-lng="reach.gauge.lng"
@@ -431,16 +447,32 @@ function bandDisplayLabel(label: string): string {
 
 // ---- OSM centerline fetch ---------------------------------------------------
 
-const fetchingCenterline = ref(false)
-const centerlineError    = ref<string | null>(null)
-const liveCenterline     = ref<any>(null)
-const manualLat          = ref('')
-const manualLng          = ref('')
+const fetchingCenterline  = ref(false)
+const centerlineError     = ref<string | null>(null)
+const liveCenterline      = ref<any>(null)
+const centerlineCleared   = ref(false)
+const manualLat           = ref('')
+const manualLng           = ref('')
 
 // Show the lat/lng input after the server tells us it has no location to work from.
 const needsCoordsInput = computed(() =>
   centerlineError.value?.includes('no location available') ?? false
 )
+
+// The centerline actually shown on the map — null if user cleared it.
+const displayCenterline = computed(() =>
+  centerlineCleared.value ? null : (liveCenterline.value ?? (reach.value as any)?.centerline ?? null)
+)
+
+async function clearCenterline() {
+  centerlineCleared.value = true
+  liveCenterline.value = null
+  centerlineError.value = null
+  await fetch(
+    `${config.public.apiBase}/api/v1/reaches/${route.params.slug}/centerline`,
+    { method: 'DELETE' }
+  )
+}
 
 async function fetchCenterline() {
   fetchingCenterline.value = true

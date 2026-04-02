@@ -37,7 +37,7 @@ const emit  = defineEmits<{ (e: 'remove-gauge', id: string): void }>()
 const { apiBase } = useRuntimeConfig().public
 const container  = ref<HTMLDivElement>()
 const mapReady   = ref(false)
-const basemap = ref<'street' | 'topo' | 'satellite'>('topo')
+const basemap = ref<'street' | 'topo' | 'satellite'>('street')
 const BASEMAP_OPTIONS = [
   { value: 'street',    label: 'Street'    },
   { value: 'topo',      label: 'Topo'      },
@@ -243,8 +243,8 @@ onMounted(() => {
         },
       },
       layers: [
-        { id: 'street-tiles', type: 'raster', source: 'street', layout: { visibility: 'none'    } },
-        { id: 'topo-tiles',   type: 'raster', source: 'topo',   layout: { visibility: 'visible' } },
+        { id: 'street-tiles', type: 'raster', source: 'street', layout: { visibility: 'visible' } },
+        { id: 'topo-tiles',   type: 'raster', source: 'topo',   layout: { visibility: 'none'    } },
         { id: 'esri-tiles',   type: 'raster', source: 'esri',   layout: { visibility: 'none'    } },
       ],
     },
