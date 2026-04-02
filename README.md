@@ -1,8 +1,48 @@
-# H2OFlow
+# H2OFlows
 
-A streamflow data platform for whitewater paddlers. Snap in your favorite gauges, get live CFS with flow status bands, compare rivers side by side, and track sessions. Backed by a free open reach registry and public API built from community data.
+A streamflow data platform for whitewater paddlers. Snap in your favorite gauges, get live CFS with flow status bands, compare rivers side by side, and ask plain-English questions about any run. Backed by a free open reach registry and public API built from community data.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for full technical design and [DECISIONS.md](DECISIONS.md) for the reasoning behind key choices.
+
+---
+
+## Features
+
+### Gauge dashboard
+- Personal watchlist of USGS and Colorado DWR gauges, persisted across sessions
+- Live CFS readings refreshed every 60 seconds
+- Flow status bands (too low / minimum / fun / optimal / pushy / flood) overlaid on each gauge card
+- Named flow band label — know at a glance whether your run is on
+- Side-by-side multi-gauge comparison graph for reaches with more than one relevant gauge
+- Gauges grouped by reach with a link through to the full reach page
+
+### Interactive maps
+- MapLibre GL maps across dashboard, explore, and reach detail views
+- Reach centerlines drawn from OSM data, colored by difficulty (green / blue / black / double-black)
+- Dashboard map auto-fits to the geographic bounding box of your saved gauges
+- Gauge markers show current CFS and flow status color
+- Street / Topo / Satellite basemap toggle on all three maps (Esri tile services)
+- Topo default uses USGS 7.5-minute quad sheets — contours, river names, access roads
+
+### Reach pages
+- Curated reach data: description, difficulty, put-in/take-out access, rapid inventory
+- 48-hour flow graph with flow band overlays
+- Seasonal stats showing historical median CFS by month
+- Hazard and conditions feeds
+- KML export of reach geometry
+
+### AI river assistant (RAG)
+- Ask plain-English questions about any reach: *"What's Browns Canyon like at 800 cfs?"*
+- Answers grounded in reach-specific embedded content (descriptions, rapids, flow ranges, access) — never hallucinates rapid names or distances not in the source data
+- Per-reach chat panel on every reach page
+- Global search on the landing page — identifies the reach from free text, then answers
+- Powered by Voyage AI embeddings + pgvector similarity search + Claude Haiku
+
+### Data pipeline
+- 32 Colorado reaches seeded with AI-generated descriptions, rapid inventories, access points, and flow ranges (all marked `ai_seed`, confidence-scored)
+- OSM centerline fetch for each reach using the Overpass API
+- Polling tiers: trusted reaches always polled, demand-tier gauges polled when recently viewed, cold gauges skipped until requested
+- USGS and Colorado DWR gauge import commands
 
 ---
 
@@ -10,12 +50,11 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full technical design and [DECISIONS.
 
 | Layer | Technology |
 |---|---|
-| Backend | Go 1.26, Chi, PostgreSQL 16 + PostGIS |
-| AI | Anthropic Claude (reach seeding, search enrichment) |
-| Frontend | Nuxt 4, Nuxt UI v4, Tailwind CSS, uPlot, Pinia |
-| Maps | MapLibre GL (planned) |
-
-Redis and Docker Compose are planned for production deployment but not required for local development.
+| Backend | Go 1.23, Chi, PostgreSQL 16 + PostGIS + pgvector |
+| AI | Anthropic Claude Haiku (RAG answers, reach seeding, search enrichment) |
+| Embeddings | Voyage AI `voyage-3` (1024-dim, stored in pgvector) |
+| Frontend | Nuxt 4, Nuxt UI Pro, Tailwind CSS, MapLibre GL, uPlot, Pinia |
+| Maps | Esri public tile services (Street / USA Topo / World Imagery) |
 
 ---
 
@@ -35,7 +74,7 @@ sudo -u postgres createdb h2oflow
 
 # 2. Copy and fill in environment variables
 cp apps/api/.env.example apps/api/.env
-# Required: DATABASE_URL, ANTHROPIC_API_KEY
+# Required: DATABASE_URL, ANTHROPIC_API_KEY, VOYAGE_API_KEY
 
 # 3. Start the API (auto-runs migrations on startup)
 cd apps/api
@@ -76,23 +115,26 @@ apps/
     cmd/
       server/         Main entrypoint (Chi router, migrations, poller)
       seed-reaches/   Upserts Front Range reaches + AI-generated content
-      seed-flow-ranges/  Seeds flow bands for gauge+reach pairs
-      seed-state-reaches/ Broader CO inventory
+      embed-reaches/  Embeds reach content chunks into pgvector
+      seed-flow-ranges/   Seeds flow bands for gauge+reach pairs
       seed-usgs-states/   Bulk USGS gauge import
     internal/
-      ai/             Claude seeder (reach descriptions, rapids, access, flow ranges)
+      ai/             Claude + Voyage AI (RAG asker, reach seeder, search enrichment)
       handlers/       HTTP route handlers
+      osm/            Overpass API client + reach centerline fetch
       poller/         Gauge polling scheduler (trusted/demand/cold tiers)
       config/         Environment config
-    migrations/       golang-migrate SQL files (026 migrations)
+    migrations/       golang-migrate SQL files (031 migrations)
   web/                Nuxt 4 frontend
     app/
-      pages/          Dashboard (index), reach detail
-      components/     GaugeCard, GaugeSearchModal, graphs, sparklines
-      composables/    useWatchlistRefresh, useGaugeGraph, useTripRecording
+      pages/          Landing, dashboard, explore, reach detail
+      components/
+        map/          DashboardMap, ReachesMap, ReachMap (MapLibre)
+        gauge/        GaugeCard, GaugeGraph, GaugeSparkline
+      composables/    useWatchlistRefresh, useGaugeGraph
       stores/         Pinia — watchlist (persisted to localStorage)
 packages/
-  gauge-core/         Gauge source adapter interface + USGS/DWR/HUC implementations
+  gauge-core/         Gauge source adapter interface + USGS/DWR implementations
 ```
 
 ---

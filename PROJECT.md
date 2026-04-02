@@ -1,4 +1,4 @@
-# H2OFlow — Project Context & Decision Log
+# H2OFlows — Project Context & Decision Log
 
 > This document captures the full planning conversation and all key decisions
 > made during the initial project design phase. Keep it at the repo root or
@@ -12,7 +12,7 @@
 
 | Item | Value |
 |---|---|
-| Project name | H2OFlow |
+| Project name | H2OFlows |
 | Canonical domain | h2oflow.org |
 | Redirect | h2omotion.org → h2oflow.org |
 | GitHub org | h2oflow |
@@ -29,13 +29,13 @@ The whitewater community currently uses a fragmented stack: USGS/Grafana dashboa
 
 American Whitewater has the closest thing to a unified platform but their reach data is proprietary and their tools are outdated. RiverApp is commercial and closed. There is no open, community-owned alternative.
 
-H2OFlow is the open data layer the whitewater community should have had for years. The core insight: **this is a data platform, not a social network**. Discord, Facebook, and SMS handle the social layer well enough. The gap is structured, queryable, geographically precise river data tied to real-time conditions — accessible to anyone via a free API.
+H2OFlows is the open data layer the whitewater community should have had for years. The core insight: **this is a data platform, not a social network**. Discord, Facebook, and SMS handle the social layer well enough. The gap is structured, queryable, geographically precise river data tied to real-time conditions — accessible to anyone via a free API.
 
 ---
 
 ## The wedge feature
 
-**Multi-gauge aggregate dashboard.** A paddler checks 3 rivers every morning before deciding where to go. Right now that's 3 tabs, 3 different graph scales, manual mental comparison. H2OFlow shows all 3 on one graph, same scale, with community-defined flow range bands (green = optimal, yellow = high, red = too much) overlaid. One glance answers the question.
+**Multi-gauge aggregate dashboard.** A paddler checks 3 rivers every morning before deciding where to go. Right now that's 3 tabs, 3 different graph scales, manual mental comparison. H2OFlows shows all 3 on one graph, same scale, with community-defined flow range bands (green = optimal, yellow = high, red = too much) overlaid. One glance answers the question.
 
 This is the feature that gets the first 30 users. Everything else follows.
 
@@ -236,7 +236,7 @@ Colorado first. The beta group can personally verify every reach in the initial 
 
 ## Discord integration
 
-Community context: Colorado Whitewater Discord server already exists and has the target community. H2OFlow doesn't replace it — it feeds data into it.
+Community context: Colorado Whitewater Discord server already exists and has the target community. H2OFlows doesn't replace it — it feeds data into it.
 
 **Phase 1 (launch) — explicit commands only:**
 ```
@@ -285,7 +285,7 @@ Phase 3 with human confirmation is likely the correct permanent state. Data qual
 
 ## Public API design
 
-H2OFlow is the open data layer. The app is just the first consumer of its own API.
+H2OFlows is the open data layer. The app is just the first consumer of its own API.
 
 Every endpoint built for the frontend is also a public API endpoint. API token issuance starts in Phase 3.
 

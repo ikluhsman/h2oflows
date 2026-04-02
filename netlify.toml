@@ -1,0 +1,18 @@
+[build]
+  base    = "apps/web"
+  command = "npm run build"
+  publish = ".output/public"
+
+[build.environment]
+  # Point the frontend at the production API.
+  # Override per deploy context below for branch previews pointing at the same API.
+  NUXT_PUBLIC_API_BASE = "https://api.h2oflows.app"
+  NODE_VERSION         = "20"
+
+# Branch deploy previews — same API, unique preview URL per branch/commit.
+# Share the Netlify preview URL with the AW team to demo specific feature branches.
+[context.deploy-preview.environment]
+  NUXT_PUBLIC_API_BASE = "https://api.h2oflows.app"
+
+[context.branch-deploy.environment]
+  NUXT_PUBLIC_API_BASE = "https://api.h2oflows.app"

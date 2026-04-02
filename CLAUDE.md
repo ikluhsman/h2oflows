@@ -1,4 +1,4 @@
-# H2OFlow — Claude Code Guide
+# H2OFlows — Claude Code Guide
 
 ## Project docs
 

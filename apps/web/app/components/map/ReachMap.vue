@@ -21,10 +21,16 @@
       </div>
       <!-- Bottom-left controls -->
       <div v-if="mapReady" class="absolute bottom-7 left-2 z-10 flex gap-1">
-        <button
-          class="text-xs bg-white/90 dark:bg-gray-800/90 rounded-md px-2 py-1 shadow border border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-          @click="toggleBasemap"
-        >{{ basemap === 'street' ? '🛰 Satellite' : '🗺 Street' }}</button>
+        <div class="flex rounded-md shadow overflow-hidden border border-gray-200 dark:border-gray-600 text-xs font-medium">
+          <button
+            v-for="opt in BASEMAP_OPTIONS" :key="opt.value"
+            class="px-2 py-1 transition-colors"
+            :class="basemap === opt.value
+              ? 'bg-blue-600 text-white'
+              : 'bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
+            @click="setBasemap(opt.value)"
+          >{{ opt.label }}</button>
+        </div>
         <button
           v-if="allFeatures.length > 0 || centerline"
           class="text-xs bg-white/90 dark:bg-gray-800/90 rounded-md px-2 py-1 shadow border border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -189,7 +195,12 @@ const hasCoords = computed(() =>
 const container  = ref<HTMLDivElement>()
 const mapReady   = ref(false)
 const selectedId = ref<string | null>(null)
-const basemap    = ref<'street' | 'satellite'>('street')
+const basemap = ref<'street' | 'topo' | 'satellite'>('topo')
+const BASEMAP_OPTIONS = [
+  { value: 'street',    label: 'Street'    },
+  { value: 'topo',      label: 'Topo'      },
+  { value: 'satellite', label: 'Satellite' },
+] as const
 let map: maplibregl.Map | null = null
 let clickPopup: maplibregl.Popup | null = null
 let classBadge: maplibregl.Marker | null = null
@@ -210,12 +221,19 @@ onMounted(async () => {
       version: 8,
       glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
       sources: {
-        osm: {
+        street: {
           type: 'raster',
-          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'],
           tileSize: 256,
-          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-          maxzoom: 19,
+          attribution: 'Tiles © Esri — Esri, DeLorme, NAVTEQ',
+          maxzoom: 18,
+        },
+        topo: {
+          type: 'raster',
+          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/USA_Topo_Maps/MapServer/tile/{z}/{y}/{x}'],
+          tileSize: 256,
+          attribution: 'Tiles © Esri — USGS, NPS',
+          maxzoom: 15,
         },
         esri: {
           type: 'raster',
@@ -226,8 +244,9 @@ onMounted(async () => {
         },
       },
       layers: [
-        { id: 'osm-tiles',  type: 'raster', source: 'osm',  layout: { visibility: 'visible' } },
-        { id: 'esri-tiles', type: 'raster', source: 'esri', layout: { visibility: 'none' } },
+        { id: 'street-tiles', type: 'raster', source: 'street', layout: { visibility: 'none'    } },
+        { id: 'topo-tiles',   type: 'raster', source: 'topo',   layout: { visibility: 'visible' } },
+        { id: 'esri-tiles',   type: 'raster', source: 'esri',   layout: { visibility: 'none'    } },
       ],
     },
     center:   [props.gaugeLng ?? -105.5, props.gaugeLat ?? 39.2],
@@ -411,12 +430,12 @@ function setSelectedMarker(id: string) {
 
 // ── Basemap toggle ────────────────────────────────────────────────────────────
 
-function toggleBasemap() {
+function setBasemap(value: 'street' | 'topo' | 'satellite') {
   if (!map) return
-  const toSat = basemap.value === 'street'
-  basemap.value = toSat ? 'satellite' : 'street'
-  map.setLayoutProperty('osm-tiles',  'visibility', toSat ? 'none'    : 'visible')
-  map.setLayoutProperty('esri-tiles', 'visibility', toSat ? 'visible' : 'none')
+  basemap.value = value
+  map.setLayoutProperty('street-tiles', 'visibility', value === 'street'    ? 'visible' : 'none')
+  map.setLayoutProperty('topo-tiles',   'visibility', value === 'topo'      ? 'visible' : 'none')
+  map.setLayoutProperty('esri-tiles',   'visibility', value === 'satellite' ? 'visible' : 'none')
 }
 
 // ── KML export ────────────────────────────────────────────────────────────────
@@ -580,13 +599,13 @@ function fitBounds() {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// Color the reach centerline by max rapid class rating.
+// Color the reach centerline by difficulty — matches the home map scale.
 function reachLineColor(maxRating: number | null): string {
-  if (maxRating == null) return '#3b82f6'  // blue  — no class data
-  if (maxRating <= 2)    return '#22c55e'  // green — Class I–II
-  if (maxRating <= 3)    return '#eab308'  // yellow — Class III
-  if (maxRating <= 4)    return '#f97316'  // orange — Class IV
-  return '#ef4444'                          // red   — Class V+
+  if (maxRating == null) return '#6b7280'  // gray — no class data
+  if (maxRating < 2.5)   return '#16a34a'  // green  — Class I–II
+  if (maxRating < 3.5)   return '#3b82f6'  // blue   — Class III
+  if (maxRating < 5.0)   return '#111827'  // black  — Class IV (incl. IV+)
+  return '#111827'                          // black  — Class V
 }
 
 function formatClass(v: number): string {

@@ -57,15 +57,15 @@
 
     <!-- Flow range legend + provenance -->
     <div v-if="flowRanges.length > 0" class="space-y-1">
-      <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500">
+      <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-700 dark:text-gray-300">
         <span
           v-for="fr in flowRanges"
           :key="fr.label"
           class="flex items-center gap-1.5"
         >
-          <span class="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" :style="{ background: bandColor(fr.label) }" />
+          <span class="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" :style="{ background: bandColorSolid(fr.label) }" />
           <span class="font-medium">{{ labelDisplay(fr.label) }}</span>
-          <span class="text-gray-400">
+          <span class="text-gray-500 dark:text-gray-400">
             {{ fr.min_cfs != null ? fr.min_cfs.toLocaleString() : '—' }}–{{ fr.max_cfs != null ? fr.max_cfs.toLocaleString() : '∞' }} cfs
           </span>
           <DataSourceBadge
@@ -226,9 +226,24 @@ const BAND_COLORS: Record<string, string> = {
   flood:   'rgba(239,68,68,0.30)',
 }
 
-// bandColor returns the fill color for a flow range label (used by legend too).
+// bandColor returns the translucent fill used on the chart bands.
 function bandColor(label: string): string {
   return BAND_COLORS[label] ?? 'rgba(156,163,175,0.10)'
+}
+
+const BAND_COLORS_SOLID: Record<string, string> = {
+  too_low: '#ef4444',
+  minimum: '#f97316',
+  fun:     '#22c55e',
+  optimal: '#10b981',
+  pushy:   '#eab308',
+  high:    '#f97316',
+  flood:   '#ef4444',
+}
+
+// bandColorSolid returns a fully opaque swatch color for the legend.
+function bandColorSolid(label: string): string {
+  return BAND_COLORS_SOLID[label] ?? '#9ca3af'
 }
 
 function drawBands(u: uPlot, ranges: FlowRange[]) {

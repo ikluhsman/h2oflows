@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -9,17 +11,19 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/h2oflow/h2oflow/apps/api/internal/ai"
 	"github.com/h2oflow/h2oflow/apps/api/internal/osm"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // ReachHandler handles reach-related HTTP routes.
 type ReachHandler struct {
-	db *pgxpool.Pool
+	db    *pgxpool.Pool
+	asker *ai.ReachAsker
 }
 
-func NewReachHandler(db *pgxpool.Pool) *ReachHandler {
-	return &ReachHandler{db: db}
+func NewReachHandler(db *pgxpool.Pool, asker *ai.ReachAsker) *ReachHandler {
+	return &ReachHandler{db: db, asker: asker}
 }
 
 // Map handles GET /api/v1/reaches/map
@@ -747,6 +751,127 @@ func (j rawJSON) MarshalJSON() ([]byte, error) {
 }
 
 // parseBBoxParam parses bbox=west,south,east,north from the query string.
+// GlobalAsk handles POST /api/v1/ask
+//
+// Accepts {"question": "..."}, identifies the reach from the question text,
+// then answers using that reach's embedded content.
+// Returns the answer plus the matched reach slug and name.
+func (h *ReachHandler) GlobalAsk(w http.ResponseWriter, r *http.Request) {
+	if h.asker == nil {
+		errorResponse(w, http.StatusServiceUnavailable, "river assistant not configured")
+		return
+	}
+
+	var body struct {
+		Question string `json:"question"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Question) == "" {
+		errorResponse(w, http.StatusBadRequest, "question is required")
+		return
+	}
+
+	// Load all reach slugs for identification.
+	rows, err := h.db.Query(r.Context(), `SELECT slug, name FROM reaches ORDER BY name`)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "could not load reaches")
+		return
+	}
+	defer rows.Close()
+	type reachStub struct{ slug, name string }
+	var all []reachStub
+	slugs := []string{}
+	for rows.Next() {
+		var s reachStub
+		rows.Scan(&s.slug, &s.name)
+		all = append(all, s)
+		slugs = append(slugs, s.slug)
+	}
+
+	askCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Step 1 — identify reach.
+	identified, err := h.asker.IdentifyReach(askCtx, body.Question, slugs)
+	if err != nil {
+		log.Printf("global ask identify: %v", err)
+		errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("could not identify reach: %v", err))
+		return
+	}
+
+	if identified.Slug == "" {
+		jsonResponse(w, http.StatusOK, map[string]string{
+			"answer": "I couldn't identify a specific reach from your question. Try asking about a named run — for example, \"What flows are good for Browns Canyon?\"",
+		})
+		return
+	}
+
+	// Look up reach ID and name.
+	var reachID, reachName string
+	if err := h.db.QueryRow(r.Context(), `SELECT id, name FROM reaches WHERE slug = $1`, identified.Slug).Scan(&reachID, &reachName); err != nil {
+		errorResponse(w, http.StatusNotFound, "reach not found")
+		return
+	}
+
+	// Step 2 — answer.
+	answer, err := h.asker.Answer(askCtx, reachID, reachName, identified.Question)
+	if err != nil {
+		log.Printf("global ask answer [%s]: %v", identified.Slug, err)
+		errorResponse(w, http.StatusInternalServerError, "could not generate answer")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"answer":     answer,
+		"reach_slug": identified.Slug,
+		"reach_name": reachName,
+	})
+}
+
+// Ask handles POST /api/v1/reaches/{slug}/ask
+//
+// Accepts {"question": "..."} and returns Claude's answer grounded in the
+// reach's embedded content (rapids, access points, descriptions, flow ranges).
+// Returns 503 if the AI keys are not configured.
+func (h *ReachHandler) Ask(w http.ResponseWriter, r *http.Request) {
+	if h.asker == nil {
+		errorResponse(w, http.StatusServiceUnavailable, "river assistant not configured")
+		return
+	}
+
+	slug := chi.URLParam(r, "slug")
+
+	var body struct {
+		Question string `json:"question"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || strings.TrimSpace(body.Question) == "" {
+		errorResponse(w, http.StatusBadRequest, "question is required")
+		return
+	}
+
+	// Look up the reach ID and name by slug.
+	var reachID, reachName string
+	err := h.db.QueryRow(r.Context(), `
+		SELECT id, name FROM reaches WHERE slug = $1
+	`, slug).Scan(&reachID, &reachName)
+	if err != nil {
+		errorResponse(w, http.StatusNotFound, "reach not found")
+		return
+	}
+
+	// Use a detached context with a generous timeout — Voyage's free tier (3 RPM)
+	// can retry up to 22s, which outlasts the default HTTP request context.
+	askCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	answer, err := h.asker.Answer(askCtx, reachID, reachName, body.Question)
+	if err != nil {
+		log.Printf("reach ask [%s]: %v", slug, err)
+		errorResponse(w, http.StatusInternalServerError, "could not generate answer")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"answer": answer})
+}
+
 // Required for the reach map endpoint — without a viewport bound the result
 // set could be enormous.
 func parseBBoxParam(r *http.Request) (*searchBBox, error) {

@@ -34,7 +34,7 @@
             </p>
           </div>
 
-          <div class="flex items-center gap-2 flex-shrink-0">
+          <div class="flex items-center gap-2 shrink-0">
             <!-- Class badge -->
             <span class="rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 font-bold text-sm">
               {{ classLabel }}
@@ -57,27 +57,6 @@
           </span>
         </div>
         <div v-else class="mt-4 text-gray-400 text-sm">No recent gauge reading</div>
-      </section>
-
-      <!-- Description -->
-      <section v-if="reach.description">
-        <div class="flex items-center gap-2 mb-2">
-          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">About</h2>
-          <DataSourceBadge
-            :source="(reach.description_source as any) ?? 'ai_seed'"
-            :verified="reach.description_verified"
-            :confidence="reach.description_ai_confidence ?? undefined"
-          />
-        </div>
-        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line">
-          {{ reach.description }}
-        </div>
-      </section>
-
-      <!-- 48h graph + diurnal banner -->
-      <section v-if="reach.gauge.id" class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">48-Hour Flow</h2>
-        <GaugeGraph :gauge-id="reach.gauge.id" :current-cfs="reach.gauge.current_cfs" />
       </section>
 
       <!-- Reach map -->
@@ -122,6 +101,124 @@
             :gauge-lat="reach.gauge.lat"
           />
         </ClientOnly>
+      </section>
+
+      <!-- Description -->
+      <section v-if="reach.description">
+        <div class="flex items-center gap-2 mb-2">
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">About</h2>
+          <DataSourceBadge
+            :source="(reach.description_source as any) ?? 'ai_seed'"
+            :verified="reach.description_verified"
+            :confidence="reach.description_ai_confidence ?? undefined"
+          />
+        </div>
+        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line">
+          {{ reach.description }}
+        </div>
+      </section>
+
+      <!-- River assistant -->
+      <section class="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+        <button
+          class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          @click="showChat = !showChat"
+        >
+          <div class="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Ask about this reach</span>
+            <span class="text-xs text-gray-400 hidden sm:inline">· AI answers based on reach data</span>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': showChat }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </button>
+
+        <div v-if="showChat" class="p-4 space-y-4">
+          <!-- Message thread -->
+          <div v-if="chatMessages.length" class="space-y-3 max-h-96 overflow-y-auto pr-1">
+            <div
+              v-for="(msg, i) in chatMessages"
+              :key="i"
+              class="flex gap-2.5"
+              :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
+            >
+              <!-- Assistant avatar -->
+              <div v-if="msg.role === 'assistant'" class="w-6 h-6 rounded-full bg-sky-100 dark:bg-sky-900 flex items-center justify-center shrink-0 mt-0.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+
+              <div
+                class="rounded-xl px-3 py-2 text-sm max-w-prose"
+                :class="msg.role === 'user'
+                  ? 'bg-sky-500 text-white rounded-br-sm'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-sm'"
+              >
+                <div class="whitespace-pre-wrap">{{ msg.content }}</div>
+              </div>
+            </div>
+
+            <!-- Typing indicator -->
+            <div v-if="chatLoading" class="flex gap-2.5 justify-start">
+              <div class="w-6 h-6 rounded-full bg-sky-100 dark:bg-sky-900 flex items-center justify-center shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              <div class="rounded-xl rounded-bl-sm bg-gray-100 dark:bg-gray-800 px-3 py-2">
+                <span class="flex gap-1 items-center h-5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0ms"/>
+                  <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 150ms"/>
+                  <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 300ms"/>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Suggested questions (only before first message) -->
+          <div v-if="!chatMessages.length" class="flex flex-wrap gap-2">
+            <button
+              v-for="q in suggestedQuestions"
+              :key="q"
+              class="text-xs rounded-full border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-gray-600 dark:text-gray-400 hover:border-sky-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
+              @click="sendQuestion(q)"
+            >
+              {{ q }}
+            </button>
+          </div>
+
+          <!-- Input -->
+          <form class="flex gap-2" @submit.prevent="sendQuestion(chatInput)">
+            <input
+              v-model="chatInput"
+              type="text"
+              placeholder="Ask anything about this reach…"
+              :disabled="chatLoading"
+              class="flex-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              :disabled="chatLoading || !chatInput.trim()"
+              class="rounded-lg bg-sky-500 hover:bg-sky-600 disabled:opacity-40 px-3 py-2 text-white transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </form>
+
+          <p v-if="chatError" class="text-xs text-red-500">{{ chatError }}</p>
+        </div>
+      </section>
+
+      <!-- 48h graph -->
+      <section v-if="reach.gauge.id" class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">48-Hour Flow</h2>
+        <GaugeGraph :gauge-id="reach.gauge.id" :current-cfs="reach.gauge.current_cfs" />
       </section>
 
       <!-- Related reaches -->
@@ -285,7 +382,7 @@ const statusLabel = computed(() => {
 // ---- SEO --------------------------------------------------------------------
 
 const metaTitle = computed(() => {
-  if (!reach.value) return 'H2OFlow'
+  if (!reach.value) return 'H2OFlows'
   const cfs = reach.value.gauge?.current_cfs
   return `${reach.value.name} | ${classLabel.value} | ${cfs != null ? `${cfs.toLocaleString()} cfs — ${statusLabel.value}` : reach.value.region}`
 })
@@ -366,6 +463,53 @@ async function fetchCenterline() {
     centerlineError.value = err?.message ?? 'Network error'
   } finally {
     fetchingCenterline.value = false
+  }
+}
+
+// ---- River assistant chat ---------------------------------------------------
+
+const showChat      = ref(false)
+const chatMessages  = ref<{ role: 'user' | 'assistant'; content: string }[]>([])
+const chatInput     = ref('')
+const chatLoading   = ref(false)
+const chatError     = ref<string | null>(null)
+
+const suggestedQuestions = computed(() => {
+  const r = reach.value as any
+  if (!r) return []
+  const base = [
+    'What flows are best?',
+    'What should I scout?',
+    'How do I get to the put-in?',
+  ]
+  if ((r.class_max ?? 0) >= 4) base.push('How committing is this run?')
+  return base
+})
+
+async function sendQuestion(question: string) {
+  const q = question.trim()
+  if (!q || chatLoading.value) return
+  chatInput.value = ''
+  chatError.value = null
+  chatMessages.value.push({ role: 'user', content: q })
+  chatLoading.value = true
+  try {
+    const res = await fetch(
+      `${config.public.apiBase}/api/v1/reaches/${route.params.slug}/ask`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q }),
+      }
+    )
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error ?? `Server error ${res.status}`)
+    chatMessages.value.push({ role: 'assistant', content: json.answer })
+  } catch (err: any) {
+    chatError.value = err?.message ?? 'Something went wrong'
+    chatMessages.value.pop() // remove the user message if we got nothing back
+  } finally {
+    chatLoading.value = false
   }
 }
 

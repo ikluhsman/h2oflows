@@ -1,0 +1,1 @@
+-- Nothing to undo — the index was dropped in the up migration.

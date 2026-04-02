@@ -108,7 +108,7 @@ func (s *FlowRangeSeeder) DataSource() string {
 	return "ai_seed"
 }
 
-const flowRangeSystemPrompt = `You are a whitewater paddling data assistant for H2OFlow. Your job is to produce accurate river flow range data for a given gauge and reach combination.
+const flowRangeSystemPrompt = `You are a whitewater paddling data assistant for H2OFlows. Your job is to produce accurate river flow range data for a given gauge and reach combination.
 
 Flow ranges define the cfs (cubic feet per second) bands at which a whitewater river section is paddleable and at what difficulty level. This data is shown to experienced paddlers — accuracy matters. A Class 5 kayaker who sees wrong flow data will distrust the entire platform.
 

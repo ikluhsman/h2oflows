@@ -20,7 +20,7 @@ type TrackPoint struct {
 	ElevM     *float64  `json:"elev_m,omitempty"`     // if available from source
 }
 
-// TrackContext is what H2OFlow already knows about the reach this track likely covers.
+// TrackContext is what H2OFlows already knows about the reach this track likely covers.
 type TrackContext struct {
 	ReachName     string
 	ReachSlug     string
@@ -85,7 +85,7 @@ func NewTrackAnalyzer(apiKey string) *TrackAnalyzer {
 	return &TrackAnalyzer{client: anthropic.NewClient(option.WithAPIKey(apiKey))}
 }
 
-const trackSystemPrompt = `You are a GPS track analyst for H2OFlow, a whitewater paddling platform.
+const trackSystemPrompt = `You are a GPS track analyst for H2OFlows, a whitewater paddling platform.
 
 You will receive a GPS track from a paddling trip alongside existing location data for a river reach (put-in, take-out, rapids, access waypoints). The track has already been pre-filtered to remove vehicle-speed movement (>15mph), but may still include walking to/from parking and shuttle logistics. Your job is to reason about what the track tells us and suggest improvements to the existing data.
 

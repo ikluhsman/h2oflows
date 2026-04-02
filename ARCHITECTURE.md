@@ -1,4 +1,4 @@
-# H2OFlow — Architecture & Vision
+# H2OFlows — Architecture & Vision
 
 > Open source whitewater platform, built by paddlers for paddlers.
 > https://h2oflow.org
@@ -7,9 +7,9 @@
 
 ## What this is
 
-H2OFlow is a community-owned, open source platform for whitewater enthusiasts. At its core it is a **streamflow data platform** — a beautiful, fast, customizable gauge dashboard that works better than anything else available, backed by an open reach registry that the entire whitewater community can build on and query freely.
+H2OFlows is a community-owned, open source platform for whitewater enthusiasts. At its core it is a **streamflow data platform** — a beautiful, fast, customizable gauge dashboard that works better than anything else available, backed by an open reach registry that the entire whitewater community can build on and query freely.
 
-It is not a social network. Discord, Facebook, and SMS fill that role well enough. H2OFlow fills the gap those platforms can't: structured, geographically precise river data tied to real-time conditions, accessible via a clean public API that any service can consume.
+It is not a social network. Discord, Facebook, and SMS fill that role well enough. H2OFlows fills the gap those platforms can't: structured, geographically precise river data tied to real-time conditions, accessible via a clean public API that any service can consume.
 
 The platform is free, open source, and will remain so. The data belongs to the community.
 
@@ -21,7 +21,7 @@ Right now a Colorado paddler checking conditions before a morning run opens mult
 
 American Whitewater has reach data but keeps it locked. RiverApp is commercial and closed. USGS is authoritative but raw. The geographic data that defines where paddlers actually put on and take out rivers doesn't exist in any open, structured form.
 
-H2OFlow builds that open data layer — and gives it back to the community as a free API.
+H2OFlows builds that open data layer — and gives it back to the community as a free API.
 
 ---
 
@@ -33,7 +33,7 @@ H2OFlow builds that open data layer — and gives it back to the community as a 
 
 **Local-first.** Trip data lives on the user's device first. The app works offline at the put-in where there's no signal. Cloud sync is optional.
 
-**Open API.** All community-contributed data is freely accessible via API to anyone with an account or token. H2OFlow is the data infrastructure. The app is just the first consumer of its own API.
+**Open API.** All community-contributed data is freely accessible via API to anyone with an account or token. H2OFlows is the data infrastructure. The app is just the first consumer of its own API.
 
 **Complexity scales with the trip.** A gauge check should take 3 seconds. A day trip 30 seconds. A permit trip has every tool it needs. The UI adapts to the use case.
 
@@ -368,7 +368,7 @@ POST /api/v1/reaches/{slug}/reports      (authenticated)
 ```
 
 Rate limits: 1000 req/hour free, elevated for community tools, commercial tier for outfitters.
-Attribution requested: "data sourced from H2OFlow community (h2oflow.org)"
+Attribution requested: "data sourced from H2OFlows community (h2oflow.org)"
 
 ---
 
@@ -443,7 +443,7 @@ Self-hosted instances can optionally federate reach edits and hazard data back t
 
 ## Reach data bootstrap
 
-Rather than OSM import (inconsistent tagging, requires human cleanup), H2OFlow uses an AI seeder backed by Claude's training knowledge, which includes American Whitewater data, published guidebooks (Caudill, Stohlquist, Nealy), and years of paddling trip reports.
+Rather than OSM import (inconsistent tagging, requires human cleanup), H2OFlows uses an AI seeder backed by Claude's training knowledge, which includes American Whitewater data, published guidebooks (Caudill, Stohlquist, Nealy), and years of paddling trip reports.
 
 ```
 Reach definition (slug, name, class, gauge IDs) → AI seeder → rapids + access + flow ranges + description

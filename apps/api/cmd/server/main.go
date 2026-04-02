@@ -42,7 +42,7 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{"http://localhost:3000", "https://*.h2oflow.app"},
+		AllowedOrigins: []string{"http://localhost:3000", "https://*.h2oflows.app", "https://h2oflows.app"},
 		AllowedMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type"},
 		MaxAge:         300,
@@ -60,6 +60,14 @@ func main() {
 		log.Println("ANTHROPIC_API_KEY not set — AI search enrichment disabled")
 	}
 
+	// River assistant (RAG) — requires both Voyage and Anthropic keys.
+	var asker *ai.ReachAsker
+	if cfg.VoyageAPIKey != "" && cfg.AnthropicAPIKey != "" {
+		asker = ai.NewReachAsker(pool, cfg.VoyageAPIKey, cfg.AnthropicAPIKey)
+	} else {
+		log.Println("VOYAGE_API_KEY not set — river assistant (/ask) disabled")
+	}
+
 	// Start gauge poller — runs in background, survives HTTP errors.
 	pollInterval := cfg.ParsePollInterval()
 	p := poller.New(pool)
@@ -69,7 +77,7 @@ func main() {
 	go p.Run(pollerCtx)
 
 	gauges := handlers.NewGaugeHandler(pool, enricher, p)
-	reaches := handlers.NewReachHandler(pool)
+	reaches := handlers.NewReachHandler(pool, asker)
 	trips   := handlers.NewTripHandler(pool)
 	imports := &handlers.Import{Pool: pool}
 	r.Route("/api/v1", func(r chi.Router) {
@@ -85,6 +93,8 @@ func main() {
 		r.Get("/reaches/{slug}/conditions", reaches.GetConditions)
 		r.Get("/reaches/{slug}/hazards", reaches.GetHazards)
 		r.Post("/reaches/{slug}/fetch-centerline", reaches.FetchCenterline)
+		r.Post("/reaches/{slug}/ask", reaches.Ask)
+		r.Post("/ask", reaches.GlobalAsk)
 
 		r.Post("/trips", trips.Create)
 

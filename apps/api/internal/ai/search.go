@@ -1,4 +1,4 @@
-// Package ai provides Claude-backed enrichment for H2OFlow search and scoring.
+// Package ai provides Claude-backed enrichment for H2OFlows search and scoring.
 package ai
 
 import (
@@ -41,7 +41,7 @@ func NewSearchEnricher(apiKey string) *SearchEnricher {
 	return &SearchEnricher{client: anthropic.NewClient(option.WithAPIKey(apiKey))}
 }
 
-const enrichSystemPrompt = `You are a search assistant for H2OFlow, a whitewater paddling data platform.
+const enrichSystemPrompt = `You are a search assistant for H2OFlows, a whitewater paddling data platform.
 
 Your job: given a paddler's free-text search query, return a JSON object that helps the platform find the right river gauges.
 

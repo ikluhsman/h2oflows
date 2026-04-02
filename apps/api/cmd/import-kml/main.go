@@ -1,5 +1,5 @@
 // import-kml imports reach features (rapids, access points, centerlines) from
-// a Google My Maps KML export into the H2OFlow database.
+// a Google My Maps KML export into the H2OFlows database.
 //
 // Map conventions:
 //   - One Folder per reach — folder name matched to reaches.name or slug

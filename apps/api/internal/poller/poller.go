@@ -308,6 +308,10 @@ func (p *Poller) backfillSource(ctx context.Context, sc sourceConfig) {
 		WHERE  g.source = $1
 		  AND  g.status NOT IN ('retired', 'inactive')
 		  AND  (
+		           g.featured = TRUE
+		           OR g.last_requested_at > NOW() - $2::interval
+		       )
+		  AND  (
 		           -- no readings at all in the window
 		           NOT EXISTS (
 		               SELECT 1 FROM gauge_readings gr
@@ -318,7 +322,7 @@ func (p *Poller) backfillSource(ctx context.Context, sc sourceConfig) {
 		           OR eg.gauge_id IS NOT NULL
 		           OR tg.gauge_id IS NOT NULL
 		       )
-	`, sourceType)
+	`, sourceType, demandWindow)
 	if err != nil {
 		log.Printf("poller: backfill query [%s]: %v", sourceType, err)
 		return

@@ -16,6 +16,7 @@ export function useWatchlistRefresh() {
       const data = await res.json()
       for (const f of data.features ?? []) {
         const p = f.properties
+        const coords = f.geometry?.coordinates as [number, number] | undefined
         store.refreshFromApi({
           id:            p.id,
           externalId:    p.external_id,
@@ -32,6 +33,8 @@ export function useWatchlistRefresh() {
           watershedName: p.watershed_name ?? null,
           basinName:     p.basin_name ?? null,
           stateAbbr:     p.state_abbr ?? null,
+          lng:           coords?.[0] ?? null,
+          lat:           coords?.[1] ?? null,
           currentCfs:    p.current_cfs ?? null,
           flowStatus:    p.flow_status ?? 'unknown',
           flowBandLabel: p.flow_band_label ?? null,

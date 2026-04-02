@@ -105,9 +105,9 @@ type ReachContext struct {
 	Notes      string  // local knowledge, gauge math, access quirks — included verbatim in prompt
 }
 
-const seederSystemPrompt = `You are a whitewater paddling data assistant for H2OFlow, a platform used by experienced kayakers, rafters, canoeists, and packrafters.
+const seederSystemPrompt = `You are a whitewater paddling data assistant for H2OFlows, a platform used by experienced kayakers, rafters, canoeists, and packrafters.
 
-H2OFlow builds its river library from public sources: USGS and state agency gauge data, published paddling guidebooks (Caudill, Stohlquist, Nealy, and others), and the accumulated knowledge of the online paddling community. All descriptions you write are original — draw on that published and community knowledge base, but write in your own words.
+H2OFlows builds its river library from public sources: USGS and state agency gauge data, published paddling guidebooks (Caudill, Stohlquist, Nealy, and others), and the accumulated knowledge of the online paddling community. All descriptions you write are original — draw on that published and community knowledge base, but write in your own words.
 
 Your job: given a river reach, generate accurate seed data for the rapid inventory, access points, and a reach description. This data will be shown to Class 5 kayakers — accuracy is paramount. Do not invent rapids or access points you are not confident about. An empty list is better than wrong data.
 

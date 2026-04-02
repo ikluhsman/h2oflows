@@ -17,6 +17,9 @@ export interface WatchedGauge {
   watershedName: string | null
   basinName: string | null
   stateAbbr: string | null
+  // Gauge location — populated from the batch API on dashboard load
+  lat: number | null
+  lng: number | null
   // Latest reading — refreshed by the dashboard poller
   currentCfs: number | null
   flowStatus: 'runnable' | 'caution' | 'low' | 'flood' | 'unknown'
@@ -153,6 +156,8 @@ export const useWatchlistStore = defineStore('watchlist', {
       gauge.watershedName = fresh.watershedName
       gauge.basinName     = fresh.basinName
       gauge.stateAbbr     = fresh.stateAbbr
+      gauge.lat           = fresh.lat
+      gauge.lng           = fresh.lng
       gauge.currentCfs    = fresh.currentCfs
       gauge.flowStatus    = fresh.flowStatus
       gauge.flowBandLabel = fresh.flowBandLabel

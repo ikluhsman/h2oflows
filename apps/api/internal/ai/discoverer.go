@@ -39,7 +39,7 @@ func NewReachDiscoverer(apiKey string) *ReachDiscoverer {
 	return &ReachDiscoverer{client: anthropic.NewClient(option.WithAPIKey(apiKey))}
 }
 
-const discovererSystemPrompt = `You are a whitewater paddling reference for H2OFlow, a river gauge monitoring platform for kayakers, rafters, and packrafters.
+const discovererSystemPrompt = `You are a whitewater paddling reference for H2OFlows, a river gauge monitoring platform for kayakers, rafters, and packrafters.
 
 Task: given a US state, list the notable whitewater sections that intermediate-to-expert paddlers would want gauge data for.
 
