@@ -1,7 +1,7 @@
 [build]
   base    = "apps/web"
   command = "npx nuxt generate"
-  publish = ".output/public"
+  publish = "dist"
 
 [build.environment]
   # Point the frontend at the production API.
