@@ -1,6 +1,6 @@
 [build]
   base    = "apps/web"
-  command = "npm run build"
+  command = "npm install --legacy-peer-deps && npm run build"
   publish = ".output/public"
 
 [build.environment]
