@@ -37,9 +37,4 @@ export default defineNuxtConfig({
     strict: true,
   },
 
-  // Use the Netlify SSR adapter when building for production on Netlify.
-  // Ignored in local dev. Self-hosted Docker builds override this via NITRO_PRESET env var.
-  nitro: {
-    preset: process.env.NITRO_PRESET ?? 'netlify',
-  },
 })
