@@ -1,6 +1,15 @@
 <template>
   <div class="min-h-screen flex flex-col bg-white dark:bg-gray-950">
 
+    <!-- Demo banner -->
+    <div v-if="showDemoBanner" class="bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800 px-4 py-2.5 flex items-center justify-between gap-4 text-sm">
+      <p class="text-amber-800 dark:text-amber-200 text-center flex-1">
+        <span class="font-semibold">Demo only.</span>
+        This build is for feature demonstration purposes. River data is AI-seeded and unverified — do not use for trip planning or safety decisions.
+      </p>
+      <button @click="dismissBanner" class="shrink-0 text-amber-600 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-100 font-medium transition-colors">Dismiss</button>
+    </div>
+
     <!-- Header -->
     <header class="shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
       <div class="flex items-center gap-2">
@@ -181,6 +190,15 @@ import { ref, onMounted } from 'vue'
 
 const waveRef = ref<SVGSVGElement | null>(null)
 const { apiBase } = useRuntimeConfig().public
+
+const showDemoBanner = ref(false)
+onMounted(() => {
+  showDemoBanner.value = localStorage.getItem('demo-banner-dismissed') !== 'true'
+})
+function dismissBanner() {
+  showDemoBanner.value = false
+  localStorage.setItem('demo-banner-dismissed', 'true')
+}
 
 // AI reach search
 const searchQuery = ref('')
