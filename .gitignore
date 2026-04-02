@@ -9,6 +9,8 @@
 /vendor/
 apps/api/bin/
 apps/api/import-kml
+apps/api/embed-reaches
+apps/api/server
 apps/api/cmd/server/__debug_bin*
 apps/discord-bot/bin/
 /import-kml
