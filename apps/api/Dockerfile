@@ -1,4 +1,5 @@
 FROM golang:1.24-alpine AS builder
+ENV GOTOOLCHAIN=auto
 WORKDIR /src
 
 # Copy workspace root and all modules together so go.work resolution works
