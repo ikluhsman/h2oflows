@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/h2oflow/h2oflow/apps/api/internal/ai"
@@ -109,7 +111,7 @@ func writeKnownRapid(ctx context.Context, pool *pgxpool.Pool, reachID string, r 
 			(reach_id, name, river_mile, class_rating, class_at_low, class_at_high,
 			 description, portage_description, is_portage_recommended,
 			 data_source, verified)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'manual',TRUE)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'maintainer',TRUE)
 		ON CONFLICT (reach_id, name) DO NOTHING
 	`,
 		reachID,
@@ -334,34 +336,34 @@ func writeKnownAccess(ctx context.Context, pool *pgxpool.Pool, reachID string, a
 	err := pool.QueryRow(ctx, `
 		INSERT INTO reach_access
 			(reach_id, access_type, name, directions, data_source, ai_confidence, verified)
-		VALUES ($1,$2,$3,$4,'manual',100,TRUE)
-		ON CONFLICT (reach_id, name) DO NOTHING
+		VALUES ($1,$2,$3,$4,'maintainer',100,TRUE)
+		ON CONFLICT (reach_id, access_type, name) DO NOTHING
 		RETURNING id
 	`, reachID, a.AccessType, a.Name, nullStr(a.Directions)).Scan(&accessID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil // conflict — already exists, skip coordinate update
+	}
 	if err != nil {
 		return err
-	}
-	if accessID == "" {
-		return nil // conflict — already exists, skip coordinate update
 	}
 	if a.WaterLat != nil && a.WaterLon != nil {
 		_, err = pool.Exec(ctx, `
 			UPDATE reach_access
-			SET water_point = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
+			SET location = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
 			WHERE id = $1
 		`, accessID, *a.WaterLon, *a.WaterLat)
 		if err != nil {
-			return fmt.Errorf("water_point: %w", err)
+			return fmt.Errorf("location: %w", err)
 		}
 	}
 	if a.ParkingLat != nil && a.ParkingLon != nil {
 		_, err = pool.Exec(ctx, `
 			UPDATE reach_access
-			SET parking_point = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
+			SET parking_location = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
 			WHERE id = $1
 		`, accessID, *a.ParkingLon, *a.ParkingLat)
 		if err != nil {
-			return fmt.Errorf("parking_point: %w", err)
+			return fmt.Errorf("parking_location: %w", err)
 		}
 	}
 	return nil

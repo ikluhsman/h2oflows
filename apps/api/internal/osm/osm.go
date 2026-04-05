@@ -33,21 +33,29 @@ func FetchReachLine(ctx context.Context, minLon, minLat, maxLon, maxLat, startLn
 		return "", nil
 	}
 
-	// Prefer named-river ways over streams to avoid chaining up tributaries.
-	// If the bbox contains at least one "river" way, drop all "stream" ways.
+	// Filter to just the target river. Multiple named rivers may exist in the
+	// bbox (e.g. Chalk Creek alongside the Arkansas). Find the river that
+	// passes closest to the put-in and keep only ways with that name.
+	// Fall back to all river-tagged ways, then all ways if no rivers exist.
 	ways := extractCoords(tagged)
-	if riverCoords := extractCoordsByType(tagged, "river"); len(riverCoords) > 0 {
-		ways = riverCoords
+	if rivers := filterByType(tagged, "river"); len(rivers) > 0 {
+		if named := filterByNearestName(rivers, startLng, startLat); len(named) > 0 {
+			ways = extractCoords(named)
+		} else {
+			ways = extractCoords(rivers)
+		}
 	}
 
-	chain := chainWays(ways, startLng, startLat)
-	if len(chain) == 0 {
+	// Stitch all same-name ways into one continuous line, then clip to the
+	// reach. OSM often splits a single river into multiple long ways — greedy
+	// chaining fails when each way is longer than the reach and neither
+	// endpoint is near the put-in. Instead, join them at shared junction
+	// nodes and let extractSubChain clip to [put-in, take-out].
+	full := stitchWays(ways)
+	if len(full) < 2 {
 		return "", nil
 	}
-	// Snap the start to the put-in and the end to the take-out so the
-	// rendered line is bounded by the actual access points.
-	chain = trimChainStart(chain, startLng, startLat)
-	chain = trimChainEnd(chain, endLng, endLat)
+	chain := extractSubChain(full, startLng, startLat, endLng, endLat)
 	if len(chain) < 2 {
 		return "", nil
 	}
@@ -67,6 +75,49 @@ func extractCoordsByType(tagged []taggedWay, wtype string) [][]coord {
 	for _, t := range tagged {
 		if t.wtype == wtype {
 			out = append(out, t.coords)
+		}
+	}
+	return out
+}
+
+// filterByType returns tagged ways matching the given waterway type.
+func filterByType(tagged []taggedWay, wtype string) []taggedWay {
+	var out []taggedWay
+	for _, t := range tagged {
+		if t.wtype == wtype {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// filterByNearestName finds the named river that passes closest to (lng, lat)
+// by checking every segment of every way, then returns all ways with that name.
+// This handles long OSM ways whose endpoints are far from the access point but
+// whose path passes directly through it (e.g. a single Arkansas River way
+// spanning 50+ miles).
+func filterByNearestName(tagged []taggedWay, lng, lat float64) []taggedWay {
+	bestName := ""
+	bestDist := math.MaxFloat64
+	for _, t := range tagged {
+		if t.name == "" {
+			continue
+		}
+		for i := 0; i < len(t.coords)-1; i++ {
+			_, d := closestPointOnSegment(lng, lat, t.coords[i], t.coords[i+1])
+			if d < bestDist {
+				bestDist = d
+				bestName = t.name
+			}
+		}
+	}
+	if bestName == "" {
+		return nil
+	}
+	var out []taggedWay
+	for _, t := range tagged {
+		if t.name == bestName {
+			out = append(out, t)
 		}
 	}
 	return out
@@ -99,6 +150,7 @@ func FetchRiverLine(ctx context.Context, minLon, minLat, maxLon, maxLat float64)
 type taggedWay struct {
 	coords []coord
 	wtype  string // "river" | "stream"
+	name   string // OSM name tag (empty if unnamed)
 }
 
 func fetchTaggedWays(ctx context.Context, minLon, minLat, maxLon, maxLat float64) ([]taggedWay, error) {
@@ -134,7 +186,7 @@ func fetchTaggedWays(ctx context.Context, minLon, minLat, maxLon, maxLat float64
 		for i, n := range el.Geometry {
 			w[i] = coord{n.Lon, n.Lat}
 		}
-		ways = append(ways, taggedWay{coords: w, wtype: el.Tags["waterway"]})
+		ways = append(ways, taggedWay{coords: w, wtype: el.Tags["waterway"], name: el.Tags["name"]})
 	}
 	return ways, nil
 }
@@ -153,14 +205,12 @@ func fetchWays(ctx context.Context, minLon, minLat, maxLon, maxLat float64) ([][
 }
 
 // chainWays assembles disconnected OSM ways into a single connected path
-// starting from the end nearest to (startLng, startLat).
-//
-// OSM ways for a river arrive in arbitrary order and may be digitized in
-// either direction. This greedy nearest-endpoint algorithm reconnects them:
-// at each step it picks the unvisited way whose nearest endpoint is closest
-// to the current path tip, reversing the way if needed, and appends it.
-// A gap threshold of ~1 km stops chaining if there's no plausible connection.
-func chainWays(ways [][]coord, startLng, startLat float64) []coord {
+// starting from the end nearest to (startLng, startLat) and heading toward
+// (endLng, endLat). At each step, candidate ways are only accepted if they
+// move the chain tip closer to the end anchor — this prevents the greedy
+// algorithm from appending a large reversed way that shoots the chain back
+// upstream when OSM has a single long way spanning the whole river.
+func chainWays(ways [][]coord, startLng, startLat, endLng, endLat float64) []coord {
 	if len(ways) == 0 {
 		return nil
 	}
@@ -168,13 +218,21 @@ func chainWays(ways [][]coord, startLng, startLat float64) []coord {
 	remaining := make([][]coord, len(ways))
 	copy(remaining, ways)
 
-	// Find the way whose nearest endpoint is closest to the start point.
+	// Find the way that passes closest to the start point, oriented so
+	// its tail end heads toward the end anchor. This prevents picking a
+	// way by endpoint proximity then reversing it to head upstream.
 	bestIdx, bestDist, bestReverse := 0, math.MaxFloat64, false
 	for i, w := range remaining {
-		if d := dist2(w[0], startLng, startLat); d < bestDist {
+		head, tail := w[0], w[len(w)-1]
+		headToEnd := dist2(head, endLng, endLat)
+		tailToEnd := dist2(tail, endLng, endLat)
+
+		// Non-reversed: attach at head, chain continues from tail toward end.
+		if d := dist2(head, startLng, startLat); d < bestDist && tailToEnd < headToEnd {
 			bestDist, bestIdx, bestReverse = d, i, false
 		}
-		if d := dist2(w[len(w)-1], startLng, startLat); d < bestDist {
+		// Reversed: attach at tail, chain continues from head toward end.
+		if d := dist2(tail, startLng, startLat); d < bestDist && headToEnd < tailToEnd {
 			bestDist, bestIdx, bestReverse = d, i, true
 		}
 	}
@@ -187,23 +245,41 @@ func chainWays(ways [][]coord, startLng, startLat float64) []coord {
 	remaining = append(remaining[:bestIdx], remaining[bestIdx+1:]...)
 
 	// Greedily chain remaining ways by nearest endpoint.
-	// maxGap² ≈ (0.01°)² — roughly 700 m; stops us bridging tributaries.
-	const maxGap2 = 0.01 * 0.01
+	// maxGap² ≈ (0.05°)² — roughly 5 km; handles gaps in OSM coverage through
+	// canyons and wilderness areas where ways aren't perfectly connected.
+	const maxGap2 = 0.05 * 0.05
+	distToEnd := func(c coord) float64 { return dist2(c, endLng, endLat) }
 	for len(remaining) > 0 {
 		tip := result[len(result)-1]
+		tipDistToEnd := distToEnd(tip)
 		bestIdx, bestDist, bestReverse = -1, maxGap2, false
 
 		for i, w := range remaining {
-			if d := dist2(w[0], tip[0], tip[1]); d < bestDist {
+			// Only accept this way if it passes closer to the destination than
+			// the current tip — prevents appending a reversed upstream way.
+			// Check the nearest point on the way to the end anchor, not just endpoints,
+			// since a way may share a junction node with the tip but still head toward the goal.
+			wayMinDistToEnd := math.MaxFloat64
+			for j := 0; j < len(w)-1; j++ {
+				_, d := closestPointOnSegment(endLng, endLat, w[j], w[j+1])
+				if d < wayMinDistToEnd {
+					wayMinDistToEnd = d
+				}
+			}
+			if wayMinDistToEnd >= tipDistToEnd {
+				continue
+			}
+			head, tail := w[0], w[len(w)-1]
+			if d := dist2(head, tip[0], tip[1]); d < bestDist {
 				bestDist, bestIdx, bestReverse = d, i, false
 			}
-			if d := dist2(w[len(w)-1], tip[0], tip[1]); d < bestDist {
+			if d := dist2(tail, tip[0], tip[1]); d < bestDist {
 				bestDist, bestIdx, bestReverse = d, i, true
 			}
 		}
 
 		if bestIdx == -1 {
-			break // no more connected ways within gap threshold
+			break // no more connected ways moving toward the end anchor
 		}
 
 		w := remaining[bestIdx]
@@ -217,35 +293,145 @@ func chainWays(ways [][]coord, startLng, startLat float64) []coord {
 	return result
 }
 
-// trimChainStart drops leading nodes from chain until the node closest to
-// (startLng, startLat) becomes the new head. This snaps the line start to
-// the put-in rather than the upstream OSM way endpoint.
-func trimChainStart(chain []coord, startLng, startLat float64) []coord {
-	if len(chain) == 0 {
-		return chain
+// stitchWays joins ways that share junction nodes into a single continuous line.
+// Unlike chainWays (greedy nearest-endpoint), this looks for exact shared
+// endpoints to concatenate ways, then returns the longest resulting chain.
+// Works well when OSM splits a single named river into a few long segments.
+func stitchWays(ways [][]coord) []coord {
+	if len(ways) == 0 {
+		return nil
 	}
-	bestIdx, bestDist := 0, dist2(chain[0], startLng, startLat)
-	for i := 1; i < len(chain); i++ {
-		if d := dist2(chain[i], startLng, startLat); d < bestDist {
-			bestDist, bestIdx = d, i
+	if len(ways) == 1 {
+		return ways[0]
+	}
+
+	// Index way endpoints for fast junction lookup.
+	// key = "lng,lat" of an endpoint, value = list of (wayIndex, isEnd)
+	type endpoint struct {
+		idx   int
+		isEnd bool // true = last node, false = first node
+	}
+	key := func(c coord) [2]float64 { return [2]float64{c[0], c[1]} }
+
+	// Try building a chain from each way and keep the longest.
+	var best []coord
+	for start := range ways {
+		chain := append([]coord{}, ways[start]...)
+		tried := make([]bool, len(ways))
+		tried[start] = true
+
+		// Extend forward from tail.
+		changed := true
+		for changed {
+			changed = false
+			tip := key(chain[len(chain)-1])
+			for i, w := range ways {
+				if tried[i] {
+					continue
+				}
+				if key(w[0]) == tip {
+					chain = append(chain, w[1:]...)
+					tried[i] = true
+					changed = true
+					break
+				}
+				if key(w[len(w)-1]) == tip {
+					chain = append(chain, reverseWay(w)[1:]...)
+					tried[i] = true
+					changed = true
+					break
+				}
+			}
+		}
+
+		// Extend backward from head.
+		changed = true
+		for changed {
+			changed = false
+			head := key(chain[0])
+			for i, w := range ways {
+				if tried[i] {
+					continue
+				}
+				if key(w[len(w)-1]) == head {
+					chain = append(w[:len(w)-1], chain...)
+					tried[i] = true
+					changed = true
+					break
+				}
+				if key(w[0]) == head {
+					rev := reverseWay(w)
+					chain = append(rev[:len(rev)-1], chain...)
+					tried[i] = true
+					changed = true
+					break
+				}
+			}
+		}
+
+		if len(chain) > len(best) {
+			best = chain
 		}
 	}
-	return chain[bestIdx:]
+	return best
 }
 
-// trimChainEnd drops trailing nodes from chain after the node closest to
-// (endLng, endLat). This snaps the line end to the take-out.
-func trimChainEnd(chain []coord, endLng, endLat float64) []coord {
-	if len(chain) == 0 {
+// extractSubChain returns the portion of chain between the two access points,
+// with endpoints snapped perpendicularly to the nearest river segment.
+// Handles reversed chains: if the end anchor is upstream of the start anchor
+// in the chain ordering, the chain is reversed before extraction.
+func extractSubChain(chain []coord, startLng, startLat, endLng, endLat float64) []coord {
+	if len(chain) < 2 {
 		return chain
 	}
-	bestIdx, bestDist := len(chain)-1, dist2(chain[len(chain)-1], endLng, endLat)
-	for i := len(chain) - 2; i >= 0; i-- {
-		if d := dist2(chain[i], endLng, endLat); d < bestDist {
-			bestDist, bestIdx = d, i
+	startSeg, startPt := nearestSegment(chain, startLng, startLat)
+	endSeg, endPt := nearestSegment(chain, endLng, endLat)
+
+	// If the end point is upstream in the chain, flip it.
+	if endSeg < startSeg {
+		chain = reverseWay(chain)
+		startSeg, startPt = nearestSegment(chain, startLng, startLat)
+		endSeg, endPt = nearestSegment(chain, endLng, endLat)
+	}
+
+	// Build: snapped start → interior nodes → snapped end.
+	result := []coord{startPt}
+	for i := startSeg + 1; i <= endSeg; i++ {
+		result = append(result, chain[i])
+	}
+	result = append(result, endPt)
+	return result
+}
+
+// nearestSegment returns the index of the segment in chain closest to (lng, lat)
+// and the projected foot point on that segment.
+func nearestSegment(chain []coord, lng, lat float64) (int, coord) {
+	bestSeg, bestDist := 0, math.MaxFloat64
+	var bestPt coord
+	for i := 0; i < len(chain)-1; i++ {
+		pt, d := closestPointOnSegment(lng, lat, chain[i], chain[i+1])
+		if d < bestDist {
+			bestDist, bestSeg, bestPt = d, i, pt
 		}
 	}
-	return chain[:bestIdx+1]
+	return bestSeg, bestPt
+}
+
+// closestPointOnSegment returns the point on segment [a,b] closest to (lng,lat)
+// and the squared distance to it.
+func closestPointOnSegment(lng, lat float64, a, b coord) (coord, float64) {
+	dx, dy := b[0]-a[0], b[1]-a[1]
+	if dx == 0 && dy == 0 {
+		return a, dist2(a, lng, lat)
+	}
+	t := ((lng-a[0])*dx + (lat-a[1])*dy) / (dx*dx + dy*dy)
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
+	}
+	p := coord{a[0] + t*dx, a[1] + t*dy}
+	return p, dist2(p, lng, lat)
 }
 
 func dist2(c coord, lng, lat float64) float64 {

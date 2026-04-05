@@ -203,7 +203,6 @@ const BASEMAP_OPTIONS = [
 ] as const
 let map: maplibregl.Map | null = null
 let clickPopup: maplibregl.Popup | null = null
-let classBadge: maplibregl.Marker | null = null
 let allMarkers: maplibregl.Marker[] = []
 const markerEls = new Map<string, HTMLElement>()
 
@@ -269,7 +268,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  classBadge?.remove()
   for (const m of allMarkers) m.remove()
   allMarkers = []
   markerEls.clear()
@@ -287,11 +285,10 @@ function addLayers() {
     const ratings = props.rapids.map(r => r.class_rating ?? 0).filter(n => n > 0)
     const maxRating = ratings.length ? Math.max(...ratings) : (props.classMax ?? null)
     const lineColor = reachLineColor(maxRating)
-    const classLabel = maxRating ? `Class ${formatClass(maxRating)}` : ''
 
     map.addSource('centerline', {
       type: 'geojson',
-      data: { type: 'Feature', geometry: props.centerline, properties: { classLabel } },
+      data: { type: 'Feature', geometry: props.centerline, properties: {} },
     })
 
     // Soft glow behind the line
@@ -309,32 +306,6 @@ function addLayers() {
       source: 'centerline',
       paint: { 'line-color': lineColor, 'line-width': 3.5, 'line-opacity': 0.92 },
     })
-
-    // Class badge — HTML marker at centerline midpoint (avoids glyph-server dependency)
-    if (classLabel) {
-      const coords = props.centerline.type === 'LineString'
-        ? props.centerline.coordinates as [number, number][]
-        : (props.centerline.coordinates as [number, number][][]).flat()
-      const mid = coords[Math.floor(coords.length / 2)]
-      const el = document.createElement('div')
-      el.textContent = classLabel
-      Object.assign(el.style, {
-        background: lineColor,
-        color: '#fff',
-        fontSize: '11px',
-        fontWeight: '700',
-        fontFamily: 'inherit',
-        padding: '2px 8px',
-        borderRadius: '999px',
-        whiteSpace: 'nowrap',
-        pointerEvents: 'none',
-        boxShadow: '0 1px 5px rgba(0,0,0,0.45)',
-        border: '1.5px solid rgba(255,255,255,0.5)',
-      })
-      classBadge = new maplibregl.Marker({ element: el, anchor: 'center' })
-        .setLngLat(mid)
-        .addTo(map!)
-    }
   }
 
   // Access point markers
@@ -630,7 +601,6 @@ function accessIcon(type: string): string {
 
 function rebuildLayers() {
   if (!map || !mapReady.value) return
-  classBadge?.remove(); classBadge = null
   for (const id of ['centerline-glow', 'centerline']) {
     if (map.getLayer(id)) map.removeLayer(id)
     if (map.getSource(id)) map.removeSource(id)

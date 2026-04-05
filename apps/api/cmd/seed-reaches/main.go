@@ -343,7 +343,7 @@ The BV gauge (07087200) is the reference. Flow is release-dependent from Twin La
 	},
 
 	// Milk Run — beginner-friendly float below BV toward Browns Canyon.
-	// Put-in below BV; take-out at Ruby Mountain (Browns Canyon put-in).
+	// Put-in below BV; take-out at Fisherman's Bridge (also Browns Canyon put-in).
 	// Gauge at BV (07087200) is the reference.
 	{
 		Slug: "arkansas-milk-run", Name: "Milk Run",
@@ -357,26 +357,26 @@ The BV gauge (07087200) is the reference. Flow is release-dependent from Twin La
 			},
 			{
 				AccessType: "take_out",
-				Name:       "Ruby Mountain / Fisherman's Bridge",
-				Directions: "Take US-285 south from BV, turn right on County Road 45 toward Ruby Mountain Recreation Area. Large BLM parking area. This is also the put-in for Browns Canyon.",
-				WaterLat:   ptr(38.8697), WaterLon: ptr(-106.1181),
-				ParkingLat: ptr(38.8700), ParkingLon: ptr(-106.1190),
+				Name:       "Fisherman's Bridge",
+				Directions: "Take US-285 south from BV approx 12 miles, turn left on CR 301 at the bridge over the Arkansas. CPW access site with stair/slide to water. This is also the put-in for Browns Canyon.",
+				WaterLat:   ptr(38.76713), WaterLon: ptr(-106.09546),
+				ParkingLat: ptr(38.76713), ParkingLon: ptr(-106.09546),
 			},
 		},
-		Region: "Arkansas River, Colorado — Buena Vista to Ruby Mountain",
-		ClassMin: 2.0, ClassMax: 2.5, Character: "continuous", LengthMi: 5.0,
+		Region: "Arkansas River, Colorado — Buena Vista to Fisherman's Bridge",
+		ClassMin: 2.0, ClassMax: 2.5, Character: "continuous", LengthMi: 12.0,
 		GaugeExtID: "07087200", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
 			{ExtID: "07091200", Source: "usgs", Relationship: "downstream_indicator"},
 		},
-		Notes: `Put-in below Buena Vista. Take-out at Ruby Mountain, which is also the upper put-in for Browns Canyon immediately downstream. A mellow, beginner-friendly run through an open valley — popular with families, newer paddlers, and as a warm-up for Browns Canyon.
+		Notes: `Put-in below Buena Vista. Take-out at Fisherman's Bridge (CR 301 off US-285), which is also the put-in for Browns Canyon immediately downstream. A mellow, beginner-friendly run through an open valley — popular with families, newer paddlers, and as a warm-up for Browns Canyon.
 
 The BV gauge (07087200) is the primary reference. The Nathrop gauge (07091200) downstream is a useful indicator for conditions approaching Browns Canyon.`,
 	},
 
 	// Browns Canyon — classic pool-drop Class III-IV through Browns Canyon NM.
-	// Put-in: Ruby Mountain / Fisherman's Bridge (near BV).
-	// Take-out: Hecla Junction (common confusion — Hecla is the take-out, not put-in).
+	// Put-in: Fisherman's Bridge (same as Milk Run take-out) or Ruby Mountain (1.7mi downstream).
+	// Take-out: Hecla Junction boat ramp.
 	// Gauge at Nathrop (07091200) is near the upper end of the run and is the
 	// accepted reference. Most commercially rafted reach on the Arkansas.
 	{
@@ -384,18 +384,26 @@ The BV gauge (07087200) is the primary reference. The Nathrop gauge (07091200) d
 		KnownAccess: []knownAccess{
 			{
 				AccessType: "put_in",
-				Name:       "Ruby Mountain / Fisherman's Bridge",
-				Directions: "Take US-285 south from Buena Vista, turn right on County Road 45 toward Ruby Mountain Recreation Area. Large BLM parking area. This is also the take-out for Milk Run.",
-				WaterLat:   ptr(38.8697), WaterLon: ptr(-106.1181),
-				ParkingLat: ptr(38.8700), ParkingLon: ptr(-106.1190),
+				Name:       "Fisherman's Bridge",
+				Directions: "Take US-285 south from Buena Vista approx 12 miles, turn left on CR 301 at the bridge. CPW access site with stair/slide to water. Also the take-out for Milk Run.",
+				WaterLat: ptr(38.7673434), WaterLon: ptr(-106.0948688),
+			},
+			{
+				AccessType: "put_in",
+				Name:       "Ruby Mountain Campground",
+				Directions: "CR 301 north to CR 300, then 2.4 miles east. Concrete boat ramp — preferred for heavy/loaded craft and during low water. 1.7 river miles downstream of Fisherman's Bridge.",
+				WaterLat: ptr(38.7522376), WaterLon: ptr(-106.0708563),
 			},
 			{
 				AccessType: "take_out",
 				Name:       "Hecla Junction",
-				Directions: "From Salida, take US-285 north to County Road 194 (Hecla Junction). Turn left and follow the road down to the river. BLM parking area at river level.",
-				WaterLat:   ptr(38.7897), WaterLon: ptr(-106.0572),
-				ParkingLat: ptr(38.7900), ParkingLon: ptr(-106.0578),
+				Directions: "From US-285 near Nathrop, turn east on CR 194 and follow ~4 miles of dirt road to the BLM boat ramp at river level.",
+				WaterLat: ptr(38.65188), WaterLon: ptr(-106.0512094),
 			},
+		},
+		KnownRapids: []knownRapid{
+			{Name: "Pinball", ClassRating: ptr(3.0), RiverMile: ptr(0.0)},
+			{Name: "Zoom Flume", ClassRating: ptr(3.0), RiverMile: ptr(0.0)},
 		},
 		Region: "Arkansas River, Colorado — Fisherman's Bridge to Hecla Junction",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "pool-drop", LengthMi: 9.0,
@@ -403,7 +411,7 @@ The BV gauge (07087200) is the primary reference. The Nathrop gauge (07091200) d
 		RelatedGauges: []gaugeAssoc{
 			{ExtID: "07087200", Source: "usgs", Relationship: "upstream_indicator"},
 		},
-		Notes: `Put-in at Ruby Mountain or Fisherman's Bridge, both near Buena Vista. Take-out at Hecla Junction — Hecla is the take-out, not the put-in (common confusion for first-timers setting shuttle).
+		Notes: `Put-in at Fisherman's Bridge (CR 301 off US-285, ~12 miles south of BV). Ruby Mountain campground with concrete boat ramp is 1.7 river miles downstream and is a common alternate put-in. Take-out at Hecla Junction — Hecla is the take-out, not the put-in (common confusion for first-timers setting shuttle).
 
 The Nathrop gauge (07091200) sits near the upper end of the run and is the primary reference for Browns Canyon. The BV gauge (07087200) is a useful upstream indicator — water takes roughly 1–2 hours to travel from BV to the canyon. Flow is release-dependent from Twin Lakes Dam. Most commercially rafted reach on the Arkansas; season typically May–August.`,
 	},

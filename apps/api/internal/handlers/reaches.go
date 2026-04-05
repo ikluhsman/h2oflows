@@ -605,11 +605,20 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 	)
 	_ = h.db.QueryRow(r.Context(), `
 		WITH pts AS (
+			-- Use water entry point; fall back to parking location when water point is unknown.
+			-- Parking is close enough to snap the river segment correctly.
 			SELECT access_type,
-			       ST_X(location::geometry) AS lng,
-			       ST_Y(location::geometry) AS lat
+			       COALESCE(
+			           ST_X(location::geometry),
+			           ST_X(parking_location::geometry)
+			       ) AS lng,
+			       COALESCE(
+			           ST_Y(location::geometry),
+			           ST_Y(parking_location::geometry)
+			       ) AS lat
 			FROM reach_access
-			WHERE reach_id = $1 AND location IS NOT NULL
+			WHERE reach_id = $1
+			  AND (location IS NOT NULL OR parking_location IS NOT NULL)
 		),
 		extremes AS (
 			-- Most-upstream put-in: smallest (most-negative) longitude
