@@ -90,6 +90,7 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 			stateAbbr           *string
 			basinName           *string
 			watershedName       *string
+			riverName           *string
 			currentCFS          *float64
 			flowStatus          string
 			flowBandLabel       *string
@@ -98,7 +99,7 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(
 			&id, &externalID, &source, &name, &status,
 			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlugsRaw, &reachRelationship, &lastReadingAt,
-			&lng, &lat, &stateAbbr, &basinName, &watershedName,
+			&lng, &lat, &stateAbbr, &basinName, &watershedName, &riverName,
 			&currentCFS, &flowStatus, &flowBandLabel, &pollTier,
 		); err != nil {
 			continue
@@ -125,6 +126,7 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 				"state_abbr":         stateAbbr,
 				"basin_name":         basinName,
 				"watershed_name":     watershedName,
+				"river_name":         riverName,
 				"current_cfs":        currentCFS,
 				"flow_status":        flowStatus,
 				"flow_band_label":    flowBandLabel,
@@ -510,6 +512,10 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			g.state_abbr,
 			g.basin_name,
 			g.watershed_name,
+			(SELECT ra.river_name FROM reaches ra
+			 WHERE ra.primary_gauge_id = g.id AND ra.river_name IS NOT NULL
+			 ORDER BY ra.name LIMIT 1
+			) AS river_name,
 			g.current_cfs,
 			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
 			fr_band.label                            AS flow_band_label,
@@ -623,6 +629,10 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			g.state_abbr,
 			g.basin_name,
 			g.watershed_name,
+			(SELECT ra.river_name FROM reaches ra
+			 WHERE ra.primary_gauge_id = g.id AND ra.river_name IS NOT NULL
+			 ORDER BY ra.name LIMIT 1
+			) AS river_name,
 			g.current_cfs,
 			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
 			fr_band.label                            AS flow_band_label,
@@ -677,6 +687,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			stateAbbr         *string
 			basinName         *string
 			watershedName     *string
+			riverName         *string
 			currentCFS        *float64
 			flowStatus        string
 			flowBandLabel     *string
@@ -685,7 +696,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(
 			&id, &externalID, &source, &name, &status,
 			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlugsRaw, &reachRelationship, &lastReadingAt,
-			&lng, &lat, &stateAbbr, &basinName, &watershedName,
+			&lng, &lat, &stateAbbr, &basinName, &watershedName, &riverName,
 			&currentCFS, &flowStatus, &flowBandLabel, &pollTier,
 		); err != nil {
 			continue
@@ -715,6 +726,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				"state_abbr":         stateAbbr,
 				"basin_name":         basinName,
 				"watershed_name":     watershedName,
+				"river_name":         riverName,
 				"current_cfs":        currentCFS,
 				"flow_status":        flowStatus,
 				"flow_band_label":    flowBandLabel,

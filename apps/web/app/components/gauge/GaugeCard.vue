@@ -13,8 +13,10 @@
           </UTooltip>
           <span class="font-medium text-sm truncate">{{ displayName }}</span>
         </div>
-        <p v-if="gauge.reachName && !hideReachSubtitle" class="text-xs text-gray-400 truncate mt-0.5 pl-4">
-          {{ gauge.reachName }}
+        <p v-if="!hideReachSubtitle" class="text-xs truncate mt-0.5 pl-4">
+          <span v-if="gauge.riverName" class="text-blue-400 dark:text-blue-500 font-medium">{{ gauge.riverName }}</span>
+          <span v-if="gauge.riverName && gauge.reachName" class="text-gray-300 dark:text-gray-600"> · </span>
+          <span v-if="gauge.reachName" class="text-gray-400">{{ gauge.reachName }}</span>
         </p>
       </div>
 

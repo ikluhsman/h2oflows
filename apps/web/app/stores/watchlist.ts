@@ -16,6 +16,7 @@ export interface WatchedGauge {
   pollTier: 'trusted' | 'demand' | 'cold'
   watershedName: string | null
   basinName: string | null
+  riverName: string | null
   stateAbbr: string | null
   // Gauge location — populated from the batch API on dashboard load
   lat: number | null
@@ -62,6 +63,23 @@ export const useWatchlistStore = defineStore('watchlist', {
       }
       if (map.has(null)) result.push({ reach: null, gauges: map.get(null)! })
       return result
+    },
+
+    // Gauges grouped by river/watershed — used by the dashboard.
+    // Named rivers sorted alphabetically; ungrouped gauges fall into "Other" at the end.
+    byRiver(state): { river: string; gauges: WatchedGauge[] }[] {
+      const map = new Map<string, WatchedGauge[]>()
+      for (const g of state.gauges) {
+        const key = g.watershedName ?? 'Other'
+        if (!map.has(key)) map.set(key, [])
+        map.get(key)!.push(g)
+      }
+      const named = [...map.entries()]
+        .filter(([k]) => k !== 'Other')
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([river, gauges]) => ({ river, gauges }))
+      const other = map.get('Other')
+      return other ? [...named, { river: 'Other', gauges: other }] : named
     },
 
     // Gauges grouped by watershed — used by the aggregate graph picker
@@ -155,6 +173,7 @@ export const useWatchlistStore = defineStore('watchlist', {
       gauge.pollTier      = fresh.pollTier
       gauge.watershedName = fresh.watershedName
       gauge.basinName     = fresh.basinName
+      gauge.riverName     = fresh.riverName
       gauge.stateAbbr     = fresh.stateAbbr
       gauge.lat           = fresh.lat
       gauge.lng           = fresh.lng

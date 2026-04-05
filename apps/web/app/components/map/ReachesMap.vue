@@ -87,7 +87,7 @@ const INITIAL_BBOX = { west: -109.1, south: 36.9, east: -102.0, north: 41.1 }
 
 const DIFFICULTY = [
   { maxClass: 2.4, color: '#16a34a', imageId: 'diff-1-2', label: 'Class I–II' },
-  { maxClass: 3.4, color: '#3b82f6', imageId: 'diff-3',   label: 'Class III'  },
+  { maxClass: 3.9, color: '#3b82f6', imageId: 'diff-3',   label: 'Class III'  },
   { maxClass: 4.9, color: '#111827', imageId: 'diff-4',   label: 'Class IV'   },
   { maxClass: 99,  color: '#111827', imageId: 'diff-5',   label: 'Class V'    },
 ]
@@ -302,7 +302,7 @@ function updateLayers(features: ReachFeature[]) {
       },
     })
 
-    const hoverPopup = new maplibregl.Popup({
+    hoverPopup = new maplibregl.Popup({
       closeButton: false, closeOnClick: false, offset: 8,
       className: 'reach-map-tooltip',
     })
@@ -311,23 +311,35 @@ function updateLayers(features: ReachFeature[]) {
       if (!map || !e.features?.length) return
       map.getCanvas().style.cursor = 'pointer'
       if (map.getZoom() < TOOLTIP_MIN_ZOOM) return
+      if (clickPopup?.isOpen()) return
       const p = e.features[0].properties as any
       const cfs = p.current_cfs != null ? `${Number(p.current_cfs).toLocaleString()} cfs` : null
       const age = p.last_reading_at ? relativeTime(p.last_reading_at) : null
       const body = cfs ? `${cfs}${age ? ` · ${age}` : ''}` : 'No recent reading'
-      hoverPopup
+      const statusColors: Record<string, string> = {
+        runnable: '#22c55e',   // fun/optimal — green
+        caution:  '#eab308',   // minimum/pushy — yellow
+        low:      '#ef4444',   // too_low — red
+        flood:    '#3b82f6',   // flood — blue
+        unknown:  'rgba(255,255,255,0.5)',
+      }
+      const bodyColor = statusColors[String(p.flow_status ?? 'unknown')] ?? 'rgba(255,255,255,0.5)'
+      const title = (p.put_in_name && p.take_out_name)
+        ? `${p.put_in_name} to ${p.take_out_name}${p.common_name ? ` (${p.common_name})` : ''}`
+        : (p.common_name ?? p.name)
+      hoverPopup!
         .setLngLat(e.lngLat)
-        .setHTML(`<strong>${p.name}</strong><br/><span style="color:#6b7280;font-size:0.8em">${body}</span>`)
+        .setHTML(`<strong>${title}</strong><br/><span style="color:${bodyColor};font-size:0.85em">${body}</span>`)
         .addTo(map)
     })
-    map.on('mousemove', 'reach-lines', e => { hoverPopup.setLngLat(e.lngLat) })
+    map.on('mousemove', 'reach-lines', e => { hoverPopup!.setLngLat(e.lngLat) })
     map.on('mouseleave', 'reach-lines', () => {
       if (map) map.getCanvas().style.cursor = ''
-      hoverPopup.remove()
+      hoverPopup!.remove()
     })
     map.on('click', 'reach-lines', e => {
       if (!map || !e.features?.length) return
-      hoverPopup.remove()
+      hoverPopup!.remove()
       showReachPopup(e.features[0].properties as any, e.lngLat)
     })
   }
@@ -394,11 +406,7 @@ function updateLayers(features: ReachFeature[]) {
     map.flyTo({ center: coords, zoom })
   })
 
-  // Navigate to reach on individual point click
-  map.on('click', 'diff-points', e => {
-    if (!map || !e.features?.length) return
-    showReachPopup(e.features[0].properties as any, e.lngLat)
-  })
+  // diff-points click reserved for future use
 
   map.on('mouseenter', 'diff-clusters', () => { if (map) map.getCanvas().style.cursor = 'pointer' })
   map.on('mouseleave', 'diff-clusters', () => { if (map) map.getCanvas().style.cursor = '' })
@@ -408,6 +416,7 @@ function updateLayers(features: ReachFeature[]) {
 
 // ── Click popup ───────────────────────────────────────────────────────────────
 
+let hoverPopup: maplibregl.Popup | null = null
 let clickPopup: maplibregl.Popup | null = null
 
 function showReachPopup(p: any, lngLat: maplibregl.LngLat) {
@@ -419,10 +428,15 @@ function showReachPopup(p: any, lngLat: maplibregl.LngLat) {
   const age  = p.last_reading_at ? relativeTime(p.last_reading_at) : null
   const flow = cfs ? `${cfs}${age ? ` · ${age}` : ''}` : 'No recent reading'
 
+  const displayName = (p.put_in_name && p.take_out_name)
+    ? `${p.put_in_name} to ${p.take_out_name}${p.common_name ? ` (${p.common_name})` : ''}`
+    : (p.common_name ?? p.name)
+  const riverLine = p.river_name ? `<p class="rcp-river">${esc(p.river_name)}</p>` : ''
+
   const popup = new maplibregl.Popup({ offset: [0, -4], className: 'reach-click-popup' })
     .setLngLat(lngLat)
     .setHTML(`<div class="rcp-inner">
-      <p class="rcp-name">${esc(p.name)}</p>
+      ${riverLine}<p class="rcp-name">${esc(displayName)}</p>
       <p class="rcp-flow">${esc(flow)}</p>
       <div class="rcp-actions">
         <a class="rcp-btn rcp-btn-primary" href="/reaches/${esc(p.slug)}">View reach</a>
@@ -460,13 +474,25 @@ function difficultyColorExpr(): maplibregl.ExpressionSpecification {
   return ['step', ['coalesce', ['get', 'class_max'], 0],
     '#16a34a',       // I–II  green
     2.5, '#3b82f6',  // III   blue
-    3.5, '#111827',  // IV    black  (4.0, 4.5, 4.9 all stay here)
+    4.0, '#111827',  // IV    black  (4.0, 4.5, 4.9 all stay here)
     5.0, '#111827',  // V     black
   ] as any
 }
 </script>
 
 <style>
+.reach-map-tooltip .maplibregl-popup-content {
+  background: #1f2937;
+  color: #f9fafb;
+  border-radius: 6px !important;
+  padding: 6px 10px !important;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+}
+.reach-map-tooltip .maplibregl-popup-tip {
+  border-bottom-color: #1f2937 !important;
+}
 .reach-click-popup .maplibregl-popup-content {
   border-radius: 10px !important;
   padding: 0 !important;
@@ -476,6 +502,14 @@ function difficultyColorExpr(): maplibregl.ExpressionSpecification {
 .rcp-inner {
   padding: 10px 14px 10px;
   font-family: system-ui, sans-serif;
+}
+.rcp-river {
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #3b82f6;
+  margin: 0 0 2px;
 }
 .rcp-name {
   font-weight: 600;

@@ -218,12 +218,12 @@ function buildChart() {
 
 const BAND_COLORS: Record<string, string> = {
   too_low: 'rgba(239,68,68,0.22)',
-  minimum: 'rgba(249,115,22,0.22)',
+  minimum: 'rgba(234,179,8,0.22)',
   fun:     'rgba(34,197,94,0.30)',
   optimal: 'rgba(16,185,129,0.35)',
   pushy:   'rgba(234,179,8,0.28)',
-  high:    'rgba(249,115,22,0.28)',
-  flood:   'rgba(239,68,68,0.30)',
+  high:    'rgba(59,130,246,0.22)',
+  flood:   'rgba(59,130,246,0.30)',
 }
 
 // bandColor returns the translucent fill used on the chart bands.
@@ -233,12 +233,12 @@ function bandColor(label: string): string {
 
 const BAND_COLORS_SOLID: Record<string, string> = {
   too_low: '#ef4444',
-  minimum: '#f97316',
+  minimum: '#eab308',
   fun:     '#22c55e',
   optimal: '#10b981',
   pushy:   '#eab308',
-  high:    '#f97316',
-  flood:   '#ef4444',
+  high:    '#3b82f6',
+  flood:   '#3b82f6',
 }
 
 // bandColorSolid returns a fully opaque swatch color for the legend.
@@ -314,6 +314,8 @@ function lineColor(ranges: FlowRange[], cfs: number | null): string {
     case 'optimal':   return '#22c55e'
     case 'minimum':
     case 'pushy':     return '#eab308'
+    case 'high':
+    case 'flood':     return '#3b82f6'
     default:          return '#ef4444'
   }
 }

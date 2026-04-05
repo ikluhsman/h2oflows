@@ -66,8 +66,15 @@ func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
 			r.id,
 			r.name,
 			r.slug,
+			r.river_name,
+			r.common_name,
+			r.put_in_name,
+			r.take_out_name,
 			r.class_min,
-			r.class_max,
+			COALESCE(
+				(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL),
+				r.class_max
+			) AS class_max,
 			r.character,
 			r.length_mi,
 			ST_AsGeoJSON(r.centerline::geometry)::json        AS centerline,
@@ -122,6 +129,10 @@ func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
 			id                string
 			name              string
 			slug              string
+			riverName         *string
+			commonName        *string
+			putInName         *string
+			takeOutName       *string
 			classMin          *float64
 			classMax          *float64
 			character         *string
@@ -142,7 +153,8 @@ func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
 			flowStatus        string
 		)
 		if err := rows.Scan(
-			&id, &name, &slug, &classMin, &classMax, &character, &lengthMi,
+			&id, &name, &slug, &riverName, &commonName, &putInName, &takeOutName,
+			&classMin, &classMax, &character, &lengthMi,
 			&centerlineJSON,
 			&putInLng, &putInLat, &takeOutLng, &takeOutLat,
 			&currentCFS, &lastReadingAt, &flowLabel, &gaugeID,
@@ -168,6 +180,10 @@ func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
 				"id":                 id,
 				"name":               name,
 				"slug":               slug,
+				"river_name":         riverName,
+				"common_name":        commonName,
+				"put_in_name":        putInName,
+				"take_out_name":      takeOutName,
 				"class_min":          classMin,
 				"class_max":          classMax,
 				"character":          character,
@@ -221,7 +237,10 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			r.name,
 			r.region,
 			r.class_min,
-			r.class_max,
+			COALESCE(
+				(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL),
+				r.class_max
+			) AS class_max,
 			r.character,
 			r.length_mi,
 			r.description,
@@ -230,6 +249,10 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			r.description_verified,
 			r.aw_reach_id,
 			r.watershed_name,
+			r.river_name,
+			r.common_name,
+			r.put_in_name,
+			r.take_out_name,
 			ST_AsGeoJSON(r.centerline::geometry) AS centerline,
 			-- Primary gauge fields (all nullable — reach may not have a gauge yet)
 			g.id                AS gauge_id,
@@ -273,6 +296,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&reach.Description, &reach.DescriptionSource,
 		&reach.DescriptionConfidence, &reach.DescriptionVerified,
 		&reach.AWReachID, &reach.WatershedName,
+		&reach.RiverName, &reach.CommonName, &reach.PutInName, &reach.TakeOutName,
 		&reach.Centerline,
 		&reach.Gauge.ID, &reach.Gauge.ExternalID, &reach.Gauge.Source,
 		&reach.Gauge.Name, &reach.Gauge.Featured,
@@ -435,6 +459,10 @@ type reachDetail struct {
 	ID                      string          `json:"id"`
 	Slug                    string          `json:"slug"`
 	Name                    string          `json:"name"`
+	RiverName               *string         `json:"river_name"`
+	CommonName              *string         `json:"common_name"`
+	PutInName               *string         `json:"put_in_name"`
+	TakeOutName             *string         `json:"take_out_name"`
 	Region                  *string         `json:"region"`
 	ClassMin                *float64        `json:"class_min"`
 	ClassMax                *float64        `json:"class_max"`
@@ -744,9 +772,9 @@ func flowColor(status string) string {
 	case "runnable":
 		return "#22c55e" // emerald-500 — go paddle
 	case "caution":
-		return "#1f2937" // gray-800 — minimum/marginal
+		return "#eab308" // yellow-500 — minimum/pushy
 	case "low":
-		return "#9ca3af" // gray-400 — too low, muted
+		return "#ef4444" // red-500 — too low, not runnable
 	case "flood":
 		return "#3b82f6" // blue-500 — too much water
 	default:

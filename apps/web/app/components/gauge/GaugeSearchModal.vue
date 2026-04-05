@@ -100,6 +100,7 @@ async function search() {
       pollTier:     f.properties.poll_tier,
       watershedName: f.properties.watershed_name ?? null,
       basinName:    f.properties.basin_name ?? null,
+      riverName:    f.properties.river_name ?? null,
       stateAbbr:    f.properties.state_abbr ?? null,
       currentCfs:    f.properties.current_cfs ?? null,
       flowStatus:    f.properties.flow_status ?? 'unknown',

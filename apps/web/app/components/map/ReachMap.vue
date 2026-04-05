@@ -581,7 +581,7 @@ function fitBounds() {
 function reachLineColor(maxRating: number | null): string {
   if (maxRating == null) return '#6b7280'  // gray — no class data
   if (maxRating < 2.5)   return '#16a34a'  // green  — Class I–II
-  if (maxRating < 3.5)   return '#3b82f6'  // blue   — Class III
+  if (maxRating < 4.0)   return '#3b82f6'  // blue   — Class III/III+
   if (maxRating < 5.0)   return '#111827'  // black  — Class IV (incl. IV+)
   return '#111827'                          // black  — Class V
 }

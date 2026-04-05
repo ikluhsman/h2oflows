@@ -34,24 +34,17 @@
         <UButton color="primary" @click="searchOpen = true">Find a gauge</UButton>
       </div>
 
-      <!-- Gauges grouped by reach -->
+      <!-- Gauges grouped by river -->
       <template v-else>
-        <section v-for="group in store.byReach" :key="group.reach ?? '__ungrouped__'" class="mb-6">
+        <section v-for="group in store.byRiver" :key="group.river" class="mb-6">
           <div class="flex items-center gap-2 mb-3">
-            <NuxtLink
-              v-if="group.gauges[0]?.reachSlug"
-              :to="`/reaches/${group.gauges[0].reachSlug}`"
-              class="text-sm font-semibold text-gray-500 uppercase tracking-wide hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-            >{{ group.reach }}</NuxtLink>
-            <h2 v-else class="text-sm font-semibold text-gray-500 uppercase tracking-wide">
-              {{ group.reach ?? 'Other Gauges' }}
-            </h2>
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ group.river }}</h2>
             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
-            <UTooltip :text="group.gauges.length < 2 ? 'Add another gauge from this reach to compare' : 'Compare gauges'">
+            <UTooltip :text="group.gauges.length < 2 ? 'Add another gauge from this river to compare' : 'Compare gauges'">
               <UButton
                 size="xs" color="neutral" variant="ghost" icon="i-heroicons-chart-bar"
                 :disabled="group.gauges.length < 2"
-                @click="openAggregate(group.reach ?? 'Other', group.gauges)"
+                @click="openAggregate(group.river, group.gauges)"
               >Compare</UButton>
             </UTooltip>
           </div>
@@ -60,7 +53,6 @@
               v-for="gauge in group.gauges"
               :key="gauge.id"
               :gauge="gauge"
-              hide-reach-subtitle
               @open="openGauge(gauge)"
             />
           </div>

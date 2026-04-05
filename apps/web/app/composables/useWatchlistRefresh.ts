@@ -32,6 +32,7 @@ export function useWatchlistRefresh() {
           pollTier:      p.poll_tier,
           watershedName: p.watershed_name ?? null,
           basinName:     p.basin_name ?? null,
+          riverName:     p.river_name ?? null,
           stateAbbr:     p.state_abbr ?? null,
           lng:           coords?.[0] ?? null,
           lat:           coords?.[1] ?? null,

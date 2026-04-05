@@ -9,7 +9,7 @@
           Dashboard
         </NuxtLink>
         <span class="text-gray-300 dark:text-gray-700">/</span>
-        <span class="text-sm font-medium truncate">{{ reach?.name }}</span>
+        <span class="text-sm font-medium truncate">{{ reach?.common_name ?? reach?.name }}</span>
       </div>
     </header>
 
@@ -27,7 +27,14 @@
       <section>
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 class="text-2xl font-bold">{{ reach.name }}</h1>
+            <div v-if="reach.river_name" class="text-xs font-medium text-blue-500 uppercase tracking-wide mb-1">{{ reach.river_name }}</div>
+            <h1 class="text-2xl font-bold">
+              <template v-if="reach.put_in_name && reach.take_out_name">
+                {{ reach.put_in_name }} to {{ reach.take_out_name }}
+                <span v-if="reach.common_name" class="font-normal text-gray-400">({{ reach.common_name }})</span>
+              </template>
+              <template v-else>{{ reach.common_name ?? reach.name }}</template>
+            </h1>
             <p class="text-gray-500 text-sm mt-0.5">
               {{ reach.region }}
               <span v-if="reach.length_mi"> · {{ reach.length_mi }} mi</span>

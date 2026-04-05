@@ -73,7 +73,7 @@ let fetchSeq      = 0   // incremented on each call; lets an in-flight fetch sel
 
 function difficultyColorExpr(): any {
   return ['step', ['coalesce', ['get', 'class_max'], 0],
-    '#16a34a', 2.5, '#3b82f6', 3.5, '#111827', 5.0, '#111827']
+    '#16a34a', 2.5, '#3b82f6', 4.0, '#111827', 5.0, '#111827']
 }
 
 // ── Geometry helpers ──────────────────────────────────────────────────────────
