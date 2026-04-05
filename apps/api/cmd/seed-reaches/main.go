@@ -666,14 +666,88 @@ poudrerockreport.com is maintained by Fort Collins locals who check the rock gau
 	{
 		Slug: "n-fork-south-platte-foxton", Name: "Foxton",
 		Region: "North Fork South Platte, Colorado — Ferndale (Boulder Garden) to confluence",
-		ClassMin: 4.0, ClassMax: 4.5, Character: "creeking", LengthMi: 5.0,
+		ClassMin: 3.0, ClassMax: 3.5, Character: "creeking", LengthMi: 5.0,
 		GaugeExtID: "PLAGRACO", GaugeSource: "dwr",
 		RelatedGauges: []gaugeAssoc{
 			{ExtID: "PLASPLCO", Source: "dwr", Relationship: "downstream_indicator"},
 		},
-		Notes: `Put-in is Boulder Garden at Ferndale. The run takes out at the confluence of the North and South Forks of the South Platte.
+		// KMZ source: "Foxton.kmz"
+		KnownAccess: []knownAccess{
+			// ---- Upstream Buffalo Creek section ----
+			{
+				AccessType: "put_in",
+				Name:       "Buffalo Creek (Post Office)",
+				Directions: "Park at the Post Office pullout on US-285 near Buffalo Creek. Put in on river right just downstream.",
+				WaterLat: ptr(39.3921966), WaterLon: ptr(-105.276871),
+				ParkingLat: ptr(39.3928962), ParkingLon: ptr(-105.2779855),
+			},
+			// ---- Boulder Garden section ----
+			{
+				AccessType: "put_in",
+				Name:       "Boulder Garden",
+				Directions: "Park at Cathedral Spires pullout on US-285. River access is a short scramble downstream.",
+				WaterLat: ptr(39.4094114), WaterLon: ptr(-105.2555163),
+				ParkingLat: ptr(39.4129671), ParkingLon: ptr(-105.2543872),
+			},
+			{
+				AccessType: "take_out",
+				Name:       "Boulder Garden Take-out",
+				Directions: "Take out river left at the downstream end of Boulder Garden. Parking is a short walk up to the road pullout.",
+				WaterLat: ptr(39.4148403), WaterLon: ptr(-105.2496925),
+				ParkingLat: ptr(39.4142176), ParkingLon: ptr(-105.2520523),
+			},
+			// ---- Standard Foxton run ----
+			{
+				AccessType: "put_in",
+				Name:       "Standard Lower Foxton",
+				Directions: "Roadside parking on Foxton Road (Jefferson County 97). Put in here to run the lower rapids. You can also park at the T intersection just upstream.",
+				WaterLat: ptr(39.4297583), WaterLon: ptr(-105.2328561),
+			},
+			{
+				AccessType: "intermediate",
+				Name:       `The "T"`,
+				Directions: `Put in or take out at the T-intersection on Foxton Road. Parking available. Lower rapids start upstream of this point.`,
+				WaterLat: ptr(39.4361133), WaterLon: ptr(-105.2340931),
+			},
+			{
+				AccessType: "take_out",
+				Name:       "Dome Rock",
+				Directions: "Standard take-out for the Foxton run. Parking available at the Dome Rock pullout on Foxton Road.",
+				WaterLat: ptr(39.4277208), WaterLon: ptr(-105.2071424),
+			},
+			{
+				AccessType: "take_out",
+				Name:       "Extra Long Take-out",
+				Directions: "Extended take-out before the flat water to the hotel. Parking on Foxton Road.",
+				WaterLat: ptr(39.4102617), WaterLon: ptr(-105.1849536),
+			},
+			{
+				AccessType: "take_out",
+				Name:       "South Platte Hotel",
+				Directions: "Take out at the confluence of the North and South Forks. The South Platte Hotel ruins are nearby.",
+				WaterLat: ptr(39.4083789), WaterLon: ptr(-105.1708317),
+			},
+		},
+		KnownRapids: []knownRapid{
+			// ---- Boulder Garden section (Class III+) ----
+			{Name: "Triple Bypass",  ClassRating: ptr(3.5), Description: "Main line is a rock slide down the middle. Sneak at low water on far right. Hero line on the left requires a quick return back to right.", Lat: ptr(39.411516), Lon: ptr(-105.2551253)},
+			{Name: "Double Tombstone", ClassRating: ptr(3.5), Description: "Stay just right of the humped rock in the middle. Fun zig-zag line available but will require a scary ferry in front of a terribly undercut rock.", Lat: ptr(39.4128201), Lon: ptr(-105.2537534)},
+			{Name: "Double Drop",    ClassRating: ptr(2.5), Description: "First drop is easiest on right with a hard left hand angle. Second drop is easiest on left.", Lat: ptr(39.413372), Lon: ptr(-105.2525977)},
+			{Name: "Log Jam Rapid", ClassRating: ptr(3.0), Description: "Easiest line is drive left as you come around the blind turn. Right can work but has a number of rocks in the main path. Bad log jam in the middle.", Lat: ptr(39.4141066), Lon: ptr(-105.2518239)},
+			{Name: "Death Star",    ClassRating: ptr(3.0), Description: `Be left of the giant house-sized boulder. Many lines including the "trenches" on the left just before the main boulder. Major dangerous sieve on river right next to the main boulder.`, Lat: ptr(39.4144433), Lon: ptr(-105.2506531)},
+			// ---- Standard Foxton run ----
+			{Name: "Last Resort",   ClassRating: ptr(3.0), Lat: ptr(39.435594),  Lon: ptr(-105.2362756)},
+			{Name: "T Rapid",       ClassRating: ptr(2.5), Description: "Decent play wave at the bottom.", Lat: ptr(39.4359151), Lon: ptr(-105.2339099)},
+			{Name: "Just Boof It",  ClassRating: ptr(3.0), Description: "You're gonna hit the boof, so just boof it.", Lat: ptr(39.4268878), Lon: ptr(-105.2193208)},
+			{Name: "Phone Boof",    ClassRating: ptr(3.0), Description: `Named after the "BOOF" decals on the phone pedestal next to the road.`, Lat: ptr(39.4270144), Lon: ptr(-105.2181294)},
+			{Name: "Shark's Tooth", ClassRating: ptr(3.0), Description: "Go left of the shark's tooth and boof the middle of the ledge. Fun and easy landing.", Lat: ptr(39.4253454), Lon: ptr(-105.2118853)},
+			{Name: "Triple-Drop",   ClassRating: ptr(3.0), Description: "Three consecutive drops. Don't hit the wall at the bottom.", Lat: ptr(39.4250455), Lon: ptr(-105.2088846)},
+		},
+		Notes: `Two distinct sections: Boulder Garden (Class III+, tight technical creeking — only attempt if you can catch all eddies in Class III) and the Standard Foxton Run (Class III+, can get continuous at times, especially over 500 cfs). Standard minimum for the lower run is around 225 cfs.
 
-Gauge math: The PLAGRACO gauge at Grant is the best upstream indicator but does not account for unmonitored tributary creeks that enter between Grant and the confluence. Local paddlers use a derived calculation to estimate true N Fork flow through Foxton: PLASPLCO (South Platte at South Platte, at the confluence) minus USGS 06701900 (S Platte below Brush Creek near Trumbull, i.e. the Deckers gauge) gives the North Fork contribution. This difference is more accurate than PLAGRACO alone when tributary runoff is significant.`,
+Put-in options: Buffalo Creek/Post Office (upstream, includes Boulder Garden), Boulder Garden (Ferndale), or Standard Lower Foxton (skips Boulder Garden). Standard take-out is Dome Rock.
+
+Gauge math: PLAGRACO at Grant is the best upstream indicator but misses unmonitored tributaries. Local formula: PLASPLCO (at confluence) minus USGS 06701900 (Deckers) gives the true North Fork contribution — more accurate than PLAGRACO alone when tributary runoff is significant.`,
 	},
 
 	// ---- South Platte (S Fork) — Deckers corridor ----------------------------

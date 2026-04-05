@@ -618,8 +618,8 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			)                  AS reach_slugs,
 			g.reach_relationship,
 			g.last_reading_at,
-			COALESCE(ST_X(g.location::geometry), 0) AS lng,
-			COALESCE(ST_Y(g.location::geometry), 0) AS lat,
+			ST_X(g.location::geometry) AS lng,
+			ST_Y(g.location::geometry) AS lat,
 			g.state_abbr,
 			g.basin_name,
 			g.watershed_name,
@@ -672,8 +672,8 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			reachSlugsRaw     []string
 			reachRelationship *string
 			lastReadingAt     *time.Time
-			lng               float64
-			lat               float64
+			lng               *float64
+			lat               *float64
 			stateAbbr         *string
 			basinName         *string
 			watershedName     *string
@@ -690,9 +690,13 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 		); err != nil {
 			continue
 		}
+		var geom any
+		if lng != nil && lat != nil {
+			geom = PointGeometry{Type: "Point", Coordinates: [2]float64{*lng, *lat}}
+		}
 		features = append(features, Feature{
 			Type:     "Feature",
-			Geometry: PointGeometry{Type: "Point", Coordinates: [2]float64{lng, lat}},
+			Geometry: geom,
 			Properties: map[string]any{
 				"id":                 id,
 				"external_id":        externalID,

@@ -54,6 +54,12 @@ function setBasemap(value: 'street' | 'topo' | 'satellite') {
 let map: maplibregl.Map | null = null
 const activeMarkers: maplibregl.Marker[] = []
 
+const gaugeTooltip = new maplibregl.Popup({
+  closeButton: false, closeOnClick: false, offset: [0, -28],
+  className: 'dash-map-tooltip',
+})
+let gaugeClickPopup: maplibregl.Popup | null = null
+
 // Colorado bbox — all current reaches are here
 const CO_BBOX = '-109.1,36.9,-102.0,41.1'
 
@@ -64,9 +70,6 @@ let fetchSeq      = 0   // incremented on each call; lets an in-flight fetch sel
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
 
-function flowColor(status: string): string {
-  return ({ runnable: '#16a34a', caution: '#d97706', low: '#9ca3af', flood: '#dc2626' } as Record<string, string>)[status] ?? '#9ca3af'
-}
 
 function difficultyColorExpr(): any {
   return ['step', ['coalesce', ['get', 'class_max'], 0],
@@ -93,53 +96,56 @@ function allCoordsOf(geom: any): [number, number][] {
 
 // ── Marker element ────────────────────────────────────────────────────────────
 
-function makeMarkerEl(gauge: WatchedGauge): HTMLElement {
-  const accent = flowColor(gauge.flowStatus)
+function makeGaugePinEl(gauge: WatchedGauge, pos: [number, number]): HTMLElement {
+  const color = '#6366f1'  // indigo-500
   const el = document.createElement('div')
-  el.style.cssText = [
-    'background:white',
-    'border:1.5px solid #e5e7eb',
-    `border-left:4px solid ${accent}`,
-    'border-radius:8px',
-    'padding:5px 8px 5px 10px',
-    'display:flex',
-    'align-items:center',
-    'gap:6px',
-    'box-shadow:0 2px 8px rgba(0,0,0,0.15)',
-    'white-space:nowrap',
-    'font-family:system-ui,-apple-system,sans-serif',
-    'cursor:default',
-    'user-select:none',
-    'max-width:220px',
-  ].join(';')
+  el.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));transition:scale 0.1s'
+  el.innerHTML = `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 1C7.1 1 1.5 6.6 1.5 13.5c0 8.7 12.5 20.5 12.5 20.5S26.5 22.2 26.5 13.5C26.5 6.6 20.9 1 14 1z"
+      fill="${color}" stroke="white" stroke-width="1.5"/>
+    <path d="M9 14.5 A5 5 0 0 1 19 14.5" fill="none" stroke="white" stroke-width="1.3" stroke-linecap="round" opacity="0.9"/>
+    <line x1="14" y1="14.5" x2="17.2" y2="10.8" stroke="white" stroke-width="1.3" stroke-linecap="round"/>
+    <circle cx="14" cy="14.5" r="1.2" fill="white"/>
+  </svg>`
 
-  const nameEl = document.createElement('span')
-  nameEl.textContent = gauge.name ?? gauge.externalId
-  nameEl.style.cssText = 'font-size:12px;font-weight:600;color:#111827;overflow:hidden;text-overflow:ellipsis;max-width:120px;display:block'
+  const name    = gauge.name ?? gauge.externalId
+  const cfsText = gauge.currentCfs != null ? `${Number(gauge.currentCfs).toLocaleString()} cfs` : '— cfs'
+  const label   = name.length > 26 ? name.slice(0, 24) + '…' : name
 
-  const cfsEl = document.createElement('span')
-  cfsEl.textContent = gauge.currentCfs != null
-    ? `${Number(gauge.currentCfs).toLocaleString()} cfs`
-    : '— cfs'
-  cfsEl.style.cssText = `font-size:11px;color:${accent};font-weight:500`
+  el.addEventListener('mouseenter', () => {
+    if (!map) return
+    gaugeTooltip.setLngLat(pos).setHTML(`<span>${label} · ${cfsText}</span>`).addTo(map)
+  })
+  el.addEventListener('mouseleave', () => gaugeTooltip.remove())
 
-  const btn = document.createElement('button')
-  btn.textContent = '×'
-  btn.title = 'Remove from dashboard'
-  btn.style.cssText = 'background:none;border:none;cursor:pointer;color:#d1d5db;font-size:18px;line-height:1;padding:0 0 0 2px;display:flex;align-items:center'
-  btn.addEventListener('mouseenter', () => { btn.style.color = '#ef4444' })
-  btn.addEventListener('mouseleave', () => { btn.style.color = '#d1d5db' })
-  btn.addEventListener('click', e => { e.stopPropagation(); emit('remove-gauge', gauge.id) })
+  el.addEventListener('click', () => {
+    gaugeTooltip.remove()
+    gaugeClickPopup?.remove()
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const popup = new maplibregl.Popup({ offset: [0, -34], className: 'dash-gauge-popup' })
+      .setLngLat(pos)
+      .setHTML(`<div class="dgp-inner">
+        <p class="dgp-name">${esc(name)}</p>
+        <p class="dgp-cfs">${esc(cfsText)}</p>
+        <button class="dgp-remove">× Remove from dashboard</button>
+      </div>`)
+      .addTo(map!)
+    gaugeClickPopup = popup
+    popup.getElement().querySelector('.dgp-remove')
+      ?.addEventListener('click', () => { popup.remove(); emit('remove-gauge', gauge.id) })
+    el.style.scale = '1.15'
+    popup.on('close', () => { el.style.scale = '1' })
+  })
 
-  el.appendChild(nameEl)
-  el.appendChild(cfsEl)
-  el.appendChild(btn)
   return el
 }
 
 // ── Data refresh ──────────────────────────────────────────────────────────────
 
 function clearMarkers() {
+  gaugeTooltip.remove()
+  gaugeClickPopup?.remove()
+  gaugeClickPopup = null
   for (const m of activeMarkers) m.remove()
   activeMarkers.length = 0
 }
@@ -154,7 +160,10 @@ async function refreshData() {
   if (idsChanged) hasFitBounds = false
   prevGaugeIds = currentIds
 
-  const slugSet = new Set(props.gauges.map(g => g.reachSlug).filter((s): s is string => !!s))
+  // Collect all reach slugs across all gauges (primary + all associated)
+  const slugSet = new Set(props.gauges.flatMap(g =>
+    [g.reachSlug, ...(g.reachSlugs ?? [])].filter((s): s is string => !!s)
+  ))
 
   let bySlug = new Map<string, any>()
   try {
@@ -174,21 +183,25 @@ async function refreshData() {
 
     clearMarkers()
 
-    // Place a marker for each gauge; fall back to gauge lat/lng when no centerline exists
+    // Place a marker for each gauge.
+    // Prefer the gauge's own GPS location; fall back to midpoint of an associated reach centerline.
     const gaugePoints: [number, number][] = []
     for (const gauge of props.gauges) {
       let pos: [number, number] | null = null
-      if (gauge.reachSlug) {
-        const feature = bySlug.get(gauge.reachSlug)
-        if (feature) pos = midpoint(feature.geometry)
+      if (gauge.lng != null && gauge.lat != null) {
+        pos = [gauge.lng, gauge.lat]
       }
-      if (!pos && Number.isFinite(gauge.lng) && Number.isFinite(gauge.lat)) {
-        pos = [gauge.lng as number, gauge.lat as number]
+      if (!pos) {
+        const slugsToTry = [gauge.reachSlug, ...(gauge.reachSlugs ?? [])].filter((s): s is string => !!s)
+        for (const slug of slugsToTry) {
+          const feature = bySlug.get(slug)
+          if (feature) { pos = midpoint(feature.geometry); break }
+        }
       }
       if (!pos) continue
 
       gaugePoints.push(pos)
-      const marker = new maplibregl.Marker({ element: makeMarkerEl(gauge), anchor: 'left', offset: [6, 0] })
+      const marker = new maplibregl.Marker({ element: makeGaugePinEl(gauge, pos), anchor: 'bottom' })
         .setLngLat(pos)
         .addTo(m)
       activeMarkers.push(marker)
@@ -300,3 +313,63 @@ onUnmounted(() => {
 // Re-render whenever gauge data changes (CFS updates re-draw labels; ID changes re-fit bounds)
 watch(() => props.gauges, refreshData, { deep: true })
 </script>
+
+<style>
+.dash-map-tooltip .maplibregl-popup-content {
+  padding: 5px 10px !important;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: rgba(17, 24, 39, 0.92) !important;
+  color: #f9fafb !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+}
+.dash-map-tooltip .maplibregl-popup-tip {
+  border-top-color: rgba(17, 24, 39, 0.92) !important;
+}
+
+.dash-gauge-popup .maplibregl-popup-content {
+  border-radius: 10px !important;
+  padding: 0 !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important;
+  min-width: 170px;
+}
+.dgp-inner {
+  padding: 10px 14px 8px;
+  font-family: system-ui, sans-serif;
+}
+.dgp-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #111827;
+  margin: 0 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.dgp-cfs {
+  font-size: 0.78rem;
+  color: #6366f1;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+.dgp-remove {
+  display: block;
+  width: 100%;
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  color: #6b7280;
+  cursor: pointer;
+  text-align: center;
+  transition: background 0.1s, color 0.1s;
+}
+.dgp-remove:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+</style>
