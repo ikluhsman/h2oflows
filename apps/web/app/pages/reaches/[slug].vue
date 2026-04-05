@@ -102,21 +102,6 @@
         </ClientOnly>
       </section>
 
-      <!-- Description -->
-      <section v-if="reach.description">
-        <div class="flex items-center gap-2 mb-2">
-          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">About</h2>
-          <DataSourceBadge
-            :source="(reach.description_source as any) ?? 'ai_seed'"
-            :verified="reach.description_verified"
-            :confidence="reach.description_ai_confidence ?? undefined"
-          />
-        </div>
-        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line">
-          {{ reach.description }}
-        </div>
-      </section>
-
       <!-- River assistant -->
       <section class="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
         <button
@@ -211,6 +196,21 @@
           </form>
 
           <p v-if="chatError" class="text-xs text-red-500">{{ chatError }}</p>
+        </div>
+      </section>
+
+      <!-- Description -->
+      <section v-if="reach.description">
+        <div class="flex items-center gap-2 mb-2">
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">About</h2>
+          <DataSourceBadge
+            :source="(reach.description_source as any) ?? 'ai_seed'"
+            :verified="reach.description_verified"
+            :confidence="reach.description_ai_confidence ?? undefined"
+          />
+        </div>
+        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line">
+          {{ reach.description }}
         </div>
       </section>
 

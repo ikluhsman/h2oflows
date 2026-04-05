@@ -135,6 +135,7 @@
             ref="reachesMapRef"
             :hovered-slug="hoveredSlug"
             @bounds-updated="onBoundsUpdated"
+            @gauge-add="addGaugeById"
           />
         </ClientOnly>
       </div>
@@ -235,6 +236,30 @@ function addGauge(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
   store.addGauge(gauge)
   query.value = ''
   results.value = []
+}
+
+async function addGaugeById(gaugeId: string) {
+  try {
+    const res = await fetch(`${apiBase}/api/v1/gauges/batch?ids=${gaugeId}`)
+    if (!res.ok) return
+    const data = await res.json()
+    const f = data.features?.[0]
+    if (!f) return
+    const p = f.properties
+    const coords = f.geometry?.coordinates as [number, number] | undefined
+    store.addGauge({
+      id: p.id, externalId: p.external_id, source: p.source,
+      name: p.name ?? null, featured: p.featured ?? false,
+      reachId: p.reach_id ?? null, reachName: p.reach_name ?? null,
+      reachNames: p.reach_names ?? [], reachSlug: p.reach_slug ?? null,
+      reachSlugs: p.reach_slugs ?? [], reachRelationship: p.reach_relationship ?? null,
+      pollTier: p.poll_tier, watershedName: p.watershed_name ?? null,
+      basinName: p.basin_name ?? null, stateAbbr: p.state_abbr ?? null,
+      lng: coords?.[0] ?? null, lat: coords?.[1] ?? null,
+      currentCfs: p.current_cfs ?? null, flowStatus: p.flow_status ?? 'unknown',
+      flowBandLabel: p.flow_band_label ?? null, lastReadingAt: p.last_reading_at ?? null,
+    })
+  } catch { /* non-fatal */ }
 }
 
 function flowDotColor(status: string): string {

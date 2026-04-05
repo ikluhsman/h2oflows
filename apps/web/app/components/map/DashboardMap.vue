@@ -99,7 +99,7 @@ function allCoordsOf(geom: any): [number, number][] {
 function makeGaugePinEl(gauge: WatchedGauge, pos: [number, number]): HTMLElement {
   const color = '#6366f1'  // indigo-500
   const el = document.createElement('div')
-  el.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));transition:scale 0.1s'
+  el.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));transition:filter 0.12s'
   el.innerHTML = `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
     <path d="M14 1C7.1 1 1.5 6.6 1.5 13.5c0 8.7 12.5 20.5 12.5 20.5S26.5 22.2 26.5 13.5C26.5 6.6 20.9 1 14 1z"
       fill="${color}" stroke="white" stroke-width="1.5"/>
@@ -133,8 +133,8 @@ function makeGaugePinEl(gauge: WatchedGauge, pos: [number, number]): HTMLElement
     gaugeClickPopup = popup
     popup.getElement().querySelector('.dgp-remove')
       ?.addEventListener('click', () => { popup.remove(); emit('remove-gauge', gauge.id) })
-    el.style.scale = '1.15'
-    popup.on('close', () => { el.style.scale = '1' })
+    el.style.filter = 'drop-shadow(0 0 4px rgba(255,255,255,0.9)) drop-shadow(0 2px 6px rgba(0,0,0,0.5))'
+    popup.on('close', () => { el.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' })
   })
 
   return el

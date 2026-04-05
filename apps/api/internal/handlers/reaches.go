@@ -76,7 +76,9 @@ func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
 			ST_X(r.take_out::geometry)                        AS take_out_lng,
 			ST_Y(r.take_out::geometry)                        AS take_out_lat,
 			lr.value                                          AS current_cfs,
+			g.last_reading_at,
 			fr.label                                          AS flow_label,
+			g.id                                              AS gauge_id,
 			g.reach_relationship,
 			g.featured                                        AS gauge_trusted,
 			g.gauge_notes,
@@ -130,7 +132,9 @@ func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
 			takeOutLng        *float64
 			takeOutLat        *float64
 			currentCFS        *float64
+			lastReadingAt     *time.Time
 			flowLabel         *string
+			gaugeID           *string
 			reachRelationship *string
 			gaugeTrusted      *bool
 			gaugeNotes        *string
@@ -141,7 +145,7 @@ func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
 			&id, &name, &slug, &classMin, &classMax, &character, &lengthMi,
 			&centerlineJSON,
 			&putInLng, &putInLat, &takeOutLng, &takeOutLat,
-			&currentCFS, &flowLabel,
+			&currentCFS, &lastReadingAt, &flowLabel, &gaugeID,
 			&reachRelationship, &gaugeTrusted, &gaugeNotes, &infoLinks,
 			&flowStatus,
 		); err != nil {
@@ -171,7 +175,9 @@ func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
 				"put_in":             putIn,
 				"take_out":           takeOut,
 				"current_cfs":        currentCFS,
+				"last_reading_at":    lastReadingAt,
 				"flow_label":         flowLabel,
+				"gauge_id":           gaugeID,
 				"flow_status":        flowStatus,
 				"flow_color":         flowColor(flowStatus),
 				"reach_relationship": reachRelationship,

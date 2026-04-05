@@ -367,7 +367,8 @@ function showTooltip(_el: HTMLElement, text: string, lngLat: [number, number]) {
 function makePinEl(color: string, imgUrl: string | null, label: string, id: string): HTMLElement {
   const el = document.createElement('div')
   el.dataset.markerId = id
-  el.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));transition:scale 0.1s'
+  el.dataset.pinColor = color
+  el.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));transition:filter 0.12s'
   const inner = imgUrl
     ? `<image href="${imgUrl}" x="4" y="4" width="20" height="20" clip-path="circle(10px at 10px 10px)"/>`
     : `<text x="14" y="17" text-anchor="middle" dominant-baseline="middle"
@@ -394,8 +395,14 @@ function accessIconUrl(type: string): string | null {
 function setSelectedMarker(id: string) {
   selectedId.value = id
   for (const [mid, el] of markerEls) {
-    el.style.scale   = mid === id ? '1.3' : '1'
-    el.style.zIndex  = mid === id ? '10' : '1'
+    const sel = mid === id
+    if (sel) {
+      const color = el.dataset.pinColor ?? '#6b7280'
+      el.style.filter = `drop-shadow(0 0 5px ${color}) drop-shadow(0 2px 6px rgba(0,0,0,0.5))`
+    } else {
+      el.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))'
+    }
+    el.style.zIndex = sel ? '10' : '1'
   }
 }
 

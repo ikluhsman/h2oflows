@@ -30,7 +30,6 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
@@ -38,6 +37,7 @@ const props = defineProps<{ hoveredSlug?: string | null }>()
 const emit  = defineEmits<{
   (e: 'reaches-updated', reaches: { slug: string; name: string; class_max: number | null }[]): void
   (e: 'bounds-updated', bbox: string): void
+  (e: 'gauge-add', gaugeId: string): void
 }>()
 
 // Local cache of loaded reach features so flyToSlug can look up geometry
@@ -61,7 +61,6 @@ function flyToSlug(slug: string) {
 
 defineExpose({ flyToSlug })
 
-const router  = useRouter()
 const { apiBase } = useRuntimeConfig().public
 const container   = ref<HTMLDivElement>()
 const mapReady    = ref(false)
@@ -327,8 +326,9 @@ function updateLayers(features: ReachFeature[]) {
       hoverPopup.remove()
     })
     map.on('click', 'reach-lines', e => {
-      const slug = e.features?.[0]?.properties?.slug
-      if (slug) router.push(`/reaches/${slug}`)
+      if (!map || !e.features?.length) return
+      hoverPopup.remove()
+      showReachPopup(e.features[0].properties as any, e.lngLat)
     })
   }
 
@@ -396,14 +396,48 @@ function updateLayers(features: ReachFeature[]) {
 
   // Navigate to reach on individual point click
   map.on('click', 'diff-points', e => {
-    const slug = e.features?.[0]?.properties?.slug
-    if (slug) router.push(`/reaches/${slug}`)
+    if (!map || !e.features?.length) return
+    showReachPopup(e.features[0].properties as any, e.lngLat)
   })
 
   map.on('mouseenter', 'diff-clusters', () => { if (map) map.getCanvas().style.cursor = 'pointer' })
   map.on('mouseleave', 'diff-clusters', () => { if (map) map.getCanvas().style.cursor = '' })
   map.on('mouseenter', 'diff-points',   () => { if (map) map.getCanvas().style.cursor = 'pointer' })
   map.on('mouseleave', 'diff-points',   () => { if (map) map.getCanvas().style.cursor = '' })
+}
+
+// ── Click popup ───────────────────────────────────────────────────────────────
+
+let clickPopup: maplibregl.Popup | null = null
+
+function showReachPopup(p: any, lngLat: maplibregl.LngLat) {
+  if (!map) return
+  clickPopup?.remove()
+
+  const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const cfs  = p.current_cfs != null ? `${Number(p.current_cfs).toLocaleString()} cfs` : null
+  const age  = p.last_reading_at ? relativeTime(p.last_reading_at) : null
+  const flow = cfs ? `${cfs}${age ? ` · ${age}` : ''}` : 'No recent reading'
+
+  const popup = new maplibregl.Popup({ offset: [0, -4], className: 'reach-click-popup' })
+    .setLngLat(lngLat)
+    .setHTML(`<div class="rcp-inner">
+      <p class="rcp-name">${esc(p.name)}</p>
+      <p class="rcp-flow">${esc(flow)}</p>
+      <div class="rcp-actions">
+        <a class="rcp-btn rcp-btn-primary" href="/reaches/${esc(p.slug)}">View reach</a>
+        ${p.gauge_id ? `<button class="rcp-btn rcp-btn-ghost" data-gauge-id="${esc(p.gauge_id)}">+ Dashboard</button>` : ''}
+      </div>
+    </div>`)
+    .addTo(map)
+
+  clickPopup = popup
+
+  popup.getElement().querySelector('[data-gauge-id]')
+    ?.addEventListener('click', () => {
+      emit('gauge-add', p.gauge_id)
+      popup.remove()
+    })
 }
 
 // Only show hover tooltip when zoomed in enough that individual reaches are distinct
@@ -431,3 +465,55 @@ function difficultyColorExpr(): maplibregl.ExpressionSpecification {
   ] as any
 }
 </script>
+
+<style>
+.reach-click-popup .maplibregl-popup-content {
+  border-radius: 10px !important;
+  padding: 0 !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important;
+  min-width: 180px;
+}
+.rcp-inner {
+  padding: 10px 14px 10px;
+  font-family: system-ui, sans-serif;
+}
+.rcp-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #111827;
+  margin: 0 0 2px;
+}
+.rcp-flow {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0 0 10px;
+}
+.rcp-actions {
+  display: flex;
+  gap: 6px;
+}
+.rcp-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  border: none;
+  transition: background 0.1s, color 0.1s;
+}
+.rcp-btn-primary {
+  background: #2563eb;
+  color: #fff;
+}
+.rcp-btn-primary:hover { background: #1d4ed8; }
+.rcp-btn-ghost {
+  background: #f3f4f6;
+  color: #374151;
+}
+.rcp-btn-ghost:hover { background: #e5e7eb; }
+</style>
