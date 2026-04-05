@@ -273,6 +273,8 @@ type knownRapid struct {
 	Description          string   // lines, hazards, scouting notes
 	PortageDescription   string   // empty = no portage route known
 	IsPortageRecommended bool
+	Lat                  *float64 // GPS location of the rapid
+	Lon                  *float64
 }
 
 func ptr(f float64) *float64 { return &f }
@@ -402,8 +404,8 @@ The BV gauge (07087200) is the primary reference. The Nathrop gauge (07091200) d
 			},
 		},
 		KnownRapids: []knownRapid{
-			{Name: "Pinball", ClassRating: ptr(3.0), RiverMile: ptr(0.0)},
-			{Name: "Zoom Flume", ClassRating: ptr(3.0), RiverMile: ptr(0.0)},
+			{Name: "Pinball", ClassRating: ptr(3.0), Lat: ptr(38.7108723), Lon: ptr(-106.0533237)},
+			{Name: "Zoom Flume", ClassRating: ptr(3.5), Lat: ptr(38.6988283), Lon: ptr(-106.0511447)},
 		},
 		Region: "Arkansas River, Colorado — Fisherman's Bridge to Hecla Junction",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "pool-drop", LengthMi: 9.0,

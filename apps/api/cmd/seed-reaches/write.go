@@ -103,16 +103,18 @@ func linkRelatedGauge(ctx context.Context, pool *pgxpool.Pool, reachID string, g
 	return nil
 }
 
-// writeKnownRapid inserts a domain-expert rapid with data_source='manual' and verified=true.
+// writeKnownRapid inserts a domain-expert rapid with data_source='maintainer' and verified=true.
 // ON CONFLICT DO NOTHING — never overwrites an existing row for the same reach+name.
 func writeKnownRapid(ctx context.Context, pool *pgxpool.Pool, reachID string, r knownRapid) error {
-	_, err := pool.Exec(ctx, `
+	var rapidID string
+	err := pool.QueryRow(ctx, `
 		INSERT INTO rapids
 			(reach_id, name, river_mile, class_rating, class_at_low, class_at_high,
 			 description, portage_description, is_portage_recommended,
 			 data_source, verified)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'maintainer',TRUE)
 		ON CONFLICT (reach_id, name) DO NOTHING
+		RETURNING id
 	`,
 		reachID,
 		r.Name,
@@ -123,7 +125,18 @@ func writeKnownRapid(ctx context.Context, pool *pgxpool.Pool, reachID string, r 
 		nullStr(r.Description),
 		nullStr(r.PortageDescription),
 		r.IsPortageRecommended,
-	)
+	).Scan(&rapidID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil // conflict — already exists
+	}
+	if err != nil {
+		return err
+	}
+	if r.Lat != nil && r.Lon != nil {
+		_, err = pool.Exec(ctx, `
+			UPDATE rapids SET location = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography WHERE id = $1
+		`, rapidID, *r.Lon, *r.Lat)
+	}
 	return err
 }
 
