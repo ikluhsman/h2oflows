@@ -148,10 +148,9 @@ func (p *Poller) writeReading(ctx context.Context, gaugeID string, r gauge.Readi
 		SET current_cfs = $2,
 		    flow_status  = COALESCE(
 		        (SELECT CASE
-		                    WHEN fr.label IN ('fun', 'optimal')   THEN 'runnable'
-		                    WHEN fr.label IN ('minimum', 'pushy') THEN 'caution'
-		                    WHEN fr.label = 'too_low'             THEN 'low'
-		                    WHEN fr.label IN ('high', 'flood')    THEN 'flood'
+		                    WHEN fr.label = 'runnable'           THEN 'runnable'
+		                    WHEN fr.label = 'below_recommended'  THEN 'low'
+		                    WHEN fr.label = 'above_recommended'  THEN 'flood'
 		                    ELSE 'unknown'
 		                END
 		         FROM flow_ranges fr

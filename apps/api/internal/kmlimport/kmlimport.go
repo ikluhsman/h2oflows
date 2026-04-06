@@ -159,14 +159,15 @@ type reachInfo struct {
 
 // Importer runs KML imports against a live database pool.
 type Importer struct {
-	pool   *pgxpool.Pool
-	DryRun bool
-	reaches []reachInfo // cached for category-map mode
+	pool    *pgxpool.Pool
+	DryRun  bool
+	reaches []reachInfo   // cached for category-map mode
+	cleared map[string]bool // reaches whose import data has been cleared this run
 }
 
 // New creates a new Importer.
 func New(pool *pgxpool.Pool, dryRun bool) *Importer {
-	return &Importer{pool: pool, DryRun: dryRun}
+	return &Importer{pool: pool, DryRun: dryRun, cleared: map[string]bool{}}
 }
 
 // Import processes all placemarks in doc and writes reach features to the DB.
@@ -268,6 +269,17 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		if !ok {
 			res.Log = append(res.Log, fmt.Sprintf("⚠  %q — bad coordinates", pm.Name))
 			continue
+		}
+
+		// Clear existing import-sourced data for this reach on first encounter,
+		// so re-importing replaces rather than accumulates.
+		if !imp.cleared[a.reachID] {
+			if err := imp.clearImportData(ctx, a.reachID); err != nil {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] clear failed: %v", a.reachName, err))
+			} else {
+				imp.cleared[a.reachID] = true
+				res.Log = append(res.Log, fmt.Sprintf("↺  [%s] cleared previous import data", a.reachName))
+			}
 		}
 
 		st := res.reachStats(a.reachSlug, a.reachName)
@@ -463,41 +475,41 @@ func (imp *Importer) upsertParking(ctx context.Context, reachID, name, notes str
 	if imp.DryRun {
 		return nil
 	}
-	tag, err := imp.pool.Exec(ctx, `
-		WITH nearest AS (
-			SELECT id
-			FROM reach_access
-			WHERE reach_id = $1
-			  AND parking_location IS NULL
-			  AND ST_DWithin(
-			        location,
-			        ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
-			        500
-			      )
-			ORDER BY ST_Distance(location, ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography)
-			LIMIT 1
-		)
-		UPDATE reach_access
-		SET parking_location = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography
-		WHERE id IN (SELECT id FROM nearest)
-	`, reachID, lon, lat)
-	if err != nil {
+	// Store parking pins as their own 'parking' access type rows.
+	// Each pin is a distinct record, so all parking pins in the KML are preserved.
+	_, err := imp.pool.Exec(ctx, `
+		INSERT INTO reach_access
+			(reach_id, access_type, name, notes,
+			 location, parking_location, data_source, verified)
+		VALUES
+			($1, 'parking', $2, NULLIF($3, ''),
+			 ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
+			 ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
+			 'import', true)
+		ON CONFLICT (reach_id, access_type, name) DO UPDATE
+		  SET location         = EXCLUDED.location,
+		      parking_location = EXCLUDED.parking_location,
+		      notes            = COALESCE(EXCLUDED.notes, reach_access.notes),
+		      verified         = true
+	`, reachID, name, notes, lon, lat)
+	return err
+}
+
+// clearImportData removes all rapids and access points seeded by AI or a prior KML import
+// for the given reach. Human KML imports are authoritative and supersede AI seeds.
+// Records with data_source = 'maintainer' are preserved.
+func (imp *Importer) clearImportData(ctx context.Context, reachID string) error {
+	if imp.DryRun {
+		return nil
+	}
+	if _, err := imp.pool.Exec(ctx,
+		`DELETE FROM rapids WHERE reach_id = $1 AND data_source IN ('import', 'ai_seed')`, reachID,
+	); err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
-		_, err = imp.pool.Exec(ctx, `
-			INSERT INTO reach_access
-				(reach_id, access_type, name, notes,
-				 location, parking_location, data_source, verified)
-			VALUES
-				($1, 'intermediate', $2, NULLIF($3, ''),
-				 ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
-				 ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography,
-				 'import', true)
-			ON CONFLICT (reach_id, access_type, name) DO UPDATE
-			  SET parking_location = EXCLUDED.parking_location
-		`, reachID, name, notes, lon, lat)
-	}
+	_, err := imp.pool.Exec(ctx,
+		`DELETE FROM reach_access WHERE reach_id = $1 AND data_source IN ('import', 'ai_seed')`, reachID,
+	)
 	return err
 }
 

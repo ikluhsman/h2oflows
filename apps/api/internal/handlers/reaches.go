@@ -365,7 +365,8 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 				WHEN 'take_out'     THEN 2
 				WHEN 'intermediate' THEN 3
 				WHEN 'shuttle_drop' THEN 4
-				WHEN 'camp'         THEN 5
+				WHEN 'parking'      THEN 5
+				WHEN 'camp'         THEN 6
 			END
 	`, reach.ID)
 	if err != nil {

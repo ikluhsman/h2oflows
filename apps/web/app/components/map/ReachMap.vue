@@ -372,7 +372,7 @@ function makePinEl(color: string, imgUrl: string | null, label: string, id: stri
   const inner = imgUrl
     ? `<image href="${imgUrl}" x="4" y="4" width="20" height="20" clip-path="circle(10px at 10px 10px)"/>`
     : `<text x="14" y="17" text-anchor="middle" dominant-baseline="middle"
-        font-size="10" font-weight="700" font-family="system-ui,sans-serif" fill="white">${label}</text>`
+        font-size="11" font-weight="800" font-family="system-ui,sans-serif" fill="white">${label}</text>`
   el.innerHTML = `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
     <path d="M14 1C7.1 1 1.5 6.6 1.5 13.5c0 8.7 12.5 20.5 12.5 20.5S26.5 22.2 26.5 13.5C26.5 6.6 20.9 1 14 1z"
       fill="${color}" stroke="white" stroke-width="1.5"/>
@@ -595,15 +595,15 @@ function formatClass(v: number): string {
 }
 
 function accessTypeLabel(type: string): string {
-  return { put_in: 'Put-in', take_out: 'Take-out', shuttle_drop: 'Shuttle', intermediate: 'Access', camp: 'Camp' }[type] ?? type
+  return { put_in: 'Put-in', take_out: 'Take-out', shuttle_drop: 'Shuttle', intermediate: 'Access', parking: 'Parking', camp: 'Camp' }[type] ?? type
 }
 
 function accessColor(type: string): string {
-  return { put_in: '#22c55e', take_out: '#ef4444', shuttle_drop: '#a855f7', intermediate: '#94a3b8', camp: '#f59e0b' }[type] ?? '#94a3b8'
+  return { put_in: '#22c55e', take_out: '#ef4444', shuttle_drop: '#a855f7', intermediate: '#94a3b8', parking: '#dc2626', camp: '#f59e0b' }[type] ?? '#94a3b8'
 }
 
 function accessIcon(type: string): string {
-  return { put_in: '↓', take_out: '↑', shuttle_drop: 'S', intermediate: '◆', camp: '⛺' }[type] ?? '·'
+  return { put_in: '↓', take_out: '↑', shuttle_drop: 'S', intermediate: '◆', parking: 'P', camp: '⛺' }[type] ?? '·'
 }
 
 function rebuildLayers() {
@@ -620,8 +620,8 @@ function rebuildLayers() {
 }
 
 // Re-add layers when data changes (e.g. after KMZ import refreshes the page, or after OSM centerline fetch)
-watch(allFeatures, rebuildLayers)
-watch(() => props.centerline, rebuildLayers)
+watch(allFeatures, rebuildLayers, { deep: true })
+watch(() => props.centerline, rebuildLayers, { deep: true })
 </script>
 
 <style>

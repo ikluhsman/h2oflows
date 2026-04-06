@@ -217,13 +217,9 @@ function buildChart() {
 // ---- Canvas drawing helpers -------------------------------------------------
 
 const BAND_COLORS: Record<string, string> = {
-  too_low: 'rgba(239,68,68,0.22)',
-  minimum: 'rgba(234,179,8,0.22)',
-  fun:     'rgba(34,197,94,0.30)',
-  optimal: 'rgba(16,185,129,0.35)',
-  pushy:   'rgba(234,179,8,0.28)',
-  high:    'rgba(59,130,246,0.22)',
-  flood:   'rgba(59,130,246,0.30)',
+  below_recommended: 'rgba(239,68,68,0.22)',
+  runnable:          'rgba(34,197,94,0.30)',
+  above_recommended: 'rgba(59,130,246,0.25)',
 }
 
 // bandColor returns the translucent fill used on the chart bands.
@@ -232,13 +228,9 @@ function bandColor(label: string): string {
 }
 
 const BAND_COLORS_SOLID: Record<string, string> = {
-  too_low: '#ef4444',
-  minimum: '#eab308',
-  fun:     '#22c55e',
-  optimal: '#10b981',
-  pushy:   '#eab308',
-  high:    '#3b82f6',
-  flood:   '#3b82f6',
+  below_recommended: '#ef4444',
+  runnable:          '#22c55e',
+  above_recommended: '#3b82f6',
 }
 
 // bandColorSolid returns a fully opaque swatch color for the legend.
@@ -262,8 +254,8 @@ function drawBands(u: uPlot, ranges: FlowRange[]) {
     if (!color) continue
 
     // Convert CFS values to canvas Y coordinates.
-    // min_cfs null means the band extends to the bottom of the chart (too_low).
-    // max_cfs null means it extends to the top (flood).
+    // min_cfs null means the band extends to the bottom (below_recommended).
+    // max_cfs null means it extends to the top (above_recommended).
     const yMin = fr.max_cfs != null
       ? u.valToPos(fr.max_cfs, 'y', true) * dpr
       : bbox.top
@@ -310,13 +302,10 @@ function lineColor(ranges: FlowRange[], cfs: number | null): string {
   )
   if (!match) return '#6b7280'
   switch (match.label) {
-    case 'fun':
-    case 'optimal':   return '#22c55e'
-    case 'minimum':
-    case 'pushy':     return '#eab308'
-    case 'high':
-    case 'flood':     return '#3b82f6'
-    default:          return '#ef4444'
+    case 'runnable':          return '#22c55e'
+    case 'above_recommended': return '#3b82f6'
+    case 'below_recommended': return '#ef4444'
+    default:                  return '#6b7280'
   }
 }
 
@@ -343,13 +332,9 @@ function formatHour(h: number): string {
 // ---- Flow range legend helpers ----------------------------------------------
 
 const LABEL_DISPLAY: Record<string, string> = {
-  too_low: 'Too Low',
-  minimum: 'Minimum',
-  fun:     'Fun',
-  optimal: 'Optimal',
-  pushy:   'Pushy',
-  high:    'High',
-  flood:   'Flood',
+  below_recommended: 'Below Recommended',
+  runnable:          'Runnable',
+  above_recommended: 'Above Recommended',
 }
 
 function labelDisplay(label: string): string {
