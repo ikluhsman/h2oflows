@@ -330,23 +330,23 @@ function addLayers() {
     markerEls.set(a.id, el)
   }
 
-  // Rapid markers
+  // Rapid labels — text only, no pin
   for (const r of rapidFeatures.value) {
-    const color = r.isSurf ? '#3b82f6' : '#f97316'
-    const el = makePinEl(color, null, r.classLabel ?? '~', r.id)
-    el.title = `${r.label}${r.classLabel ? ' · Class ' + r.classLabel : ''}`
-    el.addEventListener('mouseenter', () => showTooltip(el, el.title, [r.lng, r.lat]))
-    el.addEventListener('mouseleave', () => tooltip.remove())
-    el.addEventListener('click', () => {
+    const el = document.createElement('div')
+    el.dataset.markerId = r.id
+    el.className = 'reach-map-rapid-label'
+    el.textContent = r.label
+    el.title = r.label
+    el.addEventListener('click', (e) => {
+      e.stopPropagation()
       clickPopup?.remove()
-      const title = `${r.label}${r.classLabel ? ` <span class="map-popup-class">Class ${r.classLabel}</span>` : ''}`
-      clickPopup = new maplibregl.Popup({ offset: [0, -32] })
+      clickPopup = new maplibregl.Popup({ offset: [0, -8] })
         .setLngLat([r.lng, r.lat])
-        .setHTML(`<div class="map-popup"><p class="map-popup-title">${title}</p>${r.desc ? `<p class="map-popup-desc">${r.desc}</p>` : ''}</div>`)
+        .setHTML(`<div class="map-popup"><p class="map-popup-title">${r.label}</p>${r.desc ? `<p class="map-popup-desc">${r.desc}</p>` : ''}</div>`)
         .addTo(map!)
       setSelectedMarker(r.id)
     })
-    const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
       .setLngLat([r.lng, r.lat])
       .addTo(map!)
     allMarkers.push(marker)
@@ -625,6 +625,9 @@ watch(() => props.centerline, rebuildLayers, { deep: true })
 </script>
 
 <style>
+.maplibregl-popup {
+  z-index: 10;
+}
 .maplibregl-popup-content {
   border-radius: 8px !important;
   padding: 0 !important;
@@ -638,6 +641,7 @@ watch(() => props.centerline, rebuildLayers, { deep: true })
 .map-popup-title {
   font-weight: 600;
   font-size: 0.875rem;
+  color: #111827;
   margin: 0 0 4px;
 }
 .map-popup-class {
@@ -650,6 +654,25 @@ watch(() => props.centerline, rebuildLayers, { deep: true })
   color: #4b5563;
   margin: 0;
   line-height: 1.4;
+}
+.reach-map-rapid-label {
+  cursor: pointer;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow:
+    -1px -1px 0 #000,  1px -1px 0 #000,
+    -1px  1px 0 #000,  1px  1px 0 #000,
+     0   -1px 0 #000,  0    1px 0 #000,
+    -1px  0   0 #000,  1px  0   0 #000;
+  white-space: nowrap;
+  user-select: none;
+  letter-spacing: 0.02em;
+  transition: filter 0.15s;
+}
+.reach-map-rapid-label:hover {
+  filter: drop-shadow(0 0 4px #fbbf24) drop-shadow(0 0 8px #f59e0b);
 }
 .reach-map-tooltip .maplibregl-popup-content {
   padding: 5px 10px !important;
