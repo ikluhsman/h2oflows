@@ -72,8 +72,7 @@
           :class="selectedId === r.id ? 'bg-gray-100 dark:bg-gray-800' : ''"
           @click="selectFeature(r.id, r.lng, r.lat)"
         >
-          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-            :style="{ background: r.isSurf ? '#3b82f6' : '#f97316' }">
+          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-blue-500">
             {{ r.isSurf ? '🌊' : '~' }}
           </span>
           <span class="truncate text-gray-700 dark:text-gray-300">{{ r.label }}</span>
@@ -330,7 +329,7 @@ function addLayers() {
     markerEls.set(a.id, el)
   }
 
-  // Rapid labels — text only, no pin
+  // Rapid labels — text only with a blue glow
   for (const r of rapidFeatures.value) {
     const el = document.createElement('div')
     el.dataset.markerId = r.id
@@ -661,18 +660,20 @@ watch(() => props.centerline, rebuildLayers, { deep: true })
   font-size: 11px;
   font-weight: 700;
   color: #ffffff;
+  white-space: nowrap;
+  user-select: none;
+  letter-spacing: 0.02em;
   text-shadow:
     -1px -1px 0 #000,  1px -1px 0 #000,
     -1px  1px 0 #000,  1px  1px 0 #000,
      0   -1px 0 #000,  0    1px 0 #000,
-    -1px  0   0 #000,  1px  0   0 #000;
-  white-space: nowrap;
-  user-select: none;
-  letter-spacing: 0.02em;
+    -1px  0   0 #000,  1px  0   0 #000,
+     0    0   4px #3b82f6,
+     0    0   8px rgba(59, 130, 246, 0.7);
   transition: filter 0.15s;
 }
 .reach-map-rapid-label:hover {
-  filter: drop-shadow(0 0 4px #fbbf24) drop-shadow(0 0 8px #f59e0b);
+  filter: drop-shadow(0 0 4px #60a5fa) drop-shadow(0 0 8px #3b82f6);
 }
 .reach-map-tooltip .maplibregl-popup-content {
   padding: 5px 10px !important;

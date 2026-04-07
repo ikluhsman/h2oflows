@@ -64,9 +64,9 @@ let gaugeClickPopup: maplibregl.Popup | null = null
 const CO_BBOX = '-109.1,36.9,-102.0,41.1'
 
 // Track last gauge-id fingerprint to know when to re-fit bounds
-let prevGaugeIds  = ''
-let hasFitBounds  = false
-let fetchSeq      = 0   // incremented on each call; lets an in-flight fetch self-cancel if superseded
+let prevGaugeIdSet = new Set<string>()
+let hasFitBounds   = false
+let fetchSeq       = 0   // incremented on each call; lets an in-flight fetch self-cancel if superseded
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ function midpoint(geom: any): [number, number] | null {
     ? geom.coordinates
     : (geom.coordinates as [number, number][][]).flat()
   if (coords.length < 2) return null
-  return coords[Math.floor(coords.length / 2)]
+  return coords[Math.floor(coords.length / 2)] ?? null
 }
 
 function allCoordsOf(geom: any): [number, number][] {
@@ -155,10 +155,11 @@ async function refreshData() {
   if (!m || !mapReady.value) return
 
   const seq = ++fetchSeq                   // capture sequence number for this call
-  const currentIds = props.gauges.map(g => g.id).sort().join(',')
-  const idsChanged = currentIds !== prevGaugeIds
+  const currentIdSet = new Set(props.gauges.map(g => g.id))
+  const addedIds = [...currentIdSet].filter(id => !prevGaugeIdSet.has(id))
+  const idsChanged = addedIds.length > 0 || [...prevGaugeIdSet].some(id => !currentIdSet.has(id))
   if (idsChanged) hasFitBounds = false
-  prevGaugeIds = currentIds
+  prevGaugeIdSet = currentIdSet
 
   // Collect all reach slugs across all gauges (primary + all associated)
   const slugSet = new Set(props.gauges.flatMap(g =>
@@ -207,10 +208,32 @@ async function refreshData() {
       activeMarkers.push(marker)
     }
 
+    // When the user adds a new gauge, zoom to that gauge + its reach centerline
+    // so they immediately see the run they just bookmarked. On initial mount or
+    // after a removal, fall back to fitting the full set of saved gauges.
     const validPoints = gaugePoints.filter(p => Number.isFinite(p[0]) && Number.isFinite(p[1]))
-    if ((idsChanged || !hasFitBounds) && validPoints.length > 0) {
-      const lngs = validPoints.map(c => c[0])
-      const lats  = validPoints.map(c => c[1])
+    let fitPoints: [number, number][] | null = null
+    if (addedIds.length > 0) {
+      const focusPts: [number, number][] = []
+      for (const gauge of props.gauges) {
+        if (!addedIds.includes(gauge.id)) continue
+        if (Number.isFinite(gauge.lng) && Number.isFinite(gauge.lat)) {
+          focusPts.push([gauge.lng as number, gauge.lat as number])
+        }
+        const slugsToTry = [gauge.reachSlug, ...(gauge.reachSlugs ?? [])].filter((s): s is string => !!s)
+        for (const slug of slugsToTry) {
+          const feature = bySlug.get(slug)
+          if (feature) focusPts.push(...allCoordsOf(feature.geometry))
+        }
+      }
+      if (focusPts.length > 0) fitPoints = focusPts
+    }
+    if (!fitPoints && (idsChanged || !hasFitBounds) && validPoints.length > 0) {
+      fitPoints = validPoints
+    }
+    if (fitPoints) {
+      const lngs = fitPoints.map(c => c[0])
+      const lats = fitPoints.map(c => c[1])
       m.fitBounds(
         [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
         { padding: 80, maxZoom: 13, duration: 800 },

@@ -85,28 +85,33 @@ async function search() {
     if (!res.ok) return
     const data = await res.json()
     // API returns GeoJSON FeatureCollection — map to WatchedGauge shape
-    results.value = (data.features ?? []).map((f: any) => ({
-      id:           f.properties.id,
-      externalId:   f.properties.external_id,
-      source:       f.properties.source,
-      name:         f.properties.name ?? null,
-      featured:     f.properties.featured ?? false,
-      reachId:           f.properties.reach_id ?? null,
-      reachName:         f.properties.reach_name ?? null,
-      reachNames:        f.properties.reach_names ?? [],
-      reachSlug:         f.properties.reach_slug ?? null,
-      reachSlugs:        f.properties.reach_slugs ?? [],
-      reachRelationship: f.properties.reach_relationship ?? null,
-      pollTier:     f.properties.poll_tier,
-      watershedName: f.properties.watershed_name ?? null,
-      basinName:    f.properties.basin_name ?? null,
-      riverName:    f.properties.river_name ?? null,
-      stateAbbr:    f.properties.state_abbr ?? null,
-      currentCfs:    f.properties.current_cfs ?? null,
-      flowStatus:    f.properties.flow_status ?? 'unknown',
-      flowBandLabel: f.properties.flow_band_label ?? null,
-      lastReadingAt: f.properties.last_reading_at ?? null,
-    }))
+    results.value = (data.features ?? []).map((f: any) => {
+      const coords = f.geometry?.coordinates as [number, number] | undefined
+      return {
+        id:           f.properties.id,
+        externalId:   f.properties.external_id,
+        source:       f.properties.source,
+        name:         f.properties.name ?? null,
+        featured:     f.properties.featured ?? false,
+        reachId:           f.properties.reach_id ?? null,
+        reachName:         f.properties.reach_name ?? null,
+        reachNames:        f.properties.reach_names ?? [],
+        reachSlug:         f.properties.reach_slug ?? null,
+        reachSlugs:        f.properties.reach_slugs ?? [],
+        reachRelationship: f.properties.reach_relationship ?? null,
+        pollTier:     f.properties.poll_tier,
+        watershedName: f.properties.watershed_name ?? null,
+        basinName:    f.properties.basin_name ?? null,
+        riverName:    f.properties.river_name ?? null,
+        stateAbbr:    f.properties.state_abbr ?? null,
+        lng:           coords?.[0] ?? null,
+        lat:           coords?.[1] ?? null,
+        currentCfs:    f.properties.current_cfs ?? null,
+        flowStatus:    f.properties.flow_status ?? 'unknown',
+        flowBandLabel: f.properties.flow_band_label ?? null,
+        lastReadingAt: f.properties.last_reading_at ?? null,
+      }
+    })
   } catch {
     results.value = []
   } finally {
