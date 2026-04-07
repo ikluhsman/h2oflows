@@ -11,7 +11,9 @@
           <UTooltip :text="tierTooltip">
             <span class="text-xs shrink-0" :class="tierIconClass">{{ tierIcon }}</span>
           </UTooltip>
-          <span class="font-medium text-sm truncate">{{ displayName }}</span>
+          <UTooltip :text="displayName" :delay-duration="500">
+            <span class="font-medium text-sm truncate">{{ displayName }}</span>
+          </UTooltip>
         </div>
         <p v-if="!hideReachSubtitle" class="text-xs truncate mt-0.5 pl-4">
           <span v-if="gauge.riverName" class="text-blue-400 dark:text-blue-500 font-medium">{{ gauge.riverName }}</span>
@@ -78,6 +80,7 @@
       </UTooltip>
       {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
     </p>
+    <p v-if="lastUpdatedLabel" class="text-xs text-gray-400 mt-0.5">{{ lastUpdatedLabel }}</p>
 
     <!-- GPS permission error -->
     <p v-if="permissionErr && !isActive" class="mt-2 text-xs text-red-500">
@@ -95,11 +98,33 @@
       </span>
       Recording trip · {{ activeDuration }}
     </div>
+
+    <!-- Post-trip consent banner — shown briefly after a trip is stopped -->
+    <div
+      v-if="showConsentBanner"
+      class="mt-3 rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 p-3 space-y-2"
+      @click.stop
+    >
+      <p class="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
+        Share this trip anonymously to help improve reach data?
+      </p>
+      <div class="flex gap-2">
+        <button
+          class="flex-1 text-xs font-medium py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          @click.stop="resolveConsent(true)"
+        >Share</button>
+        <button
+          class="flex-1 text-xs font-medium py-1.5 rounded-md border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          @click.stop="resolveConsent(false)"
+        >Keep private</button>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { QueuedTrip } from '~/composables/useOfflineQueue'
 import type { WatchedGauge } from '~/stores/watchlist'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { useTripRecording } from '~/composables/useTripRecording'
@@ -236,29 +261,41 @@ function getDeviceId(): string {
   return id
 }
 
+// Post-trip consent — held here until user responds, then enqueued + flushed.
+const showConsentBanner = ref(false)
+const pendingTrip = ref<QueuedTrip | null>(null)
+
+function resolveConsent(share: boolean) {
+  if (!pendingTrip.value) return
+  pendingTrip.value.shareConsent = share
+  enqueue(pendingTrip.value)
+  flush()
+  pendingTrip.value  = null
+  showConsentBanner.value = false
+}
+
 async function handleWatchClick() {
   if (isActive.value) {
-    // End trip — stop GPS, collect track, enqueue for upload.
+    // End trip — stop GPS, collect track, hold for consent before upload.
     const track = stopRecording()
     const trip = store.activeTrip
     store.endTrip()
 
     if (trip) {
-      enqueue({
+      pendingTrip.value = {
         queuedAt:     new Date().toISOString(),
         gaugeId:      trip.gaugeId,
-        reachId:      trip.reachSlug ? null : null, // reach_id populated once we have it
+        reachId:      null,
         startCfs:     trip.startCfs,
         endCfs:       props.gauge.currentCfs ?? null,
         startedAt:    trip.startedAt,
         endedAt:      new Date().toISOString(),
         notes:        '',
         deviceId:     getDeviceId(),
-        shareConsent: null, // will be asked in post-trip flow
+        shareConsent: null,
         trackPoints:  track,
-      })
-      // Attempt immediate upload — silently queues if offline.
-      flush()
+      }
+      showConsentBanner.value = true
     }
   } else {
     // Start trip — request GPS permission and begin recording.
@@ -269,6 +306,19 @@ async function handleWatchClick() {
     // If permission denied, permissionErr is set — show it below the card.
   }
 }
+
+// --- Last updated -----------------------------------------------------------
+
+const lastUpdatedLabel = computed(() => {
+  if (!props.gauge.lastReadingAt) return ''
+  const ms = Date.now() - new Date(props.gauge.lastReadingAt).getTime()
+  const minutes = Math.floor(ms / 60_000)
+  if (minutes < 1)  return 'Updated just now'
+  if (minutes < 60) return `Updated ${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24)   return `Updated ${hours}h ago`
+  return `Updated ${Math.floor(hours / 24)}d ago`
+})
 
 // --- Active trip duration ---------------------------------------------------
 

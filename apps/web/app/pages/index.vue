@@ -25,9 +25,8 @@
           class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 font-semibold text-sm transition-colors"
         >Dashboard</NuxtLink>
         <NuxtLink
-          to="/dashboard"
-          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 font-semibold text-sm transition-colors opacity-50 cursor-not-allowed pointer-events-none"
-          title="Coming soon"
+          to="/trips"
+          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 font-semibold text-sm transition-colors"
         >My Trips</NuxtLink>
       </nav>
     </header>
@@ -51,7 +50,7 @@
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"/>
             <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"/>
           </span>
-          Live USGS streamflow · Colorado
+          Live USGS Streamflow Data
         </div>
 
         <!-- Headline -->
@@ -85,42 +84,26 @@
             </button>
           </form>
 
-          <!-- Answer card -->
-          <div v-if="searchResult" class="mb-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 text-left">
-            <div v-if="searchResult.reach_name" class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wide text-blue-500">{{ searchResult.reach_name }}</span>
-              <NuxtLink :to="`/reaches/${searchResult.reach_slug}`" class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">View reach →</NuxtLink>
+          <!-- Answer cards — one per matched reach -->
+          <div v-if="searchResult && searchResult.results.length > 0" class="mb-3 flex flex-col gap-2">
+            <div
+              v-for="result in searchResult.results"
+              :key="result.reach_slug"
+              class="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 text-left"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-semibold uppercase tracking-wide text-blue-500">{{ result.reach_name }}</span>
+                <NuxtLink :to="`/reaches/${result.reach_slug}`" class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0">View reach →</NuxtLink>
+              </div>
+              <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{{ result.answer }}</p>
             </div>
-            <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{{ searchResult.answer }}</p>
           </div>
+          <p v-else-if="searchResult && searchResult.answer" class="mb-3 text-sm text-gray-500 dark:text-gray-400">{{ searchResult.answer }}</p>
           <p v-if="searchError" class="mb-3 text-sm text-red-500">{{ searchError }}</p>
-
-          <!-- Buttons row -->
-          <div class="flex items-center gap-2 flex-wrap">
-            <NuxtLink
-              to="/dashboard"
-              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors shadow-sm"
-            >
-              My Dashboard
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </NuxtLink>
-            <button
-              disabled
-              class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 font-semibold text-sm cursor-not-allowed"
-              title="Coming soon"
-            >My Trips</button>
-            <NuxtLink
-              to="/map"
-              class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-600 dark:text-gray-400 font-medium text-sm transition-colors ml-auto"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-              Full screen map
-            </NuxtLink>
-          </div>
         </div>
 
         <!-- Framed reach map -->
-        <div class="w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm" style="height: 420px;">
+        <div class="relative w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm" style="height: 420px;">
           <ClientOnly>
             <ReachesMap
               @reaches-updated="onReachesUpdated"
@@ -128,6 +111,14 @@
               @gauge-add="addGaugeById"
             />
           </ClientOnly>
+          <NuxtLink
+            to="/map"
+            class="absolute top-3 right-12 z-10 inline-flex items-center justify-center w-9 h-9 rounded-md bg-white/95 dark:bg-gray-900/95 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-900 hover:text-blue-600 dark:hover:text-blue-400 shadow-sm transition-colors"
+            title="Open full screen map"
+            aria-label="Open full screen map"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          </NuxtLink>
         </div>
 
         <!-- Feature tiles -->
@@ -247,10 +238,12 @@ async function addGaugeById(gaugeId: string) {
 
 // ── AI search ─────────────────────────────────────────────────────────────────
 
+type AskResult = { results: { answer: string; reach_slug: string; reach_name: string }[]; answer?: string }
+
 const searchQuery  = ref('')
 const searching    = ref(false)
 const searchError  = ref('')
-const searchResult = ref<{ answer: string; reach_slug?: string; reach_name?: string } | null>(null)
+const searchResult = ref<AskResult | null>(null)
 
 async function askQuestion() {
   const q = searchQuery.value.trim()

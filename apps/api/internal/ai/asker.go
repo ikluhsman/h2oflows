@@ -25,20 +25,24 @@ Context:
 
 const identifySystemPrompt = `You are a river assistant for H2OFlows, a whitewater paddling app.
 
-Given a question from a paddler, identify which river reach they are asking about.
+Given a question from a paddler, identify which river reach(es) they are asking about.
 Return ONLY a JSON object with this schema — no explanation, no markdown:
 
 {
-  "slug": "the-reach-slug-or-empty-string",
+  "slugs": ["slug-1", "slug-2"],
   "question": "the question with any reach name removed or kept as-is"
 }
 
-The slug must match one of these known reaches:
+The slugs must match known reaches from the list below. Return up to 3 slugs, sorted by relevance.
+If the question clearly names a single reach, return only that one slug.
+If the question is ambiguous or names a river that has multiple reaches (e.g. "Arkansas River"), return all matching slugs.
+If no reach is identifiable, return an empty array.
+
+Known reaches:
 %s
 
 Rules:
 - Match common nicknames: "the numbers" → arkansas-the-numbers, "browns" → arkansas-browns-canyon, "gore" → colorado-gore-canyon, etc.
-- If no reach is identifiable, return slug as ""
 - Keep the question natural — don't rewrite it heavily`
 
 // ReachAsker answers natural-language questions about a reach using RAG:
@@ -61,8 +65,8 @@ func NewReachAsker(pool *pgxpool.Pool, voyageKey, anthropicKey string) *ReachAsk
 
 // IdentifyResult is returned by IdentifyReach.
 type IdentifyResult struct {
-	Slug     string `json:"slug"`
-	Question string `json:"question"`
+	Slugs    []string `json:"slugs"`
+	Question string   `json:"question"`
 }
 
 // IdentifyReach uses Claude to figure out which reach slug a question is about,

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -109,6 +110,187 @@ func (h *TripHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusCreated, map[string]string{"id": tripID})
+}
+
+// List handles GET /api/v1/trips?device_id=xxx
+//
+// Returns the caller's trips ordered newest-first.
+// Joins gauges and reaches so the response includes human-readable names.
+func (h *TripHandler) List(w http.ResponseWriter, r *http.Request) {
+	deviceID := r.URL.Query().Get("device_id")
+	if deviceID == "" {
+		errorResponse(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT
+			t.id,
+			t.started_at,
+			t.ended_at,
+			t.duration_min,
+			t.start_cfs,
+			t.end_cfs,
+			t.distance_mi,
+			t.notes,
+			t.share_consent,
+			COALESCE(re.name, '') AS reach_name,
+			COALESCE(re.slug, '') AS reach_slug,
+			COALESCE(g.name,  '') AS gauge_name
+		FROM trips t
+		LEFT JOIN gauges  g  ON g.id  = t.gauge_id
+		LEFT JOIN reaches re ON re.id = t.reach_id
+		WHERE t.device_id = $1
+		ORDER BY t.started_at DESC
+		LIMIT 100
+	`, deviceID)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "query failed")
+		return
+	}
+	defer rows.Close()
+
+	type tripRow struct {
+		ID           string     `json:"id"`
+		StartedAt    time.Time  `json:"started_at"`
+		EndedAt      *time.Time `json:"ended_at"`
+		DurationMin  *int32     `json:"duration_min"`
+		StartCFS     *float64   `json:"start_cfs"`
+		EndCFS       *float64   `json:"end_cfs"`
+		DistanceMi   *float64   `json:"distance_mi"`
+		Notes        *string    `json:"notes"`
+		ShareConsent *bool      `json:"share_consent"`
+		ReachName    string     `json:"reach_name"`
+		ReachSlug    string     `json:"reach_slug"`
+		GaugeName    string     `json:"gauge_name"`
+	}
+
+	var trips []tripRow
+	for rows.Next() {
+		var t tripRow
+		if err := rows.Scan(
+			&t.ID, &t.StartedAt, &t.EndedAt, &t.DurationMin,
+			&t.StartCFS, &t.EndCFS, &t.DistanceMi, &t.Notes,
+			&t.ShareConsent, &t.ReachName, &t.ReachSlug, &t.GaugeName,
+		); err != nil {
+			errorResponse(w, http.StatusInternalServerError, "scan failed")
+			return
+		}
+		trips = append(trips, t)
+	}
+	if trips == nil {
+		trips = []tripRow{}
+	}
+	jsonResponse(w, http.StatusOK, trips)
+}
+
+// Get handles GET /api/v1/trips/{id}?device_id=xxx
+//
+// Returns the full trip detail including the GPS track as a GeoJSON LineString.
+func (h *TripHandler) Get(w http.ResponseWriter, r *http.Request) {
+	id       := chi.URLParam(r, "id")
+	deviceID := r.URL.Query().Get("device_id")
+	if deviceID == "" {
+		errorResponse(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+
+	type tripDetail struct {
+		ID           string          `json:"id"`
+		StartedAt    time.Time       `json:"started_at"`
+		EndedAt      *time.Time      `json:"ended_at"`
+		DurationMin  *int32          `json:"duration_min"`
+		StartCFS     *float64        `json:"start_cfs"`
+		EndCFS       *float64        `json:"end_cfs"`
+		DistanceMi   *float64        `json:"distance_mi"`
+		Notes        *string         `json:"notes"`
+		ShareConsent *bool           `json:"share_consent"`
+		ReachName    string          `json:"reach_name"`
+		ReachSlug    string          `json:"reach_slug"`
+		GaugeName    string          `json:"gauge_name"`
+		Track        json.RawMessage `json:"track"` // GeoJSON LineString or null
+		PointCount   int             `json:"point_count"`
+	}
+
+	var t tripDetail
+	var trackJSON []byte
+	err := h.db.QueryRow(r.Context(), `
+		SELECT
+			t.id,
+			t.started_at,
+			t.ended_at,
+			t.duration_min,
+			t.start_cfs,
+			t.end_cfs,
+			t.distance_mi,
+			t.notes,
+			t.share_consent,
+			COALESCE(re.name, '') AS reach_name,
+			COALESCE(re.slug,  '') AS reach_slug,
+			COALESCE(g.name,   '') AS gauge_name,
+			CASE WHEN t.track IS NOT NULL THEN ST_AsGeoJSON(t.track)::text ELSE NULL END AS track_geojson,
+			(SELECT COUNT(*) FROM trip_track_points WHERE trip_id = t.id) AS point_count
+		FROM trips t
+		LEFT JOIN gauges  g  ON g.id  = t.gauge_id
+		LEFT JOIN reaches re ON re.id = t.reach_id
+		WHERE t.id = $1 AND t.device_id = $2
+	`, id, deviceID).Scan(
+		&t.ID, &t.StartedAt, &t.EndedAt, &t.DurationMin,
+		&t.StartCFS, &t.EndCFS, &t.DistanceMi, &t.Notes,
+		&t.ShareConsent, &t.ReachName, &t.ReachSlug, &t.GaugeName,
+		&trackJSON, &t.PointCount,
+	)
+	if err != nil {
+		errorResponse(w, http.StatusNotFound, "trip not found")
+		return
+	}
+
+	if trackJSON != nil {
+		t.Track = json.RawMessage(trackJSON)
+	} else {
+		t.Track = json.RawMessage("null")
+	}
+
+	jsonResponse(w, http.StatusOK, t)
+}
+
+// Patch handles PATCH /api/v1/trips/{id}
+//
+// Allows the device that recorded the trip to update notes and share_consent.
+func (h *TripHandler) Patch(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	var body struct {
+		DeviceID     string  `json:"device_id"`
+		Notes        *string `json:"notes"`
+		ShareConsent *bool   `json:"share_consent"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if body.DeviceID == "" {
+		errorResponse(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(), `
+		UPDATE trips
+		SET
+			notes         = COALESCE($1, notes),
+			share_consent = COALESCE($2, share_consent)
+		WHERE id = $3 AND device_id = $4
+	`, body.Notes, body.ShareConsent, id, body.DeviceID)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "update failed")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		errorResponse(w, http.StatusNotFound, "trip not found")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // ---- Request types ----------------------------------------------------------

@@ -98,6 +98,9 @@ func main() {
 		r.Post("/ask", reaches.GlobalAsk)
 
 		r.Post("/trips", trips.Create)
+		r.Get("/trips", trips.List)
+		r.Get("/trips/{id}", trips.Get)
+		r.Patch("/trips/{id}", trips.Patch)
 
 		r.Post("/import/kmz", imports.ImportKMZ)
 	})

@@ -6,15 +6,31 @@
       Loading map…
     </div>
 
-    <div v-if="mapReady" class="absolute bottom-8 left-2 z-10 flex rounded-md shadow overflow-hidden border border-gray-200 dark:border-gray-600 text-xs font-medium">
+    <div v-if="mapReady" class="absolute bottom-8 left-2 z-10 flex items-center gap-1.5">
+      <div class="flex rounded-md shadow overflow-hidden border border-gray-200 dark:border-gray-600 text-xs font-medium">
+        <button
+          v-for="opt in BASEMAP_OPTIONS" :key="opt.value"
+          class="px-2 py-1 transition-colors"
+          :class="basemap === opt.value
+            ? 'bg-blue-600 text-white'
+            : 'bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
+          @click="setBasemap(opt.value)"
+        >{{ opt.label }}</button>
+      </div>
       <button
-        v-for="opt in BASEMAP_OPTIONS" :key="opt.value"
-        class="px-2 py-1 transition-colors"
-        :class="basemap === opt.value
-          ? 'bg-blue-600 text-white'
-          : 'bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
-        @click="setBasemap(opt.value)"
-      >{{ opt.label }}</button>
+        class="flex items-center gap-1 px-2 py-1 rounded-md shadow border text-xs font-medium transition-colors"
+        :class="locating
+          ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400'
+          : locateError
+            ? 'bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400'
+            : 'bg-white/90 dark:bg-gray-800/90 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
+        :disabled="locating"
+        :title="locateError || 'Zoom to my location'"
+        @click="locateMe"
+      >
+        <svg class="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="3"/><circle cx="10" cy="10" r="7.5" stroke-dasharray="2 2"/><line x1="10" y1="1" x2="10" y2="3.5"/><line x1="10" y1="16.5" x2="10" y2="19"/><line x1="1" y1="10" x2="3.5" y2="10"/><line x1="16.5" y1="10" x2="19" y2="10"/></svg>
+        <span>{{ locateError || (locating ? 'Locating…' : 'My location') }}</span>
+      </button>
     </div>
 
     <!-- Difficulty legend -->
@@ -64,6 +80,8 @@ defineExpose({ flyToSlug })
 const { apiBase } = useRuntimeConfig().public
 const container   = ref<HTMLDivElement>()
 const mapReady    = ref(false)
+const locating    = ref(false)
+const locateError = ref('')
 const basemap = ref<'street' | 'topo' | 'satellite'>('street')
 const BASEMAP_OPTIONS = [
   { value: 'street',    label: 'Street'    },
@@ -78,10 +96,29 @@ function setBasemap(value: 'street' | 'topo' | 'satellite') {
   map.setLayoutProperty('topo-tiles',   'visibility', value === 'topo'      ? 'visible' : 'none')
   map.setLayoutProperty('esri-tiles',   'visibility', value === 'satellite' ? 'visible' : 'none')
 }
+
+function locateMe() {
+  if (!map || !navigator.geolocation) return
+  locating.value = true
+  locateError.value = ''
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      locating.value = false
+      map!.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 11, duration: 1000 })
+    },
+    () => {
+      locating.value = false
+      locateError.value = 'Location unavailable'
+      setTimeout(() => { locateError.value = '' }, 3000)
+    },
+    { timeout: 10_000 },
+  )
+}
+
 let map: maplibregl.Map | null = null
 
-// Initial viewport — Colorado/Front Range; freely pannable worldwide
-const INITIAL_BBOX = { west: -109.1, south: 36.9, east: -102.0, north: 41.1 }
+// Initial viewport — lower 48 states so all reaches are visible on load
+const INITIAL_BBOX = { west: -124.8, south: 24.4, east: -66.9, north: 49.4 }
 
 // ── Difficulty config ─────────────────────────────────────────────────────────
 

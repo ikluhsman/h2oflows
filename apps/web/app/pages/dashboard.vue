@@ -13,9 +13,10 @@
         Trip recording · {{ activeTripLabel }}
       </div>
       <template #actions>
-        <span class="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">
-          <NuxtLink to="/" class="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Sign in to save</NuxtLink>
-        </span>
+        <NuxtLink
+          to="/trips"
+          class="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors hidden sm:inline"
+        >My Trips</NuxtLink>
         <UButton size="sm" color="primary" variant="soft" icon="i-heroicons-plus" @click="searchOpen = true">
           Add gauge
         </UButton>

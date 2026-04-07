@@ -626,12 +626,12 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Query access points: full bbox for Overpass, plus the single most-upstream
-	// put-in and most-downstream take-out as chain start/end anchors.
-	// "Most upstream" = largest ST_Distance from the take-out cluster; as a
-	// practical proxy we use the put-in with MIN(lng) and the take-out with MAX(lng)
-	// since most Colorado rivers flow west→east. A single sub-query returns all
-	// six values in one round-trip.
+	// Query access points: full bbox for Overpass, plus the put-in/take-out
+	// pair separated by the largest geographic distance to use as chain anchors.
+	// Picking by maximum distance correctly handles rivers of any orientation
+	// (E-W, N-S, or anywhere in between) — earlier versions used MIN/MAX(lng)
+	// which broke on N-S flowing rivers like the South Platte at Deckers,
+	// where a take-out further north can still sit slightly west of another.
 	var (
 		accessMinLng, accessMinLat *float64
 		accessMaxLng, accessMaxLat *float64
@@ -656,23 +656,24 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 			  AND (location IS NOT NULL OR parking_location IS NOT NULL)
 		),
 		extremes AS (
-			-- Most-upstream put-in: smallest (most-negative) longitude
-			SELECT lng AS put_in_lng, lat AS put_in_lat
-			FROM pts WHERE access_type = 'put_in'
-			ORDER BY lng ASC LIMIT 1
-		),
-		extremes2 AS (
-			-- Most-downstream take-out: largest (least-negative) longitude
-			SELECT lng AS take_out_lng, lat AS take_out_lat
-			FROM pts WHERE access_type = 'take_out'
-			ORDER BY lng DESC LIMIT 1
+			-- Pair of (put_in, take_out) with the maximum geographic distance.
+			-- This identifies the longest reach span regardless of river direction.
+			SELECT p.lng AS put_in_lng,    p.lat AS put_in_lat,
+			       t.lng AS take_out_lng,  t.lat AS take_out_lat
+			FROM pts p, pts t
+			WHERE p.access_type = 'put_in' AND t.access_type = 'take_out'
+			ORDER BY ST_Distance(
+			    ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4326)::geography,
+			    ST_SetSRID(ST_MakePoint(t.lng, t.lat), 4326)::geography
+			) DESC
+			LIMIT 1
 		)
 		SELECT
 			MIN(p.lng), MIN(p.lat), MAX(p.lng), MAX(p.lat),
-			e.put_in_lng,  e.put_in_lat,
-			e2.take_out_lng, e2.take_out_lat
-		FROM pts p, extremes e, extremes2 e2
-		GROUP BY e.put_in_lng, e.put_in_lat, e2.take_out_lng, e2.take_out_lat
+			e.put_in_lng,   e.put_in_lat,
+			e.take_out_lng, e.take_out_lat
+		FROM pts p, extremes e
+		GROUP BY e.put_in_lng, e.put_in_lat, e.take_out_lng, e.take_out_lat
 	`, reachID).Scan(
 		&accessMinLng, &accessMinLat,
 		&accessMaxLng, &accessMaxLat,
@@ -846,7 +847,7 @@ func (h *ReachHandler) GlobalAsk(w http.ResponseWriter, r *http.Request) {
 	askCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	// Step 1 — identify reach.
+	// Step 1 — identify reach(es).
 	identified, err := h.asker.IdentifyReach(askCtx, body.Question, slugs)
 	if err != nil {
 		log.Printf("global ask identify: %v", err)
@@ -854,33 +855,41 @@ func (h *ReachHandler) GlobalAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if identified.Slug == "" {
-		jsonResponse(w, http.StatusOK, map[string]string{
-			"answer": "I couldn't identify a specific reach from your question. Try asking about a named run — for example, \"What flows are good for Browns Canyon?\"",
+	if len(identified.Slugs) == 0 {
+		jsonResponse(w, http.StatusOK, map[string]any{
+			"results": []any{},
+			"answer":  "I couldn't identify a specific reach from your question. Try asking about a named run — for example, \"What flows are good for Browns Canyon?\"",
 		})
 		return
 	}
 
-	// Look up reach ID and name.
-	var reachID, reachName string
-	if err := h.db.QueryRow(r.Context(), `SELECT id, name FROM reaches WHERE slug = $1`, identified.Slug).Scan(&reachID, &reachName); err != nil {
-		errorResponse(w, http.StatusNotFound, "reach not found")
-		return
+	// Step 2 — answer each matched reach (up to 3).
+	type reachResult struct {
+		Answer    string `json:"answer"`
+		ReachSlug string `json:"reach_slug"`
+		ReachName string `json:"reach_name"`
+	}
+	var results []reachResult
+	for _, slug := range identified.Slugs {
+		var reachID, reachName string
+		if err := h.db.QueryRow(r.Context(), `SELECT id, name FROM reaches WHERE slug = $1`, slug).Scan(&reachID, &reachName); err != nil {
+			log.Printf("global ask: reach not found for slug %q: %v", slug, err)
+			continue
+		}
+		answer, err := h.asker.Answer(askCtx, reachID, reachName, identified.Question)
+		if err != nil {
+			log.Printf("global ask answer [%s]: %v", slug, err)
+			continue
+		}
+		results = append(results, reachResult{Answer: answer, ReachSlug: slug, ReachName: reachName})
 	}
 
-	// Step 2 — answer.
-	answer, err := h.asker.Answer(askCtx, reachID, reachName, identified.Question)
-	if err != nil {
-		log.Printf("global ask answer [%s]: %v", identified.Slug, err)
+	if len(results) == 0 {
 		errorResponse(w, http.StatusInternalServerError, "could not generate answer")
 		return
 	}
 
-	jsonResponse(w, http.StatusOK, map[string]any{
-		"answer":     answer,
-		"reach_slug": identified.Slug,
-		"reach_name": reachName,
-	})
+	jsonResponse(w, http.StatusOK, map[string]any{"results": results})
 }
 
 // Ask handles POST /api/v1/reaches/{slug}/ask
