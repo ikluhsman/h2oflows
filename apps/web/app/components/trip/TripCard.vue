@@ -48,7 +48,7 @@ const props = defineProps<{ trip: TripSummary }>()
 const emit  = defineEmits<{ (e: 'open'): void }>()
 
 const title = computed(() =>
-  props.trip.reach_name || props.trip.gauge_name || 'Unnamed trip'
+  props.trip.title || props.trip.reach_name || props.trip.gauge_name || 'Unnamed trip'
 )
 
 const dateLabel = computed(() => {

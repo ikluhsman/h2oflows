@@ -285,7 +285,7 @@ async function handleWatchClick() {
       pendingTrip.value = {
         queuedAt:     new Date().toISOString(),
         gaugeId:      trip.gaugeId,
-        reachId:      null,
+        reachId:      props.gauge.reachId,
         startCfs:     trip.startCfs,
         endCfs:       props.gauge.currentCfs ?? null,
         startedAt:    trip.startedAt,

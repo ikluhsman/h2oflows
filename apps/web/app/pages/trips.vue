@@ -79,7 +79,7 @@ async function load() {
   try {
     trips.value = await listTrips()
   } catch {
-    error.value = 'Could not load trips. Make sure you're connected.'
+    error.value = "Could not load trips. Make sure you're connected."
   } finally {
     loading.value = false
   }

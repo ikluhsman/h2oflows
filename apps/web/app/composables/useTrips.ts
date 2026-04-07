@@ -14,6 +14,7 @@ export interface TripSummary {
   end_cfs:       number | null
   distance_mi:   number | null
   notes:         string | null
+  title:         string | null
   share_consent: boolean | null
   reach_name:    string
   reach_slug:    string
@@ -23,6 +24,11 @@ export interface TripSummary {
 export interface TripDetail extends TripSummary {
   track:       GeoJSONLineString | null
   point_count: number
+}
+
+export interface DescribeResult {
+  title:       string
+  description: string
 }
 
 interface GeoJSONLineString {
@@ -55,7 +61,7 @@ export function useTrips() {
     return res.json()
   }
 
-  async function patchTrip(id: string, patch: { notes?: string; share_consent?: boolean }): Promise<void> {
+  async function patchTrip(id: string, patch: { notes?: string; title?: string; share_consent?: boolean }): Promise<void> {
     const res = await fetch(`${apiBase}/api/v1/trips/${id}`, {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -64,5 +70,15 @@ export function useTrips() {
     if (!res.ok) throw new Error(`${res.status}`)
   }
 
-  return { listTrips, getTrip, patchTrip, getDeviceId }
+  async function describeTrip(id: string): Promise<DescribeResult> {
+    const res = await fetch(`${apiBase}/api/v1/trips/${id}/describe`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ device_id: getDeviceId() }),
+    })
+    if (!res.ok) throw new Error(`${res.status}`)
+    return res.json()
+  }
+
+  return { listTrips, getTrip, patchTrip, describeTrip, getDeviceId }
 }

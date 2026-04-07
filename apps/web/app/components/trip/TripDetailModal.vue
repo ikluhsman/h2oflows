@@ -11,6 +11,21 @@
           <span v-if="detail?.duration_min != null">{{ durationLabel }}</span>
           <span v-if="detail?.distance_mi   != null" class="text-gray-300 dark:text-gray-600">·</span>
           <span v-if="detail?.distance_mi   != null">{{ detail.distance_mi.toFixed(1) }} mi</span>
+          <!-- AI generate button in header for quick access -->
+          <UButton
+            v-if="detail"
+            size="xs" color="neutral" variant="ghost"
+            :loading="describing"
+            :title="describing ? 'Generating…' : 'Generate title & description with AI'"
+            @click="generateDescription"
+          >
+            <template #leading>
+              <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M10 2l1.8 5.5H17l-4.6 3.4 1.8 5.5L10 13l-4.2 3.4 1.8-5.5L3 7.5h5.2z" stroke-linejoin="round"/>
+              </svg>
+            </template>
+            AI
+          </UButton>
         </div>
       </div>
     </template>
@@ -42,6 +57,35 @@
           {{ detail.point_count.toLocaleString() }} GPS points · {{ detail.track ? 'track available' : 'processing…' }}
         </p>
 
+        <!-- AI description result — shown after generation -->
+        <div
+          v-if="aiDesc"
+          class="rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-3 space-y-2"
+        >
+          <p class="text-xs font-medium text-blue-600 dark:text-blue-400">AI suggestion</p>
+          <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{{ aiDesc }}</p>
+          <p class="text-xs text-gray-400">Title applied above — description is for reference only.</p>
+        </div>
+
+        <!-- Title editor -->
+        <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
+          <label class="block text-xs font-medium text-gray-500 mb-1.5">Title</label>
+          <input
+            v-model="titleEdit"
+            type="text"
+            placeholder="Give this trip a name…"
+            class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 py-2 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <div class="mt-2 flex justify-end">
+            <UButton
+              v-if="titleEdit !== (detail.title ?? '')"
+              size="xs" color="primary" variant="soft"
+              :loading="saving"
+              @click="saveTitle"
+            >Save title</UButton>
+          </div>
+        </div>
+
         <!-- Notes editor -->
         <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
           <label class="block text-xs font-medium text-gray-500 mb-1.5">Notes</label>
@@ -51,7 +95,7 @@
             placeholder="Add notes about this trip…"
             class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 py-2 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
           />
-          <div class="mt-2 flex justify-end gap-2">
+          <div class="mt-2 flex justify-end">
             <UButton
               v-if="notesEdit !== (detail.notes ?? '')"
               size="xs" color="primary" variant="soft"
@@ -104,12 +148,15 @@ import { useTrips, type TripDetail } from '~/composables/useTrips'
 const props = defineProps<{ tripId: string | null }>()
 const open  = defineModel<boolean>('open', { default: false })
 
-const { getTrip, patchTrip } = useTrips()
+const { getTrip, patchTrip, describeTrip } = useTrips()
 
-const detail    = ref<TripDetail | null>(null)
-const loading   = ref(false)
-const saving    = ref(false)
-const notesEdit = ref('')
+const detail      = ref<TripDetail | null>(null)
+const loading     = ref(false)
+const saving      = ref(false)
+const describing  = ref(false)
+const notesEdit   = ref('')
+const titleEdit   = ref('')
+const aiDesc      = ref('')  // AI-generated description (not persisted — shown inline)
 const mapContainer = ref<HTMLDivElement | null>(null)
 
 let mapInstance: any = null
@@ -122,6 +169,8 @@ watch([() => props.tripId, open], async ([id, isOpen]) => {
   try {
     detail.value  = await getTrip(id)
     notesEdit.value = detail.value.notes ?? ''
+    titleEdit.value = detail.value.title ?? ''
+    aiDesc.value    = ''
     await nextTick()
     if (detail.value.track) renderMap(detail.value.track)
   } catch { /* non-fatal */ }
@@ -202,7 +251,7 @@ async function renderMap(track: { type: string; coordinates: [number, number][] 
 // ── Computed ──────────────────────────────────────────────────────────────────
 
 const title = computed(() =>
-  detail.value?.reach_name || detail.value?.gauge_name || 'Trip details'
+  titleEdit.value || detail.value?.reach_name || detail.value?.gauge_name || 'Trip details'
 )
 
 const dateLabel = computed(() => {
@@ -222,6 +271,16 @@ const consentValue = computed(() => detail.value?.share_consent ?? false)
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
+async function saveTitle() {
+  if (!detail.value) return
+  saving.value = true
+  try {
+    await patchTrip(detail.value.id, { title: titleEdit.value })
+    detail.value.title = titleEdit.value
+  } catch { /* non-fatal */ }
+  finally { saving.value = false }
+}
+
 async function saveNotes() {
   if (!detail.value) return
   saving.value = true
@@ -230,6 +289,20 @@ async function saveNotes() {
     detail.value.notes = notesEdit.value
   } catch { /* non-fatal */ }
   finally { saving.value = false }
+}
+
+async function generateDescription() {
+  if (!detail.value) return
+  describing.value = true
+  aiDesc.value     = ''
+  try {
+    const result = await describeTrip(detail.value.id)
+    // Apply the generated title immediately — backend already saved it
+    titleEdit.value       = result.title
+    detail.value.title    = result.title
+    aiDesc.value          = result.description
+  } catch { /* non-fatal — AI may be unconfigured */ }
+  finally { describing.value = false }
 }
 
 async function toggleConsent() {

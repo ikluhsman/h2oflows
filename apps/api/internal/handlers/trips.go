@@ -1,22 +1,25 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/h2oflow/h2oflow/apps/api/internal/ai"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type TripHandler struct {
-	db *pgxpool.Pool
+	db        *pgxpool.Pool
+	describer *ai.TripDescriber // optional — nil if Anthropic key absent
 }
 
-func NewTripHandler(db *pgxpool.Pool) *TripHandler {
-	return &TripHandler{db: db}
+func NewTripHandler(db *pgxpool.Pool, describer *ai.TripDescriber) *TripHandler {
+	return &TripHandler{db: db, describer: describer}
 }
 
 // Create handles POST /api/v1/trips
@@ -89,13 +92,13 @@ func (h *TripHandler) Create(w http.ResponseWriter, r *http.Request) {
 		// Build simplified linestring + distance from stored points.
 		_, err := h.db.Exec(ctx, `
 			WITH pts AS (
-				SELECT ST_MakePoint(lng::float8, lat::float8) AS geom
+				SELECT timestamp, ST_MakePoint(lng::float8, lat::float8) AS geom
 				FROM trip_track_points
 				WHERE trip_id = $1
 				ORDER BY timestamp
 			),
 			line AS (
-				SELECT ST_MakeLine(array_agg(geom ORDER BY geom)) AS geom FROM pts
+				SELECT ST_MakeLine(array_agg(geom ORDER BY timestamp)) AS geom FROM pts
 			)
 			UPDATE trips SET
 				track       = ST_SimplifyPreserveTopology(line.geom, 0.0001)::geography,
@@ -110,6 +113,65 @@ func (h *TripHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusCreated, map[string]string{"id": tripID})
+}
+
+// Describe handles POST /api/v1/trips/{id}/describe
+//
+// Generates an AI-written title and description for the trip using reach RAG context.
+// Saves the title to the DB and returns both title and description.
+// Returns 503 if the AI describer is not configured.
+func (h *TripHandler) Describe(w http.ResponseWriter, r *http.Request) {
+	if h.describer == nil {
+		errorResponse(w, http.StatusServiceUnavailable, "AI describer not configured")
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+
+	var body struct {
+		DeviceID string `json:"device_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.DeviceID == "" {
+		errorResponse(w, http.StatusBadRequest, "device_id is required")
+		return
+	}
+
+	// Load the trip details needed to generate the description.
+	var details ai.TripDetails
+	var reachID *string
+	err := h.db.QueryRow(r.Context(), `
+		SELECT
+			t.start_cfs, t.end_cfs, t.duration_min, t.distance_mi,
+			COALESCE(re.id::text,   '') AS reach_id,
+			COALESCE(re.name, '') AS reach_name
+		FROM trips t
+		LEFT JOIN reaches re ON re.id = t.reach_id
+		WHERE t.id = $1 AND t.device_id = $2
+	`, id, body.DeviceID).Scan(
+		&details.StartCFS, &details.EndCFS, &details.DurationMin, &details.DistanceMi,
+		&reachID, &details.ReachName,
+	)
+	if err != nil {
+		errorResponse(w, http.StatusNotFound, "trip not found")
+		return
+	}
+	if reachID != nil {
+		details.ReachID = *reachID
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	result, err := h.describer.Describe(ctx, details)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "could not generate description")
+		return
+	}
+
+	// Persist the generated title so it shows up in the trip list.
+	_, _ = h.db.Exec(r.Context(), `UPDATE trips SET title = $1 WHERE id = $2`, result.Title, id)
+
+	jsonResponse(w, http.StatusOK, result)
 }
 
 // List handles GET /api/v1/trips?device_id=xxx
@@ -133,6 +195,7 @@ func (h *TripHandler) List(w http.ResponseWriter, r *http.Request) {
 			t.end_cfs,
 			t.distance_mi,
 			t.notes,
+			t.title,
 			t.share_consent,
 			COALESCE(re.name, '') AS reach_name,
 			COALESCE(re.slug, '') AS reach_slug,
@@ -159,6 +222,7 @@ func (h *TripHandler) List(w http.ResponseWriter, r *http.Request) {
 		EndCFS       *float64   `json:"end_cfs"`
 		DistanceMi   *float64   `json:"distance_mi"`
 		Notes        *string    `json:"notes"`
+		Title        *string    `json:"title"`
 		ShareConsent *bool      `json:"share_consent"`
 		ReachName    string     `json:"reach_name"`
 		ReachSlug    string     `json:"reach_slug"`
@@ -170,7 +234,7 @@ func (h *TripHandler) List(w http.ResponseWriter, r *http.Request) {
 		var t tripRow
 		if err := rows.Scan(
 			&t.ID, &t.StartedAt, &t.EndedAt, &t.DurationMin,
-			&t.StartCFS, &t.EndCFS, &t.DistanceMi, &t.Notes,
+			&t.StartCFS, &t.EndCFS, &t.DistanceMi, &t.Notes, &t.Title,
 			&t.ShareConsent, &t.ReachName, &t.ReachSlug, &t.GaugeName,
 		); err != nil {
 			errorResponse(w, http.StatusInternalServerError, "scan failed")
@@ -204,6 +268,7 @@ func (h *TripHandler) Get(w http.ResponseWriter, r *http.Request) {
 		EndCFS       *float64        `json:"end_cfs"`
 		DistanceMi   *float64        `json:"distance_mi"`
 		Notes        *string         `json:"notes"`
+		Title        *string         `json:"title"`
 		ShareConsent *bool           `json:"share_consent"`
 		ReachName    string          `json:"reach_name"`
 		ReachSlug    string          `json:"reach_slug"`
@@ -224,6 +289,7 @@ func (h *TripHandler) Get(w http.ResponseWriter, r *http.Request) {
 			t.end_cfs,
 			t.distance_mi,
 			t.notes,
+			t.title,
 			t.share_consent,
 			COALESCE(re.name, '') AS reach_name,
 			COALESCE(re.slug,  '') AS reach_slug,
@@ -236,7 +302,7 @@ func (h *TripHandler) Get(w http.ResponseWriter, r *http.Request) {
 		WHERE t.id = $1 AND t.device_id = $2
 	`, id, deviceID).Scan(
 		&t.ID, &t.StartedAt, &t.EndedAt, &t.DurationMin,
-		&t.StartCFS, &t.EndCFS, &t.DistanceMi, &t.Notes,
+		&t.StartCFS, &t.EndCFS, &t.DistanceMi, &t.Notes, &t.Title,
 		&t.ShareConsent, &t.ReachName, &t.ReachSlug, &t.GaugeName,
 		&trackJSON, &t.PointCount,
 	)
@@ -263,6 +329,7 @@ func (h *TripHandler) Patch(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		DeviceID     string  `json:"device_id"`
 		Notes        *string `json:"notes"`
+		Title        *string `json:"title"`
 		ShareConsent *bool   `json:"share_consent"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -278,9 +345,10 @@ func (h *TripHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		UPDATE trips
 		SET
 			notes         = COALESCE($1, notes),
-			share_consent = COALESCE($2, share_consent)
-		WHERE id = $3 AND device_id = $4
-	`, body.Notes, body.ShareConsent, id, body.DeviceID)
+			title         = COALESCE($2, title),
+			share_consent = COALESCE($3, share_consent)
+		WHERE id = $4 AND device_id = $5
+	`, body.Notes, body.Title, body.ShareConsent, id, body.DeviceID)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "update failed")
 		return

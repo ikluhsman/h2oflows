@@ -76,9 +76,14 @@ func main() {
 	pollerCtx, stopPoller := context.WithCancel(context.Background())
 	go p.Run(pollerCtx)
 
+	var describer *ai.TripDescriber
+	if cfg.AnthropicAPIKey != "" {
+		describer = ai.NewTripDescriber(pool, cfg.AnthropicAPIKey)
+	}
+
 	gauges := handlers.NewGaugeHandler(pool, enricher, p)
 	reaches := handlers.NewReachHandler(pool, asker)
-	trips   := handlers.NewTripHandler(pool)
+	trips   := handlers.NewTripHandler(pool, describer)
 	imports := &handlers.Import{Pool: pool}
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/gauges/search", gauges.Search)
@@ -101,6 +106,7 @@ func main() {
 		r.Get("/trips", trips.List)
 		r.Get("/trips/{id}", trips.Get)
 		r.Patch("/trips/{id}", trips.Patch)
+		r.Post("/trips/{id}/describe", trips.Describe)
 
 		r.Post("/import/kmz", imports.ImportKMZ)
 	})
