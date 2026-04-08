@@ -403,7 +403,16 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 		return len(args)
 	}
 
-	// Text search — name or external_id ILIKE %q%
+	// Text search — substring (ILIKE) + trigram similarity fallback.
+	//
+	// Pass 1: exact substring match on name, external_id, and linked reach names.
+	//         Fast via GIN trigram index (migration 038).
+	// Pass 2: trigram similarity on name when pg_trgm is available.
+	//         Handles compound-word normalization ("Elevenmile" ≈ "Eleven Mile")
+	//         and minor typos ("Grore Canyon" ≈ "Gore Canyon").
+	//         Similarity threshold 0.25 — loose enough to catch spacing/hypen
+	//         differences without surfacing irrelevant results.
+	//
 	// AI-derived ExtraTerms are OR-ed in alongside the original query.
 	// qArgN tracks the arg index for p.Q so the SELECT can reuse it to
 	// look up the relationship for the matched reach.
@@ -414,9 +423,10 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			if term == "" {
 				continue
 			}
-			n := addArg("%" + term + "%")
+			likeN := addArg("%" + term + "%")
+			termN := addArg(term) // raw term for similarity()
 			if qArgN == 0 && term == p.Q {
-				qArgN = n // capture for SELECT subquery below
+				qArgN = likeN // capture for SELECT subquery below
 			}
 			// Association table subquery: returns all gauges linked to ANY reach
 			// whose name matches — including upstream/downstream indicators.
@@ -424,11 +434,14 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			// name says "North Fork S Platte at Grant", because it has an
 			// upstream_indicator association with the Foxton reach.
 			textClauses = append(textClauses, fmt.Sprintf(
-				`(g.name ILIKE $%d OR g.external_id ILIKE $%d OR EXISTS (
+				`(g.name ILIKE $%d OR g.external_id ILIKE $%d
+				  OR similarity(g.name, $%d) > 0.25
+				  OR EXISTS (
 					SELECT 1 FROM gauge_reach_associations gra
 					JOIN reaches ra ON ra.id = gra.reach_id
-					WHERE gra.gauge_id = g.id AND ra.name ILIKE $%d
-				))`, n, n, n))
+					WHERE gra.gauge_id = g.id
+					  AND (ra.name ILIKE $%d OR similarity(ra.name, $%d) > 0.25)
+				  ))`, likeN, likeN, termN, likeN, termN))
 		}
 		if len(textClauses) > 0 {
 			where = append(where, "("+strings.Join(textClauses, " OR ")+")")
@@ -476,13 +489,15 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 	// PLASPLCO is linked as downstream). Falls back to gauges.reach_relationship.
 	reachRelCol := "g.reach_relationship"
 	if qArgN > 0 {
+		// qArgN is the ILIKE arg ($N = '%term%'); the raw-term arg for similarity is qArgN+1.
 		reachRelCol = fmt.Sprintf(`COALESCE(
 				(SELECT gra.relationship FROM gauge_reach_associations gra
 				 JOIN reaches ra ON ra.id = gra.reach_id
-				 WHERE gra.gauge_id = g.id AND ra.name ILIKE $%d
+				 WHERE gra.gauge_id = g.id
+				   AND (ra.name ILIKE $%d OR similarity(ra.name, $%d) > 0.25)
 				 LIMIT 1),
 				g.reach_relationship
-			)`, qArgN)
+			)`, qArgN, qArgN+1)
 	}
 
 	sql := fmt.Sprintf(`
@@ -520,7 +535,7 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
 			fr_band.label                            AS flow_band_label,
 			CASE
-				WHEN g.featured = TRUE                                          THEN 'trusted'
+				WHEN g.reach_id IS NOT NULL                                     THEN 'trusted'
 				WHEN g.last_requested_at > NOW() - INTERVAL '7 days'           THEN 'demand'
 				ELSE                                                                 'cold'
 			END AS poll_tier
@@ -637,7 +652,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
 			fr_band.label                            AS flow_band_label,
 			CASE
-				WHEN g.featured = TRUE                                    THEN 'trusted'
+				WHEN g.reach_id IS NOT NULL                              THEN 'trusted'
 				WHEN g.last_requested_at > NOW() - INTERVAL '7 days'     THEN 'demand'
 				ELSE                                                           'cold'
 			END AS poll_tier
