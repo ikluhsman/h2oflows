@@ -43,15 +43,32 @@ func (c *reachMapCache) get() ([]byte, bool) {
 	return c.payload, true
 }
 
+// gaugeFetcher is the narrow poller interface ReachHandler needs for
+// on-demand fetching of stale primary gauges. Keeps this package free of a
+// hard dependency on the poller implementation.
+type gaugeFetcher interface {
+	FetchNowIfStale(ctx context.Context, gaugeID string, maxAge time.Duration) bool
+	TouchRequested(ctx context.Context, gaugeID string)
+}
+
 // ReachHandler handles reach-related HTTP routes.
 type ReachHandler struct {
-	db    *pgxpool.Pool
-	asker *ai.ReachAsker
-	cache *reachMapCache
+	db     *pgxpool.Pool
+	asker  *ai.ReachAsker
+	cache  *reachMapCache
+	poller gaugeFetcher // nil = on-demand fetching disabled
 }
 
 func NewReachHandler(db *pgxpool.Pool, asker *ai.ReachAsker) *ReachHandler {
 	return &ReachHandler{db: db, asker: asker, cache: &reachMapCache{}}
+}
+
+// WithPoller wires a poller for on-demand gauge fetching. Optional — without
+// it, reach detail pages still work but show whatever the last poll tick
+// captured.
+func (h *ReachHandler) WithPoller(p gaugeFetcher) *ReachHandler {
+	h.poller = p
+	return h
 }
 
 // WarmCache fetches all reach features (no bbox filter) and stores the result
@@ -440,6 +457,21 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ---- On-demand gauge refresh --------------------------------------------
+	// If the primary gauge's most recent reading is older than 1 hour,
+	// fetch synchronously before the main query so the user sees current data
+	// on first view rather than waiting for the next poll tick.
+	if h.poller != nil {
+		var primaryGaugeID *string
+		_ = h.db.QueryRow(r.Context(),
+			`SELECT primary_gauge_id::text FROM reaches WHERE slug = $1`, slug,
+		).Scan(&primaryGaugeID)
+		if primaryGaugeID != nil && *primaryGaugeID != "" {
+			h.poller.FetchNowIfStale(r.Context(), *primaryGaugeID, time.Hour)
+			go h.poller.TouchRequested(context.Background(), *primaryGaugeID)
+		}
+	}
+
 	// ---- Reach + gauge info -------------------------------------------------
 	var reach reachDetail
 	err := h.db.QueryRow(r.Context(), `
@@ -450,9 +482,10 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			r.region,
 			r.class_min,
 			COALESCE(
-				(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL),
+				(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL AND is_permanent_hazard = FALSE),
 				r.class_max
 			) AS class_max,
+			r.class_hardest,
 			r.character,
 			r.length_mi,
 			r.description,
@@ -508,7 +541,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		WHERE r.slug = $1
 	`, slug).Scan(
 		&reach.ID, &reach.Slug, &reach.Name, &reach.Region,
-		&reach.ClassMin, &reach.ClassMax, &reach.Character, &reach.LengthMi,
+		&reach.ClassMin, &reach.ClassMax, &reach.ClassHardest, &reach.Character, &reach.LengthMi,
 		&reach.Description, &reach.DescriptionSource,
 		&reach.DescriptionConfidence, &reach.DescriptionVerified,
 		&reach.AWReachID, &reach.WatershedName,
@@ -575,6 +608,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		SELECT
 			id, name, river_mile, class_rating, class_at_low, class_at_high,
 			description, portage_description, is_portage_recommended, is_surf_wave,
+			is_permanent_hazard, hazard_type,
 			data_source, ai_confidence, verified,
 			ST_X(location::geometry) AS lng,
 			ST_Y(location::geometry) AS lat
@@ -593,6 +627,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			&rr.ID, &rr.Name, &rr.RiverMile,
 			&rr.ClassRating, &rr.ClassAtLow, &rr.ClassAtHigh,
 			&rr.Description, &rr.PortageDescription, &rr.IsPortageRecommended, &rr.IsSurfWave,
+			&rr.IsPermanentHazard, &rr.HazardType,
 			&rr.DataSource, &rr.AIConfidence, &rr.Verified,
 			&rr.Lng, &rr.Lat,
 		); err != nil {
@@ -724,6 +759,7 @@ type reachDetail struct {
 	Region                  *string         `json:"region"`
 	ClassMin                *float64        `json:"class_min"`
 	ClassMax                *float64        `json:"class_max"`
+	ClassHardest            *float64        `json:"class_hardest"`
 	Character               *string         `json:"character"`
 	LengthMi                *float64        `json:"length_mi"`
 	Description             *string         `json:"description"`
@@ -765,6 +801,8 @@ type rapidRow struct {
 	PortageDescription   *string  `json:"portage_description"`
 	IsPortageRecommended bool     `json:"is_portage_recommended"`
 	IsSurfWave           bool     `json:"is_surf_wave"`
+	IsPermanentHazard    bool     `json:"is_permanent_hazard"`
+	HazardType           *string  `json:"hazard_type"`
 	DataSource           string   `json:"data_source"`
 	AIConfidence         *int     `json:"ai_confidence"`
 	Verified             bool     `json:"verified"`
@@ -997,9 +1035,16 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Store as PostGIS geography.
+	// Store as PostGIS geography and derive length_mi from the line if not set.
+	// ST_Length on a geography returns metres; divide by 1609.344 for miles.
 	_, err = h.db.Exec(r.Context(), `
-		UPDATE reaches SET centerline = ST_GeomFromGeoJSON($1)::geography WHERE id = $2
+		UPDATE reaches
+		SET    centerline = ST_GeomFromGeoJSON($1)::geography,
+		       length_mi  = COALESCE(
+		           length_mi,
+		           ROUND((ST_Length(ST_GeomFromGeoJSON($1)::geography) / 1609.344)::numeric, 2)
+		       )
+		WHERE  id = $2
 	`, lineJSON, reachID)
 	if err != nil {
 		log.Printf("centerline update for %s: %v", slug, err)
@@ -1007,8 +1052,14 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Return the computed length alongside the geometry so the frontend can
+	// display it immediately without a separate reach reload.
+	var lengthMi *float64
+	_ = h.db.QueryRow(r.Context(), `SELECT length_mi FROM reaches WHERE id = $1`, reachID).Scan(&lengthMi)
+
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"centerline": rawGeometry([]byte(lineJSON)),
+		"length_mi":  lengthMi,
 	})
 }
 

@@ -8,10 +8,21 @@
 // Pin name prefix → feature type:
 //
 //	"Rapid: <name>"    → rapids
+//	"Wave: <name>"     → rapids (is_surf_wave=true)
+//	"Surf: <name>"     → rapids (is_surf_wave=true)
 //	"Put-in: <name>"   → reach_access type=put_in
 //	"Take-out: <name>" → reach_access type=take_out
-//	"Parking: <name>"  → reach_access.parking_location on nearest access
+//	"Parking: <name>"  → reach_access type=parking
 //	"Shuttle: <name>"  → reach_access type=shuttle_drop
+//	"Hazard: <name>"   → rapids (is_permanent_hazard=true)
+//
+// Hazard descriptions may include a hazard type keyword to classify them:
+//
+//	"low-head dam", "lowhead", "dam" → hazard_type="low_head_dam"
+//	"rebar", "rebar/concrete"        → hazard_type="rebar"
+//	"strainer"                        → hazard_type="strainer"
+//	"bridge"                          → hazard_type="bridge_piling"
+//	(default)                         → hazard_type="other"
 package kmlimport
 
 import (
@@ -41,6 +52,7 @@ type Result struct {
 type ReachResult struct {
 	Name     string   `json:"name"`
 	Rapids   int      `json:"rapids"`
+	Hazards  int      `json:"hazards"`
 	PutIns   int      `json:"put_ins"`
 	TakeOuts int      `json:"take_outs"`
 	Parking  int      `json:"parking"`
@@ -289,7 +301,7 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		switch prefix {
 		case "rapid", "wave":
 			isSurf := prefix == "wave"
-			if err := imp.upsertRapidLocation(ctx, a.reachID, pinName, desc, isSurf, lon, lat); err != nil {
+			if err := imp.upsertRapidLocation(ctx, a.reachID, pinName, desc, isSurf, false, "", lon, lat); err != nil {
 				st.Errors = append(st.Errors, fmt.Sprintf("rapid %q: %v", pinName, err))
 				res.Log = append(res.Log, fmt.Sprintf("✗ [%s] rapid %q: %v", a.reachName, pinName, err))
 			} else {
@@ -299,6 +311,15 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				} else {
 					res.Log = append(res.Log, fmt.Sprintf("✓ [%s] rapid: %s", a.reachName, pinName))
 				}
+			}
+		case "hazard":
+			htype := inferHazardType(desc + " " + pinName)
+			if err := imp.upsertRapidLocation(ctx, a.reachID, pinName, desc, false, true, htype, lon, lat); err != nil {
+				st.Errors = append(st.Errors, fmt.Sprintf("hazard %q: %v", pinName, err))
+				res.Log = append(res.Log, fmt.Sprintf("✗ [%s] hazard %q: %v", a.reachName, pinName, err))
+			} else {
+				st.Hazards++
+				res.Log = append(res.Log, fmt.Sprintf("✓ [%s] hazard (%s): %s", a.reachName, htype, pinName))
 			}
 		case "put-in":
 			if err := imp.upsertAccess(ctx, a.reachID, "put_in", pinName, desc, lon, lat); err != nil {
@@ -422,34 +443,62 @@ func (imp *Importer) inferReachFromText(ctx context.Context, text string) (id, s
 
 // ── DB upserts ────────────────────────────────────────────────────────────────
 
-func (imp *Importer) upsertRapidLocation(ctx context.Context, reachID, name, desc string, isSurfWave bool, lon, lat float64) error {
+func (imp *Importer) upsertRapidLocation(ctx context.Context, reachID, name, desc string, isSurfWave, isPermanentHazard bool, hazardType string, lon, lat float64) error {
 	if imp.DryRun {
 		return nil
 	}
 	classRating := ParseClassRating(desc)
 	tag, err := imp.pool.Exec(ctx, `
 		UPDATE rapids
-		SET location     = ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
-		    description  = CASE WHEN $5 <> '' THEN $5 ELSE description END,
-		    class_rating = CASE WHEN $6::numeric IS NOT NULL THEN $6::numeric ELSE class_rating END,
-		    is_surf_wave = is_surf_wave OR $7
+		SET location             = ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
+		    description          = CASE WHEN $5 <> '' THEN $5 ELSE description END,
+		    class_rating         = CASE WHEN $6::numeric IS NOT NULL THEN $6::numeric ELSE class_rating END,
+		    is_surf_wave         = is_surf_wave OR $7,
+		    is_permanent_hazard  = is_permanent_hazard OR $8,
+		    hazard_type          = CASE WHEN $9 <> '' THEN $9 ELSE hazard_type END
 		WHERE reach_id = $1 AND LOWER(name) = LOWER($2)
-	`, reachID, name, lon, lat, desc, classRating, isSurfWave)
+	`, reachID, name, lon, lat, desc, classRating, isSurfWave, isPermanentHazard, hazardType)
 	if err != nil {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
 		_, err = imp.pool.Exec(ctx, `
-			INSERT INTO rapids (reach_id, name, location, description, class_rating, is_surf_wave, data_source, verified)
-			VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography, NULLIF($5,''), $6::numeric, $7, 'import', true)
+			INSERT INTO rapids (reach_id, name, location, description, class_rating,
+			                    is_surf_wave, is_permanent_hazard, hazard_type,
+			                    data_source, verified)
+			VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
+			        NULLIF($5,''), $6::numeric, $7, $8, NULLIF($9,''), 'import', true)
 			ON CONFLICT (reach_id, name) DO UPDATE
-			  SET location     = EXCLUDED.location,
-			      description  = COALESCE(EXCLUDED.description, rapids.description),
-			      class_rating = COALESCE(EXCLUDED.class_rating, rapids.class_rating),
-			      is_surf_wave = rapids.is_surf_wave OR EXCLUDED.is_surf_wave
-		`, reachID, name, lon, lat, desc, classRating, isSurfWave)
+			  SET location            = EXCLUDED.location,
+			      description         = COALESCE(EXCLUDED.description, rapids.description),
+			      class_rating        = COALESCE(EXCLUDED.class_rating, rapids.class_rating),
+			      is_surf_wave        = rapids.is_surf_wave OR EXCLUDED.is_surf_wave,
+			      is_permanent_hazard = rapids.is_permanent_hazard OR EXCLUDED.is_permanent_hazard,
+			      hazard_type         = COALESCE(EXCLUDED.hazard_type, rapids.hazard_type)
+		`, reachID, name, lon, lat, desc, classRating, isSurfWave, isPermanentHazard, hazardType)
 	}
 	return err
+}
+
+// inferHazardType classifies a permanent hazard from its name/description text.
+func inferHazardType(text string) string {
+	lower := strings.ToLower(text)
+	switch {
+	case strings.Contains(lower, "low-head") || strings.Contains(lower, "lowhead") ||
+		strings.Contains(lower, "low head") || strings.Contains(lower, "weir"):
+		return "low_head_dam"
+	case strings.Contains(lower, "dam"):
+		return "dam"
+	case strings.Contains(lower, "rebar") || strings.Contains(lower, "rebar/concrete") ||
+		strings.Contains(lower, "rebar / concrete"):
+		return "rebar"
+	case strings.Contains(lower, "strainer"):
+		return "strainer"
+	case strings.Contains(lower, "bridge") || strings.Contains(lower, "piling"):
+		return "bridge_piling"
+	default:
+		return "other"
+	}
 }
 
 func (imp *Importer) upsertAccess(ctx context.Context, reachID, accessType, name, notes string, lon, lat float64) error {
@@ -563,6 +612,8 @@ func SplitPrefixWithHint(name, description, folderHint string) (prefix, rest str
 		return "rapid", name
 	case "access points", "access":
 		return "put-in", name
+	case "hazards", "permanent hazards":
+		return "hazard", name
 	}
 	return "", name
 }
@@ -570,7 +621,7 @@ func SplitPrefixWithHint(name, description, folderHint string) (prefix, rest str
 // SplitPrefix splits "Rapid: Zoom Flume" → ("rapid", "Zoom Flume").
 func SplitPrefix(name string) (prefix, rest string) {
 	lower := strings.ToLower(name)
-	for _, p := range []string{"Rapid", "Wave", "Surf", "Put-in", "Take-out", "Parking", "Shuttle"} {
+	for _, p := range []string{"Rapid", "Wave", "Surf", "Put-in", "Take-out", "Parking", "Shuttle", "Hazard"} {
 		if strings.HasPrefix(lower, strings.ToLower(p)+":") {
 			prefix := strings.ToLower(p)
 			if prefix == "surf" {
@@ -694,7 +745,8 @@ func SyncCenterline(ctx context.Context, pool *pgxpool.Pool, slug string, dryRun
 	}
 
 	_, err = pool.Exec(ctx, `
-		UPDATE reaches SET centerline = (
+		UPDATE reaches
+		SET    centerline = (
 			SELECT ST_LineSubstring(
 				line,
 				ST_LineLocatePoint(line, put_pt),
@@ -708,7 +760,19 @@ func SyncCenterline(ctx context.Context, pool *pgxpool.Pool, slug string, dryRun
 					ST_ClosestPoint(ST_GeomFromGeoJSON($2),
 					    ST_SetSRID(ST_MakePoint($5, $6), 4326))                AS take_pt
 			) sub
-		)
+		),
+		       length_mi = COALESCE(
+		           length_mi,
+		           ROUND((
+		               ST_Length((
+		                   SELECT ST_LineSubstring(
+		                       ST_GeomFromGeoJSON($2),
+		                       ST_LineLocatePoint(ST_GeomFromGeoJSON($2), ST_ClosestPoint(ST_GeomFromGeoJSON($2), ST_SetSRID(ST_MakePoint($3,$4),4326))),
+		                       ST_LineLocatePoint(ST_GeomFromGeoJSON($2), ST_ClosestPoint(ST_GeomFromGeoJSON($2), ST_SetSRID(ST_MakePoint($5,$6),4326)))
+		                   )::geography
+		               )) / 1609.344
+		           )::numeric, 2)
+		       )
 		WHERE slug = $1
 	`, slug, geojson, putInLon, putInLat, takeOutLon, takeOutLat)
 	return err

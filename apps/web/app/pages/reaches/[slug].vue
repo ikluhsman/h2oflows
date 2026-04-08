@@ -337,6 +337,77 @@
       </section>
 
 
+      <!-- River features: put-ins, take-outs, rapids, hazards — upstream to downstream -->
+      <section v-if="riverFeatures.length > 0">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">River Features</h2>
+        <div class="relative">
+          <!-- Vertical timeline spine -->
+          <div class="absolute left-4 top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
+
+          <div class="space-y-5">
+            <div
+              v-for="feat in riverFeatures"
+              :key="feat.key"
+              class="relative flex gap-4 pl-10"
+            >
+              <!-- Timeline dot -->
+              <div
+                class="absolute left-2.5 top-1 w-3 h-3 rounded-full border-2 shrink-0"
+                :class="featureDotClass(feat)"
+              />
+
+              <div class="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 min-w-0">
+                <div class="flex items-start gap-2 flex-wrap">
+                  <!-- Type pill -->
+                  <span
+                    class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
+                    :class="featurePillClass(feat)"
+                  >
+                    {{ featureTypeLabel(feat) }}
+                  </span>
+
+                  <!-- Class badge for rapids -->
+                  <span
+                    v-if="feat.type === 'rapid' && feat.class_rating"
+                    class="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-mono font-medium text-gray-600 dark:text-gray-300 shrink-0"
+                  >
+                    {{ romanClass(feat.class_rating) }}
+                    <span v-if="feat.class_at_high && feat.class_at_high > feat.class_rating" class="text-gray-400 ml-0.5">({{ romanClass(feat.class_at_high) }})</span>
+                  </span>
+
+                  <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100 leading-tight">
+                    {{ feat.name }}
+                  </h3>
+                </div>
+
+                <p
+                  v-if="feat.description"
+                  class="mt-1.5 text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-3"
+                >
+                  {{ feat.description }}
+                </p>
+
+                <!-- Portage note -->
+                <p
+                  v-if="feat.portage_description"
+                  class="mt-1 text-xs text-amber-600 dark:text-amber-400"
+                >
+                  Portage: {{ feat.portage_description }}
+                </p>
+
+                <!-- Hazard type badge -->
+                <span
+                  v-if="feat.is_permanent_hazard && feat.hazard_type"
+                  class="mt-1.5 inline-flex items-center rounded bg-red-50 dark:bg-red-950 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-300"
+                >
+                  ⚠ {{ hazardTypeLabel(feat.hazard_type) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Tributary / other related reaches -->
       <section v-if="tributaryReaches.length > 0">
         <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Tributaries & Related</h2>
@@ -388,6 +459,120 @@ const { data: flowRanges } = await useAsyncData(
   { default: () => [] }
 )
 
+// ---- River features (upstream→downstream timeline) --------------------------
+
+interface RiverFeature {
+  key:          string
+  type:         'rapid' | 'put_in' | 'take_out' | 'hazard' | 'access'
+  name:         string
+  description?: string | null
+  // rapids-specific
+  class_rating?:          number | null
+  class_at_high?:         number | null
+  portage_description?:   string | null
+  is_portage_recommended?: boolean
+  is_permanent_hazard?:   boolean
+  hazard_type?:           string | null
+  // sorting
+  lng?: number | null
+}
+
+// Combine rapids and access points sorted upstream → downstream.
+// Colorado rivers run west→east so ascending longitude = upstream→downstream.
+// Features without coordinates go at the end.
+const riverFeatures = computed<RiverFeature[]>(() => {
+  const r = reach.value as any
+  if (!r) return []
+
+  const items: RiverFeature[] = []
+
+  for (const rap of r.rapids ?? []) {
+    items.push({
+      key:  `rapid-${rap.id}`,
+      type: rap.is_permanent_hazard ? 'hazard' : 'rapid',
+      name: rap.name,
+      description: rap.description,
+      class_rating: rap.class_rating,
+      class_at_high: rap.class_at_high,
+      portage_description: rap.portage_description,
+      is_portage_recommended: rap.is_portage_recommended,
+      is_permanent_hazard: rap.is_permanent_hazard,
+      hazard_type: rap.hazard_type,
+      lng: rap.lng,
+    })
+  }
+
+  for (const acc of r.access ?? []) {
+    if (acc.access_type === 'parking' || acc.access_type === 'shuttle_drop') continue
+    items.push({
+      key:  `access-${acc.id}`,
+      type: acc.access_type as any,
+      name: acc.name,
+      description: acc.notes ?? acc.directions,
+      lng: acc.water_lng ?? acc.parking_lng,
+    })
+  }
+
+  return items.sort((a, b) => {
+    if (a.lng == null && b.lng == null) return 0
+    if (a.lng == null) return 1
+    if (b.lng == null) return -1
+    return a.lng - b.lng  // west=upstream first
+  })
+})
+
+function featureTypeLabel(feat: RiverFeature): string {
+  if (feat.is_permanent_hazard) return 'Hazard'
+  switch (feat.type) {
+    case 'rapid':    return 'Rapid'
+    case 'put_in':   return 'Put-in'
+    case 'take_out': return 'Take-out'
+    case 'access':   return 'Access'
+    default:         return 'Feature'
+  }
+}
+
+function featurePillClass(feat: RiverFeature): string {
+  if (feat.is_permanent_hazard)
+    return 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+  switch (feat.type) {
+    case 'rapid':
+      return 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+    case 'put_in':
+    case 'take_out':
+    case 'access':
+      return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+    default:
+      return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+  }
+}
+
+function featureDotClass(feat: RiverFeature): string {
+  if (feat.is_permanent_hazard)
+    return 'bg-red-500 border-red-300 dark:border-red-700'
+  switch (feat.type) {
+    case 'rapid':
+      return 'bg-blue-500 border-blue-300 dark:border-blue-700'
+    case 'put_in':
+    case 'take_out':
+      return 'bg-emerald-500 border-emerald-300 dark:border-emerald-700'
+    default:
+      return 'bg-gray-400 border-gray-200 dark:border-gray-600'
+  }
+}
+
+function hazardTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    low_head_dam:  'Low-head dam',
+    dam:           'Dam',
+    rebar:         'Rebar / concrete',
+    strainer:      'Strainer',
+    bridge_piling: 'Bridge piling',
+    other:         'Permanent hazard',
+  }
+  return map[type] ?? type
+}
+
 // ---- Derived display --------------------------------------------------------
 // Declared before SEO so metaTitle/metaDesc can reference them without TDZ errors.
 
@@ -415,10 +600,14 @@ const tributaryReaches = computed(() =>
 )
 
 const classLabel = computed(() => {
-  const r = reach.value
+  const r = reach.value as any
   if (!r?.class_min && !r?.class_max) return 'Unknown class'
-  if (r.class_min === r.class_max)     return `Class ${romanClass(r.class_min!)}`
-  return `Class ${romanClass(r.class_min!)}–${romanClass(r.class_max!)}`
+  const base = r.class_min === r.class_max
+    ? `Class ${romanClass(r.class_min!)}`
+    : `Class ${romanClass(r.class_min!)}–${romanClass(r.class_max!)}`
+  if (r.class_hardest != null && r.class_hardest > (r.class_max ?? 0))
+    return `${base} (${romanClass(r.class_hardest)})`
+  return base
 })
 
 const statusColor = computed(() => {
