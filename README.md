@@ -11,7 +11,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full technical design and [DECISIONS.
 ### Gauge dashboard
 - Personal watchlist of USGS and Colorado DWR gauges, persisted across sessions
 - Live CFS readings refreshed every 60 seconds
-- Flow status bands (too low / minimum / fun / optimal / pushy / flood) overlaid on each gauge card
+- Flow status bands (below recommended / runnable / above recommended) overlaid on each gauge card
 - Named flow band label — know at a glance whether your run is on
 - Side-by-side multi-gauge comparison graph for reaches with more than one relevant gauge
 - Gauges grouped by reach with a link through to the full reach page
@@ -104,6 +104,17 @@ RESEED=true go run ./cmd/seed-reaches
 # Bulk import USGS gauges by state
 go run ./cmd/seed-usgs-states
 ```
+
+### Importing reach data from KMZ
+
+Build a Google My Map of a river (rapids, put-ins, take-outs, parking) and export as KMZ:
+
+```sh
+cd apps/api
+go run ./cmd/import-kml -file /path/to/your-export.kmz
+```
+
+See [docs/kmz-import-guide.md](docs/kmz-import-guide.md) for the folder and pin naming conventions the importer expects.
 
 ---
 
