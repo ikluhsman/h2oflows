@@ -22,9 +22,9 @@
         </p>
       </div>
 
-      <!-- Card actions -->
+      <!-- Card actions: Record/Stop + Remove -->
       <div class="flex items-center gap-1 shrink-0">
-        <!-- Run it / Stop recording -->
+        <!-- Record / Stop -->
         <UTooltip :text="watchTooltip">
           <button
             class="rounded-lg p-1.5 transition-all duration-150"
@@ -36,18 +36,18 @@
           </button>
         </UTooltip>
 
-        <!-- More actions -->
-        <UDropdownMenu :items="cardMenuItems" @click.stop>
+        <!-- Remove gauge -->
+        <UTooltip text="Remove gauge">
           <button
-            class="rounded-lg p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-150"
-            aria-label="More actions"
-            @click.stop
+            class="rounded-lg p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all duration-150"
+            aria-label="Remove gauge"
+            @click.stop="store.removeGauge(gauge.id)"
           >
             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <circle cx="4" cy="10" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="16" cy="10" r="1.5" />
+              <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
             </svg>
           </button>
-        </UDropdownMenu>
+        </UTooltip>
       </div>
     </div>
 
@@ -219,10 +219,10 @@ const cardClass = computed(() => ({
 
 // --- Track button -----------------------------------------------------------
 
-// saved  → "Track it" (play icon) — tap to start a flow tracking session
-// active → "Stop" (stop icon)     — tap to end the session
+// saved  → "Record" (red circle) — tap to start a flow tracking session
+// active → "Stop"  (stop icon)   — tap to end the session
 const watchIcon = computed(() =>
-  isActive.value ? resolveComponent('IconStop') : resolveComponent('IconPlay')
+  isActive.value ? resolveComponent('IconStop') : resolveComponent('IconRecord')
 )
 const watchButtonClass = computed(() => ({
   'text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950': isSaved.value,
@@ -231,23 +231,6 @@ const watchButtonClass = computed(() => ({
 const watchTooltip = computed(() =>
   isActive.value ? 'Stop tracking' : 'Track it — start a flow tracking session'
 )
-
-// --- Card menu (⋯) ----------------------------------------------------------
-
-const cardMenuItems = computed(() => [[
-  {
-    label: isActive.value ? 'Stop tracking' : 'Track it',
-    icon: isActive.value ? 'i-heroicons-stop-circle' : 'i-heroicons-play-circle',
-    onSelect: () => handleWatchClick(),
-  },
-], [
-  {
-    label: 'Remove gauge',
-    icon: 'i-heroicons-trash',
-    class: 'text-red-500',
-    onSelect: () => store.removeGauge(props.gauge.id),
-  },
-]])
 
 // deviceId — random UUID generated once per install, stored in localStorage.
 // Identifies anonymous devices for trip attribution without requiring login.

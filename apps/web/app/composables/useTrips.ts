@@ -1,8 +1,9 @@
 /**
- * useTrips — fetch and manage trip records for the current device.
+ * useTrips — fetch and manage trip records.
  *
- * All trips are keyed by device_id (anonymous beta; no auth required).
- * The device_id is a random UUID stored in localStorage, generated once on first install.
+ * When authenticated (Supabase session present), requests carry
+ * Authorization: Bearer <token> and the API scopes trips by user_id.
+ * For anonymous/legacy use, trips fall back to device_id scoping.
  */
 
 export interface TripSummary {
@@ -38,6 +39,7 @@ interface GeoJSONLineString {
 
 export function useTrips() {
   const { apiBase } = useRuntimeConfig().public
+  const { getToken } = useAuth()
 
   function getDeviceId(): string {
     const key = 'h2oflow_device_id'
@@ -49,14 +51,28 @@ export function useTrips() {
     return id
   }
 
+  /** Build request headers — adds Bearer token when signed in. */
+  function authHeaders(extra?: Record<string, string>): HeadersInit {
+    const token = getToken()
+    const headers: Record<string, string> = { ...extra }
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    return headers
+  }
+
   async function listTrips(): Promise<TripSummary[]> {
-    const res = await fetch(`${apiBase}/api/v1/trips?device_id=${getDeviceId()}`)
+    const res = await fetch(
+      `${apiBase}/api/v1/trips?device_id=${getDeviceId()}`,
+      { headers: authHeaders() },
+    )
     if (!res.ok) throw new Error(`${res.status}`)
     return res.json()
   }
 
   async function getTrip(id: string): Promise<TripDetail> {
-    const res = await fetch(`${apiBase}/api/v1/trips/${id}?device_id=${getDeviceId()}`)
+    const res = await fetch(
+      `${apiBase}/api/v1/trips/${id}?device_id=${getDeviceId()}`,
+      { headers: authHeaders() },
+    )
     if (!res.ok) throw new Error(`${res.status}`)
     return res.json()
   }
@@ -64,7 +80,7 @@ export function useTrips() {
   async function patchTrip(id: string, patch: { notes?: string; title?: string; share_consent?: boolean }): Promise<void> {
     const res = await fetch(`${apiBase}/api/v1/trips/${id}`, {
       method:  'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body:    JSON.stringify({ device_id: getDeviceId(), ...patch }),
     })
     if (!res.ok) throw new Error(`${res.status}`)
@@ -73,7 +89,7 @@ export function useTrips() {
   async function describeTrip(id: string): Promise<DescribeResult> {
     const res = await fetch(`${apiBase}/api/v1/trips/${id}/describe`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body:    JSON.stringify({ device_id: getDeviceId() }),
     })
     if (!res.ok) throw new Error(`${res.status}`)

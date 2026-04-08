@@ -11,6 +11,21 @@
 
     <main class="max-w-3xl mx-auto px-4 py-8">
 
+      <!-- Sign-in prompt for anonymous users -->
+      <div
+        v-if="!isAuthenticated"
+        class="mb-6 rounded-xl border border-blue-100 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 flex items-center justify-between gap-4"
+      >
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-blue-700 dark:text-blue-300">Sync trips across devices</p>
+          <p class="text-xs text-blue-600/70 dark:text-blue-400/70 mt-0.5">Sign in to save your trips to your account and access them anywhere.</p>
+        </div>
+        <NuxtLink
+          to="/login"
+          class="shrink-0 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+        >Sign in</NuxtLink>
+      </div>
+
       <div class="flex items-center justify-between mb-6">
         <h1 class="text-xl font-bold">My Trips</h1>
         <span v-if="trips.length" class="text-sm text-gray-400">{{ trips.length }} trip{{ trips.length === 1 ? '' : 's' }}</span>
@@ -66,6 +81,7 @@ import { ref, onMounted } from 'vue'
 import { useTrips, type TripSummary } from '~/composables/useTrips'
 
 const { listTrips } = useTrips()
+const { isAuthenticated } = useAuth()
 
 const trips          = ref<TripSummary[]>([])
 const loading        = ref(true)

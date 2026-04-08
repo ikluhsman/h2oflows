@@ -18,6 +18,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	gauge "github.com/h2oflow/h2oflow/packages/gauge-core"
 	"github.com/h2oflow/h2oflow/apps/api/internal/ai"
+	"github.com/h2oflow/h2oflow/apps/api/internal/auth"
 	"github.com/h2oflow/h2oflow/apps/api/internal/config"
 	"github.com/h2oflow/h2oflow/apps/api/internal/db"
 	"github.com/h2oflow/h2oflow/apps/api/internal/handlers"
@@ -81,17 +82,38 @@ func main() {
 		describer = ai.NewTripDescriber(pool, cfg.AnthropicAPIKey)
 	}
 
-	gauges := handlers.NewGaugeHandler(pool, enricher, p)
+	// Supabase JWT verifier — optional. When unset, all requests stay anonymous
+	// and the existing device_id flow continues to work unchanged.
+	var verifier *auth.Verifier
+	if cfg.SupabaseJWKSURL != "" {
+		v, err := auth.NewVerifier(context.Background(), cfg.SupabaseJWKSURL)
+		if err != nil {
+			log.Fatalf("auth: %v", err)
+		}
+		verifier = v
+		log.Printf("auth: Supabase JWT verification enabled (%s)", cfg.SupabaseJWKSURL)
+	} else {
+		log.Println("SUPABASE_JWKS_URL not set — auth middleware disabled, all requests anonymous")
+	}
+
+	gauges  := handlers.NewGaugeHandler(pool, enricher, p)
 	reaches := handlers.NewReachHandler(pool, asker)
+	// Warm the reach map cache immediately, then refresh every poll cycle.
+	reaches.WarmCache(context.Background())
+	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
 	trips   := handlers.NewTripHandler(pool, describer)
 	imports := &handlers.Import{Pool: pool}
 	r.Route("/api/v1", func(r chi.Router) {
+		// Optional: attaches user claims when a valid Bearer token is present,
+		// but anonymous (device_id) requests still flow through.
+		r.Use(auth.Optional(verifier))
 		r.Get("/gauges/search", gauges.Search)
 		r.Get("/gauges/batch", gauges.BatchGet)
 		r.Get("/gauges/{id}/readings", gauges.GetReadings)
 		r.Get("/gauges/{id}/flow-ranges", gauges.GetFlowRanges)
 		r.Get("/gauges/{id}/seasonal", gauges.GetSeasonalStats)
 
+		r.Get("/reaches/map/all", reaches.MapAll)
 		r.Get("/reaches/map", reaches.Map)
 		r.Get("/reaches", reaches.List)
 		r.Get("/reaches/{slug}", reaches.Get)

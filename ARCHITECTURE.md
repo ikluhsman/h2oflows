@@ -37,7 +37,7 @@ H2OFlows builds that open data layer — and gives it back to the community as a
 
 **Complexity scales with the trip.** A gauge check should take 3 seconds. A day trip 30 seconds. A permit trip has every tool it needs. The UI adapts to the use case.
 
-**FOSS commitment is real.** Self-hosting is a first-class deployment option. `docker compose up` should produce a running instance in under 10 minutes.
+**FOSS commitment is real.** The codebase is open under a permissive license. Anyone can fork, audit, contribute, or adapt the gauge-core adapters for their own use.
 
 **No hardcoded brand strings.** App name, domain, and org live in config only. Rebranding or repo migration is a one-line change.
 
@@ -92,11 +92,11 @@ The open geographic data layer that doesn't currently exist in open form.
 | Migrations | golang-migrate |
 | AI | Anthropic Claude (anthropic-sdk-go) |
 | Cache | Redis (planned — not required for Phase 1) |
-| Object storage | Cloudflare R2 (hosted) / any S3-compatible (self-hosted) |
+| Object storage | Cloudflare R2 (S3-compatible, no egress fees) |
 | Reverse proxy | Traefik (planned) |
 | Auth | Google / Apple / magic-link (Phase 3 — anonymous until beta pilot completes) |
 
-Go was chosen for single-binary deployment (critical for self-hosting), excellent concurrency for gauge polling across multiple sources, and a strong FOSS contributor ecosystem. The `gauge-core` package implements a plugin interface — adding a new data source is writing one adapter file.
+Go was chosen for excellent concurrency across multi-source gauge polling, single-binary deployment to ECS Fargate, and a strong FOSS contributor ecosystem. The `gauge-core` package implements a plugin interface — adding a new data source is writing one adapter file.
 
 ### Frontend
 
@@ -431,13 +431,6 @@ Reported at 920 CFS (currently 950, rising)
 - **Hosted trip page** — flow graph, geotagged photo map, embedded YouTube/Vimeo, food log, conditions summary
 
 Photos auto-pinned from EXIF GPS. River-following line drawn using reach centerline geometry.
-
----
-
-## Self-hosting
-
-Target: `git clone` → `docker compose up` → running in under 10 minutes.
-Self-hosted instances can optionally federate reach edits and hazard data back to the public commons with user consent.
 
 ---
 

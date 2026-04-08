@@ -13,7 +13,9 @@ type Config struct {
 	Port             string
 	AppName          string
 	AppDomain        string
-	JWTSecret        string // Phase 3 — auth
+	SupabaseURL      string // https://<project>.supabase.co
+	SupabaseJWKSURL  string // JWKS endpoint for verifying Supabase-issued JWTs
+	SupabaseService  string // service role / secret key — admin actions only
 	AnthropicAPIKey  string // required for AI search enrichment and flow interpretation
 	VoyageAPIKey     string // required for reach embeddings and /ask endpoint
 	USGSAPIKey       string // optional, raises rate limits
@@ -29,7 +31,9 @@ func Load() Config {
 		Port:             env("APP_PORT", "8080"),
 		AppName:          env("APP_NAME", "H2OFlows"),
 		AppDomain:        env("APP_DOMAIN", "localhost"),
-		JWTSecret:        env("JWT_SECRET", ""),
+		SupabaseURL:      env("SUPABASE_URL", ""),
+		SupabaseJWKSURL:  env("SUPABASE_JWKS_URL", ""),
+		SupabaseService:  env("SUPABASE_SERVICE_KEY", ""),
 		AnthropicAPIKey:  env("ANTHROPIC_API_KEY", ""),
 		VoyageAPIKey:     env("VOYAGE_API_KEY", ""),
 		USGSAPIKey:       env("USGS_API_KEY", ""),

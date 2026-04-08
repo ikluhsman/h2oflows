@@ -126,14 +126,26 @@ interface AccessFeature {
   water_lat: number | null
 }
 
+interface GaugeProp {
+  id: string
+  name?: string | null
+  external_id?: string | null
+  reach_relationship?: string | null
+  lng?: number | null
+  lat?: number | null
+}
+
 const props = defineProps<{
   name?: string
   classMax?: number | null
   centerline?: any
   rapids: RapidFeature[]
   access: AccessFeature[]
+  // Legacy single-gauge props — kept for backwards compat
   gaugeLng?: number | null
   gaugeLat?: number | null
+  // Preferred: pass all gauges as an array so each gets a pin
+  gauges?: GaugeProp[]
 }>()
 
 // ── Derived lists ─────────────────────────────────────────────────────────────
@@ -185,8 +197,19 @@ const selectedFeature = computed(() => {
   return null
 })
 
+// Gauges with valid coordinates (from array or legacy single props)
+const gaugeFeatures = computed<GaugeProp[]>(() => {
+  if (props.gauges && props.gauges.length > 0) {
+    return props.gauges.filter(g => g.lng != null && g.lat != null)
+  }
+  if (props.gaugeLng != null && props.gaugeLat != null) {
+    return [{ id: 'gauge', lng: props.gaugeLng, lat: props.gaugeLat }]
+  }
+  return []
+})
+
 const hasCoords = computed(() =>
-  props.centerline || allFeatures.value.length > 0 || props.gaugeLng != null
+  props.centerline || allFeatures.value.length > 0 || gaugeFeatures.value.length > 0
 )
 
 // ── Map state ─────────────────────────────────────────────────────────────────
@@ -247,7 +270,7 @@ onMounted(async () => {
         { id: 'esri-tiles',   type: 'raster', source: 'esri',   layout: { visibility: 'none'    } },
       ],
     },
-    center:   [props.gaugeLng ?? -105.5, props.gaugeLat ?? 39.2],
+    center:   [gaugeFeatures.value[0]?.lng ?? -105.5, gaugeFeatures.value[0]?.lat ?? 39.2],
     zoom:     11,
     attributionControl: false,
     fadeDuration: 0,
@@ -264,6 +287,15 @@ onMounted(async () => {
   })
 
   map.on('error', (e) => { console.warn('[ReachMap]', e.error?.message ?? e) })
+
+  // Scale rapid text labels with zoom level (larger when zoomed in on a rapid)
+  map.on('zoom', () => {
+    if (!map) return
+    const z = map.getZoom()
+    const size = z >= 15 ? '14px' : z >= 13 ? '12px' : '10px'
+    document.querySelectorAll<HTMLElement>('.reach-map-rapid-label')
+      .forEach(el => { el.style.fontSize = size })
+  })
 })
 
 onUnmounted(() => {
@@ -329,6 +361,22 @@ function addLayers() {
     markerEls.set(a.id, el)
   }
 
+  // Gauge pins — cyan/teal color, "G" label with relationship subtitle
+  for (const g of gaugeFeatures.value) {
+    const relLabel = gaugeRelLabel(g.reach_relationship)
+    const label = g.reach_relationship === 'upstream_indicator' ? '▲' :
+                  g.reach_relationship === 'downstream_indicator' ? '▼' : '~'
+    const el = makePinEl('#0891b2', null, label, g.id)
+    el.title = `${relLabel}${g.name ? ': ' + g.name : g.external_id ? ': ' + g.external_id : ''}`
+    el.addEventListener('mouseenter', () => showTooltip(el, el.title, [g.lng!, g.lat!]))
+    el.addEventListener('mouseleave', () => tooltip.remove())
+    const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([g.lng!, g.lat!])
+      .addTo(map!)
+    allMarkers.push(marker)
+    markerEls.set(g.id, el)
+  }
+
   // Rapid labels — text only with a blue glow
   for (const r of rapidFeatures.value) {
     const el = document.createElement('div')
@@ -363,33 +411,41 @@ function showTooltip(_el: HTMLElement, text: string, lngLat: [number, number]) {
   tooltip.setLngLat(lngLat).setHTML(`<span>${text}</span>`).addTo(map)
 }
 
-function makePinEl(color: string, imgUrl: string | null, label: string, id: string): HTMLElement {
+/**
+ * Build an SVG DOM element for an access point marker.
+ * put_in    → green teardrop with down-arrow
+ * take_out  → red teardrop with up-arrow
+ * parking   → red teardrop with bold "P"
+ * others    → gray teardrop with icon letter
+ */
+function makePinEl(color: string, _imgUrl: string | null, label: string, id: string): HTMLElement {
   const el = document.createElement('div')
   el.dataset.markerId = id
   el.dataset.pinColor = color
-  el.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));transition:filter 0.12s'
-  const inner = imgUrl
-    ? `<image href="${imgUrl}" x="4" y="4" width="20" height="20" clip-path="circle(10px at 10px 10px)"/>`
-    : `<text x="14" y="17" text-anchor="middle" dominant-baseline="middle"
-        font-size="11" font-weight="800" font-family="system-ui,sans-serif" fill="white">${label}</text>`
-  el.innerHTML = `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
-    <path d="M14 1C7.1 1 1.5 6.6 1.5 13.5c0 8.7 12.5 20.5 12.5 20.5S26.5 22.2 26.5 13.5C26.5 6.6 20.9 1 14 1z"
-      fill="${color}" stroke="white" stroke-width="1.5"/>
-    ${inner}
-  </svg>`
+  el.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));transition:filter 0.12s'
+  el.innerHTML = makePinSvg(color, label)
   return el
 }
 
-function accessIconUrl(type: string): string | null {
-  // Map access types to the KMZ icon images (served from /icons/)
-  const map: Record<string, string> = {
-    put_in:       '/icons/kmz-icon-1.png',   // blue kayaker
-    take_out:     '/icons/kmz-icon-5.png',   // red kayaker
-    intermediate: '/icons/kmz-icon-4.png',   // green kayaker
-    shuttle_drop: '/icons/kmz-icon-2.png',   // red P (parking)
-  }
-  return map[type] ?? null
+function makePinSvg(color: string, label: string): string {
+  const arrow = label === '↓'
+    // Down-arrow (put-in)
+    ? `<path d="M14 8 L14 19 M9 15 L14 20 L19 15" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
+    : label === '↑'
+    // Up-arrow (take-out)
+    ? `<path d="M14 20 L14 9 M9 13 L14 8 L19 13" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
+    // Text label (P, S, ◆, etc.)
+    : `<text x="14" y="18" text-anchor="middle" dominant-baseline="middle"
+        font-size="12" font-weight="800" font-family="system-ui,sans-serif" fill="white">${label}</text>`
+  return `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg">
+    <path d="M14 2C7.9 2 3 6.9 3 13c0 7.5 11 21 11 21S25 20.5 25 13C25 6.9 20.1 2 14 2z"
+      fill="${color}" stroke="white" stroke-width="1.5"/>
+    ${arrow}
+  </svg>`
 }
+
+// Kept for API compatibility — no longer used (inline SVG replaces KMZ images)
+function accessIconUrl(_type: string): string | null { return null }
 
 function setSelectedMarker(id: string) {
   selectedId.value = id
@@ -557,15 +613,11 @@ function fitBounds() {
   accessFeatures.value.forEach(a => coords.push([a.lng, a.lat]))
   if (props.centerline?.coordinates) {
     const line = props.centerline.coordinates as [number, number][]
-    coords.push(line[0], line[line.length - 1])
+    if (line.length > 0) coords.push(line[0] as [number, number], line[line.length - 1] as [number, number])
   }
-  if (coords.length === 0) {
-    if (props.gaugeLng != null && props.gaugeLat != null) {
-      map.setCenter([props.gaugeLng, props.gaugeLat]); map.setZoom(12)
-    }
-    return
-  }
-  if (coords.length === 1) { map.setCenter(coords[0]); map.setZoom(14); return }
+  gaugeFeatures.value.forEach(g => coords.push([g.lng!, g.lat!]))
+  if (coords.length === 0) return
+  if (coords.length === 1) { map.setCenter(coords[0] as [number, number]); map.setZoom(14); return }
   const lngs = coords.map(c => c[0])
   const lats = coords.map(c => c[1])
   map.fitBounds(
@@ -578,11 +630,11 @@ function fitBounds() {
 
 // Color the reach centerline by difficulty — matches the home map scale.
 function reachLineColor(maxRating: number | null): string {
-  if (maxRating == null) return '#6b7280'  // gray — no class data
+  if (maxRating == null) return '#6b7280'  // gray   — no class data
   if (maxRating < 2.5)   return '#16a34a'  // green  — Class I–II
   if (maxRating < 4.0)   return '#3b82f6'  // blue   — Class III/III+
-  if (maxRating < 5.0)   return '#111827'  // black  — Class IV (incl. IV+)
-  return '#111827'                          // black  — Class V
+  if (maxRating < 5.0)   return '#1f2937'  // black  — Class IV (incl. IV+)
+  return '#dc2626'                          // red    — Class V (expert warning)
 }
 
 function formatClass(v: number): string {
@@ -591,6 +643,15 @@ function formatClass(v: number): string {
     3: 'III', 3.5: 'III+', 4: 'IV', 4.5: 'IV+', 5: 'V',
   }
   return map[v] ?? String(v)
+}
+
+function gaugeRelLabel(rel: string | null | undefined): string {
+  switch (rel) {
+    case 'upstream_indicator':   return 'Upstream gauge'
+    case 'downstream_indicator': return 'Downstream gauge'
+    case 'tributary':            return 'Tributary gauge'
+    default:                     return 'Flow gauge'
+  }
 }
 
 function accessTypeLabel(type: string): string {
@@ -659,21 +720,21 @@ watch(() => props.centerline, rebuildLayers, { deep: true })
   font-family: system-ui, sans-serif;
   font-size: 11px;
   font-weight: 700;
-  color: #ffffff;
+  /* Slightly off-white fill — softer than pure white */
+  color: #e5e7eb;
   white-space: nowrap;
   user-select: none;
   letter-spacing: 0.02em;
+  /* Dark gray stroke (was pure black) + subtle blue glow */
   text-shadow:
-    -1px -1px 0 #000,  1px -1px 0 #000,
-    -1px  1px 0 #000,  1px  1px 0 #000,
-     0   -1px 0 #000,  0    1px 0 #000,
-    -1px  0   0 #000,  1px  0   0 #000,
-     0    0   4px #3b82f6,
-     0    0   8px rgba(59, 130, 246, 0.7);
-  transition: filter 0.15s;
+    -1px -1px 0 #374151,  1px -1px 0 #374151,
+    -1px  1px 0 #374151,  1px  1px 0 #374151,
+     0   -1px 0 #374151,  0    1px 0 #374151,
+    -1px  0   0 #374151,  1px  0   0 #374151;
+  transition: filter 0.15s, font-size 0.15s;
 }
 .reach-map-rapid-label:hover {
-  filter: drop-shadow(0 0 4px #60a5fa) drop-shadow(0 0 8px #3b82f6);
+  filter: drop-shadow(0 0 5px #60a5fa) drop-shadow(0 0 10px rgba(59,130,246,0.65));
 }
 .reach-map-tooltip .maplibregl-popup-content {
   padding: 5px 10px !important;

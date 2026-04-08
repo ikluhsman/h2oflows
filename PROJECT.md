@@ -66,7 +66,7 @@ Initial beta group: ~20–30 Colorado paddler friends. Colorado-centric launch, 
 
 ### Backend: Go + Chi
 
-**Why Go:** Single binary deployment (critical for self-hosting community), excellent concurrency model for polling multiple gauge APIs on schedules, strong standard library means fewer dependencies, cross-compilation is trivial. Learning curve for the primary developer but porting existing USGS/DWR logic is the ideal first Go project.
+**Why Go:** Excellent concurrency model for polling multiple gauge APIs on schedules, strong standard library means fewer dependencies, single-binary deployment makes ECS Fargate operations trivial. Learning curve for the primary developer but porting existing USGS/DWR logic is the ideal first Go project.
 
 **Why Chi:** Lightweight, idiomatic, no magic. Good FOSS contributor community.
 
@@ -100,7 +100,7 @@ PWA first. When ready for app stores, wrap with Capacitor (Ionic team) — still
 |---|---|---|
 | Reverse proxy | Traefik | Docker-native, automatic TLS |
 | Cache | Redis | Gauge data TTLs, alert queue |
-| Object storage | Cloudflare R2 | No egress fees (hosted). Any S3-compatible for self-hosted. |
+| Object storage | Cloudflare R2 | No egress fees, S3-compatible. |
 | Auth | JWT + email/password | No social login — paddlers are privacy-conscious |
 | Discord bot | Go (same monorepo) | Phase 1: incoming webhooks only. Phase 2: slash commands. |
 
@@ -300,18 +300,6 @@ Every endpoint built for the frontend is also a public API endpoint. API token i
 
 ---
 
-## Self-hosting
-
-First-class deployment target. A self-hosted instance:
-- Runs the full stack via `docker compose up`
-- Can add private gauge sources that don't appear in the public commons
-- Can optionally federate reach edits and hazard data back to h2oflow.org with user consent
-- Points to any S3-compatible storage backend (R2, Backblaze B2, MinIO)
-
-Target: `git clone` → `docker compose up` → running instance in under 10 minutes.
-
----
-
 ## Subscription / sustainability model
 
 Core platform: **free forever.** The FOSS commitment is real.
@@ -415,7 +403,6 @@ Photo storage on R2 is cheap enough at community scale that the supporter tier c
 ## Open questions (decide as they come up)
 
 - OSM whitewater data import: how to handle inconsistent tagging schema across regions
-- Federation protocol between self-hosted instances and public commons — lightweight custom vs ActivityPub-inspired
 - Offline sync conflict resolution when same trip edited on two devices
 - Discord bot hosting — same server as API or separate lightweight instance
 - Open-Meteo vs other weather API for auto-stamping weather on trip reports

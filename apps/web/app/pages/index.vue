@@ -106,8 +106,11 @@
         <div class="relative w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm" style="height: 420px;">
           <ClientOnly>
             <ReachesMap
+              :hovered-slug="heroHoveredSlug"
               @reaches-updated="onReachesUpdated"
               @bounds-updated="onBoundsUpdated"
+              @hover-changed="slug => heroHoveredSlug = slug"
+              @reach-click="slug => navigateTo(`/reaches/${slug}`)"
               @gauge-add="addGaugeById"
             />
           </ClientOnly>
@@ -207,6 +210,8 @@ onMounted(async () => {
 })
 
 // ── Map callbacks ─────────────────────────────────────────────────────────────
+
+const heroHoveredSlug = ref<string | null>(null)
 
 function onReachesUpdated(_reaches: { slug: string; name: string; class_max: number | null }[]) {}
 function onBoundsUpdated(_bbox: string) {}

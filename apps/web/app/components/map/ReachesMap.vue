@@ -49,10 +49,21 @@ import { ref, watch, onMounted, onUnmounted } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
+export interface ReachListItem {
+  slug:        string
+  name:        string
+  class_max:   number | null
+  flow_status: string
+  current_cfs: number | null
+}
+
 const props = defineProps<{ hoveredSlug?: string | null }>()
 const emit  = defineEmits<{
-  (e: 'reaches-updated', reaches: { slug: string; name: string; class_max: number | null }[]): void
+  (e: 'reaches-updated', reaches: ReachListItem[]): void
   (e: 'bounds-updated', bbox: string): void
+  (e: 'zoom-updated', zoom: number): void
+  (e: 'hover-changed', slug: string | null): void
+  (e: 'reach-click', slug: string): void
   (e: 'gauge-add', gaugeId: string): void
 }>()
 
@@ -67,10 +78,9 @@ function flyToSlug(slug: string) {
     ? f.geometry.coordinates
     : (f.geometry.coordinates as [number, number][][]).flat()
   if (coords.length < 2) return
-  const lngs = coords.map(c => c[0])
-  const lats  = coords.map(c => c[1])
   map.fitBounds(
-    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+    [[Math.min(...coords.map(c => c[0])), Math.min(...coords.map(c => c[1]))],
+     [Math.max(...coords.map(c => c[0])), Math.max(...coords.map(c => c[1]))]],
     { padding: 80, maxZoom: 14, duration: 800 },
   )
 }
@@ -117,23 +127,25 @@ function locateMe() {
 
 let map: maplibregl.Map | null = null
 
-// Initial viewport — lower 48 states so all reaches are visible on load
-const INITIAL_BBOX = { west: -124.8, south: 24.4, east: -66.9, north: 49.4 }
+// Initial viewport — western US (Colorado + surrounding states)
+const INITIAL_BBOX = { west: -116.0, south: 35.5, east: -101.5, north: 45.5 }
 
 // ── Difficulty config ─────────────────────────────────────────────────────────
 
+// Icons: I-II circle, III square, IV single diamond, V double black diamond
+// Lines: I-II green, III blue, IV near-black, V red
 const DIFFICULTY = [
   { maxClass: 2.4, color: '#16a34a', imageId: 'diff-1-2', label: 'Class I–II' },
   { maxClass: 3.9, color: '#3b82f6', imageId: 'diff-3',   label: 'Class III'  },
-  { maxClass: 4.9, color: '#111827', imageId: 'diff-4',   label: 'Class IV'   },
-  { maxClass: 99,  color: '#111827', imageId: 'diff-5',   label: 'Class V'    },
+  { maxClass: 4.9, color: '#1f2937', imageId: 'diff-4',   label: 'Class IV'   },
+  { maxClass: 99,  color: '#1f2937', imageId: 'diff-5',   label: 'Class V'    }, // icon stays black
 ]
 
 const DIFFICULTY_LEGEND = [
   { label: 'Class I–II', symbol: circleSvg('#16a34a')     },
   { label: 'Class III',  symbol: squareSvg('#3b82f6')     },
-  { label: 'Class IV',   symbol: diamondSvg('#111827')    },
-  { label: 'Class V',    symbol: dblDiamondSvg('#111827') },
+  { label: 'Class IV',   symbol: diamondSvg('#1f2937')    },
+  { label: 'Class V',    symbol: dblDiamondSvg('#1f2937') }, // black icon, red line
 ]
 
 function difficultyFor(classMax: number | null) {
@@ -161,7 +173,6 @@ function dblDiamondSvg(color: string) {
     <path d="M26 1 L34 10 L26 19 L18 10 Z" fill="${color}" stroke="white" stroke-width="1.5"/></svg>`
 }
 
-// Load an SVG string into the map sprite as a named image
 function loadSvgImage(m: maplibregl.Map, id: string, svg: string, w: number, h: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const img = new Image(w, h)
@@ -200,7 +211,7 @@ onMounted(async () => {
           type: 'raster',
           tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
           tileSize: 256,
-          attribution: 'Tiles © Esri — Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP',
+          attribution: 'Tiles © Esri',
           maxzoom: 18,
         },
       },
@@ -220,18 +231,20 @@ onMounted(async () => {
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 
   map.on('load', async () => {
-    // Register difficulty shape images in the sprite
     await Promise.all([
       loadSvgImage(map!, 'diff-1-2', circleSvg('#16a34a'),     20, 20),
       loadSvgImage(map!, 'diff-3',   squareSvg('#3b82f6'),     20, 20),
-      loadSvgImage(map!, 'diff-4',   diamondSvg('#111827'),    20, 20),
-      loadSvgImage(map!, 'diff-5',   dblDiamondSvg('#111827'), 36, 20),
+      loadSvgImage(map!, 'diff-4',   diamondSvg('#1f2937'),    20, 20),
+      loadSvgImage(map!, 'diff-5',   dblDiamondSvg('#1f2937'), 36, 20), // black icon
     ])
     mapReady.value = true
-    await loadReaches()
+    await loadAllReaches()   // one request — all features, cached server-side
   })
 
-  map.on('moveend', loadReaches)
+  map.on('moveend', () => {
+    emit('zoom-updated', map!.getZoom())
+    filterVisible()   // no network call — filter already-loaded features
+  })
   map.on('error', e => console.warn('[ReachesMap]', e.error?.message ?? e))
 })
 
@@ -247,30 +260,66 @@ interface ReachFeature {
   geometry: { type: string; coordinates: any }
   properties: {
     id: string; name: string; slug: string
-    class_max: number | null; flow_status: string
+    class_max: number | null; flow_status: string; current_cfs: number | null
+    put_in_name: string | null; take_out_name: string | null; common_name: string | null
+    river_name: string | null; gauge_id: string | null
   }
 }
 
-async function loadReaches() {
+// All features from the server — loaded once at startup.
+let allServerFeatures: ReachFeature[] = []
+
+/** One-time load of the full cached dataset from the server. */
+async function loadAllReaches() {
   if (!map) return
-  const b = map.getBounds()
-  const bbox = `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`
-  emit('bounds-updated', bbox)
   try {
-    const res = await fetch(`${apiBase}/api/v1/reaches/map?bbox=${bbox}`)
+    const res = await fetch(`${apiBase}/api/v1/reaches/map/all`)
     if (!res.ok) return
     const fc = await res.json()
-    const features: ReachFeature[] = fc.features ?? []
-    loadedFeatures = features
-    updateLayers(features)
-    emit('reaches-updated', features.map(f => ({
-      slug:      f.properties.slug,
-      name:      f.properties.name,
-      class_max: f.properties.class_max,
-    })))
+    allServerFeatures = fc.features ?? []
+    loadedFeatures = allServerFeatures
+    filterVisible()
   } catch (e) {
     console.warn('[ReachesMap] fetch:', e)
   }
+}
+
+/** Filter already-loaded features to the current viewport and update layers. */
+function filterVisible() {
+  if (!map || allServerFeatures.length === 0) return
+  const b = map.getBounds()
+  emit('bounds-updated', `${b.getWest()},${b.getSouth()},${b.getEast()},${b.getNorth()}`)
+  emit('zoom-updated', map.getZoom())
+
+  // Simple bbox test — avoids the PostGIS round-trip entirely.
+  const visible = allServerFeatures.filter(f => {
+    if (!f.geometry?.coordinates) return false
+    const coords: [number, number][] = f.geometry.type === 'LineString'
+      ? f.geometry.coordinates
+      : (f.geometry.coordinates as [number, number][][]).flat()
+    return coords.some(([lng, lat]) =>
+      lng >= b.getWest() && lng <= b.getEast() &&
+      lat >= b.getSouth() && lat <= b.getNorth()
+    )
+  })
+
+  updateLayers(visible)
+  emit('reaches-updated', visible.map(f => ({
+    slug:        f.properties.slug,
+    name:        displayName(f.properties),
+    class_max:   f.properties.class_max,
+    flow_status: f.properties.flow_status ?? 'unknown',
+    current_cfs: f.properties.current_cfs ?? null,
+  })))
+}
+
+function displayName(p: ReachFeature['properties']): string {
+  if (p.put_in_name && p.take_out_name) {
+    return p.common_name
+      ? `${p.put_in_name}–${p.take_out_name} (${p.common_name})`
+      : `${p.put_in_name}–${p.take_out_name}`
+  }
+  return p.common_name ?? p.name
 }
 
 function midpoint(f: ReachFeature): [number, number] | null {
@@ -287,7 +336,6 @@ function updateLayers(features: ReachFeature[]) {
 
   const lineFC = { type: 'FeatureCollection' as const, features: features as any[] }
 
-  // Build a point feature at the midpoint of each reach for the cluster source
   const markerFeatures = features.flatMap(f => {
     const mid = midpoint(f)
     if (!mid) return []
@@ -295,12 +343,7 @@ function updateLayers(features: ReachFeature[]) {
     return [{
       type: 'Feature' as const,
       geometry: { type: 'Point' as const, coordinates: mid },
-      properties: {
-        slug: f.properties.slug,
-        name: f.properties.name,
-        icon: diff.imageId,
-        label: diff.label,
-      },
+      properties: { slug: f.properties.slug, name: f.properties.name, icon: diff.imageId },
     }]
   })
   const markerFC = { type: 'FeatureCollection' as const, features: markerFeatures }
@@ -311,6 +354,7 @@ function updateLayers(features: ReachFeature[]) {
   } else {
     map.addSource('reaches', { type: 'geojson', data: lineFC })
 
+    // Glow — class V gets a red glow, others a softer color-matched glow
     map.addLayer({
       id: 'reach-glow', type: 'line', source: 'reaches',
       paint: {
@@ -328,56 +372,42 @@ function updateLayers(features: ReachFeature[]) {
       },
     })
 
-    // Hover highlight layer — initially shows nothing
+    // Hover / selected highlight layer
     map.addLayer({
       id: 'reach-highlight', type: 'line', source: 'reaches',
       filter: ['==', ['get', 'slug'], ''],
       paint: {
-        'line-color': '#facc15',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 4, 12, 8],
-        'line-opacity': 1,
+        // V-class reaches highlight red; others highlight yellow
+        'line-color': ['case',
+          ['>=', ['coalesce', ['get', 'class_max'], 0], 5.0], '#ef4444',
+          '#facc15',
+        ],
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 5, 12, 10],
+        'line-opacity': 0.95,
+        'line-blur': ['case',
+          ['>=', ['coalesce', ['get', 'class_max'], 0], 5.0], 3,
+          0,
+        ],
       },
     })
 
-    hoverPopup = new maplibregl.Popup({
-      closeButton: false, closeOnClick: false, offset: 8,
-      className: 'reach-map-tooltip',
+    // Click → navigate (no popup)
+    map.on('click', 'reach-lines', e => {
+      if (!map || !e.features?.length) return
+      const slug = (e.features[0].properties as any).slug as string
+      if (slug) emit('reach-click', slug)
     })
 
+    // Hover → sync sidebar
     map.on('mouseenter', 'reach-lines', e => {
       if (!map || !e.features?.length) return
       map.getCanvas().style.cursor = 'pointer'
-      if (map.getZoom() < TOOLTIP_MIN_ZOOM) return
-      if (clickPopup?.isOpen()) return
-      const p = e.features[0].properties as any
-      const cfs = p.current_cfs != null ? `${Number(p.current_cfs).toLocaleString()} cfs` : null
-      const age = p.last_reading_at ? relativeTime(p.last_reading_at) : null
-      const body = cfs ? `${cfs}${age ? ` · ${age}` : ''}` : 'No recent reading'
-      const statusColors: Record<string, string> = {
-        runnable: '#22c55e',   // fun/optimal — green
-        caution:  '#eab308',   // minimum/pushy — yellow
-        low:      '#ef4444',   // too_low — red
-        flood:    '#3b82f6',   // flood — blue
-        unknown:  'rgba(255,255,255,0.5)',
-      }
-      const bodyColor = statusColors[String(p.flow_status ?? 'unknown')] ?? 'rgba(255,255,255,0.5)'
-      const title = (p.put_in_name && p.take_out_name)
-        ? `${p.put_in_name} to ${p.take_out_name}${p.common_name ? ` (${p.common_name})` : ''}`
-        : (p.common_name ?? p.name)
-      hoverPopup!
-        .setLngLat(e.lngLat)
-        .setHTML(`<strong>${title}</strong><br/><span style="color:${bodyColor};font-size:0.85em">${body}</span>`)
-        .addTo(map)
+      const slug = (e.features[0].properties as any).slug as string
+      emit('hover-changed', slug)
     })
-    map.on('mousemove', 'reach-lines', e => { hoverPopup!.setLngLat(e.lngLat) })
     map.on('mouseleave', 'reach-lines', () => {
       if (map) map.getCanvas().style.cursor = ''
-      hoverPopup!.remove()
-    })
-    map.on('click', 'reach-lines', e => {
-      if (!map || !e.features?.length) return
-      hoverPopup!.remove()
-      showReachPopup(e.features[0].properties as any, e.lngLat)
+      emit('hover-changed', null)
     })
   }
 
@@ -395,7 +425,6 @@ function updateLayers(features: ReachFeature[]) {
     clusterRadius: 48,
   })
 
-  // Cluster bubble
   map.addLayer({
     id: 'diff-clusters', type: 'circle', source: 'diff-markers',
     filter: ['has', 'point_count'],
@@ -408,7 +437,6 @@ function updateLayers(features: ReachFeature[]) {
     },
   })
 
-  // Cluster count label
   map.addLayer({
     id: 'diff-cluster-count', type: 'symbol', source: 'diff-markers',
     filter: ['has', 'point_count'],
@@ -421,7 +449,6 @@ function updateLayers(features: ReachFeature[]) {
     paint: { 'text-color': '#fff' },
   })
 
-  // Individual difficulty icon
   map.addLayer({
     id: 'diff-points', type: 'symbol', source: 'diff-markers',
     filter: ['!', ['has', 'point_count']],
@@ -433,7 +460,6 @@ function updateLayers(features: ReachFeature[]) {
     },
   })
 
-  // Zoom into cluster on click
   map.on('click', 'diff-clusters', async e => {
     if (!map || !e.features?.length) return
     const clusterId = e.features[0].properties?.cluster_id as number
@@ -443,56 +469,11 @@ function updateLayers(features: ReachFeature[]) {
     map.flyTo({ center: coords, zoom })
   })
 
-  // diff-points click reserved for future use
-
   map.on('mouseenter', 'diff-clusters', () => { if (map) map.getCanvas().style.cursor = 'pointer' })
   map.on('mouseleave', 'diff-clusters', () => { if (map) map.getCanvas().style.cursor = '' })
   map.on('mouseenter', 'diff-points',   () => { if (map) map.getCanvas().style.cursor = 'pointer' })
   map.on('mouseleave', 'diff-points',   () => { if (map) map.getCanvas().style.cursor = '' })
 }
-
-// ── Click popup ───────────────────────────────────────────────────────────────
-
-let hoverPopup: maplibregl.Popup | null = null
-let clickPopup: maplibregl.Popup | null = null
-
-function showReachPopup(p: any, lngLat: maplibregl.LngLat) {
-  if (!map) return
-  clickPopup?.remove()
-
-  const esc = (s: string) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  const cfs  = p.current_cfs != null ? `${Number(p.current_cfs).toLocaleString()} cfs` : null
-  const age  = p.last_reading_at ? relativeTime(p.last_reading_at) : null
-  const flow = cfs ? `${cfs}${age ? ` · ${age}` : ''}` : 'No recent reading'
-
-  const displayName = (p.put_in_name && p.take_out_name)
-    ? `${p.put_in_name} to ${p.take_out_name}${p.common_name ? ` (${p.common_name})` : ''}`
-    : (p.common_name ?? p.name)
-  const riverLine = p.river_name ? `<p class="rcp-river">${esc(p.river_name)}</p>` : ''
-
-  const popup = new maplibregl.Popup({ offset: [0, -4], className: 'reach-click-popup' })
-    .setLngLat(lngLat)
-    .setHTML(`<div class="rcp-inner">
-      ${riverLine}<p class="rcp-name">${esc(displayName)}</p>
-      <p class="rcp-flow">${esc(flow)}</p>
-      <div class="rcp-actions">
-        <a class="rcp-btn rcp-btn-primary" href="/reaches/${esc(p.slug)}">View reach</a>
-        ${p.gauge_id ? `<button class="rcp-btn rcp-btn-ghost" data-gauge-id="${esc(p.gauge_id)}">+ Dashboard</button>` : ''}
-      </div>
-    </div>`)
-    .addTo(map)
-
-  clickPopup = popup
-
-  popup.getElement().querySelector('[data-gauge-id]')
-    ?.addEventListener('click', () => {
-      emit('gauge-add', p.gauge_id)
-      popup.remove()
-    })
-}
-
-// Only show hover tooltip when zoomed in enough that individual reaches are distinct
-const TOOLTIP_MIN_ZOOM = 10
 
 function relativeTime(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()
@@ -502,89 +483,20 @@ function relativeTime(iso: string): string {
   return `${Math.floor(m / 60)}h ${m % 60}m ago`
 }
 
+// Sync hover highlight from parent (sidebar hovering a row)
 watch(() => props.hoveredSlug, slug => {
   if (!map || !map.getLayer('reach-highlight')) return
   map.setFilter('reach-highlight', ['==', ['get', 'slug'], slug ?? ''])
 })
 
+// Line colors: I-II green, III blue, IV near-black, V red (expert warning)
+// Icon colors: all black for IV+V — only the line changes for V
 function difficultyColorExpr(): maplibregl.ExpressionSpecification {
   return ['step', ['coalesce', ['get', 'class_max'], 0],
-    '#16a34a',       // I–II  green
-    2.5, '#3b82f6',  // III   blue
-    4.0, '#111827',  // IV    black  (4.0, 4.5, 4.9 all stay here)
-    5.0, '#111827',  // V     black
+    '#16a34a',       // 0–2.4  I–II   green
+    2.5, '#3b82f6',  // 2.5–3.9 III   blue
+    4.0, '#1f2937',  // 4.0–4.9 IV    near-black
+    5.0, '#dc2626',  // 5.0+    V     red
   ] as any
 }
 </script>
-
-<style>
-.reach-map-tooltip .maplibregl-popup-content {
-  background: #1f2937;
-  color: #f9fafb;
-  border-radius: 6px !important;
-  padding: 6px 10px !important;
-  font-family: system-ui, sans-serif;
-  font-size: 0.8rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
-}
-.reach-map-tooltip .maplibregl-popup-tip {
-  border-bottom-color: #1f2937 !important;
-}
-.reach-click-popup .maplibregl-popup-content {
-  border-radius: 10px !important;
-  padding: 0 !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important;
-  min-width: 180px;
-}
-.rcp-inner {
-  padding: 10px 14px 10px;
-  font-family: system-ui, sans-serif;
-}
-.rcp-river {
-  font-size: 0.7rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #3b82f6;
-  margin: 0 0 2px;
-}
-.rcp-name {
-  font-weight: 600;
-  font-size: 0.875rem;
-  color: #111827;
-  margin: 0 0 2px;
-}
-.rcp-flow {
-  font-size: 0.75rem;
-  color: #6b7280;
-  margin: 0 0 10px;
-}
-.rcp-actions {
-  display: flex;
-  gap: 6px;
-}
-.rcp-btn {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  padding: 5px 10px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  text-decoration: none;
-  border: none;
-  transition: background 0.1s, color 0.1s;
-}
-.rcp-btn-primary {
-  background: #2563eb;
-  color: #fff;
-}
-.rcp-btn-primary:hover { background: #1d4ed8; }
-.rcp-btn-ghost {
-  background: #f3f4f6;
-  color: #374151;
-}
-.rcp-btn-ghost:hover { background: #e5e7eb; }
-</style>

@@ -15,13 +15,12 @@ import (
 // It maps directly onto a row in the flow_ranges table.
 type FlowRangeSeed struct {
 	// Label must be one of the DB CHECK values:
-	//   too_low | minimum | fun | optimal | pushy | high | flood
+	//   below_recommended | runnable | above_recommended
 	//
 	// Mapping to user-visible flowStatus:
-	//   too_low              → "Too Low"     (red)
-	//   minimum / pushy      → "Caution"     (yellow)
-	//   fun / optimal        → "Runnable"    (green)
-	//   high / flood         → "Flood Stage" (red)
+	//   below_recommended → "Too Low"      (red)
+	//   runnable          → "Runnable"     (green)
+	//   above_recommended → "Flood Stage"  (blue)
 	Label     string   `json:"label"`
 	MinCFS    *float64 `json:"min_cfs"`    // null = no lower bound (only valid for too_low)
 	MaxCFS    *float64 `json:"max_cfs"`    // null = no upper bound (only valid for flood/high)
@@ -114,14 +113,14 @@ Flow ranges define the cfs (cubic feet per second) bands at which a whitewater r
 
 You will output a JSON array of flow range objects. Each object represents one flow band for the gauge.
 
-LABELS — use EXACTLY these values (they map to the database CHECK constraint):
-  "too_low"  — below minimum runnable. Boat dragging, exposed rocks. Do not run.
-  "minimum"  — barely runnable. Scratchy, bony, or pushy depending on character. Proceed with caution.
-  "fun"      — solid, enjoyable flows. The run is in. Most paddlers enjoy this range.
-  "optimal"  — prime flows. Classic level. The run shines here.
-  "pushy"    — high, fast, pushy. Runnable but difficulty has increased. Know your limits.
-  "high"     — very high flows. Significantly elevated class rating, some features may be washed out or dangerous.
-  "flood"    — flood stage. Do not run. Strainer hazard, undefined hydraulics, dangerous.
+LABELS — use EXACTLY these three values (they map to the database CHECK constraint):
+  "below_recommended" — below minimum recommended flow. Bony, boat-dragging, exposed rocks. Do not run or high portage risk.
+  "runnable"          — within the recommended runnable window. The run is in. Includes the full range from minimum to pushy optimal.
+  "above_recommended" — above recommended flows. Significantly elevated hazard: strainer risk, washed-out features, flood conditions.
+
+Each reach gets exactly 2–3 bands:
+  - Always include "below_recommended" (with min_cfs: null) and "above_recommended" (with max_cfs: null).
+  - Always include at least one "runnable" band. If you have craft-specific information, you may emit separate "runnable" rows for different craft types (e.g., kayak vs raft have different minimums). Otherwise emit one "runnable" band with craft_type "general".
 
 CRAFT TYPES:
   "general"  — applies to all craft, or you do not have craft-specific info (most common)
@@ -149,11 +148,12 @@ SOURCE URLS:
 
 IMPORTANT:
   - min_cfs and max_cfs define the band: the label applies when current_cfs >= min_cfs AND current_cfs < max_cfs.
-  - "too_low" has no lower bound — set min_cfs to null.
-  - "flood" has no upper bound — set max_cfs to null.
-  - Bands should be contiguous but may have small gaps if the transition is genuinely ambiguous.
+  - "below_recommended" has no lower bound — set min_cfs to null.
+  - "above_recommended" has no upper bound — set max_cfs to null.
+  - The max_cfs of "below_recommended" should equal the min_cfs of "runnable".
+  - The max_cfs of "runnable" should equal the min_cfs of "above_recommended".
   - class_modifier: how much the difficulty shifts at this band relative to the listed class rating.
-    E.g. if the reach is Class IV at optimal and becomes Class IV+ at pushy flows, set class_modifier to +0.5.
+    E.g. if the reach is Class IV at optimal and becomes Class IV+ at high flows, set class_modifier to +0.5 on above_recommended.
     Leave null if you do not have reliable information.
 
 Respond ONLY with a valid JSON array. No markdown fences, no explanation, no preamble.`

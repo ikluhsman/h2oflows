@@ -20,7 +20,6 @@
           </svg>
           <span class="text-base font-bold tracking-tight">H2OFlows</span>
         </NuxtLink>
-        <span class="hidden sm:inline text-xs text-gray-400 ml-1">Colorado · Live streamflow</span>
       </div>
       <nav class="flex items-center gap-2">
         <button
@@ -37,15 +36,82 @@
       </nav>
     </header>
 
-    <!-- Map — fills remaining height -->
-    <div class="flex-1 overflow-hidden">
-      <ClientOnly>
-        <ReachesMap
-          @reaches-updated="onReachesUpdated"
-          @bounds-updated="onBoundsUpdated"
-          @gauge-add="addGaugeById"
-        />
-      </ClientOnly>
+    <!-- Map + Sidebar -->
+    <div class="flex-1 overflow-hidden flex">
+
+      <!-- Map -->
+      <div class="flex-1 min-w-0 relative">
+        <ClientOnly>
+          <ReachesMap
+            :hovered-slug="hoveredSlug"
+            @reaches-updated="onReachesUpdated"
+            @bounds-updated="onBoundsUpdated"
+            @zoom-updated="onZoomUpdated"
+            @hover-changed="onMapHover"
+            @reach-click="onReachClick"
+          />
+        </ClientOnly>
+      </div>
+
+      <!-- Reach sidebar -->
+      <aside class="w-72 shrink-0 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col overflow-hidden">
+
+        <!-- Zoom-out prompt -->
+        <div v-if="mapZoom < SIDEBAR_ZOOM" class="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
+          <svg class="w-8 h-8 text-gray-300 dark:text-gray-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            <path d="M11 8v6M8 11h6" stroke-linecap="round"/>
+          </svg>
+          <p class="text-sm text-gray-400 leading-relaxed">Zoom in to display<br>river details</p>
+        </div>
+
+        <!-- Reach list -->
+        <template v-else>
+          <div class="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+              {{ mapReaches.length }} reach{{ mapReaches.length === 1 ? '' : 'es' }} in view
+            </span>
+          </div>
+
+          <div class="flex-1 overflow-y-auto">
+            <div
+              v-for="r in mapReaches"
+              :key="r.slug"
+              :ref="(el) => setReachRef(r.slug, el as HTMLElement | null)"
+              class="px-3 py-2.5 border-b border-gray-50 dark:border-gray-900 cursor-pointer transition-colors"
+              :class="hoveredSlug === r.slug
+                ? 'bg-blue-50 dark:bg-blue-950/40'
+                : 'hover:bg-gray-50 dark:hover:bg-gray-900/60'"
+              @mouseenter="hoveredSlug = r.slug"
+              @mouseleave="hoveredSlug = null"
+              @click="navigateTo(`/reaches/${r.slug}`)"
+            >
+              <div class="flex items-center gap-2 min-w-0">
+                <!-- Flow status dot -->
+                <span
+                  class="w-2 h-2 rounded-full shrink-0"
+                  :style="{ background: flowStatusColor(r.flow_status) }"
+                />
+                <span class="text-sm font-medium truncate text-gray-800 dark:text-gray-200">{{ r.name }}</span>
+              </div>
+              <div class="flex items-center justify-between mt-0.5 pl-4">
+                <span class="text-xs text-gray-400">{{ classLabel(r.class_max) }}</span>
+                <span
+                  v-if="r.current_cfs != null"
+                  class="text-xs font-medium tabular-nums"
+                  :style="{ color: flowStatusColor(r.flow_status) }"
+                >{{ r.current_cfs.toLocaleString() }} cfs</span>
+                <span v-else class="text-xs text-gray-300 dark:text-gray-600">no data</span>
+              </div>
+            </div>
+
+            <!-- Empty inside threshold -->
+            <div v-if="mapReaches.length === 0" class="flex items-center justify-center py-12 text-xs text-gray-400">
+              No reaches found in this area
+            </div>
+          </div>
+        </template>
+      </aside>
     </div>
 
     <!-- AI search modal -->
@@ -63,7 +129,6 @@
         @click.self="searchOpen = false"
       >
         <div class="w-full max-w-xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-          <!-- Search input -->
           <form class="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800" @submit.prevent="askQuestion">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             <input
@@ -94,17 +159,23 @@
             </button>
           </form>
 
-          <!-- Answer -->
-          <div v-if="searchResult" class="px-4 py-4">
-            <div v-if="searchResult.reach_name" class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wide text-blue-500">{{ searchResult.reach_name }}</span>
-              <NuxtLink
-                :to="`/reaches/${searchResult.reach_slug}`"
-                class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                @click="searchOpen = false"
-              >View reach →</NuxtLink>
+          <div v-if="searchResult" class="px-4 py-4 space-y-3 max-h-96 overflow-y-auto">
+            <div
+              v-for="result in (searchResult.results ?? [])"
+              :key="result.reach_slug"
+              class="rounded-lg border border-gray-100 dark:border-gray-800 p-3 space-y-1"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-semibold uppercase tracking-wide text-blue-500">{{ result.reach_name }}</span>
+                <NuxtLink
+                  :to="`/reaches/${result.reach_slug}`"
+                  class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0"
+                  @click="searchOpen = false"
+                >View reach →</NuxtLink>
+              </div>
+              <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{{ result.answer }}</p>
             </div>
-            <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{{ searchResult.answer }}</p>
+            <p v-if="!searchResult.results?.length && searchResult.answer" class="text-sm text-gray-500 leading-relaxed">{{ searchResult.answer }}</p>
           </div>
           <p v-else-if="!searching && !searchResult" class="px-4 py-3 text-xs text-gray-400">
             Try: "What's Foxton like at 300 cfs?" or "Best beginner runs near Denver"
@@ -123,10 +194,10 @@
 
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted } from 'vue'
-import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
+import type { ReachListItem } from '~/components/map/ReachesMap.vue'
 
 const { apiBase } = useRuntimeConfig().public
-const store = useWatchlistStore()
+const router = useRouter()
 
 const showDemoBanner = ref(false)
 onMounted(() => {
@@ -137,40 +208,67 @@ function dismissBanner() {
   localStorage.setItem('demo-banner-dismissed', 'true')
 }
 
-// ── Map callbacks ─────────────────────────────────────────────────────────────
+// ── Sidebar ───────────────────────────────────────────────────────────────────
 
-function onReachesUpdated(_reaches: { slug: string; name: string; class_max: number | null }[]) {
-  // reserved for future sidebar / stats
+// Zoom level at which the sidebar shows reach details (~state-sized viewport)
+const SIDEBAR_ZOOM = 6.5
+
+const mapZoom    = ref(4)
+const mapReaches = ref<ReachListItem[]>([])
+const hoveredSlug = ref<string | null>(null)
+
+// DOM ref map for scrolling sidebar to hovered reach
+const reachRefs = new Map<string, HTMLElement>()
+function setReachRef(slug: string, el: HTMLElement | null) {
+  if (el) reachRefs.set(slug, el)
+  else    reachRefs.delete(slug)
 }
-function onBoundsUpdated(_bbox: string) {
-  // reserved
+
+function onReachesUpdated(reaches: ReachListItem[]) {
+  mapReaches.value = reaches
+}
+function onBoundsUpdated(_bbox: string) {}
+function onZoomUpdated(zoom: number) {
+  mapZoom.value = zoom
 }
 
-// ── Add gauge from map popup ──────────────────────────────────────────────────
+// When the map emits a hover (user moused over a line), update hoveredSlug
+// and scroll the sidebar to that row
+function onMapHover(slug: string | null) {
+  hoveredSlug.value = slug
+  if (slug) {
+    nextTick(() => {
+      reachRefs.get(slug)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }
+}
 
-async function addGaugeById(gaugeId: string) {
-  try {
-    const res = await fetch(`${apiBase}/api/v1/gauges/batch?ids=${gaugeId}`)
-    if (!res.ok) return
-    const data = await res.json()
-    const f = data.features?.[0]
-    if (!f) return
-    const p = f.properties
-    const coords = f.geometry?.coordinates as [number, number] | undefined
-    store.addGauge({
-      id: p.id, externalId: p.external_id, source: p.source,
-      name: p.name ?? null, featured: p.featured ?? false,
-      reachId: p.reach_id ?? null, reachName: p.reach_name ?? null,
-      reachNames: p.reach_names ?? [], reachSlug: p.reach_slug ?? null,
-      reachSlugs: p.reach_slugs ?? [], reachRelationship: p.reach_relationship ?? null,
-      pollTier: p.poll_tier, watershedName: p.watershed_name ?? null,
-      basinName: p.basin_name ?? null, riverName: p.river_name ?? null,
-      stateAbbr: p.state_abbr ?? null,
-      lng: coords?.[0] ?? null, lat: coords?.[1] ?? null,
-      currentCfs: p.current_cfs ?? null, flowStatus: p.flow_status ?? 'unknown',
-      flowBandLabel: p.flow_band_label ?? null, lastReadingAt: p.last_reading_at ?? null,
-    } satisfies Omit<WatchedGauge, 'watchState' | 'activeSince'>)
-  } catch { /* non-fatal */ }
+function onReachClick(slug: string) {
+  router.push(`/reaches/${slug}`)
+}
+
+// Flow status colors (match the gauge color scheme)
+function flowStatusColor(status: string): string {
+  const map: Record<string, string> = {
+    runnable: '#22c55e',
+    caution:  '#eab308',
+    low:      '#ef4444',
+    flood:    '#3b82f6',
+  }
+  return map[status] ?? '#9ca3af'
+}
+
+// Difficulty label for sidebar rows
+function classLabel(classMax: number | null): string {
+  if (classMax == null) return 'Unknown'
+  const labels: Record<number, string> = {
+    0: 'Class I', 1: 'Class I', 1.5: 'Class I+',
+    2: 'Class II', 2.5: 'Class II+',
+    3: 'Class III', 3.5: 'Class III+',
+    4: 'Class IV', 4.5: 'Class IV+',
+    5: 'Class V', 5.5: 'Class V+', 6: 'Class VI',
+  }
+  return labels[classMax] ?? `Class ${classMax}`
 }
 
 // ── AI search ─────────────────────────────────────────────────────────────────
@@ -180,7 +278,7 @@ const searchInputRef = ref<HTMLInputElement>()
 const searchQuery = ref('')
 const searching   = ref(false)
 const searchError = ref('')
-const searchResult = ref<{ answer: string; reach_slug?: string; reach_name?: string } | null>(null)
+const searchResult = ref<{ results?: { answer: string; reach_slug: string; reach_name: string }[]; answer?: string } | null>(null)
 
 watch(searchOpen, async (open) => {
   if (open) {

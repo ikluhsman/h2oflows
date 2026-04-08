@@ -13,6 +13,39 @@
       </div>
     </header>
 
+    <!-- Upstream / downstream pagination -->
+    <div v-if="upstreamReach || downstreamReach" class="border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950">
+      <div class="max-w-5xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
+        <!-- Upstream (left) -->
+        <NuxtLink
+          v-if="upstreamReach"
+          :to="`/reaches/${upstreamReach.slug}`"
+          class="flex items-center gap-1.5 min-w-0 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-gray-400 group-hover:text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          <div class="min-w-0">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">upstream</div>
+            <div class="text-sm font-medium truncate">{{ upstreamReach.name }}</div>
+          </div>
+        </NuxtLink>
+        <div v-else class="flex-1" />
+
+        <!-- Downstream (right) -->
+        <NuxtLink
+          v-if="downstreamReach"
+          :to="`/reaches/${downstreamReach.slug}`"
+          class="flex items-center gap-1.5 min-w-0 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group text-right"
+        >
+          <div class="min-w-0">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">downstream</div>
+            <div class="text-sm font-medium truncate">{{ downstreamReach.name }}</div>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-gray-400 group-hover:text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </NuxtLink>
+        <div v-else class="flex-1" />
+      </div>
+    </div>
+
     <!-- Admin bar -->
     <div v-if="reach" class="shrink-0 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60">
       <div class="max-w-5xl mx-auto px-3 py-2 flex items-center gap-4 flex-wrap">
@@ -116,22 +149,64 @@
         </div>
       </section>
 
-      <!-- 48h graph + current CFS -->
-      <section v-if="reach.gauge.id" class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">48-Hour Flow</h2>
-        <GaugeGraph :gauge-id="reach.gauge.id" :current-cfs="reach.gauge.current_cfs" />
-        <!-- Current reading + status pill below graph -->
-        <div v-if="reach.gauge.current_cfs != null" class="mt-3 flex items-end gap-2 border-t border-gray-100 dark:border-gray-800 pt-3">
-          <span class="text-3xl font-bold tabular-nums" :class="cfsClass">
-            {{ reach.gauge.current_cfs.toLocaleString() }}
-          </span>
-          <span class="text-gray-500 mb-0.5">cfs</span>
-          <UBadge v-if="reach.gauge.flow_status" :color="statusColor" variant="subtle" size="sm" class="mb-0.5">{{ statusLabel }}</UBadge>
-          <span v-if="reach.gauge.last_reading_at" class="text-xs text-gray-400 mb-1">
-            · {{ lastReadingRelative }}
-          </span>
+      <!-- Gauges — one card per gauge linked to this reach -->
+      <section v-if="allGauges.length > 0" class="space-y-4">
+        <div
+          v-for="g in allGauges"
+          :key="g.id"
+          class="border border-gray-200 dark:border-gray-700 rounded-xl p-4"
+        >
+          <!-- Gauge header: name + relationship label + dashboard button -->
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="min-w-0">
+              <div class="text-xs text-gray-400 uppercase tracking-wide mb-0.5">
+                {{ gaugeRelLabel(g.reach_relationship) }}
+              </div>
+              <div class="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">
+                {{ g.name ?? g.external_id }}
+              </div>
+              <div class="text-xs text-gray-400 mt-0.5">
+                {{ g.source?.toUpperCase() }} · {{ g.external_id }}
+              </div>
+            </div>
+
+            <!-- Add / remove dashboard button -->
+            <button
+              v-if="!onDashboard(g.id)"
+              class="shrink-0 flex items-center gap-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              @click="addToDashboard(g)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Dashboard
+            </button>
+            <button
+              v-else
+              class="shrink-0 flex items-center gap-1.5 text-xs rounded-lg border border-emerald-300 dark:border-emerald-700 px-2.5 py-1.5 text-emerald-600 dark:text-emerald-400 hover:border-red-300 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+              @click="removeFromDashboard(g.id)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              On dashboard
+            </button>
+          </div>
+
+          <!-- Graph -->
+          <GaugeGraph :gauge-id="g.id" :current-cfs="g.current_cfs" />
+
+          <!-- CFS + status below graph -->
+          <div v-if="g.current_cfs != null" class="mt-3 flex items-end gap-2 border-t border-gray-100 dark:border-gray-800 pt-3">
+            <span class="text-3xl font-bold tabular-nums" :class="cfsColorClass(g.flow_status)">
+              {{ g.current_cfs.toLocaleString() }}
+            </span>
+            <span class="text-gray-500 mb-0.5">cfs</span>
+            <UBadge v-if="g.flow_status && g.flow_status !== 'unknown'" :color="flowStatusColor(g.flow_status)" variant="subtle" size="sm" class="mb-0.5">
+              {{ flowStatusLabel(g.flow_status) }}
+            </UBadge>
+            <span v-if="g.last_reading_at" class="text-xs text-gray-400 mb-1">
+              · {{ relativeTime(g.last_reading_at) }}
+            </span>
+          </div>
+          <div v-else class="mt-3 text-gray-400 text-sm border-t border-gray-100 dark:border-gray-800 pt-3">No recent reading</div>
         </div>
-        <div v-else class="mt-3 text-gray-400 text-sm border-t border-gray-100 dark:border-gray-800 pt-3">No recent gauge reading</div>
       </section>
 
       <!-- Reach map -->
@@ -144,8 +219,7 @@
             :centerline="displayCenterline"
             :rapids="reach.rapids"
             :access="reach.access"
-            :gauge-lng="reach.gauge.lng"
-            :gauge-lat="reach.gauge.lat"
+            :gauges="allGauges"
           />
         </ClientOnly>
       </section>
@@ -263,20 +337,18 @@
       </section>
 
 
-      <!-- Related reaches -->
-      <section v-if="reach.related?.length > 0">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Related Reaches</h2>
+      <!-- Tributary / other related reaches -->
+      <section v-if="tributaryReaches.length > 0">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Tributaries & Related</h2>
         <div class="flex flex-wrap gap-2">
           <NuxtLink
-            v-for="rel in reach.related"
+            v-for="rel in tributaryReaches"
             :key="rel.slug"
             :to="`/reaches/${rel.slug}`"
             class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 px-3 py-2 transition-colors"
           >
             <span class="text-xs text-gray-400">
-              <template v-if="rel.relationship === 'upstream'">↑</template>
-              <template v-else-if="rel.relationship === 'downstream'">↓</template>
-              <template v-else-if="rel.relationship === 'tributary'">⤷</template>
+              <template v-if="rel.relationship === 'tributary'">⤷</template>
               <template v-else>↔</template>
             </span>
             <span class="text-sm font-medium">{{ rel.name }}</span>
@@ -285,11 +357,6 @@
         </div>
       </section>
 
-      <!-- Gauge attribution -->
-      <section v-if="reach.gauge.external_id" class="text-xs text-gray-400">
-        Flow data: {{ reach.gauge.source?.toUpperCase() }} gauge {{ reach.gauge.external_id }}
-        <span v-if="reach.gauge.name"> · {{ reach.gauge.name }}</span>
-      </section>
 
     </main>
   </div>
@@ -297,9 +364,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useWatchlistStore } from '~/stores/watchlist'
 
 const route  = useRoute()
 const config = useRuntimeConfig()
+const store  = useWatchlistStore()
 
 // ---- Data -------------------------------------------------------------------
 
@@ -330,6 +399,20 @@ function romanClass(n: number): string {
   }
   return map[n] ?? String(n)
 }
+
+// ---- Related reach navigation -----------------------------------------------
+
+const upstreamReach = computed(() =>
+  (reach.value as any)?.related?.find((r: any) => r.relationship === 'upstream') ?? null
+)
+const downstreamReach = computed(() =>
+  (reach.value as any)?.related?.find((r: any) => r.relationship === 'downstream') ?? null
+)
+const tributaryReaches = computed(() =>
+  ((reach.value as any)?.related ?? []).filter(
+    (r: any) => r.relationship !== 'upstream' && r.relationship !== 'downstream'
+  )
+)
 
 const classLabel = computed(() => {
   const r = reach.value
@@ -415,6 +498,103 @@ const lastReadingRelative = computed(() => {
   if (m < 60) return `${m}m ago`
   return `${Math.floor(m / 60)}h ${m % 60}m ago`
 })
+
+// ---- Multi-gauge helpers ----------------------------------------------------
+
+// All gauges for this reach: the API returns a `gauges` array with primary first,
+// then any secondary gauges linked via reach_id.
+const allGauges = computed<any[]>(() => {
+  const r = reach.value as any
+  if (!r) return []
+  // Prefer the flat `gauges` array (new field). Fall back to wrapping the primary gauge.
+  if (Array.isArray(r.gauges) && r.gauges.length > 0) return r.gauges
+  if (r.gauge?.id) return [r.gauge]
+  return []
+})
+
+function gaugeRelLabel(rel: string | null | undefined): string {
+  switch (rel) {
+    case 'upstream_indicator':   return 'Upstream gauge'
+    case 'downstream_indicator': return 'Downstream gauge'
+    case 'tributary':            return 'Tributary gauge'
+    case 'primary':
+    default:                     return 'Flow gauge'
+  }
+}
+
+function onDashboard(gaugeId: string): boolean {
+  return store.gauges.some(g => g.id === gaugeId)
+}
+
+function addToDashboard(g: any) {
+  store.addGauge({
+    id:               g.id,
+    externalId:       g.external_id,
+    source:           g.source ?? '',
+    name:             g.name ?? null,
+    reachId:          (reach.value as any)?.id ?? null,
+    reachName:        (reach.value as any)?.common_name ?? (reach.value as any)?.name ?? null,
+    reachNames:       [],
+    reachSlug:        (reach.value as any)?.slug ?? null,
+    reachSlugs:       [],
+    reachRelationship: g.reach_relationship ?? 'primary',
+    featured:         g.featured ?? false,
+    pollTier:         g.featured ? 'trusted' : 'cold',
+    watershedName:    (reach.value as any)?.watershed_name ?? null,
+    basinName:        null,
+    riverName:        (reach.value as any)?.river_name ?? null,
+    stateAbbr:        null,
+    lat:              g.lat ?? null,
+    lng:              g.lng ?? null,
+    currentCfs:       g.current_cfs ?? null,
+    flowStatus:       g.flow_status ?? 'unknown',
+    flowBandLabel:    null,
+    lastReadingAt:    g.last_reading_at ?? null,
+  })
+}
+
+function removeFromDashboard(gaugeId: string) {
+  store.removeGauge(gaugeId)
+}
+
+function flowStatusColor(status: string): string {
+  switch (status) {
+    case 'runnable': return 'success'
+    case 'caution':  return 'warning'
+    case 'low':
+    case 'flood':    return 'error'
+    default:         return 'neutral'
+  }
+}
+
+function flowStatusLabel(status: string): string {
+  switch (status) {
+    case 'runnable': return 'Runnable'
+    case 'caution':  return 'Caution'
+    case 'low':      return 'Too Low'
+    case 'flood':    return 'Flood Stage'
+    default:         return 'Unknown'
+  }
+}
+
+function cfsColorClass(status: string): string {
+  switch (status) {
+    case 'runnable': return 'text-emerald-500'
+    case 'caution':  return 'text-yellow-500'
+    case 'low':
+    case 'flood':    return 'text-red-500'
+    default:         return 'text-gray-300'
+  }
+}
+
+function relativeTime(t: string | null): string {
+  if (!t) return ''
+  const ms = Date.now() - new Date(t).getTime()
+  const m = Math.floor(ms / 60_000)
+  if (m < 1)  return 'just now'
+  if (m < 60) return `${m}m ago`
+  return `${Math.floor(m / 60)}h ${m % 60}m ago`
+}
 
 // ---- Flow band helpers -------------------------------------------------------
 

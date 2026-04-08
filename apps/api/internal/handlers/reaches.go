@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -16,14 +17,75 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// reachMapCache holds a pre-warmed snapshot of all reach features for the
+// /reaches/map/all endpoint. This lets the frontend load the full dataset
+// in one request at startup and filter client-side on every viewport change,
+// eliminating per-pan/zoom round-trips to the database.
+type reachMapCache struct {
+	mu       sync.RWMutex
+	payload  []byte    // marshalled GeoJSON FeatureCollection
+	warmedAt time.Time
+}
+
+func (c *reachMapCache) set(payload []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.payload = payload
+	c.warmedAt = time.Now()
+}
+
+func (c *reachMapCache) get() ([]byte, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if len(c.payload) == 0 {
+		return nil, false
+	}
+	return c.payload, true
+}
+
 // ReachHandler handles reach-related HTTP routes.
 type ReachHandler struct {
 	db    *pgxpool.Pool
 	asker *ai.ReachAsker
+	cache *reachMapCache
 }
 
 func NewReachHandler(db *pgxpool.Pool, asker *ai.ReachAsker) *ReachHandler {
-	return &ReachHandler{db: db, asker: asker}
+	return &ReachHandler{db: db, asker: asker, cache: &reachMapCache{}}
+}
+
+// WarmCache fetches all reach features (no bbox filter) and stores the result
+// in the in-memory cache. Call once at server startup, then every poll cycle.
+func (h *ReachHandler) WarmCache(ctx context.Context) {
+	features, err := h.queryAllFeatures(ctx)
+	if err != nil {
+		log.Printf("reach cache: warm failed: %v", err)
+		return
+	}
+	payload, err := json.Marshal(newFeatureCollection(features))
+	if err != nil {
+		log.Printf("reach cache: marshal failed: %v", err)
+		return
+	}
+	h.cache.set(payload)
+	log.Printf("reach cache: warmed %d features", len(features))
+}
+
+// StartCacheRefresh launches a background goroutine that re-warms the cache
+// on the given interval (typically the same as the gauge poll interval).
+func (h *ReachHandler) StartCacheRefresh(ctx context.Context, interval time.Duration) {
+	go func() {
+		t := time.NewTicker(interval)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				h.WarmCache(ctx)
+			}
+		}
+	}()
 }
 
 // Map handles GET /api/v1/reaches/map
@@ -91,12 +153,16 @@ func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
 			g.gauge_notes,
 			g.info_links,
 			CASE
-				WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
-				WHEN fr.label IN ('fun', 'optimal')       THEN 'runnable'
-				WHEN fr.label IN ('minimum', 'pushy')     THEN 'caution'
-				WHEN fr.label = 'too_low'                 THEN 'low'
-				WHEN fr.label IN ('high', 'flood')        THEN 'flood'
-				ELSE                                           'unknown'
+				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
+				WHEN fr.label = 'runnable'                 THEN 'runnable'
+				WHEN fr.label = 'below_recommended'        THEN 'caution'
+				WHEN fr.label = 'above_recommended'        THEN 'flood'
+				-- legacy labels (pre-migration 034) kept for any un-migrated rows
+				WHEN fr.label IN ('fun', 'optimal')        THEN 'runnable'
+				WHEN fr.label IN ('minimum', 'pushy')      THEN 'caution'
+				WHEN fr.label = 'too_low'                  THEN 'low'
+				WHEN fr.label IN ('high', 'flood')         THEN 'flood'
+				ELSE                                            'unknown'
 			END AS flow_status
 		FROM reaches r
 		LEFT JOIN gauges g
@@ -211,6 +277,152 @@ func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, newFeatureCollection(features))
 }
 
+// MapAll handles GET /api/v1/reaches/map/all
+//
+// Returns the full reach GeoJSON dataset (no bbox filter). Served from an
+// in-memory cache warmed at startup and refreshed every poll cycle. The
+// frontend loads this once and filters client-side on every viewport change,
+// eliminating per-pan/zoom round-trips.
+func (h *ReachHandler) MapAll(w http.ResponseWriter, r *http.Request) {
+	if payload, ok := h.cache.get(); ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=60")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(payload)
+		return
+	}
+	// Cache cold (first request before WarmCache finishes) — query directly.
+	features, err := h.queryAllFeatures(r.Context())
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "query failed")
+		return
+	}
+	jsonResponse(w, http.StatusOK, newFeatureCollection(features))
+}
+
+// queryAllFeatures runs the reach-map query without a bbox filter and returns
+// the raw Feature slice. Shared by MapAll and WarmCache.
+func (h *ReachHandler) queryAllFeatures(ctx context.Context) ([]Feature, error) {
+	rows, err := h.db.Query(ctx, `
+		WITH latest_reading AS (
+			SELECT DISTINCT ON (gauge_id)
+				gauge_id, value
+			FROM gauge_readings
+			WHERE timestamp > NOW() - INTERVAL '48 hours'
+			ORDER BY gauge_id, timestamp DESC
+		)
+		SELECT
+			r.id, r.name, r.slug,
+			r.river_name, r.common_name, r.put_in_name, r.take_out_name,
+			r.class_min,
+			COALESCE(
+				(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL),
+				r.class_max
+			) AS class_max,
+			r.character, r.length_mi,
+			ST_AsGeoJSON(r.centerline::geometry)::json AS centerline,
+			ST_X(r.put_in::geometry)   AS put_in_lng,
+			ST_Y(r.put_in::geometry)   AS put_in_lat,
+			ST_X(r.take_out::geometry) AS take_out_lng,
+			ST_Y(r.take_out::geometry) AS take_out_lat,
+			lr.value                   AS current_cfs,
+			g.last_reading_at,
+			fr.label                   AS flow_label,
+			g.id                       AS gauge_id,
+			g.reach_relationship,
+			g.featured                 AS gauge_trusted,
+			g.gauge_notes,
+			g.info_links,
+			CASE
+				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
+				WHEN fr.label = 'runnable'                 THEN 'runnable'
+				WHEN fr.label = 'below_recommended'        THEN 'caution'
+				WHEN fr.label = 'above_recommended'        THEN 'flood'
+				WHEN fr.label IN ('fun', 'optimal')        THEN 'runnable'
+				WHEN fr.label IN ('minimum', 'pushy')      THEN 'caution'
+				WHEN fr.label = 'too_low'                  THEN 'low'
+				WHEN fr.label IN ('high', 'flood')         THEN 'flood'
+				ELSE                                            'unknown'
+			END AS flow_status
+		FROM reaches r
+		LEFT JOIN gauges g ON g.id = r.primary_gauge_id
+		LEFT JOIN latest_reading lr ON lr.gauge_id = g.id
+		LEFT JOIN LATERAL (
+			SELECT label FROM flow_ranges
+			WHERE gauge_id = g.id
+			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
+			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
+			LIMIT 1
+		) fr ON TRUE
+		WHERE r.centerline IS NOT NULL
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	features := make([]Feature, 0)
+	for rows.Next() {
+		var (
+			id, name, slug                    string
+			riverName, commonName             *string
+			putInName, takeOutName            *string
+			classMin, classMax                *float64
+			character                         *string
+			lengthMi                          *float64
+			centerlineJSON                    []byte
+			putInLng, putInLat                *float64
+			takeOutLng, takeOutLat            *float64
+			currentCFS                        *float64
+			lastReadingAt                     *time.Time
+			flowLabel, gaugeID                *string
+			reachRelationship                 *string
+			gaugeTrusted                      *bool
+			gaugeNotes                        *string
+			infoLinks                         []byte
+			flowStatus                        string
+		)
+		if err := rows.Scan(
+			&id, &name, &slug,
+			&riverName, &commonName, &putInName, &takeOutName,
+			&classMin, &classMax, &character, &lengthMi,
+			&centerlineJSON,
+			&putInLng, &putInLat, &takeOutLng, &takeOutLat,
+			&currentCFS, &lastReadingAt, &flowLabel, &gaugeID,
+			&reachRelationship, &gaugeTrusted, &gaugeNotes, &infoLinks,
+			&flowStatus,
+		); err != nil {
+			continue
+		}
+		var putIn, takeOut *[2]float64
+		if putInLng != nil && putInLat != nil {
+			putIn = &[2]float64{*putInLng, *putInLat}
+		}
+		if takeOutLng != nil && takeOutLat != nil {
+			takeOut = &[2]float64{*takeOutLng, *takeOutLat}
+		}
+		features = append(features, Feature{
+			Type:     "Feature",
+			Geometry: rawGeometry(centerlineJSON),
+			Properties: map[string]any{
+				"id": id, "name": name, "slug": slug,
+				"river_name": riverName, "common_name": commonName,
+				"put_in_name": putInName, "take_out_name": takeOutName,
+				"class_min": classMin, "class_max": classMax,
+				"character": character, "length_mi": lengthMi,
+				"put_in": putIn, "take_out": takeOut,
+				"current_cfs": currentCFS, "last_reading_at": lastReadingAt,
+				"flow_label": flowLabel, "gauge_id": gaugeID,
+				"flow_status": flowStatus, "flow_color": flowColor(flowStatus),
+				"reach_relationship": reachRelationship,
+				"gauge_trusted": gaugeTrusted, "gauge_notes": gaugeNotes,
+				"info_links": rawJSON(infoLinks),
+			},
+		})
+	}
+	return features, rows.Err()
+}
+
 // List handles GET /api/v1/reaches
 // TODO: implement
 func (h *ReachHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -265,7 +477,11 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			COALESCE(ST_X(g.location::geometry), NULL) AS gauge_lng,
 			COALESCE(ST_Y(g.location::geometry), NULL) AS gauge_lat,
 			CASE
-				WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
+				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
+				WHEN fr.label = 'runnable'                 THEN 'runnable'
+				WHEN fr.label = 'below_recommended'        THEN 'caution'
+				WHEN fr.label = 'above_recommended'        THEN 'flood'
+				-- legacy fallbacks (pre-migration 034)
 				WHEN fr.label IN ('fun','optimal')         THEN 'runnable'
 				WHEN fr.label IN ('minimum','pushy')       THEN 'caution'
 				WHEN fr.label = 'too_low'                  THEN 'low'
@@ -310,8 +526,49 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ensure arrays serialize as [] not null when empty
-	reach.Rapids = make([]rapidRow, 0)
-	reach.Access = make([]accessRow, 0)
+	reach.Rapids   = make([]rapidRow, 0)
+	reach.Access   = make([]accessRow, 0)
+	reach.Gauges   = make([]gaugeSnippet, 0)
+
+	// Primary gauge goes in Gauges[0] if it exists
+	if reach.Gauge.ID != nil {
+		reach.Gauges = append(reach.Gauges, reach.Gauge)
+	}
+
+	// Secondary gauges — all gauges linked to this reach (excluding primary)
+	secRows, err := h.db.Query(r.Context(), `
+		SELECT
+			g.id, g.external_id, g.source, g.name, g.featured,
+			g.reach_relationship,
+			g.current_cfs, g.flow_status, g.last_reading_at,
+			ST_X(g.location::geometry) AS lng,
+			ST_Y(g.location::geometry) AS lat
+		FROM gauges g
+		WHERE g.reach_id = $1
+		  AND ($2::uuid IS NULL OR g.id != $2::uuid)
+		  AND g.status = 'active'
+		ORDER BY CASE g.reach_relationship
+			WHEN 'primary'              THEN 1
+			WHEN 'upstream_indicator'   THEN 2
+			WHEN 'downstream_indicator' THEN 3
+			ELSE 4
+		END, g.name
+	`, reach.ID, reach.Gauge.ID)
+	if err == nil {
+		defer secRows.Close()
+		for secRows.Next() {
+			var sg gaugeSnippet
+			if err := secRows.Scan(
+				&sg.ID, &sg.ExternalID, &sg.Source, &sg.Name, &sg.Featured,
+				&sg.Relationship,
+				&sg.CurrentCFS, &sg.FlowStatus, &sg.LastReadingAt,
+				&sg.Lng, &sg.Lat,
+			); err != nil {
+				continue
+			}
+			reach.Gauges = append(reach.Gauges, sg)
+		}
+	}
 
 	// ---- Rapids -------------------------------------------------------------
 	rapidRows, err := h.db.Query(r.Context(), `
@@ -477,9 +734,10 @@ type reachDetail struct {
 	WatershedName           *string         `json:"watershed_name"`
 	Centerline              rawGeometry     `json:"centerline"`
 	Gauge                   gaugeSnippet    `json:"gauge"`
-	Rapids          []rapidRow       `json:"rapids"`
-	Access          []accessRow      `json:"access"`
-	Related         []relatedReach   `json:"related"`
+	Gauges                  []gaugeSnippet  `json:"gauges"`
+	Rapids                  []rapidRow      `json:"rapids"`
+	Access                  []accessRow     `json:"access"`
+	Related                 []relatedReach  `json:"related"`
 }
 
 type gaugeSnippet struct {
@@ -488,6 +746,7 @@ type gaugeSnippet struct {
 	Source        *string    `json:"source"`
 	Name          *string    `json:"name"`
 	Featured      *bool      `json:"featured"`
+	Relationship  *string    `json:"reach_relationship"`
 	CurrentCFS    *float64   `json:"current_cfs"`
 	LastReadingAt *time.Time `json:"last_reading_at"`
 	FlowStatus    string     `json:"flow_status"`

@@ -6,7 +6,18 @@ export default defineNuxtConfig({
     '@nuxt/ui',
     '@pinia/nuxt',
     '@pinia-plugin-persistedstate/nuxt',
+    '@nuxtjs/supabase',
   ],
+
+  supabase: {
+    // Don't auto-redirect — we handle navigation ourselves
+    redirect: false,
+    redirectOptions: {
+      login:    '/login',
+      callback: '/confirm',
+      exclude:  ['/', '/map', '/reaches/*', '/dashboard'],
+    },
+  },
 
   // Register components by filename only, not directory/filename prefix.
   // This keeps templates readable: <GaugeCard> not <GaugeGaugeCard>.
