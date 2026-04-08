@@ -301,3 +301,75 @@ func (s ReachSeed) DescriptionAutoVerified() bool {
 	return s.DescriptionConfidence >= autoVerifyThreshold
 }
 
+// DescriptionSeed is a focused description-only result, used by SeedDescription.
+// Mirrors the description fields of ReachSeed without forcing the caller to
+// generate rapids/access/flow_ranges they don't need.
+type DescriptionSeed struct {
+	Description string `json:"description"`
+	Confidence  int    `json:"confidence"`
+}
+
+// AutoVerified reports whether this description meets the auto-verify threshold.
+func (d DescriptionSeed) AutoVerified() bool { return d.Confidence >= autoVerifyThreshold }
+
+const descriptionSystemPrompt = `You are a whitewater paddling data assistant for H2OFlows, a platform used by experienced kayakers, rafters, canoeists, and packrafters.
+
+Your job: given a river reach, write an accurate prose description for the reach. This is shown to Class 5 paddlers — accuracy matters. Do not invent rapids, distances, gauges, or hazards you are not confident about. A short, accurate description is better than a long, speculative one.
+
+Draw on published guidebooks (Caudill, Stohlquist, Nealy), American Whitewater data, and the accumulated knowledge of the online paddling community. Write in your own words.
+
+Respond ONLY with a valid JSON object — no markdown fences, no preamble:
+
+{
+  "description": "string — 2-4 paragraph markdown description covering character, typical flows, key features, and historical or cultural context. Written for an experienced paddler.",
+  "confidence": 0-100
+}
+
+Confidence guidelines (same as the reach seeder):
+- 90-100: Classic, nationally recognized run. Solid published documentation.
+- 85-89:  Well-known regional run. Strong information.
+- 70-84:  Known run, moderate documentation. Some details approximate.
+- 50-69:  Seldom-documented or obscure. Partial information.
+- Below 50: You do not have reliable information. Set description to "" and confidence below 50; the caller will skip writing.`
+
+// SeedDescription calls Claude to generate ONLY the prose description for a reach.
+// Used for backfilling reaches that were imported from KMZ or other sources without
+// going through the full ReachSeeder pass. Times out after 60 seconds.
+func (s *ReachSeeder) SeedDescription(ctx context.Context, rc ReachContext) (*DescriptionSeed, error) {
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+
+	prompt := buildSeedPrompt(rc)
+
+	msg, err := s.client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.ModelClaudeSonnet4_6,
+		MaxTokens: 1500,
+		System: []anthropic.TextBlockParam{
+			{Text: descriptionSystemPrompt},
+		},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("claude: %w", err)
+	}
+	if len(msg.Content) == 0 {
+		return nil, fmt.Errorf("claude: empty response")
+	}
+
+	raw := strings.TrimSpace(msg.Content[0].Text)
+	// Strip markdown code fences if present (``` or ```json)
+	if strings.HasPrefix(raw, "```") {
+		if idx := strings.Index(raw, "\n"); idx != -1 {
+			raw = raw[idx+1:]
+		}
+		raw = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(raw), "```"))
+	}
+	var d DescriptionSeed
+	if err := json.Unmarshal([]byte(raw), &d); err != nil {
+		return nil, fmt.Errorf("claude: parse response: %w\nraw: %s", err, raw)
+	}
+	return &d, nil
+}
+
