@@ -238,14 +238,72 @@ func (p *Poller) pruneOldReadings(ctx context.Context) {
 // demand-driven poll window. Call this whenever the API serves gauge data to
 // a user — search results, detail page, watchlist load.
 // Fire-and-forget: errors are logged but not returned to the caller.
+//
+// Reach-linked gauges are skipped: they're already polled every cycle, so
+// touching them just churns last_requested_at without changing behaviour.
 func (p *Poller) TouchRequested(ctx context.Context, gaugeID string) {
 	_, err := p.db.Exec(ctx,
-		`UPDATE gauges SET last_requested_at = NOW() WHERE id = $1 AND featured = FALSE`,
+		`UPDATE gauges SET last_requested_at = NOW() WHERE id = $1 AND reach_id IS NULL`,
 		gaugeID,
 	)
 	if err != nil {
 		log.Printf("poller: touch requested for %s: %v", gaugeID, err)
 	}
+}
+
+// FetchNowIfStale fetches a single reading synchronously from the upstream
+// source if the gauge's most recent reading is older than maxAge (or absent).
+// Returns true if a fresh reading was written.
+//
+// Used by handlers serving reach detail pages so the user sees current data
+// on first view rather than waiting for the next poll tick. Bounded by a
+// short timeout so a hung upstream API never blocks the page response.
+func (p *Poller) FetchNowIfStale(ctx context.Context, gaugeID string, maxAge time.Duration) bool {
+	// Look up source + external_id + last reading freshness in one shot.
+	var (
+		sourceType   string
+		externalID   string
+		lastReadingAt *time.Time
+	)
+	err := p.db.QueryRow(ctx, `
+		SELECT g.source, g.external_id, g.last_reading_at
+		FROM   gauges g
+		WHERE  g.id = $1
+	`, gaugeID).Scan(&sourceType, &externalID, &lastReadingAt)
+	if err != nil {
+		return false
+	}
+	if lastReadingAt != nil && time.Since(*lastReadingAt) < maxAge {
+		return false
+	}
+
+	// Find the registered source for this gauge.
+	var src gauge.GaugeSource
+	for _, sc := range p.sources {
+		if string(sc.source.SourceType()) == sourceType {
+			src = sc.source
+			break
+		}
+	}
+	if src == nil {
+		return false
+	}
+
+	// Bound the upstream call so a slow USGS response can't stall the handler.
+	fetchCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
+	defer cancel()
+
+	reading, err := src.FetchReading(fetchCtx, externalID)
+	if err != nil {
+		p.recordFailure(ctx, gaugeID, err)
+		return false
+	}
+	if err := p.writeReading(ctx, gaugeID, *reading); err != nil {
+		log.Printf("poller: on-demand write for %s: %v", gaugeID, err)
+		return false
+	}
+	p.recordSuccess(ctx, gaugeID)
+	return true
 }
 
 // --- Historical backfill ----------------------------------------------------
@@ -307,7 +365,7 @@ func (p *Poller) backfillSource(ctx context.Context, sc sourceConfig) {
 		WHERE  g.source = $1
 		  AND  g.status NOT IN ('retired', 'inactive')
 		  AND  (
-		           g.featured = TRUE
+		           g.reach_id IS NOT NULL
 		           OR g.last_requested_at > NOW() - $2::interval
 		       )
 		  AND  (
@@ -566,11 +624,13 @@ const demandWindow = 7 * 24 * time.Hour
 // loadGauges returns gauges for the given source that should be polled this tick.
 //
 // A gauge is included if:
-//   - It is featured (always polled — these are the curated backbone of the app), OR
+//   - It is associated with a reach (always polled — these are the load-bearing
+//     gauges that back reach pages), OR
 //   - It was actively requested by a user within the demand window
 //
 // This keeps the poll set small. USGS has ~10,000 gauges in Colorado alone;
-// we have no business polling gauges that nobody is looking at.
+// we have no business polling gauges that nobody is looking at and that don't
+// belong to any reach.
 func (p *Poller) loadGauges(ctx context.Context, sourceName string) ([]dbGauge, error) {
 	rows, err := p.db.Query(ctx, `
 		SELECT id, external_id
@@ -584,7 +644,7 @@ func (p *Poller) loadGauges(ctx context.Context, sourceName string) ([]dbGauge, 
 		      OR TO_CHAR(NOW(), 'MM-DD') BETWEEN seasonal_start_mmdd AND seasonal_end_mmdd
 		  )
 		  AND (
-		      featured = TRUE
+		      reach_id IS NOT NULL
 		      OR last_requested_at > NOW() - $2::interval
 		  )
 	`, sourceName, demandWindow)

@@ -97,7 +97,7 @@ func main() {
 	}
 
 	gauges  := handlers.NewGaugeHandler(pool, enricher, p)
-	reaches := handlers.NewReachHandler(pool, asker)
+	reaches := handlers.NewReachHandler(pool, asker).WithPoller(p)
 	// Warm the reach map cache immediately, then refresh every poll cycle.
 	reaches.WarmCache(context.Background())
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)

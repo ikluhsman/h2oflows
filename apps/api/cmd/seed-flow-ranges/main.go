@@ -1,5 +1,5 @@
 // seed-flow-ranges queries Claude for paddling flow range data for every
-// featured (trusted) gauge that has an associated reach but no verified ranges yet.
+// reach-linked gauge that does not yet have verified ranges.
 //
 // Run once after seeding reaches, or re-run safely — it never overwrites verified rows.
 //
@@ -37,7 +37,7 @@ func main() {
 
 	seeder := ai.NewFlowRangeSeeder(apiKey)
 
-	// Load all featured gauges that have an associated reach but no verified flow ranges.
+	// Load all reach-linked gauges that don't yet have verified flow ranges.
 	// We skip gauges with verified=true ranges — human entries win, always.
 	rows, err := pool.Query(ctx, `
 		SELECT
@@ -54,8 +54,7 @@ func main() {
 			r.aw_reach_id
 		FROM gauges g
 		JOIN reaches r ON r.id = g.reach_id
-		WHERE g.featured = TRUE
-		  AND NOT EXISTS (
+		WHERE NOT EXISTS (
 			SELECT 1 FROM flow_ranges fr
 			WHERE fr.gauge_id = g.id AND fr.verified = TRUE
 		  )
