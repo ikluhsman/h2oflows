@@ -332,6 +332,7 @@
             :rapids="reach.rapids"
             :access="reach.access"
             :gauges="allGauges"
+            @gauge-add="(id) => { const g = allGauges.find((x: any) => x.id === id); if (g) addToDashboard(g) }"
           />
         </ClientOnly>
       </section>

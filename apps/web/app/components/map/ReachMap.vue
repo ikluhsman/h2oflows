@@ -83,17 +83,36 @@
       <!-- Gauges group -->
       <template v-if="gaugeFeatures.length > 0">
         <p class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Gauges</p>
-        <button
+        <div
           v-for="g in gaugeFeatures"
           :key="g.id"
-          class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-xs"
-          :class="selectedId === g.id ? 'bg-gray-100 dark:bg-gray-800' : ''"
-          @click="selectFeature(g.id, g.lng!, g.lat!)"
+          class="flex items-center gap-1 pr-1.5"
+          :class="selectedId === g.id ? 'bg-gray-100 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'"
         >
-          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-cyan-600">~</span>
-          <span class="truncate text-gray-700 dark:text-gray-300">{{ g.name ?? g.external_id ?? gaugeRelLabel(g.reach_relationship) }}</span>
-          <span class="shrink-0 text-[10px] text-gray-400 capitalize">{{ gaugeRelLabel(g.reach_relationship) }}</span>
-        </button>
+          <button
+            class="flex-1 flex items-center gap-2 px-3 py-1.5 text-left transition-colors text-xs min-w-0"
+            @click="selectFeature(g.id, g.lng!, g.lat!)"
+          >
+            <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-cyan-600">~</span>
+            <span class="truncate text-gray-700 dark:text-gray-300">{{ g.name ?? g.external_id ?? gaugeRelLabel(g.reach_relationship) }}</span>
+          </button>
+          <!-- Add to dashboard -->
+          <button
+            v-if="!onDashboard(g.id)"
+            class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/40 transition-colors"
+            title="Add to dashboard"
+            @click.stop="emit('gauge-add', g.id)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <span
+            v-else
+            class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-emerald-500"
+            title="On dashboard"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+          </span>
+        </div>
       </template>
     </div>
   </div>
@@ -118,7 +137,32 @@
         </div>
         <p v-if="selectedFeature.subtitle" class="text-xs text-gray-400 mt-0.5">{{ selectedFeature.subtitle }}</p>
         <p v-if="selectedFeature.desc" class="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed line-clamp-3">{{ selectedFeature.desc }}</p>
-        <p v-else class="text-xs text-gray-400 mt-1 italic">No description available.</p>
+        <p v-else-if="!selectedFeature.gaugeId" class="text-xs text-gray-400 mt-1 italic">No description available.</p>
+        <!-- Gauge actions: add to dashboard + source link -->
+        <div v-if="selectedFeature.gaugeId" class="flex items-center gap-3 mt-2">
+          <button
+            v-if="!onDashboard(selectedFeature.gaugeId)"
+            class="flex items-center gap-1 text-xs text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-medium transition-colors"
+            @click="emit('gauge-add', selectedFeature.gaugeId)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Add to dashboard
+          </button>
+          <span v-else class="flex items-center gap-1 text-xs text-emerald-500 font-medium">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+            On dashboard
+          </span>
+          <a
+            v-if="selectedFeature.sourceUrl"
+            :href="selectedFeature.sourceUrl"
+            target="_blank"
+            rel="noopener"
+            class="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            View source
+          </a>
+        </div>
       </div>
       <button
         class="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none"
@@ -132,6 +176,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { useWatchlistStore } from '~/stores/watchlist'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -158,6 +203,7 @@ interface GaugeProp {
   id: string
   name?: string | null
   external_id?: string | null
+  source?: string | null
   reach_relationship?: string | null
   lng?: number | null
   lat?: number | null
@@ -175,6 +221,21 @@ const props = defineProps<{
   // Preferred: pass all gauges as an array so each gets a pin
   gauges?: GaugeProp[]
 }>()
+
+const emit = defineEmits<{
+  (e: 'gauge-add', gaugeId: string): void
+}>()
+
+const watchlist = useWatchlistStore()
+const onDashboard = (id: string) => watchlist.gauges.some(g => g.id === id)
+
+function gaugeSourceUrl(g: GaugeProp): string | null {
+  if (g.source === 'usgs' && g.external_id)
+    return `https://waterdata.usgs.gov/monitoring-location/${g.external_id}/`
+  if (g.source === 'dwr' && g.external_id)
+    return `https://dwr.state.co.us/Tools/Stations/${g.external_id}`
+  return null
+}
 
 // ── Derived lists ─────────────────────────────────────────────────────────────
 
@@ -236,6 +297,8 @@ const selectedFeature = computed(() => {
     desc:       null as string | null,
     pinColor:   '#0891b2',
     pinIcon:    '~',
+    gaugeId:    gauge.id,
+    sourceUrl:  gaugeSourceUrl(gauge),
   }
   return null
 })
