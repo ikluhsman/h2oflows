@@ -262,10 +262,13 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		}
 	} else {
 		for _, folder := range doc.Folders {
-			rid, rslug, rname, err := imp.matchReach(ctx, folder.Name)
+			rid, rslug, rname, created, err := imp.matchOrCreateReach(ctx, folder.Name)
 			if err != nil {
-				res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — no matching reach, skipping", folder.Name))
+				res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — %v", folder.Name, err))
 				continue
+			}
+			if created {
+				res.Log = append(res.Log, fmt.Sprintf("+ created reach %q (slug: %s)", folder.Name, rslug))
 			}
 			for _, pm := range folder.Placemarks {
 				pins = append(pins, assignment{rid, rslug, rname, pm, ""})
@@ -367,6 +370,19 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		}
 	}
 
+	// After all pins are inserted, derive put_in_name / take_out_name for each
+	// reach that was touched, and update name = "<put_in> to <take_out>".
+	seen := map[string]struct{}{}
+	for _, a := range pins {
+		if _, ok := seen[a.reachID]; ok {
+			continue
+		}
+		seen[a.reachID] = struct{}{}
+		if err := imp.updateReachNaming(ctx, a.reachID); err != nil {
+			res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] name update: %v", a.reachName, err))
+		}
+	}
+
 	return res, nil
 }
 
@@ -378,21 +394,110 @@ func (res *Result) reachStats(slug, name string) *ReachResult {
 	return res.Reaches[slug]
 }
 
-// ── Reach matching ────────────────────────────────────────────────────────────
+// ── Reach matching / creation ─────────────────────────────────────────────────
 
-func (imp *Importer) matchReach(ctx context.Context, folderName string) (id, slug, name string, err error) {
-	err = imp.pool.QueryRow(ctx, `
+// matchOrCreateReach finds an existing reach by folder name or creates a new
+// stub reach so the KML can be imported without pre-seeding in Go code.
+//
+// On creation:
+//   - slug       = slugified folder name (e.g. "Browns Canyon" → "browns-canyon")
+//   - common_name = folder name as-is
+//   - name        = common_name (overwritten by updateReachNaming once pins are loaded)
+//
+// The returned created flag is true when a new row was inserted.
+func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName string) (id, slug, name string, created bool, err error) {
+	// Try to match existing reach first.
+	matchErr := imp.pool.QueryRow(ctx, `
 		SELECT id, slug, name FROM reaches
-		WHERE LOWER(name) = LOWER($1) OR LOWER(slug) = LOWER($1)
-		   OR LOWER(name) LIKE '%' || LOWER($1) || '%'
-		   OR LOWER($1) LIKE '%' || LOWER(name) || '%'
+		WHERE  LOWER(name)        = LOWER($1)
+		    OR LOWER(slug)        = LOWER($1)
+		    OR LOWER(common_name) = LOWER($1)
+		    OR LOWER(name)   LIKE '%' || LOWER($1) || '%'
+		    OR LOWER($1)     LIKE '%' || LOWER(name) || '%'
 		ORDER BY
-			CASE WHEN LOWER(name) = LOWER($1) THEN 0
-			     WHEN LOWER(slug) = LOWER($1) THEN 1
-			     ELSE 2 END
+			CASE WHEN LOWER(name)        = LOWER($1) THEN 0
+			     WHEN LOWER(slug)        = LOWER($1) THEN 1
+			     WHEN LOWER(common_name) = LOWER($1) THEN 2
+			     ELSE 3 END
 		LIMIT 1
 	`, folderName).Scan(&id, &slug, &name)
-	return
+	if matchErr == nil {
+		return id, slug, name, false, nil
+	}
+
+	// No match — create a stub reach from the folder name.
+	newSlug := slugify(folderName)
+	err = imp.pool.QueryRow(ctx, `
+		INSERT INTO reaches (slug, name, common_name)
+		VALUES ($1, $2, $2)
+		ON CONFLICT (slug) DO UPDATE SET common_name = EXCLUDED.common_name
+		RETURNING id, slug, name
+	`, newSlug, folderName).Scan(&id, &slug, &name)
+	if err != nil {
+		return "", "", "", false, fmt.Errorf("create reach %q: %w", folderName, err)
+	}
+	return id, slug, name, true, nil
+}
+
+// updateReachNaming derives put_in_name / take_out_name from the imported access
+// points and updates name = "<put_in_name> to <take_out_name>" on the reach.
+// Uses extreme longitudes as a proxy for upstream/downstream ordering when no
+// centerline river_order is available (works for west→east rivers; good enough
+// for initial import since centerline can be fetched afterward).
+func (imp *Importer) updateReachNaming(ctx context.Context, reachID string) error {
+	if imp.DryRun {
+		return nil
+	}
+	var putInName, takeOutName *string
+	err := imp.pool.QueryRow(ctx, `
+		WITH
+		  put_ins AS (
+		    SELECT name FROM reach_access
+		    WHERE reach_id = $1 AND access_type = 'put_in'
+		    ORDER BY ST_X(location::geometry) ASC   -- westernmost = most upstream
+		    LIMIT 1
+		  ),
+		  take_outs AS (
+		    SELECT name FROM reach_access
+		    WHERE reach_id = $1 AND access_type = 'take_out'
+		    ORDER BY ST_X(location::geometry) DESC  -- easternmost = most downstream
+		    LIMIT 1
+		  )
+		SELECT p.name, t.name FROM put_ins p, take_outs t
+	`, reachID).Scan(&putInName, &takeOutName)
+	if err != nil {
+		// No put-in/take-out yet — skip; name stays as common_name for now.
+		return nil
+	}
+	if putInName == nil || takeOutName == nil {
+		return nil
+	}
+	derivedName := *putInName + " to " + *takeOutName
+	_, err = imp.pool.Exec(ctx, `
+		UPDATE reaches
+		SET name        = $2,
+		    put_in_name  = $3,
+		    take_out_name = $4
+		WHERE id = $1
+	`, reachID, derivedName, *putInName, *takeOutName)
+	return err
+}
+
+// slugify converts a display name to a URL-safe slug.
+// "Browns Canyon" → "browns-canyon", "Cache La Poudre" → "cache-la-poudre"
+func slugify(s string) string {
+	var b strings.Builder
+	prevDash := false
+	for _, r := range strings.ToLower(s) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			prevDash = false
+		} else if !prevDash && b.Len() > 0 {
+			b.WriteByte('-')
+			prevDash = true
+		}
+	}
+	return strings.TrimRight(b.String(), "-")
 }
 
 // genericGeoWords are words that appear in many reach names but shouldn't

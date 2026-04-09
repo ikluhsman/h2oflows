@@ -122,6 +122,7 @@ func main() {
 		r.Get("/reaches/{slug}", reaches.Get)
 		r.Get("/reaches/{slug}/conditions", reaches.GetConditions)
 		r.Get("/reaches/{slug}/hazards", reaches.GetHazards)
+		r.Delete("/reaches/{slug}", reaches.Delete)
 		r.Post("/reaches/{slug}/fetch-centerline", reaches.FetchCenterline)
 		r.Delete("/reaches/{slug}/centerline", reaches.ClearCenterline)
 		r.Post("/reaches/{slug}/ask", reaches.Ask)

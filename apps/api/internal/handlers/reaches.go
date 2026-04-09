@@ -1081,6 +1081,26 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Delete handles DELETE /api/v1/reaches/{slug}
+// Permanently removes the reach and all cascading child records (rapids,
+// access points, conditions, embeddings, reach_relationships).
+// Gauges linked to this reach have their reach_id set to NULL by FK cascade.
+func (h *ReachHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	tag, err := h.db.Exec(r.Context(), `DELETE FROM reaches WHERE slug = $1`, slug)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "delete failed")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		errorResponse(w, http.StatusNotFound, "reach not found")
+		return
+	}
+	// Rewarm map cache so the deleted reach disappears from the map immediately.
+	go h.WarmCache(context.Background())
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ClearCenterline handles DELETE /api/v1/reaches/{slug}/centerline
 // Nulls out the stored centerline so it can be re-fetched from OSM.
 func (h *ReachHandler) ClearCenterline(w http.ResponseWriter, r *http.Request) {

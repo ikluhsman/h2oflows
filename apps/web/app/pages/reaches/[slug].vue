@@ -112,6 +112,19 @@
           </template>
         </div>
         <p v-if="importError" class="text-xs text-red-500">{{ importError }}</p>
+
+        <span class="text-gray-200 dark:text-gray-700">|</span>
+
+        <!-- Delete reach -->
+        <button
+          class="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 flex items-center gap-1 disabled:opacity-50"
+          :disabled="deleting"
+          @click="deleteReach"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          <span v-if="deleting">Deleting…</span>
+          <span v-else>Delete reach</span>
+        </button>
       </div>
     </div>
 
@@ -917,6 +930,24 @@ async function sendQuestion(question: string) {
     chatMessages.value.pop() // remove the user message if we got nothing back
   } finally {
     chatLoading.value = false
+  }
+}
+
+// ---- Delete reach -----------------------------------------------------------
+
+const deleting = ref(false)
+
+async function deleteReach() {
+  if (!confirm(`Permanently delete "${(reach.value as any)?.common_name ?? (reach.value as any)?.name}"?\n\nThis removes all rapids, access points, and features. Gauges are unlinked but kept.`)) return
+  deleting.value = true
+  try {
+    const res = await fetch(`${config.public.apiBase}/api/v1/reaches/${route.params.slug}`, { method: 'DELETE' })
+    if (!res.ok) throw new Error(`Server error ${res.status}`)
+    navigateTo('/')
+  } catch (err: any) {
+    alert(err?.message ?? 'Delete failed')
+  } finally {
+    deleting.value = false
   }
 }
 
