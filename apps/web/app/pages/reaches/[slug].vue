@@ -402,20 +402,41 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': expandedFeatureKey === feat.key }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
               </div>
 
-              <!-- Expanded details -->
+              <!-- Expanded details card -->
               <div
                 v-if="expandedFeatureKey === feat.key"
-                class="px-4 pb-4 pt-1 space-y-2 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40"
+                class="px-3 pb-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40"
               >
-                <p v-if="feat.description" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{{ feat.description }}</p>
-                <p v-if="feat.portage_description" class="text-xs text-amber-600 dark:text-amber-400">
-                  <span class="font-medium">Portage:</span> {{ feat.portage_description }}
-                </p>
-                <span
-                  v-if="feat.is_permanent_hazard && feat.hazard_type"
-                  class="inline-flex items-center rounded bg-red-50 dark:bg-red-950 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-300"
-                >⚠ {{ hazardTypeLabel(feat.hazard_type) }}</span>
-                <p v-if="!feat.description && !feat.portage_description && !(feat.is_permanent_hazard && feat.hazard_type)" class="text-xs text-gray-400 italic">No additional details available.</p>
+                <div class="mt-3 flex gap-3">
+                  <!-- Pin icon column -->
+                  <div
+                    class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                    :class="featurePinBg(feat)"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" :class="featurePinIcon(feat)" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                  </div>
+                  <!-- Content -->
+                  <div class="flex-1 min-w-0 space-y-1.5">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ feat.name }}</span>
+                      <span
+                        v-if="(feat.type === 'rapid' || feat.type === 'hazard') && feat.class_rating"
+                        class="text-xs font-mono font-medium text-gray-500 dark:text-gray-400"
+                      >{{ romanClass(feat.class_rating) }}<span v-if="feat.class_at_high && feat.class_at_high > feat.class_rating" class="text-gray-400">({{ romanClass(feat.class_at_high) }})</span></span>
+                    </div>
+                    <p v-if="feat.description" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{{ feat.description }}</p>
+                    <p v-if="feat.portage_description" class="text-xs text-amber-600 dark:text-amber-400">
+                      <span class="font-medium">Portage:</span> {{ feat.portage_description }}
+                    </p>
+                    <span
+                      v-if="feat.is_permanent_hazard && feat.hazard_type"
+                      class="inline-flex items-center rounded bg-red-50 dark:bg-red-950 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-300"
+                    >⚠ {{ hazardTypeLabel(feat.hazard_type) }}</span>
+                    <p v-if="!feat.description && !feat.portage_description && !(feat.is_permanent_hazard && feat.hazard_type)" class="text-xs text-gray-400 italic">No additional details available.</p>
+                  </div>
+                </div>
               </div>
 
             </div>
@@ -612,6 +633,34 @@ function featurePillClass(feat: RiverFeature): string {
       return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
     default:
       return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+  }
+}
+
+function featurePinBg(feat: RiverFeature): string {
+  if (feat.is_permanent_hazard) return 'bg-red-100 dark:bg-red-950'
+  switch (feat.type) {
+    case 'rapid':   return 'bg-blue-100 dark:bg-blue-950'
+    case 'hazard':  return 'bg-red-100 dark:bg-red-950'
+    case 'put_in':
+    case 'take_out':
+    case 'access':  return 'bg-emerald-100 dark:bg-emerald-950'
+    case 'camp':    return 'bg-amber-100 dark:bg-amber-950'
+    case 'parking': return 'bg-gray-100 dark:bg-gray-800'
+    default:        return 'bg-gray-100 dark:bg-gray-800'
+  }
+}
+
+function featurePinIcon(feat: RiverFeature): string {
+  if (feat.is_permanent_hazard) return 'text-red-500'
+  switch (feat.type) {
+    case 'rapid':   return 'text-blue-500'
+    case 'hazard':  return 'text-red-500'
+    case 'put_in':
+    case 'take_out':
+    case 'access':  return 'text-emerald-500'
+    case 'camp':    return 'text-amber-500'
+    case 'parking': return 'text-gray-400'
+    default:        return 'text-gray-400'
   }
 }
 
