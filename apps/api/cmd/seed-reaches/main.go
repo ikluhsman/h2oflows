@@ -25,7 +25,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	dbURL  := mustEnv("DATABASE_URL")
+	dbURL := mustEnv("DATABASE_URL")
 	apiKey := mustEnv("ANTHROPIC_API_KEY")
 	dryRun := os.Getenv("DRY_RUN") == "true"
 
@@ -211,25 +211,25 @@ func main() {
 // so it's available immediately without waiting for FlowRangeSeeder to run.
 
 type reachDef struct {
-	Slug             string
-	Name             string
-	Region           string
-	ClassMin         float64
-	ClassMax         float64
-	Character        string // pool-drop / continuous / creeking / big-water / canyon
-	LengthMi         float64
-	AWReachID        string
-	GaugeExtID       string
-	GaugeSource      string
+	Slug        string
+	Name        string
+	Region      string
+	ClassMin    float64
+	ClassMax    float64
+	Character   string // pool-drop / continuous / creeking / big-water / canyon
+	LengthMi    float64
+	AWReachID   string
+	GaugeExtID  string
+	GaugeSource string
 	// Additional gauges with explicit relationship types.
 	// The primary gauge (GaugeExtID/GaugeSource) always gets reach_relationship='primary'.
 	// These get the stated relationship type.
-	RelatedGauges    []gaugeAssoc
+	RelatedGauges []gaugeAssoc
 	// Notes passed to the AI seeder as extra context (gauge math, local knowledge, etc.)
-	Notes            string
-	KnownRapids      []knownRapid
-	KnownFlowRanges  []knownFlowRange
-	KnownAccess      []knownAccess
+	Notes           string
+	KnownRapids     []knownRapid
+	KnownFlowRanges []knownFlowRange
+	KnownAccess     []knownAccess
 }
 
 // gaugeAssoc links a gauge to a reach with an explicit relationship type.
@@ -242,23 +242,23 @@ type gaugeAssoc struct {
 // knownFlowRange is a flow range band entered from direct domain knowledge
 // (not AI-generated). Written with data_source='manual' and verified=true.
 type knownFlowRange struct {
-	Label   string
-	MinCFS  *float64
-	MaxCFS  *float64
-	Notes   string
+	Label  string
+	MinCFS *float64
+	MaxCFS *float64
+	Notes  string
 }
 
 // knownAccess is an access point entered from direct domain knowledge with
 // GPS-verified coordinates. Written with data_source='manual' and verified=true.
 // WaterLat/WaterLon are the water-entry point; ParkingLat/ParkingLon are the lot.
 type knownAccess struct {
-	AccessType  string  // put_in / take_out / shuttle_drop / intermediate
-	Name        string
-	Directions  string
-	WaterLat    *float64
-	WaterLon    *float64
-	ParkingLat  *float64
-	ParkingLon  *float64
+	AccessType string // put_in / take_out / shuttle_drop / intermediate
+	Name       string
+	Directions string
+	WaterLat   *float64
+	WaterLon   *float64
+	ParkingLat *float64
+	ParkingLon *float64
 }
 
 // knownRapid is a rapid entered from direct domain knowledge (guidebook, personal
@@ -270,8 +270,8 @@ type knownRapid struct {
 	ClassRating          *float64 // primary class at typical flow
 	ClassAtLow           *float64
 	ClassAtHigh          *float64
-	Description          string   // lines, hazards, scouting notes
-	PortageDescription   string   // empty = no portage route known
+	Description          string // lines, hazards, scouting notes
+	PortageDescription   string // empty = no portage route known
 	IsPortageRecommended bool
 	Lat                  *float64 // GPS location of the rapid
 	Lon                  *float64
@@ -293,7 +293,7 @@ var reaches = []reachDef{
 	// put-in for The Numbers. Extremely committing — no egress through the gorge.
 	{
 		Slug: "arkansas-pine-creek", Name: "Pine Creek",
-		Region: "Arkansas River, Colorado — Granite to Pine Creek Rapid",
+		Region:   "Arkansas River, Colorado — Granite to Pine Creek Rapid",
 		ClassMin: 5.0, ClassMax: 5.0, Character: "canyon", LengthMi: 5.0,
 		GaugeExtID: "07087050", GaugeSource: "usgs",
 		Notes: `Put-in at Granite off US-24. The run drops through a narrow granite gorge with no egress. Take-out is river left at the bottom of Pine Creek Rapid — a mandatory scout and the crux of the section.
@@ -308,7 +308,7 @@ Flow is release-dependent from Twin Lakes Dam upstream. The Granite gauge (07087
 	// Class IV runs in Colorado. Gauge at Granite (07087050) is the reference.
 	{
 		Slug: "arkansas-the-numbers", Name: "The Numbers",
-		Region: "Arkansas River, Colorado — Pine Creek Rapid to Fisherman's Bridge",
+		Region:   "Arkansas River, Colorado — Pine Creek Rapid to Fisherman's Bridge",
 		ClassMin: 4.0, ClassMax: 4.5, Character: "continuous", LengthMi: 8.0,
 		GaugeExtID: "07087050", GaugeSource: "usgs",
 		Notes: `Put-in at the bottom of Pine Creek Rapid (river left), which is also the take-out for Pine Creek Canyon above. Take-out at Fisherman's Bridge near Buena Vista.
@@ -321,7 +321,7 @@ The run consists of a long sequence of numbered drops (roughly Numbers 1–8) se
 	// Gauge at Granite (07087050) is still the upstream reference here.
 	{
 		Slug: "arkansas-fractions", Name: "Fractions",
-		Region: "Arkansas River, Colorado — Fisherman's Bridge to Buena Vista",
+		Region:   "Arkansas River, Colorado — Fisherman's Bridge to Buena Vista",
 		ClassMin: 3.0, ClassMax: 3.5, Character: "continuous", LengthMi: 4.0,
 		GaugeExtID: "07087050", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
@@ -336,7 +336,7 @@ The Granite gauge (07087050) is the upstream reference; the BV gauge (07087200) 
 	// Gauge at Buena Vista (07087200) is the reference.
 	{
 		Slug: "arkansas-bv-whitewater-park", Name: "Buena Vista Whitewater Park",
-		Region: "Arkansas River, Colorado — through downtown Buena Vista",
+		Region:   "Arkansas River, Colorado — through downtown Buena Vista",
 		ClassMin: 2.0, ClassMax: 3.0, Character: "continuous", LengthMi: 1.5,
 		GaugeExtID: "07087200", GaugeSource: "usgs",
 		Notes: `Engineered whitewater park in the heart of Buena Vista. Accessible from downtown, used heavily by local paddlers and as a warm-up or warm-down for runs upstream and downstream.
@@ -365,7 +365,7 @@ The BV gauge (07087200) is the reference. Flow is release-dependent from Twin La
 				ParkingLat: ptr(38.76713), ParkingLon: ptr(-106.09546),
 			},
 		},
-		Region: "Arkansas River, Colorado — Buena Vista to Fisherman's Bridge",
+		Region:   "Arkansas River, Colorado — Buena Vista to Fisherman's Bridge",
 		ClassMin: 2.0, ClassMax: 2.5, Character: "continuous", LengthMi: 12.0,
 		GaugeExtID: "07087200", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
@@ -388,26 +388,26 @@ The BV gauge (07087200) is the primary reference. The Nathrop gauge (07091200) d
 				AccessType: "put_in",
 				Name:       "Fisherman's Bridge",
 				Directions: "Take US-285 south from Buena Vista approx 12 miles, turn left on CR 301 at the bridge. CPW access site with stair/slide to water. Also the take-out for Milk Run.",
-				WaterLat: ptr(38.7673434), WaterLon: ptr(-106.0948688),
+				WaterLat:   ptr(38.7673434), WaterLon: ptr(-106.0948688),
 			},
 			{
 				AccessType: "put_in",
 				Name:       "Ruby Mountain Campground",
 				Directions: "CR 301 north to CR 300, then 2.4 miles east. Concrete boat ramp — preferred for heavy/loaded craft and during low water. 1.7 river miles downstream of Fisherman's Bridge.",
-				WaterLat: ptr(38.7522376), WaterLon: ptr(-106.0708563),
+				WaterLat:   ptr(38.7522376), WaterLon: ptr(-106.0708563),
 			},
 			{
 				AccessType: "take_out",
 				Name:       "Hecla Junction",
 				Directions: "From US-285 near Nathrop, turn east on CR 194 and follow ~4 miles of dirt road to the BLM boat ramp at river level.",
-				WaterLat: ptr(38.65188), WaterLon: ptr(-106.0512094),
+				WaterLat:   ptr(38.65188), WaterLon: ptr(-106.0512094),
 			},
 		},
 		KnownRapids: []knownRapid{
 			{Name: "Pinball", ClassRating: ptr(3.0), Lat: ptr(38.7108723), Lon: ptr(-106.0533237)},
 			{Name: "Zoom Flume", ClassRating: ptr(3.5), Lat: ptr(38.6988283), Lon: ptr(-106.0511447)},
 		},
-		Region: "Arkansas River, Colorado — Fisherman's Bridge to Hecla Junction",
+		Region:   "Arkansas River, Colorado — Fisherman's Bridge to Hecla Junction",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "pool-drop", LengthMi: 9.0,
 		GaugeExtID: "07091200", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
@@ -422,7 +422,7 @@ The Nathrop gauge (07091200) sits near the upper end of the run and is the prima
 	// Gauge at Salida (07091500) is the reference.
 	{
 		Slug: "arkansas-salida-whitewater-park", Name: "Salida Whitewater Park",
-		Region: "Arkansas River, Colorado — through downtown Salida",
+		Region:   "Arkansas River, Colorado — through downtown Salida",
 		ClassMin: 2.0, ClassMax: 3.0, Character: "continuous", LengthMi: 1.5,
 		GaugeExtID: "07091500", GaugeSource: "usgs",
 		Notes: `Engineered whitewater park through downtown Salida. Similar character to the BV Whitewater Park upstream — accessible, beginner-friendly features. Good warm-up or warm-down for runs on either side.
@@ -434,7 +434,7 @@ The Salida gauge (07091500) is the reference. Flow is release-dependent from Twi
 	// Exact put-in/take-out boundaries need local verification.
 	{
 		Slug: "arkansas-salida-to-rincon", Name: "Salida to Rincon",
-		Region: "Arkansas River, Colorado — Salida to Rincon",
+		Region:   "Arkansas River, Colorado — Salida to Rincon",
 		ClassMin: 3.0, ClassMax: 3.5, Character: "continuous", LengthMi: 8.0,
 		GaugeExtID: "07091500", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
@@ -449,7 +449,7 @@ The Salida gauge (07091500) is the primary reference. The Wellsville gauge (0709
 	// Exact boundaries need local verification.
 	{
 		Slug: "arkansas-rincon-to-cotopaxi", Name: "Rincon to Cotopaxi",
-		Region: "Arkansas River, Colorado — Rincon to Cotopaxi",
+		Region:   "Arkansas River, Colorado — Rincon to Cotopaxi",
 		ClassMin: 3.0, ClassMax: 3.5, Character: "canyon", LengthMi: 10.0,
 		GaugeExtID: "07093700", GaugeSource: "usgs",
 		Notes: `Put-in at Rincon take-out. Take-out near Cotopaxi. Exact access points need local verification.
@@ -461,7 +461,7 @@ The Wellsville gauge (07093700) is the primary reference for this section. Flow 
 	// Exact boundaries and difficulty need local verification.
 	{
 		Slug: "arkansas-texas-creek", Name: "Texas Creek",
-		Region: "Arkansas River, Colorado — Cotopaxi to Texas Creek",
+		Region:   "Arkansas River, Colorado — Cotopaxi to Texas Creek",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 8.0,
 		GaugeExtID: "07093700", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
@@ -477,7 +477,7 @@ The Wellsville gauge (07093700) is the primary reference. The Parkdale gauge (07
 	// Wellsville gauge (07093700) is near the upper end; Parkdale (07094500) at take-out.
 	{
 		Slug: "arkansas-parkdale", Name: "Parkdale",
-		Region: "Arkansas River, Colorado — Wellsville to Parkdale",
+		Region:   "Arkansas River, Colorado — Wellsville to Parkdale",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 12.0,
 		GaugeExtID: "07093700", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
@@ -493,7 +493,7 @@ The Wellsville gauge (07093700) is near the upper put-in and is the primary refe
 	// accepted reference. The canyon walls rise 1,000+ feet above the river.
 	{
 		Slug: "arkansas-royal-gorge", Name: "Royal Gorge",
-		Region: "Arkansas River, Colorado — Parkdale to Cañon City",
+		Region:   "Arkansas River, Colorado — Parkdale to Cañon City",
 		ClassMin: 4.0, ClassMax: 5.0, Character: "canyon", LengthMi: 10.0,
 		GaugeExtID: "07094500", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
@@ -507,7 +507,7 @@ The Parkdale gauge (07094500) is at the put-in and is the primary flow reference
 	// ---- Colorado River -------------------------------------------------------
 	{
 		Slug: "colorado-gore-canyon", Name: "Gore Canyon",
-		Region: "Colorado River, Colorado — near Kremmling",
+		Region:   "Colorado River, Colorado — near Kremmling",
 		ClassMin: 5.0, ClassMax: 5.0, Character: "continuous", LengthMi: 10.0,
 		GaugeExtID: "09058000", GaugeSource: "usgs",
 	},
@@ -517,13 +517,13 @@ The Parkdale gauge (07094500) is at the put-in and is the primary flow reference
 	// The user noted 1040 cfs rising on a diurnal cycle as a typical morning reading.
 	{
 		Slug: "yampa-cross-mountain-gorge", Name: "Cross Mountain Gorge",
-		Region: "Yampa River, Colorado — near Maybell",
+		Region:   "Yampa River, Colorado — near Maybell",
 		ClassMin: 4.0, ClassMax: 4.0, Character: "canyon", LengthMi: 7.0,
 		GaugeExtID: "09251000", GaugeSource: "usgs",
 	},
 	{
 		Slug: "yampa-canyon", Name: "Yampa Canyon",
-		Region: "Yampa River, Colorado — Deerlodge Park through Dinosaur National Monument",
+		Region:   "Yampa River, Colorado — Deerlodge Park through Dinosaur National Monument",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 46.0,
 		GaugeExtID: "09260050", GaugeSource: "usgs",
 	},
@@ -531,13 +531,13 @@ The Parkdale gauge (07094500) is at the put-in and is the primary flow reference
 	// ---- Gunnison River -------------------------------------------------------
 	{
 		Slug: "gunnison-black-canyon", Name: "Black Canyon of the Gunnison",
-		Region: "Gunnison River, Colorado — Black Canyon National Park",
+		Region:   "Gunnison River, Colorado — Black Canyon National Park",
 		ClassMin: 5.0, ClassMax: 5.0, Character: "creeking", LengthMi: 14.0,
 		GaugeExtID: "09128000", GaugeSource: "usgs",
 	},
 	{
 		Slug: "gunnison-gorge", Name: "Gunnison Gorge",
-		Region: "Gunnison River, Colorado — below Black Canyon",
+		Region:   "Gunnison River, Colorado — below Black Canyon",
 		ClassMin: 4.0, ClassMax: 4.0, Character: "canyon", LengthMi: 16.0,
 		GaugeExtID: "09152500", GaugeSource: "usgs",
 	},
@@ -549,15 +549,15 @@ The Parkdale gauge (07094500) is at the put-in and is the primary flow reference
 	// Domain-expert data: 300–500 cfs is good medium flow (community-verified).
 	{
 		Slug: "escalante-creek", Name: "Escalante Creek",
-		Region: "Escalante Creek, Colorado — near Delta",
+		Region:   "Escalante Creek, Colorado — near Delta",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "creeking", LengthMi: 12.0,
 		GaugeExtID: "09151500", GaugeSource: "usgs",
 		KnownFlowRanges: []knownFlowRange{
-			{Label: "too_low", MinCFS: nil,       MaxCFS: ptr(200),  Notes: "Boat-dragging conditions below 200 cfs."},
-			{Label: "minimum", MinCFS: ptr(200),  MaxCFS: ptr(300),  Notes: "Runnable but bony."},
-			{Label: "fun",     MinCFS: ptr(300),  MaxCFS: ptr(500),  Notes: "Good medium flow. Classic Escalante conditions."},
-			{Label: "pushy",   MinCFS: ptr(500),  MaxCFS: ptr(800),  Notes: "Higher, faster. Diurnal peak range on big snowmelt days."},
-			{Label: "flood",   MinCFS: ptr(800),  MaxCFS: nil,       Notes: "Do not run."},
+			{Label: "too_low", MinCFS: nil, MaxCFS: ptr(200), Notes: "Boat-dragging conditions below 200 cfs."},
+			{Label: "minimum", MinCFS: ptr(200), MaxCFS: ptr(300), Notes: "Runnable but bony."},
+			{Label: "fun", MinCFS: ptr(300), MaxCFS: ptr(500), Notes: "Good medium flow. Classic Escalante conditions."},
+			{Label: "pushy", MinCFS: ptr(500), MaxCFS: ptr(800), Notes: "Higher, faster. Diurnal peak range on big snowmelt days."},
+			{Label: "flood", MinCFS: ptr(800), MaxCFS: nil, Notes: "Do not run."},
 		},
 	},
 
@@ -571,7 +571,7 @@ The Parkdale gauge (07094500) is at the put-in and is the primary flow reference
 	// Shuttle on Hwy 6, continuous granite canyon, strong diurnal swing in April–June.
 	{
 		Slug: "clear-creek-lawson", Name: "Lawson",
-		Region: "Clear Creek, Colorado — Lawson to Idaho Springs",
+		Region:   "Clear Creek, Colorado — Lawson to Idaho Springs",
 		ClassMin: 4.0, ClassMax: 4.0, Character: "canyon", LengthMi: 7.0,
 		GaugeExtID: "06716500", GaugeSource: "usgs",
 	},
@@ -583,7 +583,7 @@ The Parkdale gauge (07094500) is at the put-in and is the primary flow reference
 	// 06716500 (Lawson, upstream) is an upstream indicator.
 	{
 		Slug: "clear-creek-canyon", Name: "Clear Creek Canyon",
-		Region: "Clear Creek, Colorado — Idaho Springs to Golden",
+		Region:   "Clear Creek, Colorado — Idaho Springs to Golden",
 		ClassMin: 4.0, ClassMax: 5.0, Character: "canyon", LengthMi: 14.0,
 		GaugeExtID: "06719505", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
@@ -604,7 +604,7 @@ The Parkdale gauge (07094500) is at the put-in and is the primary flow reference
 	// and posts conditions + hazard notes — a candidate for future RSS/AI integration.
 	{
 		Slug: "cache-la-poudre-canyon", Name: "Cache La Poudre Canyon",
-		Region: "Cache La Poudre River, Colorado — Fort Collins Canyon",
+		Region:   "Cache La Poudre River, Colorado — Fort Collins Canyon",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 14.0,
 		GaugeExtID: "06752260", GaugeSource: "usgs",
 		Notes: `The USGS gauge at Fort Collins (06752260) is at the canyon mouth. Correlation to canyon flow is imperfect: reservoir outflows from Halligan/Seaman and inflow from the Laramie River tunnel near the take-out can inflate readings, especially at lower flows.
@@ -617,7 +617,7 @@ poudrerockreport.com is maintained by Fort Collins locals who check the rock gau
 	// ---- Animas River ---------------------------------------------------------
 	{
 		Slug: "animas-durango", Name: "Animas River — Durango Town Run",
-		Region: "Animas River, Colorado — through Durango",
+		Region:   "Animas River, Colorado — through Durango",
 		ClassMin: 2.0, ClassMax: 3.0, Character: "continuous", LengthMi: 5.0,
 		GaugeExtID: "09361500", GaugeSource: "usgs",
 	},
@@ -625,7 +625,7 @@ poudrerockreport.com is maintained by Fort Collins locals who check the rock gau
 	// ---- Rio Grande -----------------------------------------------------------
 	{
 		Slug: "rio-grande-taos-box", Name: "Taos Box",
-		Region: "Rio Grande, New Mexico — below Taos Junction Bridge",
+		Region:   "Rio Grande, New Mexico — below Taos Junction Bridge",
 		ClassMin: 4.0, ClassMax: 4.0, Character: "canyon", LengthMi: 17.0,
 		GaugeExtID: "08276500", GaugeSource: "usgs",
 	},
@@ -633,7 +633,7 @@ poudrerockreport.com is maintained by Fort Collins locals who check the rock gau
 	// ---- North Platte ---------------------------------------------------------
 	{
 		Slug: "north-platte-six-mile-gap", Name: "Six Mile Gap",
-		Region: "North Platte River, Colorado — near Northgate",
+		Region:   "North Platte River, Colorado — near Northgate",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 6.0,
 		GaugeExtID: "06620000", GaugeSource: "usgs",
 	},
@@ -643,7 +643,7 @@ poudrerockreport.com is maintained by Fort Collins locals who check the rock gau
 	// extremely committing, limited egress. Primarily a kayak run.
 	{
 		Slug: "south-platte-cheesman-canyon", Name: "Cheesman Canyon",
-		Region: "South Platte River, Colorado — above Deckers",
+		Region:   "South Platte River, Colorado — above Deckers",
 		ClassMin: 5.0, ClassMax: 5.0, Character: "creeking", LengthMi: 8.0,
 		GaugeExtID: "06700000", GaugeSource: "usgs",
 	},
@@ -657,7 +657,7 @@ poudrerockreport.com is maintained by Fort Collins locals who check the rock gau
 	// when it becomes available. PLAGRACO is the best upstream proxy for now.
 	{
 		Slug: "n-fork-south-platte-bailey", Name: "Bailey",
-		Region: "North Fork South Platte, Colorado — Bailey to Cliffdale",
+		Region:   "North Fork South Platte, Colorado — Bailey to Cliffdale",
 		ClassMin: 4.0, ClassMax: 5.0, Character: "creeking", LengthMi: 6.0,
 		GaugeExtID: "PLAGRACO", GaugeSource: "dwr",
 		// PLAGRACO is upstream at Grant — acts as upstream indicator for the run.
@@ -665,7 +665,7 @@ poudrerockreport.com is maintained by Fort Collins locals who check the rock gau
 	},
 	{
 		Slug: "n-fork-south-platte-foxton", Name: "Foxton",
-		Region: "North Fork South Platte, Colorado — Ferndale (Boulder Garden) to confluence",
+		Region:   "North Fork South Platte, Colorado — Ferndale (Boulder Garden) to confluence",
 		ClassMin: 3.0, ClassMax: 3.5, Character: "creeking", LengthMi: 5.0,
 		GaugeExtID: "PLAGRACO", GaugeSource: "dwr",
 		RelatedGauges: []gaugeAssoc{
@@ -678,7 +678,7 @@ poudrerockreport.com is maintained by Fort Collins locals who check the rock gau
 				AccessType: "put_in",
 				Name:       "Buffalo Creek (Post Office)",
 				Directions: "Park at the Post Office pullout on US-285 near Buffalo Creek. Put in on river right just downstream.",
-				WaterLat: ptr(39.3921966), WaterLon: ptr(-105.276871),
+				WaterLat:   ptr(39.3921966), WaterLon: ptr(-105.276871),
 				ParkingLat: ptr(39.3928962), ParkingLon: ptr(-105.2779855),
 			},
 			// ---- Boulder Garden section ----
@@ -686,14 +686,14 @@ poudrerockreport.com is maintained by Fort Collins locals who check the rock gau
 				AccessType: "put_in",
 				Name:       "Boulder Garden",
 				Directions: "Park at Cathedral Spires pullout on US-285. River access is a short scramble downstream.",
-				WaterLat: ptr(39.4094114), WaterLon: ptr(-105.2555163),
+				WaterLat:   ptr(39.4094114), WaterLon: ptr(-105.2555163),
 				ParkingLat: ptr(39.4129671), ParkingLon: ptr(-105.2543872),
 			},
 			{
 				AccessType: "take_out",
 				Name:       "Boulder Garden Take-out",
 				Directions: "Take out river left at the downstream end of Boulder Garden. Parking is a short walk up to the road pullout.",
-				WaterLat: ptr(39.4148403), WaterLon: ptr(-105.2496925),
+				WaterLat:   ptr(39.4148403), WaterLon: ptr(-105.2496925),
 				ParkingLat: ptr(39.4142176), ParkingLon: ptr(-105.2520523),
 			},
 			// ---- Standard Foxton run ----
@@ -701,47 +701,47 @@ poudrerockreport.com is maintained by Fort Collins locals who check the rock gau
 				AccessType: "put_in",
 				Name:       "Standard Lower Foxton",
 				Directions: "Roadside parking on Foxton Road (Jefferson County 97). Put in here to run the lower rapids. You can also park at the T intersection just upstream.",
-				WaterLat: ptr(39.4297583), WaterLon: ptr(-105.2328561),
+				WaterLat:   ptr(39.4297583), WaterLon: ptr(-105.2328561),
 			},
 			{
 				AccessType: "intermediate",
 				Name:       `The "T"`,
 				Directions: `Put in or take out at the T-intersection on Foxton Road. Parking available. Lower rapids start upstream of this point.`,
-				WaterLat: ptr(39.4361133), WaterLon: ptr(-105.2340931),
+				WaterLat:   ptr(39.4361133), WaterLon: ptr(-105.2340931),
 			},
 			{
 				AccessType: "take_out",
 				Name:       "Dome Rock",
 				Directions: "Standard take-out for the Foxton run. Parking available at the Dome Rock pullout on Foxton Road.",
-				WaterLat: ptr(39.4277208), WaterLon: ptr(-105.2071424),
+				WaterLat:   ptr(39.4277208), WaterLon: ptr(-105.2071424),
 			},
 			{
 				AccessType: "take_out",
 				Name:       "Extra Long Take-out",
 				Directions: "Extended take-out before the flat water to the hotel. Parking on Foxton Road.",
-				WaterLat: ptr(39.4102617), WaterLon: ptr(-105.1849536),
+				WaterLat:   ptr(39.4102617), WaterLon: ptr(-105.1849536),
 			},
 			{
 				AccessType: "take_out",
 				Name:       "South Platte Hotel",
 				Directions: "Take out at the confluence of the North and South Forks. The South Platte Hotel ruins are nearby.",
-				WaterLat: ptr(39.4083789), WaterLon: ptr(-105.1708317),
+				WaterLat:   ptr(39.4083789), WaterLon: ptr(-105.1708317),
 			},
 		},
 		KnownRapids: []knownRapid{
 			// ---- Boulder Garden section (Class III+) ----
-			{Name: "Triple Bypass",  ClassRating: ptr(3.5), Description: "Main line is a rock slide down the middle. Sneak at low water on far right. Hero line on the left requires a quick return back to right.", Lat: ptr(39.411516), Lon: ptr(-105.2551253)},
+			{Name: "Triple Bypass", ClassRating: ptr(3.5), Description: "Main line is a rock slide down the middle. Sneak at low water on far right. Hero line on the left requires a quick return back to right.", Lat: ptr(39.411516), Lon: ptr(-105.2551253)},
 			{Name: "Double Tombstone", ClassRating: ptr(3.5), Description: "Stay just right of the humped rock in the middle. Fun zig-zag line available but will require a scary ferry in front of a terribly undercut rock.", Lat: ptr(39.4128201), Lon: ptr(-105.2537534)},
-			{Name: "Double Drop",    ClassRating: ptr(2.5), Description: "First drop is easiest on right with a hard left hand angle. Second drop is easiest on left.", Lat: ptr(39.413372), Lon: ptr(-105.2525977)},
+			{Name: "Double Drop", ClassRating: ptr(2.5), Description: "First drop is easiest on right with a hard left hand angle. Second drop is easiest on left.", Lat: ptr(39.413372), Lon: ptr(-105.2525977)},
 			{Name: "Log Jam Rapid", ClassRating: ptr(3.0), Description: "Easiest line is drive left as you come around the blind turn. Right can work but has a number of rocks in the main path. Bad log jam in the middle.", Lat: ptr(39.4141066), Lon: ptr(-105.2518239)},
-			{Name: "Death Star",    ClassRating: ptr(3.0), Description: `Be left of the giant house-sized boulder. Many lines including the "trenches" on the left just before the main boulder. Major dangerous sieve on river right next to the main boulder.`, Lat: ptr(39.4144433), Lon: ptr(-105.2506531)},
+			{Name: "Death Star", ClassRating: ptr(3.0), Description: `Be left of the giant house-sized boulder. Many lines including the "trenches" on the left just before the main boulder. Major dangerous sieve on river right next to the main boulder.`, Lat: ptr(39.4144433), Lon: ptr(-105.2506531)},
 			// ---- Standard Foxton run ----
-			{Name: "Last Resort",   ClassRating: ptr(3.0), Lat: ptr(39.435594),  Lon: ptr(-105.2362756)},
-			{Name: "T Rapid",       ClassRating: ptr(2.5), Description: "Decent play wave at the bottom.", Lat: ptr(39.4359151), Lon: ptr(-105.2339099)},
-			{Name: "Just Boof It",  ClassRating: ptr(3.0), Description: "You're gonna hit the boof, so just boof it.", Lat: ptr(39.4268878), Lon: ptr(-105.2193208)},
-			{Name: "Phone Boof",    ClassRating: ptr(3.0), Description: `Named after the "BOOF" decals on the phone pedestal next to the road.`, Lat: ptr(39.4270144), Lon: ptr(-105.2181294)},
+			{Name: "Last Resort", ClassRating: ptr(3.0), Lat: ptr(39.435594), Lon: ptr(-105.2362756)},
+			{Name: "T Rapid", ClassRating: ptr(2.5), Description: "Decent play wave at the bottom.", Lat: ptr(39.4359151), Lon: ptr(-105.2339099)},
+			{Name: "Just Boof It", ClassRating: ptr(3.0), Description: "You're gonna hit the boof, so just boof it.", Lat: ptr(39.4268878), Lon: ptr(-105.2193208)},
+			{Name: "Phone Boof", ClassRating: ptr(3.0), Description: `Named after the "BOOF" decals on the phone pedestal next to the road.`, Lat: ptr(39.4270144), Lon: ptr(-105.2181294)},
 			{Name: "Shark's Tooth", ClassRating: ptr(3.0), Description: "Go left of the shark's tooth and boof the middle of the ledge. Fun and easy landing.", Lat: ptr(39.4253454), Lon: ptr(-105.2118853)},
-			{Name: "Triple-Drop",   ClassRating: ptr(3.0), Description: "Three consecutive drops. Don't hit the wall at the bottom.", Lat: ptr(39.4250455), Lon: ptr(-105.2088846)},
+			{Name: "Triple-Drop", ClassRating: ptr(3.0), Description: "Three consecutive drops. Don't hit the wall at the bottom.", Lat: ptr(39.4250455), Lon: ptr(-105.2088846)},
 		},
 		Notes: `Two distinct sections: Boulder Garden (Class III+, tight technical creeking — only attempt if you can catch all eddies in Class III) and the Standard Foxton Run (Class III+, can get continuous at times, especially over 500 cfs). Standard minimum for the lower run is around 225 cfs.
 
@@ -756,7 +756,7 @@ Gauge math: PLAGRACO at Grant is the best upstream indicator but misses unmonito
 	// controlling gauge. PLASPLCO sits at the bottom of the run near the confluence.
 	{
 		Slug: "south-platte-deckers", Name: "Deckers",
-		Region: "South Platte River, Colorado — Trumbull/Deckers to South Platte confluence",
+		Region:   "South Platte River, Colorado — Trumbull/Deckers to South Platte confluence",
 		ClassMin: 2.0, ClassMax: 3.0, Character: "canyon", LengthMi: 10.0,
 		GaugeExtID: "06701900", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
@@ -772,7 +772,7 @@ Gauge math: PLAGRACO at Grant is the best upstream indicator but misses unmonito
 	// Note: do not paddle into Chatfield Reservoir — take out at Gravel Ponds Bridge.
 	{
 		Slug: "south-platte-waterton-chatfield", Name: "S Platte: Waterton to Chatfield",
-		Region: "South Platte River, Colorado — Waterton Canyon to Chatfield Reservoir",
+		Region:   "South Platte River, Colorado — Waterton Canyon to Chatfield Reservoir",
 		ClassMin: 1.0, ClassMax: 1.0, Character: "flatwater", LengthMi: 4.5,
 		GaugeExtID: "PLAWATCO", GaugeSource: "dwr",
 		KnownAccess: []knownAccess{
@@ -792,11 +792,11 @@ Gauge math: PLAGRACO at Grant is the best upstream indicator but misses unmonito
 			},
 		},
 		KnownFlowRanges: []knownFlowRange{
-			{Label: "too_low", MinCFS: nil,       MaxCFS: ptr(100.0), Notes: "Too shallow for comfortable paddling."},
+			{Label: "too_low", MinCFS: nil, MaxCFS: ptr(100.0), Notes: "Too shallow for comfortable paddling."},
 			{Label: "minimum", MinCFS: ptr(100.0), MaxCFS: ptr(150.0), Notes: "Runnable but scratchy in spots."},
-			{Label: "fun",     MinCFS: ptr(150.0), MaxCFS: ptr(300.0), Notes: "Ideal. ~200 CFS is the sweet spot — current moves well, no hazards."},
-			{Label: "pushy",   MinCFS: ptr(300.0), MaxCFS: ptr(500.0), Notes: "Faster current, still appropriate for intermediate paddlers."},
-			{Label: "flood",   MinCFS: ptr(500.0), MaxCFS: nil,        Notes: "High — use caution."},
+			{Label: "fun", MinCFS: ptr(150.0), MaxCFS: ptr(300.0), Notes: "Ideal. ~200 CFS is the sweet spot — current moves well, no hazards."},
+			{Label: "pushy", MinCFS: ptr(300.0), MaxCFS: ptr(500.0), Notes: "Faster current, still appropriate for intermediate paddlers."},
+			{Label: "flood", MinCFS: ptr(500.0), MaxCFS: nil, Notes: "High — use caution."},
 		},
 		Notes: `Relaxed flatwater float through Waterton Canyon, suitable for SUP, tubing, and beginners. No significant rapids. ~200 CFS on the PLAWATCO gauge (averaging ~1.5 ft) is reported as the ideal level for recreational paddling.
 
@@ -813,12 +813,26 @@ Stop at Gravel Ponds Bridge — paddling into Chatfield Reservoir is not recomme
 	// worth noting at high runoff. I-70 parallels the entire run; egress is easy.
 	{
 		Slug: "eagle-river-dowd-chutes", Name: "Dowd Chutes",
-		Region: "Eagle River, Colorado — Minturn to Edwards",
+		Region:   "Eagle River, Colorado — Minturn to Edwards",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 9.0,
 		GaugeExtID: "09064600", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
 			{ExtID: "09070000", Source: "usgs", Relationship: "downstream_indicator"},
 		},
+	},
+
+	// Ruby–Horsethief Canyon is a mellow float through redrock canyon near Grand Junction.
+	{
+		Slug:        "ruby-horsethief",
+		Name:        "Ruby–Horsethief Canyon",
+		Region:      "Grand Junction, CO",
+		ClassMin:    1,
+		ClassMax:    2,
+		Character:   "canyon",
+		LengthMi:    25,
+		GaugeExtID:  "09163500", // USGS station number
+		GaugeSource: "usgs",
+		Notes:       "Flat-water float through redrock canyon, BLM permit required",
 	},
 
 	// ---- Colorado River — Utah ------------------------------------------------
@@ -834,7 +848,7 @@ Stop at Gravel Ponds Bridge — paddling into Chatfield Reservoir is not recomme
 	// water takes ~12-24 hours to travel from there to Westwater.
 	{
 		Slug: "westwater-canyon", Name: "Westwater Canyon",
-		Region: "Colorado River, Utah — Westwater to Cisco",
+		Region:   "Colorado River, Utah — Westwater to Cisco",
 		ClassMin: 3.0, ClassMax: 4.0, Character: "canyon", LengthMi: 17.0,
 		GaugeExtID: "09180500", GaugeSource: "usgs",
 		RelatedGauges: []gaugeAssoc{
@@ -856,7 +870,7 @@ Cisco gauge (09180500) is the standard flow reference. Most parties target 4,000
 	// PLAWATCO (South Platte at Waterton) is downstream near the canyon exit.
 	{
 		Slug: "south-platte-waterton-canyon", Name: "Waterton Canyon",
-		Region: "South Platte River, Colorado — South Platte to Strontia Springs",
+		Region:   "South Platte River, Colorado — South Platte to Strontia Springs",
 		ClassMin: 2.0, ClassMax: 3.0, Character: "canyon", LengthMi: 10.0,
 		GaugeExtID: "PLASPLCO", GaugeSource: "dwr",
 		RelatedGauges: []gaugeAssoc{
@@ -873,7 +887,7 @@ Cisco gauge (09180500) is the standard flow reference. Most parties target 4,000
 	// Domain-expert data: 150 cfs minimum to float; 200 cfs is enjoyable.
 	{
 		Slug: "south-platte-strontia-chatfield", Name: "Strontia Springs to Chatfield",
-		Region: "South Platte River, Colorado — Waterton Canyon parking lot to Chatfield gravel ponds",
+		Region:   "South Platte River, Colorado — Waterton Canyon parking lot to Chatfield gravel ponds",
 		ClassMin: 1.0, ClassMax: 2.0, Character: "continuous", LengthMi: 2.0,
 		GaugeExtID: "PLAWATCO", GaugeSource: "dwr",
 		RelatedGauges: []gaugeAssoc{
@@ -889,9 +903,9 @@ Not a whitewater run — mellow and continuous, suitable for recreational kayaks
 
 Minimum floatable flow is approximately 150 cfs. Below that, expect dragging and rocky shallows. At 200 cfs and above the run has enough current to be genuinely enjoyable.`,
 		KnownFlowRanges: []knownFlowRange{
-			{Label: "too_low", MinCFS: nil,       MaxCFS: ptr(150), Notes: "Too shallow to float without dragging."},
-			{Label: "minimum", MinCFS: ptr(150),  MaxCFS: ptr(200), Notes: "Marginal but floatable; expect some scraping in shallows."},
-			{Label: "fun",     MinCFS: ptr(200),  MaxCFS: nil,      Notes: "Good current; enjoyable recreational float."},
+			{Label: "too_low", MinCFS: nil, MaxCFS: ptr(150), Notes: "Too shallow to float without dragging."},
+			{Label: "minimum", MinCFS: ptr(150), MaxCFS: ptr(200), Notes: "Marginal but floatable; expect some scraping in shallows."},
+			{Label: "fun", MinCFS: ptr(200), MaxCFS: nil, Notes: "Good current; enjoyable recreational float."},
 		},
 	},
 }
