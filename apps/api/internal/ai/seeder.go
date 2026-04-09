@@ -153,10 +153,10 @@ Respond ONLY with a valid JSON object matching this exact schema. No markdown, n
   ],
   "flow_ranges": [
     {
-      "label": "too_low" | "minimum" | "fun" | "optimal" | "pushy" | "high" | "flood",
+      "label": "below_recommended" | "runnable" | "above_recommended",
       "min_cfs": number | null,
       "max_cfs": number | null,
-      "notes": "string — brief context, e.g. 'Bony but runnable at minimum'",
+      "notes": "string — brief context, e.g. 'Bony but runnable at minimum flows'",
       "confidence": 0-100
     }
   ]
@@ -179,7 +179,10 @@ IMPORTANT on access points:
 
 IMPORTANT on flow ranges:
 - Provide community-accepted CFS windows for the reach's primary gauge (the gauge that most paddlers use to decide whether to run this reach).
-- Use the labels in order: too_low → minimum → fun → optimal → pushy → high → flood. Omit labels you are not confident about.
+- Use exactly these three labels (omit any you are not confident about):
+    "below_recommended" — too low to run comfortably; scrapy, portages increase, not worth the trip
+    "runnable"          — the recommended window; covers everything from minimum to pushy-but-fun
+    "above_recommended" — above the safe or enjoyable limit; experts only or do not run
 - min_cfs null means "any flow below max_cfs". max_cfs null means "any flow above min_cfs". Both null is invalid — omit the entry instead.
 - For dam-regulated rivers, note if the window is release-dependent rather than flow-dependent.
 - Well-documented classics (Browns Canyon, The Numbers, Gore Canyon) should have complete ranges at high confidence. Obscure runs may have only 1-2 bands.
