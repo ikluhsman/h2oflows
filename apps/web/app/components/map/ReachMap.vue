@@ -79,24 +79,52 @@
           <span v-if="r.classLabel" class="shrink-0 text-[10px] text-gray-400 font-medium">{{ r.classLabel }}</span>
         </button>
       </template>
+
+      <!-- Gauges group -->
+      <template v-if="gaugeFeatures.length > 0">
+        <p class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Gauges</p>
+        <button
+          v-for="g in gaugeFeatures"
+          :key="g.id"
+          class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-xs"
+          :class="selectedId === g.id ? 'bg-gray-100 dark:bg-gray-800' : ''"
+          @click="selectFeature(g.id, g.lng!, g.lat!)"
+        >
+          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-cyan-600">~</span>
+          <span class="truncate text-gray-700 dark:text-gray-300">{{ g.name ?? g.external_id ?? gaugeRelLabel(g.reach_relationship) }}</span>
+          <span class="shrink-0 text-[10px] text-gray-400 capitalize">{{ gaugeRelLabel(g.reach_relationship) }}</span>
+        </button>
+      </template>
     </div>
   </div>
 
-  <!-- Selected feature detail panel -->
+  <!-- Selected feature detail card -->
   <div
     v-if="selectedFeature"
-    class="border-t border-gray-200 dark:border-gray-700 px-4 py-3 flex items-start gap-3"
+    class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-3 py-3"
   >
-    <div class="flex-1 min-w-0">
-      <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ selectedFeature.title }}</p>
-      <p v-if="selectedFeature.subtitle" class="text-xs text-gray-400 mt-0.5">{{ selectedFeature.subtitle }}</p>
-      <p v-if="selectedFeature.desc" class="text-sm text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">{{ selectedFeature.desc }}</p>
-      <p v-else class="text-xs text-gray-400 mt-1 italic">No description available.</p>
+    <div class="flex gap-2.5 items-start">
+      <!-- Map pin icon (same SVG as the map marker, scaled to 20×26) -->
+      <div
+        class="shrink-0 mt-0.5"
+        style="width:20px;height:26px;line-height:0;overflow:visible"
+        v-html="selectedFeaturePinSvg"
+      />
+      <!-- Content -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <p class="text-sm font-semibold text-gray-800 dark:text-gray-100 leading-tight">{{ selectedFeature.title }}</p>
+          <span v-if="selectedFeature.classLabel" class="text-xs font-mono text-gray-500 dark:text-gray-400">Class {{ selectedFeature.classLabel }}</span>
+        </div>
+        <p v-if="selectedFeature.subtitle" class="text-xs text-gray-400 mt-0.5">{{ selectedFeature.subtitle }}</p>
+        <p v-if="selectedFeature.desc" class="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed line-clamp-3">{{ selectedFeature.desc }}</p>
+        <p v-else class="text-xs text-gray-400 mt-1 italic">No description available.</p>
+      </div>
+      <button
+        class="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none"
+        @click="selectedId = null"
+      >×</button>
     </div>
-    <button
-      class="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none mt-0.5"
-      @click="selectedId = null"
-    >×</button>
   </div>
 </template>
 
@@ -184,17 +212,47 @@ const selectedFeature = computed(() => {
   if (!selectedId.value) return null
   const rapid = rapidFeatures.value.find(r => r.id === selectedId.value)
   if (rapid) return {
-    title:    rapid.label + (rapid.classLabel ? ` · Class ${rapid.classLabel}` : ''),
-    subtitle: rapid.isSurf ? 'Surf wave' : null,
-    desc:     rapid.desc || null,
+    title:      rapid.label,
+    classLabel: rapid.classLabel,
+    subtitle:   rapid.isSurf ? 'Surf wave' : null,
+    desc:       rapid.desc || null,
+    pinColor:   '#3b82f6',
+    pinIcon:    rapid.isSurf ? '🌊' : '~',
   }
   const access = accessFeatures.value.find(a => a.id === selectedId.value)
   if (access) return {
-    title:    accessTypeLabel(access.type),
-    subtitle: access.label !== accessTypeLabel(access.type) ? access.label : null,
-    desc:     access.notes || null,
+    title:      access.label !== accessTypeLabel(access.type) ? access.label : accessTypeLabel(access.type),
+    classLabel: null as string | null,
+    subtitle:   access.label !== accessTypeLabel(access.type) ? accessTypeLabel(access.type) : null,
+    desc:       access.notes || null,
+    pinColor:   accessColor(access.type),
+    pinIcon:    accessIcon(access.type),
+  }
+  const gauge = gaugeFeatures.value.find(g => g.id === selectedId.value)
+  if (gauge) return {
+    title:      gauge.name ?? gauge.external_id ?? 'Flow gauge',
+    classLabel: null as string | null,
+    subtitle:   gaugeRelLabel(gauge.reach_relationship),
+    desc:       null as string | null,
+    pinColor:   '#0891b2',
+    pinIcon:    '~',
   }
   return null
+})
+
+// Pre-scaled pin SVG for the detail card (20×26 instead of the map's 28×36)
+const selectedFeaturePinSvg = computed(() => {
+  if (!selectedFeature.value) return ''
+  const { pinColor, pinIcon } = selectedFeature.value
+  const arrow = pinIcon === '↓'
+    ? `<path d="M10 5.5 L10 13.5 M6.5 10.5 L10 14 L13.5 10.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
+    : pinIcon === '↑'
+    ? `<path d="M10 14 L10 5.5 M6.5 9 L10 5.5 L13.5 9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
+    : `<text x="10" y="13" text-anchor="middle" dominant-baseline="middle" font-size="9" font-weight="800" font-family="system-ui,sans-serif" fill="white">${pinIcon}</text>`
+  return `<svg width="20" height="26" viewBox="0 0 20 26" xmlns="http://www.w3.org/2000/svg">
+    <path d="M10 1.5C6.1 1.5 3 4.6 3 8.5c0 5.3 7 16 7 16s7-10.7 7-16c0-3.9-3.1-7-7-7z" fill="${pinColor}" stroke="white" stroke-width="1.2"/>
+    ${arrow}
+  </svg>`
 })
 
 // Gauges with valid coordinates (from array or legacy single props)
@@ -370,6 +428,11 @@ function addLayers() {
     el.title = `${relLabel}${g.name ? ': ' + g.name : g.external_id ? ': ' + g.external_id : ''}`
     el.addEventListener('mouseenter', () => showTooltip(el, el.title, [g.lng!, g.lat!]))
     el.addEventListener('mouseleave', () => tooltip.remove())
+    el.addEventListener('click', () => {
+      clickPopup?.remove()
+      map!.flyTo({ center: [g.lng!, g.lat!], zoom: Math.max(map!.getZoom(), 14), duration: 600 })
+      setSelectedMarker(g.id)
+    })
     const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
       .setLngLat([g.lng!, g.lat!])
       .addTo(map!)
@@ -586,6 +649,7 @@ function selectFeature(id: string, lng: number, lat: number) {
   if (!map) return
   map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 14), duration: 600 })
   clickPopup?.remove()
+  // Gauges use the detail card only — no popup
   const rapid = rapidFeatures.value.find(r => r.id === id)
   const access = accessFeatures.value.find(a => a.id === id)
   if (rapid) {
