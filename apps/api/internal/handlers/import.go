@@ -9,7 +9,10 @@ import (
 )
 
 // Import provides the KMZ/KML file import endpoint.
-type Import struct{ Pool *pgxpool.Pool }
+type Import struct {
+	Pool        *pgxpool.Pool
+	CacheWarmer func() // optional; called after a successful import to refresh the map cache
+}
 
 // ImportKMZ handles POST /api/v1/import/kmz
 // Accepts multipart/form-data with a "file" field containing a KML or KMZ file.
@@ -45,6 +48,11 @@ func (h *Import) ImportKMZ(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "import: "+err.Error())
 		return
+	}
+
+	// Rewarm the map cache so imported reaches appear on the map immediately.
+	if h.CacheWarmer != nil {
+		go h.CacheWarmer()
 	}
 
 	jsonResponse(w, http.StatusOK, res)

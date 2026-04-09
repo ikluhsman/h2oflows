@@ -1072,6 +1072,9 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 	var lengthMi *float64
 	_ = h.db.QueryRow(r.Context(), `SELECT length_mi FROM reaches WHERE id = $1`, reachID).Scan(&lengthMi)
 
+	// Rewarm the map cache so the reach appears on the map immediately.
+	go h.WarmCache(context.Background())
+
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"centerline": rawGeometry([]byte(lineJSON)),
 		"length_mi":  lengthMi,

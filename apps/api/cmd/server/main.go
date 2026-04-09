@@ -102,7 +102,10 @@ func main() {
 	reaches.WarmCache(context.Background())
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
 	trips   := handlers.NewTripHandler(pool, describer)
-	imports := &handlers.Import{Pool: pool}
+	imports := &handlers.Import{
+		Pool:        pool,
+		CacheWarmer: func() { reaches.WarmCache(context.Background()) },
+	}
 	r.Route("/api/v1", func(r chi.Router) {
 		// Optional: attaches user claims when a valid Bearer token is present,
 		// but anonymous (device_id) requests still flow through.

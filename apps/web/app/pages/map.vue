@@ -247,13 +247,13 @@ function onReachClick(slug: string) {
   router.push(`/reaches/${slug}`)
 }
 
-// Flow status colors (match the gauge color scheme)
+// Flow status colors — aligned with GaugeGraph band colors
 function flowStatusColor(status: string): string {
   const map: Record<string, string> = {
-    runnable: '#22c55e',
-    caution:  '#eab308',
-    low:      '#ef4444',
-    flood:    '#3b82f6',
+    runnable: '#22c55e',   // green  — runnable band
+    caution:  '#ef4444',   // red    — below_recommended band
+    low:      '#ef4444',   // red
+    flood:    '#3b82f6',   // blue   — above_recommended band
   }
   return map[status] ?? '#9ca3af'
 }

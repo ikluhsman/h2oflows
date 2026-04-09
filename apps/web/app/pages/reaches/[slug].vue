@@ -339,73 +339,77 @@
       </section>
 
 
-      <!-- River features: put-ins, take-outs, rapids, hazards — upstream to downstream -->
-      <section v-if="riverFeatures.length > 0">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">River Features</h2>
-        <div class="relative">
-          <!-- Vertical timeline spine -->
-          <div class="absolute left-4 top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
+      <!-- Features tabbed panel -->
+      <section v-if="allFeatures.length > 0">
+        <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
 
-          <div class="space-y-5">
-            <div
-              v-for="feat in riverFeatures"
-              :key="feat.key"
-              class="relative flex gap-4 pl-10"
+          <!-- Tab bar -->
+          <div class="flex overflow-x-auto border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950">
+            <button
+              v-for="tab in featureTabs"
+              :key="tab.key"
+              class="shrink-0 px-4 py-3 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap flex items-center gap-1.5"
+              :class="featuresTab === tab.key
+                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+              @click="featuresTab = tab.key; expandedFeatureKey = null"
             >
-              <!-- Timeline dot -->
+              {{ tab.label }}
+              <span
+                class="rounded-full px-1.5 py-px text-xs leading-none"
+                :class="featuresTab === tab.key
+                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
+                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500'"
+              >{{ tab.count }}</span>
+            </button>
+          </div>
+
+          <!-- Feature rows -->
+          <div v-if="filteredFeatures.length" class="divide-y divide-gray-100 dark:divide-gray-800">
+            <div v-for="feat in filteredFeatures" :key="feat.key">
+
+              <!-- Row summary -->
               <div
-                class="absolute left-2.5 top-1 w-3 h-3 rounded-full border-2 shrink-0"
-                :class="featureDotClass(feat)"
-              />
-
-              <div class="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 min-w-0">
-                <div class="flex items-start gap-2 flex-wrap">
-                  <!-- Type pill -->
+                class="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/60 transition-colors select-none"
+                @click="toggleFeature(feat.key)"
+              >
+                <div class="flex items-center gap-2 flex-wrap min-w-0">
                   <span
-                    class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
                     :class="featurePillClass(feat)"
-                  >
-                    {{ featureTypeLabel(feat) }}
-                  </span>
-
-                  <!-- Class badge for rapids -->
+                  >{{ featureTypeLabel(feat) }}</span>
                   <span
-                    v-if="feat.type === 'rapid' && feat.class_rating"
+                    v-if="(feat.type === 'rapid' || feat.type === 'hazard') && feat.class_rating"
                     class="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-mono font-medium text-gray-600 dark:text-gray-300 shrink-0"
                   >
-                    {{ romanClass(feat.class_rating) }}
-                    <span v-if="feat.class_at_high && feat.class_at_high > feat.class_rating" class="text-gray-400 ml-0.5">({{ romanClass(feat.class_at_high) }})</span>
+                    {{ romanClass(feat.class_rating) }}<span v-if="feat.class_at_high && feat.class_at_high > feat.class_rating" class="text-gray-400 ml-0.5">({{ romanClass(feat.class_at_high) }})</span>
                   </span>
-
-                  <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100 leading-tight">
-                    {{ feat.name }}
-                  </h3>
+                  <span class="text-sm font-medium text-gray-800 dark:text-gray-100">{{ feat.name }}</span>
                 </div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': expandedFeatureKey === feat.key }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+              </div>
 
-                <p
-                  v-if="feat.description"
-                  class="mt-1.5 text-xs text-gray-500 dark:text-gray-400 leading-relaxed line-clamp-3"
-                >
-                  {{ feat.description }}
+              <!-- Expanded details -->
+              <div
+                v-if="expandedFeatureKey === feat.key"
+                class="px-4 pb-4 pt-1 space-y-2 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40"
+              >
+                <p v-if="feat.description" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{{ feat.description }}</p>
+                <p v-if="feat.portage_description" class="text-xs text-amber-600 dark:text-amber-400">
+                  <span class="font-medium">Portage:</span> {{ feat.portage_description }}
                 </p>
-
-                <!-- Portage note -->
-                <p
-                  v-if="feat.portage_description"
-                  class="mt-1 text-xs text-amber-600 dark:text-amber-400"
-                >
-                  Portage: {{ feat.portage_description }}
-                </p>
-
-                <!-- Hazard type badge -->
                 <span
                   v-if="feat.is_permanent_hazard && feat.hazard_type"
-                  class="mt-1.5 inline-flex items-center rounded bg-red-50 dark:bg-red-950 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-300"
-                >
-                  ⚠ {{ hazardTypeLabel(feat.hazard_type) }}
-                </span>
+                  class="inline-flex items-center rounded bg-red-50 dark:bg-red-950 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-300"
+                >⚠ {{ hazardTypeLabel(feat.hazard_type) }}</span>
+                <p v-if="!feat.description && !feat.portage_description && !(feat.is_permanent_hazard && feat.hazard_type)" class="text-xs text-gray-400 italic">No additional details available.</p>
               </div>
+
             </div>
+          </div>
+
+          <div v-else class="px-4 py-8 text-center text-sm text-gray-400">
+            No features in this category
           </div>
         </div>
       </section>
@@ -465,7 +469,7 @@ const { data: flowRanges } = await useAsyncData(
 
 interface RiverFeature {
   key:          string
-  type:         'rapid' | 'put_in' | 'take_out' | 'hazard' | 'access'
+  type:         'rapid' | 'put_in' | 'take_out' | 'hazard' | 'access' | 'camp' | 'parking'
   name:         string
   description?: string | null
   // rapids-specific
@@ -480,10 +484,8 @@ interface RiverFeature {
   lng?:         number | null
 }
 
-// Combine rapids and access points sorted upstream → downstream.
-// Colorado rivers run west→east so ascending longitude = upstream→downstream.
-// Features without coordinates go at the end.
-const riverFeatures = computed<RiverFeature[]>(() => {
+// All features sorted upstream → downstream (including camps and parking).
+const allFeatures = computed<RiverFeature[]>(() => {
   const r = reach.value as any
   if (!r) return []
 
@@ -507,10 +509,14 @@ const riverFeatures = computed<RiverFeature[]>(() => {
   }
 
   for (const acc of r.access ?? []) {
-    if (acc.access_type === 'parking' || acc.access_type === 'shuttle_drop') continue
+    let type: RiverFeature['type'] = 'access'
+    if (acc.access_type === 'put_in')   type = 'put_in'
+    else if (acc.access_type === 'take_out') type = 'take_out'
+    else if (acc.access_type === 'camp') type = 'camp'
+    else if (acc.access_type === 'parking' || acc.access_type === 'shuttle_drop') type = 'parking'
     items.push({
       key:  `access-${acc.id}`,
-      type: acc.access_type as any,
+      type,
       name: acc.name,
       description: acc.notes ?? acc.directions,
       river_order: acc.river_order,
@@ -531,12 +537,46 @@ const riverFeatures = computed<RiverFeature[]>(() => {
   })
 })
 
+// ---- Features tab state -------------------------------------------------------
+
+const featuresTab = ref<string>('all')
+const expandedFeatureKey = ref<string | null>(null)
+
+function toggleFeature(key: string) {
+  expandedFeatureKey.value = expandedFeatureKey.value === key ? null : key
+}
+
+const featureTabs = computed(() => {
+  const f = allFeatures.value
+  const tabs = [
+    { key: 'all',     label: 'All',           count: f.length },
+    { key: 'access',  label: 'Access Points', count: f.filter(x => ['put_in','take_out','access'].includes(x.type)).length },
+    { key: 'rapids',  label: 'Rapids',        count: f.filter(x => x.type === 'rapid' || x.type === 'hazard').length },
+    { key: 'camps',   label: 'Camps',         count: f.filter(x => x.type === 'camp').length },
+    { key: 'parking', label: 'Parking',       count: f.filter(x => x.type === 'parking').length },
+  ]
+  // Only show specific tabs when they have entries
+  return tabs.filter(t => t.key === 'all' || t.count > 0)
+})
+
+const filteredFeatures = computed(() => {
+  switch (featuresTab.value) {
+    case 'access':  return allFeatures.value.filter(f => ['put_in','take_out','access'].includes(f.type))
+    case 'rapids':  return allFeatures.value.filter(f => f.type === 'rapid' || f.type === 'hazard')
+    case 'camps':   return allFeatures.value.filter(f => f.type === 'camp')
+    case 'parking': return allFeatures.value.filter(f => f.type === 'parking')
+    default:        return allFeatures.value
+  }
+})
+
 function featureTypeLabel(feat: RiverFeature): string {
   if (feat.is_permanent_hazard) return 'Hazard'
   switch (feat.type) {
     case 'rapid':    return 'Rapid'
     case 'put_in':   return 'Put-in'
     case 'take_out': return 'Take-out'
+    case 'camp':     return 'Campsite'
+    case 'parking':  return 'Parking'
     case 'access':   return 'Access'
     default:         return 'Feature'
   }
@@ -547,27 +587,18 @@ function featurePillClass(feat: RiverFeature): string {
     return 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
   switch (feat.type) {
     case 'rapid':
+    case 'hazard':
       return 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
     case 'put_in':
     case 'take_out':
     case 'access':
       return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+    case 'camp':
+      return 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+    case 'parking':
+      return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
     default:
       return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
-  }
-}
-
-function featureDotClass(feat: RiverFeature): string {
-  if (feat.is_permanent_hazard)
-    return 'bg-red-500 border-red-300 dark:border-red-700'
-  switch (feat.type) {
-    case 'rapid':
-      return 'bg-blue-500 border-blue-300 dark:border-blue-700'
-    case 'put_in':
-    case 'take_out':
-      return 'bg-emerald-500 border-emerald-300 dark:border-emerald-700'
-    default:
-      return 'bg-gray-400 border-gray-200 dark:border-gray-600'
   }
 }
 
@@ -623,9 +654,9 @@ const classLabel = computed(() => {
 const statusColor = computed(() => {
   switch (reach.value?.gauge.flow_status) {
     case 'runnable': return 'success'
-    case 'caution':  return 'warning'
-    case 'low':
-    case 'flood':    return 'error'
+    case 'caution':  return 'error'
+    case 'low':      return 'error'
+    case 'flood':    return 'info'
     default:         return 'neutral'
   }
 })
@@ -683,8 +714,8 @@ useSeoMeta({
 
 const cfsClass = computed(() => ({
   'text-emerald-500': reach.value?.gauge.flow_status === 'runnable',
-  'text-yellow-500':  reach.value?.gauge.flow_status === 'caution',
-  'text-red-500':     ['low','flood'].includes(reach.value?.gauge.flow_status ?? ''),
+  'text-red-500':     ['caution','low'].includes(reach.value?.gauge.flow_status ?? ''),
+  'text-sky-500':     reach.value?.gauge.flow_status === 'flood',
   'text-gray-300':    reach.value?.gauge.flow_status === 'unknown',
 }))
 
@@ -759,9 +790,9 @@ function removeFromDashboard(gaugeId: string) {
 function flowStatusColor(status: string): string {
   switch (status) {
     case 'runnable': return 'success'
-    case 'caution':  return 'warning'
+    case 'caution':  return 'error'    // below_recommended = red (matches graph)
     case 'low':      return 'error'
-    case 'flood':    return 'info'
+    case 'flood':    return 'info'     // above_recommended = blue (matches graph)
     default:         return 'neutral'
   }
 }
@@ -779,9 +810,9 @@ function flowStatusLabel(status: string): string {
 function cfsColorClass(status: string): string {
   switch (status) {
     case 'runnable': return 'text-emerald-500'
-    case 'caution':  return 'text-yellow-500'
+    case 'caution':  return 'text-red-500'    // below_recommended = red
     case 'low':      return 'text-red-500'
-    case 'flood':    return 'text-sky-500'
+    case 'flood':    return 'text-sky-500'    // above_recommended = blue
     default:         return 'text-gray-300'
   }
 }

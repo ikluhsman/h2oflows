@@ -1,6 +1,6 @@
 <template>
   <!-- Map + feature list side-by-side on sm+, stacked on mobile -->
-  <div class="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:h-120">
+  <div class="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:h-140">
 
     <!-- MapLibre container — ref is on THIS element so MapLibre reads its own clientHeight -->
     <div
