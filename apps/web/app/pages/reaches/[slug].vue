@@ -149,82 +149,7 @@
         </div>
       </section>
 
-      <!-- Gauges — one card per gauge linked to this reach -->
-      <section v-if="allGauges.length > 0" class="space-y-4">
-        <div
-          v-for="g in allGauges"
-          :key="g.id"
-          class="border border-gray-200 dark:border-gray-700 rounded-xl p-4"
-        >
-          <!-- Gauge header: name + relationship label + dashboard button -->
-          <div class="flex items-start justify-between gap-3 mb-3">
-            <div class="min-w-0">
-              <div class="text-xs text-gray-400 uppercase tracking-wide mb-0.5">
-                {{ gaugeRelLabel(g.reach_relationship) }}
-              </div>
-              <div class="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">
-                {{ g.name ?? g.external_id }}
-              </div>
-              <div class="text-xs text-gray-400 mt-0.5">
-                {{ g.source?.toUpperCase() }} · {{ g.external_id }}
-              </div>
-            </div>
-
-            <!-- Add / remove dashboard button -->
-            <button
-              v-if="!onDashboard(g.id)"
-              class="shrink-0 flex items-center gap-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              @click="addToDashboard(g)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-              Dashboard
-            </button>
-            <button
-              v-else
-              class="shrink-0 flex items-center gap-1.5 text-xs rounded-lg border border-emerald-300 dark:border-emerald-700 px-2.5 py-1.5 text-emerald-600 dark:text-emerald-400 hover:border-red-300 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-              @click="removeFromDashboard(g.id)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
-              On dashboard
-            </button>
-          </div>
-
-          <!-- Graph -->
-          <GaugeGraph :gauge-id="g.id" :current-cfs="g.current_cfs" />
-
-          <!-- CFS + status below graph -->
-          <div v-if="g.current_cfs != null" class="mt-3 flex items-end gap-2 border-t border-gray-100 dark:border-gray-800 pt-3">
-            <span class="text-3xl font-bold tabular-nums" :class="cfsColorClass(g.flow_status)">
-              {{ g.current_cfs.toLocaleString() }}
-            </span>
-            <span class="text-gray-500 mb-0.5">cfs</span>
-            <UBadge v-if="g.flow_status && g.flow_status !== 'unknown'" :color="flowStatusColor(g.flow_status)" variant="subtle" size="sm" class="mb-0.5">
-              {{ flowStatusLabel(g.flow_status) }}
-            </UBadge>
-            <span v-if="g.last_reading_at" class="text-xs text-gray-400 mb-1">
-              · {{ relativeTime(g.last_reading_at) }}
-            </span>
-          </div>
-          <div v-else class="mt-3 text-gray-400 text-sm border-t border-gray-100 dark:border-gray-800 pt-3">No recent reading</div>
-        </div>
-      </section>
-
-      <!-- Reach map -->
-      <section>
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Map</h2>
-        <ClientOnly>
-          <ReachMap
-            :name="reach.name"
-            :class-max="reach.class_max"
-            :centerline="displayCenterline"
-            :rapids="reach.rapids"
-            :access="reach.access"
-            :gauges="allGauges"
-          />
-        </ClientOnly>
-      </section>
-
-      <!-- River assistant -->
+      <!-- River assistant — Ask about this reach -->
       <section class="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
         <button
           class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -319,6 +244,83 @@
 
           <p v-if="chatError" class="text-xs text-red-500">{{ chatError }}</p>
         </div>
+      </section>
+
+      <!-- Gauges — one card per gauge linked to this reach -->
+      <section v-if="allGauges.length > 0" class="space-y-4">
+        <div
+          v-for="g in allGauges"
+          :key="g.id"
+          class="border border-gray-200 dark:border-gray-700 rounded-xl p-4"
+        >
+          <!-- Gauge header: name + relationship label + flow status + dashboard button -->
+          <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 mb-0.5">
+                <div class="text-xs text-gray-400 uppercase tracking-wide">
+                  {{ gaugeRelLabel(g.reach_relationship) }}
+                </div>
+                <UBadge v-if="g.flow_status && g.flow_status !== 'unknown'" :color="flowStatusColor(g.flow_status)" variant="subtle" size="xs">
+                  {{ flowStatusLabel(g.flow_status) }}
+                </UBadge>
+              </div>
+              <div class="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">
+                {{ g.name ?? g.external_id }}
+              </div>
+              <div class="text-xs text-gray-400 mt-0.5">
+                {{ g.source?.toUpperCase() }} · {{ g.external_id }}
+              </div>
+            </div>
+
+            <!-- Add / remove dashboard button -->
+            <button
+              v-if="!onDashboard(g.id)"
+              class="shrink-0 flex items-center gap-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              @click="addToDashboard(g)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              Dashboard
+            </button>
+            <button
+              v-else
+              class="shrink-0 flex items-center gap-1.5 text-xs rounded-lg border border-emerald-300 dark:border-emerald-700 px-2.5 py-1.5 text-emerald-600 dark:text-emerald-400 hover:border-red-300 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+              @click="removeFromDashboard(g.id)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+              On dashboard
+            </button>
+          </div>
+
+          <!-- Graph -->
+          <GaugeGraph :gauge-id="g.id" :current-cfs="g.current_cfs" />
+
+          <!-- CFS + last updated below graph -->
+          <div v-if="g.current_cfs != null" class="mt-3 flex items-end gap-2 border-t border-gray-100 dark:border-gray-800 pt-3">
+            <span class="text-3xl font-bold tabular-nums" :class="cfsColorClass(g.flow_status)">
+              {{ g.current_cfs.toLocaleString() }}
+            </span>
+            <span class="text-gray-500 mb-0.5">cfs</span>
+            <span v-if="g.last_reading_at" class="text-xs text-gray-400 mb-1">
+              · {{ relativeTime(g.last_reading_at) }}
+            </span>
+          </div>
+          <div v-else class="mt-3 text-gray-400 text-sm border-t border-gray-100 dark:border-gray-800 pt-3">No recent reading</div>
+        </div>
+      </section>
+
+      <!-- Reach map -->
+      <section>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Map</h2>
+        <ClientOnly>
+          <ReachMap
+            :name="reach.name"
+            :class-max="reach.class_max"
+            :centerline="displayCenterline"
+            :rapids="reach.rapids"
+            :access="reach.access"
+            :gauges="allGauges"
+          />
+        </ClientOnly>
       </section>
 
       <!-- Description -->
@@ -473,8 +475,9 @@ interface RiverFeature {
   is_portage_recommended?: boolean
   is_permanent_hazard?:   boolean
   hazard_type?:           string | null
-  // sorting
-  lng?: number | null
+  // sorting — river_order is 0→1 along centerline (preferred); lng is fallback
+  river_order?: number | null
+  lng?:         number | null
 }
 
 // Combine rapids and access points sorted upstream → downstream.
@@ -498,6 +501,7 @@ const riverFeatures = computed<RiverFeature[]>(() => {
       is_portage_recommended: rap.is_portage_recommended,
       is_permanent_hazard: rap.is_permanent_hazard,
       hazard_type: rap.hazard_type,
+      river_order: rap.river_order,
       lng: rap.lng,
     })
   }
@@ -509,15 +513,21 @@ const riverFeatures = computed<RiverFeature[]>(() => {
       type: acc.access_type as any,
       name: acc.name,
       description: acc.notes ?? acc.directions,
+      river_order: acc.river_order,
       lng: acc.water_lng ?? acc.parking_lng,
     })
   }
 
   return items.sort((a, b) => {
+    // Prefer centerline position (river_order 0→1) — works for any flow direction.
+    if (a.river_order != null && b.river_order != null) return a.river_order - b.river_order
+    if (a.river_order != null) return -1
+    if (b.river_order != null) return 1
+    // Fall back to longitude when no centerline (Colorado rivers flow west→east)
     if (a.lng == null && b.lng == null) return 0
     if (a.lng == null) return 1
     if (b.lng == null) return -1
-    return a.lng - b.lng  // west=upstream first
+    return a.lng - b.lng
   })
 })
 
@@ -750,8 +760,8 @@ function flowStatusColor(status: string): string {
   switch (status) {
     case 'runnable': return 'success'
     case 'caution':  return 'warning'
-    case 'low':
-    case 'flood':    return 'error'
+    case 'low':      return 'error'
+    case 'flood':    return 'info'
     default:         return 'neutral'
   }
 }
@@ -759,9 +769,9 @@ function flowStatusColor(status: string): string {
 function flowStatusLabel(status: string): string {
   switch (status) {
     case 'runnable': return 'Runnable'
-    case 'caution':  return 'Caution'
+    case 'caution':  return 'Below Recommended'
     case 'low':      return 'Too Low'
-    case 'flood':    return 'Flood Stage'
+    case 'flood':    return 'Above Recommended'
     default:         return 'Unknown'
   }
 }
@@ -770,8 +780,8 @@ function cfsColorClass(status: string): string {
   switch (status) {
     case 'runnable': return 'text-emerald-500'
     case 'caution':  return 'text-yellow-500'
-    case 'low':
-    case 'flood':    return 'text-red-500'
+    case 'low':      return 'text-red-500'
+    case 'flood':    return 'text-sky-500'
     default:         return 'text-gray-300'
   }
 }

@@ -73,14 +73,19 @@
               :disabled="searching"
             />
             <button
+              v-if="!searching"
               type="submit"
-              :disabled="searching || !searchQuery.trim()"
+              :disabled="!searchQuery.trim()"
               class="px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors shrink-0"
+            >Ask</button>
+            <button
+              v-else
+              type="button"
+              class="px-4 py-2.5 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-semibold transition-colors shrink-0 flex items-center gap-1.5"
+              @click="cancelSearch"
             >
-              <span v-if="searching" class="flex items-center gap-1.5">
-                <span class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
-              </span>
-              <span v-else>Ask</span>
+              <span class="w-3.5 h-3.5 border-2 border-gray-400 border-t-gray-700 dark:border-t-gray-200 rounded-full animate-spin"/>
+              Stop
             </button>
           </form>
 
@@ -245,29 +250,46 @@ async function addGaugeById(gaugeId: string) {
 
 type AskResult = { results: { answer: string; reach_slug: string; reach_name: string }[]; answer?: string }
 
-const searchQuery  = ref('')
-const searching    = ref(false)
-const searchError  = ref('')
-const searchResult = ref<AskResult | null>(null)
+const searchQuery      = ref('')
+const searching        = ref(false)
+const searchError      = ref('')
+const searchResult     = ref<AskResult | null>(null)
+const searchController = ref<AbortController | null>(null)
 
 async function askQuestion() {
+  // Cancel any in-flight request before starting a new one
+  searchController.value?.abort()
+
   const q = searchQuery.value.trim()
   if (!q) return
+
+  const controller = new AbortController()
+  searchController.value = controller
   searching.value = true
   searchError.value = ''
   searchResult.value = null
+
   try {
     const res = await fetch(`${apiBase}/api/v1/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ question: q }),
+      signal: controller.signal,
     })
     if (!res.ok) throw new Error(`${res.status}`)
     searchResult.value = await res.json()
-  } catch {
-    searchError.value = 'Something went wrong. Try again.'
+  } catch (err: any) {
+    if (err?.name !== 'AbortError') {
+      searchError.value = 'Something went wrong. Try again.'
+    }
   } finally {
     searching.value = false
+    searchController.value = null
   }
+}
+
+function cancelSearch() {
+  searchController.value?.abort()
+  searching.value = false
 }
 </script>

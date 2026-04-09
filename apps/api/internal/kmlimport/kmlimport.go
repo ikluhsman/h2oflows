@@ -50,14 +50,15 @@ type Result struct {
 
 // ReachResult holds per-reach counts.
 type ReachResult struct {
-	Name     string   `json:"name"`
-	Rapids   int      `json:"rapids"`
-	Hazards  int      `json:"hazards"`
-	PutIns   int      `json:"put_ins"`
-	TakeOuts int      `json:"take_outs"`
-	Parking  int      `json:"parking"`
-	Shuttle  int      `json:"shuttle"`
-	Errors   []string `json:"errors,omitempty"`
+	Name      string   `json:"name"`
+	Rapids    int      `json:"rapids"`
+	Hazards   int      `json:"hazards"`
+	PutIns    int      `json:"put_ins"`
+	TakeOuts  int      `json:"take_outs"`
+	Parking   int      `json:"parking"`
+	Shuttle   int      `json:"shuttle"`
+	Campsites int      `json:"campsites"`
+	Errors    []string `json:"errors,omitempty"`
 }
 
 // ── KML types ─────────────────────────────────────────────────────────────────
@@ -353,6 +354,14 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				st.Shuttle++
 				res.Log = append(res.Log, fmt.Sprintf("✓ [%s] shuttle: %s", a.reachName, pinName))
 			}
+		case "campsite":
+			if err := imp.upsertAccess(ctx, a.reachID, "camp", pinName, desc, lon, lat); err != nil {
+				st.Errors = append(st.Errors, fmt.Sprintf("campsite %q: %v", pinName, err))
+				res.Log = append(res.Log, fmt.Sprintf("✗ [%s] campsite %q: %v", a.reachName, pinName, err))
+			} else {
+				st.Campsites++
+				res.Log = append(res.Log, fmt.Sprintf("✓ [%s] campsite: %s", a.reachName, pinName))
+			}
 		default:
 			res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] %q — unknown type, skipping", a.reachName, pm.Name))
 		}
@@ -614,6 +623,8 @@ func SplitPrefixWithHint(name, description, folderHint string) (prefix, rest str
 		return "put-in", name
 	case "hazards", "permanent hazards":
 		return "hazard", name
+	case "campsites", "camps", "camping":
+		return "campsite", name
 	}
 	return "", name
 }
@@ -621,7 +632,7 @@ func SplitPrefixWithHint(name, description, folderHint string) (prefix, rest str
 // SplitPrefix splits "Rapid: Zoom Flume" → ("rapid", "Zoom Flume").
 func SplitPrefix(name string) (prefix, rest string) {
 	lower := strings.ToLower(name)
-	for _, p := range []string{"Rapid", "Wave", "Surf", "Put-in", "Take-out", "Parking", "Shuttle", "Hazard"} {
+	for _, p := range []string{"Rapid", "Wave", "Surf", "Put-in", "Take-out", "Parking", "Shuttle", "Hazard", "Campsite"} {
 		if strings.HasPrefix(lower, strings.ToLower(p)+":") {
 			prefix := strings.ToLower(p)
 			if prefix == "surf" {

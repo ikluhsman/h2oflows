@@ -604,18 +604,27 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ---- Rapids -------------------------------------------------------------
+	// river_order: 0→1 position along the stored centerline (put-in=0, take-out=1).
+	// Falls back to NULL when no centerline — frontend then falls back to lng sort.
 	rapidRows, err := h.db.Query(r.Context(), `
-		SELECT
-			id, name, river_mile, class_rating, class_at_low, class_at_high,
-			description, portage_description, is_portage_recommended, is_surf_wave,
-			is_permanent_hazard, hazard_type,
-			data_source, ai_confidence, verified,
-			ST_X(location::geometry) AS lng,
-			ST_Y(location::geometry) AS lat
-		FROM rapids
-		WHERE reach_id = $1
-		ORDER BY river_mile ASC NULLS LAST, name ASC
-	`, reach.ID)
+		WITH rap AS (
+			SELECT
+				id, name, river_mile, class_rating, class_at_low, class_at_high,
+				description, portage_description, is_portage_recommended, is_surf_wave,
+				is_permanent_hazard, hazard_type,
+				data_source, ai_confidence, verified,
+				ST_X(location::geometry) AS lng,
+				ST_Y(location::geometry) AS lat,
+				CASE WHEN $2::text IS NOT NULL AND location IS NOT NULL
+				     THEN ST_LineLocatePoint(ST_GeomFromGeoJSON($2), location::geometry)
+				     ELSE NULL
+				END AS river_order
+			FROM rapids
+			WHERE reach_id = $1
+		)
+		SELECT * FROM rap
+		ORDER BY river_order ASC NULLS LAST, river_mile ASC NULLS LAST, name ASC
+	`, reach.ID, reach.Centerline)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "rapids query failed")
 		return
@@ -629,7 +638,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			&rr.Description, &rr.PortageDescription, &rr.IsPortageRecommended, &rr.IsSurfWave,
 			&rr.IsPermanentHazard, &rr.HazardType,
 			&rr.DataSource, &rr.AIConfidence, &rr.Verified,
-			&rr.Lng, &rr.Lat,
+			&rr.Lng, &rr.Lat, &rr.RiverOrder,
 		); err != nil {
 			continue
 		}
@@ -648,7 +657,11 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			ST_X(parking_location::geometry) AS parking_lng,
 			ST_Y(parking_location::geometry) AS parking_lat,
 			hike_to_water_min,
-			data_source, ai_confidence, verified
+			data_source, ai_confidence, verified,
+			CASE WHEN $2::text IS NOT NULL AND location IS NOT NULL
+			     THEN ST_LineLocatePoint(ST_GeomFromGeoJSON($2), location::geometry)
+			     ELSE NULL
+			END AS river_order
 		FROM reach_access
 		WHERE reach_id = $1
 		ORDER BY
@@ -660,7 +673,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 				WHEN 'parking'      THEN 5
 				WHEN 'camp'         THEN 6
 			END
-	`, reach.ID)
+	`, reach.ID, reach.Centerline)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "access query failed")
 		return
@@ -677,7 +690,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			&a.SeasonalCloseStart, &a.SeasonalCloseEnd, &a.Notes,
 			&a.WaterLng, &a.WaterLat, &a.ParkingLng, &a.ParkingLat,
 			&a.HikeToWaterMin,
-			&a.DataSource, &a.AIConfidence, &a.Verified,
+			&a.DataSource, &a.AIConfidence, &a.Verified, &a.RiverOrder,
 		); err != nil {
 			continue
 		}
@@ -808,6 +821,7 @@ type rapidRow struct {
 	Verified             bool     `json:"verified"`
 	Lng                  *float64 `json:"lng"`
 	Lat                  *float64 `json:"lat"`
+	RiverOrder           *float64 `json:"river_order"`
 }
 
 type accessRow struct {
@@ -835,6 +849,7 @@ type accessRow struct {
 	AIConfidence       *int          `json:"ai_confidence"`
 	Verified           bool          `json:"verified"`
 	Waypoints          []waypointRow `json:"waypoints"`
+	RiverOrder         *float64      `json:"river_order"`
 }
 
 type relatedReach struct {
@@ -1173,33 +1188,46 @@ func (h *ReachHandler) GlobalAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Step 2 — answer each matched reach (up to 3).
+	// Step 2 — answer each matched reach in parallel (up to 3).
 	type reachResult struct {
 		Answer    string `json:"answer"`
 		ReachSlug string `json:"reach_slug"`
 		ReachName string `json:"reach_name"`
 	}
-	var results []reachResult
-	for _, slug := range identified.Slugs {
-		var reachID, reachName string
-		if err := h.db.QueryRow(r.Context(), `SELECT id, name FROM reaches WHERE slug = $1`, slug).Scan(&reachID, &reachName); err != nil {
-			log.Printf("global ask: reach not found for slug %q: %v", slug, err)
-			continue
-		}
-		answer, err := h.asker.Answer(askCtx, reachID, reachName, identified.Question)
-		if err != nil {
-			log.Printf("global ask answer [%s]: %v", slug, err)
-			continue
-		}
-		results = append(results, reachResult{Answer: answer, ReachSlug: slug, ReachName: reachName})
+	results := make([]reachResult, len(identified.Slugs))
+	var wg sync.WaitGroup
+	for i, slug := range identified.Slugs {
+		wg.Add(1)
+		go func(i int, slug string) {
+			defer wg.Done()
+			var reachID, reachName string
+			if err := h.db.QueryRow(askCtx, `SELECT id, name FROM reaches WHERE slug = $1`, slug).Scan(&reachID, &reachName); err != nil {
+				log.Printf("global ask: reach not found for slug %q: %v", slug, err)
+				return
+			}
+			answer, err := h.asker.Answer(askCtx, reachID, reachName, identified.Question)
+			if err != nil {
+				log.Printf("global ask answer [%s]: %v", slug, err)
+				return
+			}
+			results[i] = reachResult{Answer: answer, ReachSlug: slug, ReachName: reachName}
+		}(i, slug)
 	}
+	wg.Wait()
 
-	if len(results) == 0 {
+	// Filter slots that failed (empty Answer).
+	var finalResults []reachResult
+	for _, rr := range results {
+		if rr.Answer != "" {
+			finalResults = append(finalResults, rr)
+		}
+	}
+	if len(finalResults) == 0 {
 		errorResponse(w, http.StatusInternalServerError, "could not generate answer")
 		return
 	}
 
-	jsonResponse(w, http.StatusOK, map[string]any{"results": results})
+	jsonResponse(w, http.StatusOK, map[string]any{"results": finalResults})
 }
 
 // Ask handles POST /api/v1/reaches/{slug}/ask
