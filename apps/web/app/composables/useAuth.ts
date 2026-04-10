@@ -20,10 +20,12 @@ export function useAuth() {
 
   /**
    * Returns the current access token string, or null when unauthenticated.
-   * Use this to add Authorization: Bearer <token> headers to API requests.
+   * Uses getSession() directly so the token is always fresh — the reactive
+   * session ref may not yet be populated when called right after page load.
    */
-  function getToken(): string | null {
-    return session.value?.access_token ?? null
+  async function getToken(): Promise<string | null> {
+    const { data } = await client.auth.getSession()
+    return data.session?.access_token ?? null
   }
 
   async function signOut() {

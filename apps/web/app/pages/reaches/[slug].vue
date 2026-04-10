@@ -983,7 +983,7 @@ async function fetchCenterline() {
     if (manualLat.value && manualLng.value) {
       url += `?lat=${encodeURIComponent(manualLat.value)}&lng=${encodeURIComponent(manualLng.value)}`
     }
-    const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` } })
+    const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${await getToken()}` } })
     const text = await res.text()
     let json: any
     try { json = JSON.parse(text) } catch { json = null }
@@ -1054,7 +1054,7 @@ async function deleteReach() {
   if (!confirm(`Permanently delete "${(reach.value as any)?.common_name ?? (reach.value as any)?.name}"?\n\nThis removes all rapids, access points, and features. Gauges are unlinked but kept.`)) return
   deleting.value = true
   try {
-    const res = await fetch(`${config.public.apiBase}/api/v1/reaches/${route.params.slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${getToken()}` } })
+    const res = await fetch(`${config.public.apiBase}/api/v1/reaches/${route.params.slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await getToken()}` } })
     if (!res.ok) throw new Error(`Server error ${res.status}`)
     navigateTo('/')
   } catch (err: any) {
@@ -1090,7 +1090,7 @@ async function runImport() {
     form.append('file', kmzFile.value)
     const res = await fetch(`${config.public.apiBase}/api/v1/import/kmz`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${getToken()}` },
+      headers: { Authorization: `Bearer ${await getToken()}` },
       body: form,
     })
     const json = await res.json()
