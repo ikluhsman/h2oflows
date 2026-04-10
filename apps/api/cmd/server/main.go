@@ -96,8 +96,9 @@ func main() {
 		log.Println("SUPABASE_JWKS_URL not set — auth middleware disabled, all requests anonymous")
 	}
 
-	gauges  := handlers.NewGaugeHandler(pool, enricher, p)
-	reaches := handlers.NewReachHandler(pool, asker).WithPoller(p)
+	gauges    := handlers.NewGaugeHandler(pool, enricher, p)
+	reaches   := handlers.NewReachHandler(pool, asker).WithPoller(p)
+	watchlist := handlers.NewWatchlistHandler(pool)
 	// Warm the reach map cache immediately, then refresh every poll cycle.
 	reaches.WarmCache(context.Background())
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
@@ -126,6 +127,14 @@ func main() {
 		r.Get("/reaches/{slug}/flow-ranges", reaches.GetFlowRanges)
 		r.Post("/reaches/{slug}/ask", reaches.Ask)
 		r.Post("/ask", reaches.GlobalAsk)
+
+		// Authenticated user routes — require a valid Supabase JWT.
+		r.Group(func(r chi.Router) {
+			r.Use(auth.Required(verifier))
+			r.Get("/watchlist", watchlist.List)
+			r.Post("/watchlist", watchlist.Add)
+			r.Delete("/watchlist/{gaugeId}", watchlist.Remove)
+		})
 
 		// Admin-only write routes — require authenticated user with role "admin".
 		r.Group(func(r chi.Router) {

@@ -94,9 +94,15 @@ definePageMeta({ ssr: false })
 
 const store = useWatchlistStore()
 const { refresh } = useWatchlistRefresh()
+const { isAuthenticated } = useAuth()
+const { addAndSync, loadFromServer, pushLocalToServer } = useWatchlistSync()
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
-onMounted(() => {
+onMounted(async () => {
+  if (isAuthenticated.value) {
+    await loadFromServer()
+    await pushLocalToServer()
+  }
   refresh()
   refreshTimer = setInterval(refresh, 60_000)
 })
@@ -105,7 +111,7 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 const searchOpen = ref(false)
 
 function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
-  store.addGauge(gauge)
+  addAndSync(gauge)
 }
 
 const activeTripLabel = computed(() => {

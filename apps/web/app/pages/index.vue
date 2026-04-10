@@ -251,6 +251,7 @@ function focusAsk() {
 }
 const { apiBase } = useRuntimeConfig().public
 const store = useWatchlistStore()
+const { addAndSync } = useWatchlistSync()
 
 const showDemoBanner = ref(false)
 onMounted(() => {
@@ -292,7 +293,7 @@ async function addGaugeById(gaugeId: string) {
     if (!f) return
     const p = f.properties
     const coords = f.geometry?.coordinates as [number, number] | undefined
-    store.addGauge({
+    addAndSync({
       id: p.id, externalId: p.external_id, source: p.source,
       name: p.name ?? null, featured: p.featured ?? false,
       reachId: p.reach_id ?? null, reachName: p.reach_name ?? null,

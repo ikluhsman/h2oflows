@@ -499,6 +499,7 @@ import { featurePanelIcon } from '~/utils/featureIcons'
 const route  = useRoute()
 const config = useRuntimeConfig()
 const store  = useWatchlistStore()
+const { addAndSync, removeAndSync } = useWatchlistSync()
 const { isAdmin, getToken } = useAuth()
 
 // ---- Data -------------------------------------------------------------------
@@ -883,7 +884,7 @@ function onDashboard(gaugeId: string): boolean {
 }
 
 function addToDashboard(g: any) {
-  store.addGauge({
+  addAndSync({
     id:               g.id,
     externalId:       g.external_id,
     source:           g.source ?? '',
@@ -910,7 +911,7 @@ function addToDashboard(g: any) {
 }
 
 function removeFromDashboard(gaugeId: string) {
-  store.removeGauge(gaugeId)
+  removeAndSync(gaugeId)
 }
 
 function flowStatusColor(status: string): string {
