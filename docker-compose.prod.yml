@@ -21,8 +21,9 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL:      postgres://${POSTGRES_USER:-h2oflow}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-h2oflow}?sslmode=disable
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      VOYAGE_API_KEY:    ${VOYAGE_API_KEY}
+      ANTHROPIC_API_KEY:  ${ANTHROPIC_API_KEY}
+      VOYAGE_API_KEY:     ${VOYAGE_API_KEY}
+      SUPABASE_JWKS_URL:  ${SUPABASE_JWKS_URL}
       APP_PORT:          "8080"
       APP_DOMAIN:        h2oflows.app
     depends_on:
