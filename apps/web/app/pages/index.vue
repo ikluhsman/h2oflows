@@ -83,10 +83,8 @@
                 <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Map structure</h3>
                 <ul class="space-y-1 text-gray-300">
                   <li><span class="text-white font-medium">Document name</span> — used as the river name (e.g. <code class="text-blue-400">South Platte River</code>)</li>
-                  <li><span class="text-white font-medium">Each folder</span> — one reach. Name format: <code class="text-blue-400">Display Name (CommonName,classMin,classMax)</code></li>
+                  <li><span class="text-white font-medium">Each folder</span> — one reach. Use the plain display name (e.g. <code class="text-blue-400">Buffalo Creek to Foxton</code>)</li>
                 </ul>
-                <p class="mt-1 text-gray-500 text-xs">Example folder name: <code class="text-blue-300">Buffalo Creek to Foxton (Foxton,3,4)</code></p>
-                <p class="text-gray-500 text-xs">Slug generated: <code class="text-blue-300">south-platte-river-foxton</code></p>
               </section>
 
               <section>
@@ -99,21 +97,23 @@
                   <span><code class="text-blue-400">Parking: Name</code></span><span class="text-gray-500">parking area</span>
                   <span><code class="text-blue-400">Hazard: Name</code></span><span class="text-gray-500">permanent hazard</span>
                   <span><code class="text-blue-400">Campsite: Name</code></span><span class="text-gray-500">campsite</span>
-                  <span><code class="text-blue-400">Shuttle: Name</code></span><span class="text-gray-500">shuttle drop</span>
                 </div>
               </section>
 
               <section>
-                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Metadata placemarks <span class="text-gray-600 normal-case font-normal">(no pin — add to folder data table)</span></h3>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Metadata placemarks <span class="text-gray-600 normal-case font-normal">(no pin — add via folder data table)</span></h3>
                 <div class="grid grid-cols-2 gap-x-4 gap-y-0.5 text-gray-300">
+                  <span><code class="text-blue-400">common_name</code></span><span class="text-gray-500">short name used in slug, e.g. <code class="text-blue-300">Foxton</code></span>
+                  <span><code class="text-blue-400">min_class</code></span><span class="text-gray-500">minimum difficulty, e.g. <code class="text-blue-300">3</code></span>
+                  <span><code class="text-blue-400">max_class</code></span><span class="text-gray-500">maximum difficulty, e.g. <code class="text-blue-300">4</code></span>
                   <span><code class="text-blue-400">gauge</code></span><span class="text-gray-500">USGS site number, e.g. <code class="text-blue-300">09058000</code></span>
                   <span><code class="text-blue-400">below</code></span><span class="text-gray-500">max CFS for below-recommended, e.g. <code class="text-blue-300">200</code></span>
-                  <span><code class="text-blue-400">low</code></span><span class="text-gray-500">min,max CFS, e.g. <code class="text-blue-300">200,400</code> (optional)</span>
+                  <span><code class="text-blue-400">low</code></span><span class="text-gray-500">min,max CFS e.g. <code class="text-blue-300">200,400</code> (optional)</span>
                   <span><code class="text-blue-400">med</code></span><span class="text-gray-500">min,max CFS, e.g. <code class="text-blue-300">400,800</code></span>
-                  <span><code class="text-blue-400">high</code></span><span class="text-gray-500">min,max CFS, e.g. <code class="text-blue-300">800,1200</code> (optional)</span>
+                  <span><code class="text-blue-400">high</code></span><span class="text-gray-500">min,max CFS e.g. <code class="text-blue-300">800,1200</code> (optional)</span>
                   <span><code class="text-blue-400">above</code></span><span class="text-gray-500">min CFS for above-recommended, e.g. <code class="text-blue-300">1200</code></span>
                 </div>
-                <p class="mt-1.5 text-gray-500 text-xs">3-tier (below/med/above) and 5-tier (all five) both work. Omit low and high for 3-tier.</p>
+                <p class="mt-1.5 text-gray-500 text-xs">Slug: <code class="text-blue-300">river-name-common-name</code> if common_name set, else <code class="text-blue-300">river-name-folder-name</code>. 3-tier (below/med/above) and 5-tier both work.</p>
               </section>
 
             </div>

@@ -13,7 +13,6 @@
 //	"Put-in: <name>"   → reach_access type=put_in
 //	"Take-out: <name>" → reach_access type=take_out
 //	"Parking: <name>"  → reach_access type=parking
-//	"Shuttle: <name>"  → reach_access type=shuttle_drop
 //	"Hazard: <name>"   → rapids (is_permanent_hazard=true)
 //
 // Hazard descriptions may include a hazard type keyword to classify them:
@@ -56,7 +55,6 @@ type ReachResult struct {
 	PutIns    int      `json:"put_ins"`
 	TakeOuts  int      `json:"take_outs"`
 	Parking   int      `json:"parking"`
-	Shuttle   int      `json:"shuttle"`
 	Campsites int      `json:"campsites"`
 	Errors    []string `json:"errors,omitempty"`
 }
@@ -277,7 +275,45 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		var gaugeAssocs []gaugeAssoc
 
 		for _, folder := range doc.Folders {
-			rid, rslug, rname, created, err := imp.matchOrCreateReach(ctx, folder.Name, doc.Name)
+			// Pre-scan metadata placemarks (no coordinates) to extract reach
+			// properties before calling matchOrCreateReach.
+			var (
+				commonName string
+				classMin   *float64
+				classMax   *float64
+				gaugeExtID string
+			)
+			var folderFlowRanges []reachFlowRange
+			var folderPins []KMLPlacemark
+
+			for _, pm := range folder.Placemarks {
+				if pm.Point == nil {
+					key := strings.ToLower(strings.TrimSpace(pm.Name))
+					val := strings.TrimSpace(pm.Description)
+					switch key {
+					case "common_name":
+						commonName = val
+					case "min_class":
+						if v, err2 := strconv.ParseFloat(val, 64); err2 == nil {
+							classMin = &v
+						}
+					case "max_class":
+						if v, err2 := strconv.ParseFloat(val, 64); err2 == nil {
+							classMax = &v
+						}
+					case "gauge":
+						gaugeExtID = val
+					default:
+						if label, minCFS, maxCFS, ok := parseFlowRangePM(pm.Name, pm.Description); ok {
+							folderFlowRanges = append(folderFlowRanges, reachFlowRange{"", "", label, minCFS, maxCFS})
+						}
+					}
+					continue
+				}
+				folderPins = append(folderPins, pm)
+			}
+
+			rid, rslug, rname, created, err := imp.matchOrCreateReach(ctx, folder.Name, doc.Name, commonName, classMin, classMax)
 			if err != nil {
 				res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — %v", folder.Name, err))
 				continue
@@ -285,23 +321,18 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 			if created {
 				res.Log = append(res.Log, fmt.Sprintf("+ created reach %q (slug: %s)", folder.Name, rslug))
 			}
-			for _, pm := range folder.Placemarks {
-				// Metadata placemarks — no coordinates.
-				if pm.Point == nil {
-					key := strings.ToLower(strings.TrimSpace(pm.Name))
-					if key == "gauge" {
-						if extID := strings.TrimSpace(pm.Description); extID != "" {
-							gaugeAssocs = append(gaugeAssocs, gaugeAssoc{rid, rname, extID})
-							res.Log = append(res.Log, fmt.Sprintf("~ [%s] gauge %s", rname, extID))
-						}
-						continue
-					}
-					if label, minCFS, maxCFS, ok := parseFlowRangePM(pm.Name, pm.Description); ok {
-						flowRanges = append(flowRanges, reachFlowRange{rid, rname, label, minCFS, maxCFS})
-						res.Log = append(res.Log, fmt.Sprintf("~ [%s] flow range %s", rname, label))
-					}
-					continue
-				}
+
+			for _, fr := range folderFlowRanges {
+				fr.reachID = rid
+				fr.reachName = rname
+				flowRanges = append(flowRanges, fr)
+				res.Log = append(res.Log, fmt.Sprintf("~ [%s] flow range %s", rname, fr.label))
+			}
+			if gaugeExtID != "" {
+				gaugeAssocs = append(gaugeAssocs, gaugeAssoc{rid, rname, gaugeExtID})
+				res.Log = append(res.Log, fmt.Sprintf("~ [%s] gauge %s", rname, gaugeExtID))
+			}
+			for _, pm := range folderPins {
 				pins = append(pins, assignment{rid, rslug, rname, pm, ""})
 			}
 		}
@@ -396,14 +427,6 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				st.Parking++
 				res.Log = append(res.Log, fmt.Sprintf("✓ [%s] parking: %s", a.reachName, pinName))
 			}
-		case "shuttle":
-			if err := imp.upsertAccess(ctx, a.reachID, "shuttle_drop", pinName, desc, lon, lat); err != nil {
-				st.Errors = append(st.Errors, fmt.Sprintf("shuttle %q: %v", pinName, err))
-				res.Log = append(res.Log, fmt.Sprintf("✗ [%s] shuttle %q: %v", a.reachName, pinName, err))
-			} else {
-				st.Shuttle++
-				res.Log = append(res.Log, fmt.Sprintf("✓ [%s] shuttle: %s", a.reachName, pinName))
-			}
 		case "campsite":
 			if err := imp.upsertAccess(ctx, a.reachID, "camp", pinName, desc, lon, lat); err != nil {
 				st.Errors = append(st.Errors, fmt.Sprintf("campsite %q: %v", pinName, err))
@@ -447,61 +470,23 @@ func (res *Result) reachStats(slug, name string) *ReachResult {
 //
 // Format: "Display Name (CommonName,classMin,classMax)"
 // Example: "Buffalo Creek to South Platte Hotel (Foxton,3,4)"
-type folderMeta struct {
-	baseName   string  // "Buffalo Creek to South Platte Hotel"
-	commonName string  // "Foxton" (empty if not present)
-	classMin   float64 // 3.0 (0 if not present)
-	classMax   float64 // 4.0 (0 if not present)
-}
-
-// parseFolderMeta extracts reach metadata from a KML folder name.
-// The trailing parenthetical is optional — if absent, baseName == folderName.
-func parseFolderMeta(folderName string) folderMeta {
-	m := folderMeta{}
-	// Find last '(' … ')' pair.
-	open := strings.LastIndex(folderName, "(")
-	close := strings.LastIndex(folderName, ")")
-	if open < 0 || close <= open {
-		m.baseName = strings.TrimSpace(folderName)
-		return m
-	}
-	m.baseName = strings.TrimSpace(folderName[:open])
-	inner := strings.TrimSpace(folderName[open+1 : close])
-	parts := strings.SplitN(inner, ",", 3)
-	if len(parts) >= 1 {
-		m.commonName = strings.TrimSpace(parts[0])
-	}
-	if len(parts) >= 2 {
-		if v, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64); err == nil {
-			m.classMin = v
-		}
-	}
-	if len(parts) >= 3 {
-		if v, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64); err == nil {
-			m.classMax = v
-		}
-	}
-	return m
-}
-
 // matchOrCreateReach finds an existing reach by folder name or creates a new
 // stub reach so the KML can be imported without pre-seeding in Go code.
 //
-// folderName format: "Display Name (CommonName,classMin,classMax)"
-// riverName: the KML document name, used as river_name on new reaches.
+// folderName: plain display name from the KML folder (no parenthetical).
+// riverName:  KML document name, stored as river_name on new reaches.
+// commonName: from the "common_name" metadata placemark (may be empty).
+// classMin/classMax: from "min_class"/"max_class" metadata placemarks (may be nil).
 //
-// Slug on creation: slugify(riverName) + "-" + slugify(commonName or baseName)
+// Slug: slugify(riverName) + "-" + slugify(commonName)  when commonName is set,
+//       slugify(riverName) + "-" + slugify(folderName)   otherwise.
 //
 // The returned created flag is true when a new row was inserted.
-func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName, riverName string) (id, slug, name string, created bool, err error) {
-	meta := parseFolderMeta(folderName)
-
-	// Build candidate search terms: common name, base name, full folder name.
+func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName, riverName, commonName string, classMin, classMax *float64) (id, slug, name string, created bool, err error) {
+	// Build candidate search terms in priority order.
 	candidates := []string{folderName}
-	if meta.commonName != "" {
-		candidates = append([]string{meta.commonName, meta.baseName}, candidates...)
-	} else {
-		candidates = append([]string{meta.baseName}, candidates...)
+	if commonName != "" {
+		candidates = append([]string{commonName}, candidates...)
 	}
 
 	// Try to match existing reach by any candidate.
@@ -523,29 +508,16 @@ func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName, riverNa
 		}
 	}
 
-	// No match — derive slug from riverName + commonName (or baseName).
-	identifier := meta.baseName
-	if meta.commonName != "" {
-		identifier = meta.commonName
+	// No match — build slug from riverName + commonName (or folderName).
+	identifier := folderName
+	if commonName != "" {
+		identifier = commonName
 	}
 	newSlug := slugify(riverName) + "-" + slugify(identifier)
 
-	// Build INSERT with all available metadata.
-	displayName := meta.baseName
-	if displayName == "" {
-		displayName = folderName
-	}
-	commonNameVal := meta.commonName
+	commonNameVal := commonName
 	if commonNameVal == "" {
-		commonNameVal = displayName
-	}
-
-	var classMinArg, classMaxArg interface{}
-	if meta.classMin > 0 {
-		classMinArg = meta.classMin
-	}
-	if meta.classMax > 0 {
-		classMaxArg = meta.classMax
+		commonNameVal = folderName
 	}
 
 	err = imp.pool.QueryRow(ctx, `
@@ -557,7 +529,7 @@ func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName, riverNa
 			    class_min   = COALESCE(reaches.class_min, EXCLUDED.class_min),
 			    class_max   = COALESCE(reaches.class_max, EXCLUDED.class_max)
 		RETURNING id, slug, name
-	`, newSlug, displayName, commonNameVal, riverName, classMinArg, classMaxArg).Scan(&id, &slug, &name)
+	`, newSlug, folderName, commonNameVal, riverName, classMin, classMax).Scan(&id, &slug, &name)
 	if err != nil {
 		return "", "", "", false, fmt.Errorf("create reach %q: %w", folderName, err)
 	}
@@ -960,7 +932,7 @@ func SplitPrefixWithHint(name, description, folderHint string) (prefix, rest str
 // SplitPrefix splits "Rapid: Zoom Flume" → ("rapid", "Zoom Flume").
 func SplitPrefix(name string) (prefix, rest string) {
 	lower := strings.ToLower(name)
-	for _, p := range []string{"Rapid", "Wave", "Surf", "Put-in", "Take-out", "Parking", "Shuttle", "Hazard", "Campsite"} {
+	for _, p := range []string{"Rapid", "Wave", "Surf", "Put-in", "Take-out", "Parking", "Hazard", "Campsite"} {
 		if strings.HasPrefix(lower, strings.ToLower(p)+":") {
 			prefix := strings.ToLower(p)
 			if prefix == "surf" {
@@ -978,8 +950,6 @@ func SplitPrefix(name string) (prefix, rest string) {
 		return "take-out", name
 	case strings.Contains(lower, "parking") || strings.Contains(lower, "trailhead"):
 		return "parking", name
-	case strings.Contains(lower, "shuttle"):
-		return "shuttle", name
 	case strings.Contains(lower, "rapid") || strings.Contains(lower, "falls") ||
 		strings.Contains(lower, "drop") || strings.Contains(lower, "hole"):
 		return "rapid", name

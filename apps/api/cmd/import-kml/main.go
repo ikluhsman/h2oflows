@@ -77,8 +77,8 @@ func main() {
 	fmt.Println()
 	var centerlineReaches []string
 	for slug, st := range res.Reaches {
-		fmt.Printf("  %s — rapids=%d put-ins=%d take-outs=%d parking=%d shuttle=%d\n",
-			st.Name, st.Rapids, st.PutIns, st.TakeOuts, st.Parking, st.Shuttle)
+		fmt.Printf("  %s — rapids=%d put-ins=%d take-outs=%d parking=%d\n",
+			st.Name, st.Rapids, st.PutIns, st.TakeOuts, st.Parking)
 		if st.PutIns > 0 && st.TakeOuts > 0 {
 			centerlineReaches = append(centerlineReaches, slug)
 		}
