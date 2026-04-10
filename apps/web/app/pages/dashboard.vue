@@ -74,6 +74,7 @@
             <DashboardMap
               :gauges="store.gauges"
               @remove-gauge="store.removeGauge($event)"
+              @open-gauge="(id) => { const g = store.gauges.find(x => x.id === id); if (g) openGauge(g) }"
             />
           </ClientOnly>
         </section>

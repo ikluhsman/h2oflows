@@ -110,6 +110,7 @@ const props = defineProps<{
   gaugeId: string
   reachSlug?: string | null
   currentCfs?: number | null
+  noRanges?: boolean
 }>()
 
 // ---- State ------------------------------------------------------------------
@@ -131,15 +132,21 @@ async function load() {
   loading.value = true
   try {
     const since = new Date(Date.now() - hours.value * 3_600_000).toISOString()
-    const flowRangesUrl = props.reachSlug
-      ? `${apiBase}/api/v1/reaches/${props.reachSlug}/flow-ranges`
-      : `${apiBase}/api/v1/gauges/${props.gaugeId}/flow-ranges`
-    const [rdRes, frRes] = await Promise.all([
-      fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/readings?since=${since}&limit=500`),
-      fetch(flowRangesUrl),
-    ])
-    if (rdRes.ok) readings.value = await rdRes.json()
-    if (frRes.ok) flowRanges.value = await frRes.json()
+    if (props.noRanges) {
+      const rdRes = await fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/readings?since=${since}&limit=500`)
+      if (rdRes.ok) readings.value = await rdRes.json()
+      flowRanges.value = []
+    } else {
+      const flowRangesUrl = props.reachSlug
+        ? `${apiBase}/api/v1/reaches/${props.reachSlug}/flow-ranges`
+        : `${apiBase}/api/v1/gauges/${props.gaugeId}/flow-ranges`
+      const [rdRes, frRes] = await Promise.all([
+        fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/readings?since=${since}&limit=500`),
+        fetch(flowRangesUrl),
+      ])
+      if (rdRes.ok) readings.value = await rdRes.json()
+      if (frRes.ok) flowRanges.value = await frRes.json()
+    }
   } finally {
     loading.value = false
     await nextTick()

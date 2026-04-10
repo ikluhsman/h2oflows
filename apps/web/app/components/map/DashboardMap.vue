@@ -29,12 +29,17 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { useRouter } from '#app'
 import type { WatchedGauge } from '~/stores/watchlist'
 
 const props = defineProps<{ gauges: WatchedGauge[] }>()
-const emit  = defineEmits<{ (e: 'remove-gauge', id: string): void }>()
+const emit  = defineEmits<{
+  (e: 'remove-gauge', id: string): void
+  (e: 'open-gauge',   id: string): void
+}>()
 
 const { apiBase } = useRuntimeConfig().public
+const router     = useRouter()
 const container  = ref<HTMLDivElement>()
 const mapReady   = ref(false)
 const basemap = ref<'street' | 'topo' | 'satellite'>('street')
@@ -58,7 +63,6 @@ const gaugeTooltip = new maplibregl.Popup({
   closeButton: false, closeOnClick: false, offset: [0, -28],
   className: 'dash-map-tooltip',
 })
-let gaugeClickPopup: maplibregl.Popup | null = null
 
 // Colorado bbox — all current reaches are here
 const CO_BBOX = '-109.1,36.9,-102.0,41.1'
@@ -121,20 +125,7 @@ function makeGaugePinEl(gauge: WatchedGauge, pos: [number, number]): HTMLElement
   el.addEventListener('click', () => {
     gaugeTooltip.remove()
     gaugeClickPopup?.remove()
-    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    const popup = new maplibregl.Popup({ offset: [0, -34], className: 'dash-gauge-popup' })
-      .setLngLat(pos)
-      .setHTML(`<div class="dgp-inner">
-        <p class="dgp-name">${esc(name)}</p>
-        <p class="dgp-cfs">${esc(cfsText)}</p>
-        <button class="dgp-remove">× Remove from dashboard</button>
-      </div>`)
-      .addTo(map!)
-    gaugeClickPopup = popup
-    popup.getElement().querySelector('.dgp-remove')
-      ?.addEventListener('click', () => { popup.remove(); emit('remove-gauge', gauge.id) })
-    el.style.filter = 'drop-shadow(0 0 4px rgba(255,255,255,0.9)) drop-shadow(0 2px 6px rgba(0,0,0,0.5))'
-    popup.on('close', () => { el.style.filter = 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))' })
+    emit('open-gauge', gauge.id)
   })
 
   return el
@@ -144,8 +135,6 @@ function makeGaugePinEl(gauge: WatchedGauge, pos: [number, number]): HTMLElement
 
 function clearMarkers() {
   gaugeTooltip.remove()
-  gaugeClickPopup?.remove()
-  gaugeClickPopup = null
   for (const m of activeMarkers) m.remove()
   activeMarkers.length = 0
 }
@@ -189,7 +178,8 @@ async function refreshData() {
     const gaugePoints: [number, number][] = []
     for (const gauge of props.gauges) {
       let pos: [number, number] | null = null
-      if (gauge.lng != null && gauge.lat != null) {
+      if (gauge.lng != null && gauge.lat != null
+          && (Math.abs(gauge.lng) > 0.001 || Math.abs(gauge.lat) > 0.001)) {
         pos = [gauge.lng, gauge.lat]
       }
       if (!pos) {
@@ -327,6 +317,20 @@ onMounted(() => {
       },
     })
 
+    // Click a reach line → navigate to reach detail page
+    map!.addLayer({
+      id: 'dash-lines-hit',
+      type: 'line',
+      source: 'dash-reaches',
+      paint: { 'line-color': 'transparent', 'line-width': 12, 'line-opacity': 0 },
+    })
+    map!.on('click', 'dash-lines-hit', (e) => {
+      const slug = e.features?.[0]?.properties?.slug
+      if (slug) router.push(`/reaches/${slug}`)
+    })
+    map!.on('mouseenter', 'dash-lines-hit', () => { map!.getCanvas().style.cursor = 'pointer' })
+    map!.on('mouseleave', 'dash-lines-hit', () => { map!.getCanvas().style.cursor = '' })
+
     mapReady.value = true
     refreshData()
   })
@@ -356,50 +360,5 @@ watch(() => props.gauges, refreshData, { deep: true })
 }
 .dash-map-tooltip .maplibregl-popup-tip {
   border-top-color: rgba(17, 24, 39, 0.92) !important;
-}
-
-.dash-gauge-popup .maplibregl-popup-content {
-  border-radius: 10px !important;
-  padding: 0 !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.18) !important;
-  min-width: 170px;
-}
-.dgp-inner {
-  padding: 10px 14px 8px;
-  font-family: system-ui, sans-serif;
-}
-.dgp-name {
-  font-weight: 600;
-  font-size: 0.85rem;
-  color: #111827;
-  margin: 0 0 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 180px;
-}
-.dgp-cfs {
-  font-size: 0.78rem;
-  color: #6366f1;
-  font-weight: 500;
-  margin: 0 0 8px;
-}
-.dgp-remove {
-  display: block;
-  width: 100%;
-  background: none;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 0.75rem;
-  color: #6b7280;
-  cursor: pointer;
-  text-align: center;
-  transition: background 0.1s, color 0.1s;
-}
-.dgp-remove:hover {
-  background: #fee2e2;
-  border-color: #fca5a5;
-  color: #dc2626;
 }
 </style>

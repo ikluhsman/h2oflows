@@ -12,15 +12,12 @@
           </p>
         </div>
 
-        <!-- Current CFS + badge -->
+        <!-- Current CFS -->
         <div class="shrink-0 text-right">
           <span class="text-2xl font-bold tabular-nums" :class="cfsClass">
             {{ gauge.currentCfs != null ? gauge.currentCfs.toLocaleString() : '—' }}
           </span>
           <span class="text-xs text-gray-500 ml-1">cfs</span>
-          <div class="mt-1">
-            <UBadge :color="statusColor" variant="subtle" size="xs">{{ statusLabel }}</UBadge>
-          </div>
         </div>
       </div>
     </template>
@@ -28,7 +25,7 @@
     <template #body>
       <div class="space-y-4">
         <!-- 48-hour graph -->
-        <GaugeGraph :gauge-id="gauge.id" :current-cfs="gauge.currentCfs" />
+        <GaugeGraph :gauge-id="gauge.id" :current-cfs="gauge.currentCfs" :no-ranges="true" />
 
         <!-- Last updated -->
         <p v-if="gauge.lastReadingAt" class="text-xs text-gray-500">
@@ -89,32 +86,6 @@ const sourceUrl = computed(() => {
       return `https://dwr.state.co.us/Tools/Stations/${props.gauge.externalId}`
     default:
       return '#'
-  }
-})
-
-const statusColor = computed(() => {
-  switch (props.gauge.flowStatus) {
-    case 'runnable': return 'success'
-    case 'caution':  return 'warning'
-    case 'low':      return 'error'
-    case 'flood':    return 'info'
-    default:         return 'neutral'
-  }
-})
-
-const statusLabel = computed(() => {
-  if (props.gauge.flowBandLabel) {
-    return props.gauge.flowBandLabel
-      .split('_')
-      .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ')
-  }
-  switch (props.gauge.flowStatus) {
-    case 'runnable': return 'Runnable'
-    case 'caution':  return 'Caution'
-    case 'low':      return 'Too Low'
-    case 'flood':    return 'Flood Stage'
-    default:         return 'Unknown'
   }
 })
 
