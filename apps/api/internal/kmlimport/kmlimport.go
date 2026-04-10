@@ -561,7 +561,7 @@ func (imp *Importer) upsertRapidLocation(ctx context.Context, reachID, name, des
 	if imp.DryRun {
 		return nil
 	}
-	classRating := ParseClassRating(desc)
+	classRating := ParseClassRating(name, desc)
 	tag, err := imp.pool.Exec(ctx, `
 		UPDATE rapids
 		SET location             = ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
@@ -779,9 +779,60 @@ func ParseCoords(raw string) (lon, lat float64, ok bool) {
 	return lon, lat, err1 == nil && err2 == nil
 }
 
-// ParseClassRating extracts a numeric class from text like "Class III+" → 3.5.
-func ParseClassRating(desc string) *float64 {
-	lower := strings.ToLower(desc)
+// ParseClassRating extracts a numeric class rating from one or more text fields.
+// Priority: parenthesized notation "(IV+)", "(III-)" > "class III+" prefix.
+// Accepts variadic strings so callers can pass both name and description.
+func ParseClassRating(texts ...string) *float64 {
+	lower := strings.ToLower(strings.Join(texts, " "))
+	if v := parseParenClass(lower); v != nil {
+		return v
+	}
+	return parseClassPrefix(lower)
+}
+
+// parseParenClass finds the first "(IV+)" / "(III-)" / "(III)" style annotation.
+func parseParenClass(lower string) *float64 {
+	for i := 0; i < len(lower); i++ {
+		if lower[i] != '(' {
+			continue
+		}
+		rest := lower[i+1:]
+		if strings.HasPrefix(rest, "class ") {
+			rest = rest[6:]
+		}
+		var base float64
+		var eaten int
+		switch {
+		case strings.HasPrefix(rest, "v"):
+			base, eaten = 5, 1
+		case strings.HasPrefix(rest, "iv"):
+			base, eaten = 4, 2
+		case strings.HasPrefix(rest, "iii"):
+			base, eaten = 3, 3
+		case strings.HasPrefix(rest, "ii"):
+			base, eaten = 2, 2
+		case strings.HasPrefix(rest, "i"):
+			base, eaten = 1, 1
+		default:
+			continue
+		}
+		rest = rest[eaten:]
+		if strings.HasPrefix(rest, "+") {
+			base += 0.5
+			rest = rest[1:]
+		} else if strings.HasPrefix(rest, "-") {
+			base -= 0.5
+			rest = rest[1:]
+		}
+		if strings.HasPrefix(rest, ")") {
+			return &base
+		}
+	}
+	return nil
+}
+
+// parseClassPrefix finds "class III+" / "class IV-" style annotations.
+func parseClassPrefix(lower string) *float64 {
 	idx := strings.Index(lower, "class ")
 	if idx < 0 {
 		return nil
@@ -804,6 +855,8 @@ func ParseClassRating(desc string) *float64 {
 	}
 	if strings.HasPrefix(rest, "+") {
 		base += 0.5
+	} else if strings.HasPrefix(rest, "-") {
+		base -= 0.5
 	}
 	return &base
 }

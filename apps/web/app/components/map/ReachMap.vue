@@ -129,11 +129,10 @@
     class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-3 py-3"
   >
     <div class="flex gap-2.5 items-start">
-      <!-- Map pin icon (same SVG as the map marker, scaled to 20×26) -->
-      <div
-        class="shrink-0 mt-0.5"
-        style="width:20px;height:26px;line-height:0;overflow:visible"
-        v-html="selectedFeaturePinSvg"
+      <span
+        class="shrink-0 w-6 h-6 rounded-full flex items-center justify-center p-1 mt-0.5"
+        :style="{ background: selectedFeature.pinColor }"
+        v-html="selectedFeature.circleIcon"
       />
       <!-- Content -->
       <div class="flex-1 min-w-0">
@@ -289,50 +288,36 @@ const selectedFeature = computed(() => {
   if (!selectedId.value) return null
   const rapid = rapidFeatures.value.find(r => r.id === selectedId.value)
   if (rapid) return {
-    title:      rapid.label,
-    classLabel: rapid.classLabel,
-    subtitle:   rapid.isSurf ? 'Surf wave' : null,
-    desc:       rapid.desc || null,
-    pinColor:   '#3b82f6',
-    pinIcon:    rapid.isSurf ? '🌊' : '~',
+    title:       rapid.label,
+    classLabel:  rapid.classLabel,
+    subtitle:    rapid.isSurf ? 'Surf wave' : null,
+    desc:        rapid.desc || null,
+    pinColor:    '#3b82f6',
+    circleIcon:  rapidFeatureIcon(rapid.isSurf),
   }
   const access = accessFeatures.value.find(a => a.id === selectedId.value)
   if (access) return {
-    title:      access.label !== accessTypeLabel(access.type) ? access.label : accessTypeLabel(access.type),
-    classLabel: null as string | null,
-    subtitle:   access.label !== accessTypeLabel(access.type) ? accessTypeLabel(access.type) : null,
-    desc:       access.notes || null,
-    pinColor:   accessColor(access.type),
-    pinIcon:    accessIcon(access.type),
+    title:       access.label !== accessTypeLabel(access.type) ? access.label : accessTypeLabel(access.type),
+    classLabel:  null as string | null,
+    subtitle:    access.label !== accessTypeLabel(access.type) ? accessTypeLabel(access.type) : null,
+    desc:        access.notes || null,
+    pinColor:    accessColor(access.type),
+    circleIcon:  accessFeatureIcon(access.type),
   }
   const gauge = gaugeFeatures.value.find(g => g.id === selectedId.value)
   if (gauge) return {
-    title:      gauge.name ?? gauge.external_id ?? 'Flow gauge',
-    classLabel: null as string | null,
-    subtitle:   gaugeRelLabel(gauge.reach_relationship),
-    desc:       null as string | null,
-    pinColor:   '#0891b2',
-    pinIcon:    '~',
-    gaugeId:    gauge.id,
-    sourceUrl:  gaugeSourceUrl(gauge),
+    title:       gauge.name ?? gauge.external_id ?? 'Flow gauge',
+    classLabel:  null as string | null,
+    subtitle:    gaugeRelLabel(gauge.reach_relationship),
+    desc:        null as string | null,
+    pinColor:    '#0891b2',
+    circleIcon:  gaugeFeatureIcon(gauge.reach_relationship),
+    gaugeId:     gauge.id,
+    sourceUrl:   gaugeSourceUrl(gauge),
   }
   return null
 })
 
-// Pre-scaled pin SVG for the detail card (20×26 instead of the map's 28×36)
-const selectedFeaturePinSvg = computed(() => {
-  if (!selectedFeature.value) return ''
-  const { pinColor, pinIcon } = selectedFeature.value
-  const arrow = pinIcon === '↓'
-    ? `<path d="M10 5.5 L10 13.5 M6.5 10.5 L10 14 L13.5 10.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
-    : pinIcon === '↑'
-    ? `<path d="M10 14 L10 5.5 M6.5 9 L10 5.5 L13.5 9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
-    : `<text x="10" y="13" text-anchor="middle" dominant-baseline="middle" font-size="9" font-weight="800" font-family="system-ui,sans-serif" fill="white">${pinIcon}</text>`
-  return `<svg width="20" height="26" viewBox="0 0 20 26" xmlns="http://www.w3.org/2000/svg">
-    <path d="M10 1.5C6.1 1.5 3 4.6 3 8.5c0 5.3 7 16 7 16s7-10.7 7-16c0-3.9-3.1-7-7-7z" fill="${pinColor}" stroke="white" stroke-width="1.2"/>
-    ${arrow}
-  </svg>`
-})
 
 // Gauges with valid coordinates (from array or legacy single props)
 const gaugeFeatures = computed<GaugeProp[]>(() => {
