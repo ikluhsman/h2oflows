@@ -504,6 +504,17 @@ func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName, riverNa
 			LIMIT 1
 		`, term).Scan(&id, &slug, &name)
 		if matchErr == nil {
+			// Match found — apply any metadata the KML provides.
+			if !imp.DryRun {
+				_, _ = imp.pool.Exec(ctx, `
+					UPDATE reaches SET
+						common_name = CASE WHEN $2 != '' THEN $2 ELSE common_name END,
+						river_name  = CASE WHEN $3 != '' THEN $3 ELSE river_name  END,
+						class_min   = CASE WHEN $4 IS NOT NULL THEN $4 ELSE class_min END,
+						class_max   = CASE WHEN $5 IS NOT NULL THEN $5 ELSE class_max END
+					WHERE id = $1
+				`, id, commonName, riverName, classMin, classMax)
+			}
 			return id, slug, name, false, nil
 		}
 	}
@@ -526,8 +537,8 @@ func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName, riverNa
 		ON CONFLICT (slug) DO UPDATE
 			SET common_name = EXCLUDED.common_name,
 			    river_name  = EXCLUDED.river_name,
-			    class_min   = COALESCE(reaches.class_min, EXCLUDED.class_min),
-			    class_max   = COALESCE(reaches.class_max, EXCLUDED.class_max)
+			    class_min   = EXCLUDED.class_min,
+			    class_max   = EXCLUDED.class_max
 		RETURNING id, slug, name
 	`, newSlug, folderName, commonNameVal, riverName, classMin, classMax).Scan(&id, &slug, &name)
 	if err != nil {
