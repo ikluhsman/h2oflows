@@ -19,7 +19,7 @@ func Optional(v *Verifier) func(http.Handler) http.Handler {
 			token := bearerToken(r)
 			if token != "" && v != nil {
 				if claims, err := v.Verify(r.Context(), token); err == nil {
-					r = r.WithContext(WithUser(r.Context(), claims.UserID, claims.Email))
+					r = r.WithContext(WithUser(r.Context(), claims.UserID, claims.Email, claims.Role))
 				}
 				// Invalid tokens are silently ignored in Optional mode —
 				// the request continues as anonymous. Endpoints that must
@@ -50,10 +50,28 @@ func Required(v *Verifier) func(http.Handler) http.Handler {
 				writeJSONError(w, http.StatusUnauthorized, "invalid token")
 				return
 			}
-			ctx := WithUser(r.Context(), claims.UserID, claims.Email)
+			ctx := WithUser(r.Context(), claims.UserID, claims.Email, claims.Role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// RequireAdmin returns middleware that rejects requests from non-admin users.
+// It relies on the Optional (or Required) middleware having already run and
+// populated the role in context. Returns 401 for unauthenticated requests and
+// 403 for authenticated non-admin users.
+func RequireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := UserIDFromContext(r.Context()); !ok {
+			writeJSONError(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
+		if !IsAdminFromContext(r.Context()) {
+			writeJSONError(w, http.StatusForbidden, "admin role required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // bearerToken extracts the token from the Authorization header, if present.

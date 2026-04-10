@@ -14,12 +14,14 @@ type contextKey int
 const (
 	userIDKey contextKey = iota
 	emailKey
+	roleKey
 )
 
-// WithUser stores the authenticated user's Supabase ID and email in ctx.
-func WithUser(ctx context.Context, userID, email string) context.Context {
+// WithUser stores the authenticated user's Supabase ID, email, and role in ctx.
+func WithUser(ctx context.Context, userID, email, role string) context.Context {
 	ctx = context.WithValue(ctx, userIDKey, userID)
 	ctx = context.WithValue(ctx, emailKey, email)
+	ctx = context.WithValue(ctx, roleKey, role)
 	return ctx
 }
 
@@ -40,4 +42,10 @@ func EmailFromContext(ctx context.Context) (string, bool) {
 		return "", false
 	}
 	return v, true
+}
+
+// IsAdminFromContext returns true when the authenticated user has the "admin" role.
+func IsAdminFromContext(ctx context.Context) bool {
+	v, _ := ctx.Value(roleKey).(string)
+	return v == "admin"
 }

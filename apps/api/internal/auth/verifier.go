@@ -47,6 +47,7 @@ func NewVerifier(ctx context.Context, jwksURL string) (*Verifier, error) {
 type Claims struct {
 	UserID string // "sub" — Supabase auth.users UUID
 	Email  string // "email" — user's primary email, if present
+	Role   string // "app_metadata.role" — "admin" or "" for regular users
 }
 
 // Verify parses and validates a JWT string, returning the parsed claims.
@@ -75,5 +76,15 @@ func (v *Verifier) Verify(ctx context.Context, tokenString string) (*Claims, err
 		}
 	}
 
-	return &Claims{UserID: sub, Email: email}, nil
+	// Role comes from app_metadata.role (admin-controlled, not user-editable).
+	var role string
+	if v, ok := tok.Get("app_metadata"); ok {
+		if m, ok := v.(map[string]interface{}); ok {
+			if r, ok := m["role"].(string); ok {
+				role = r
+			}
+		}
+	}
+
+	return &Claims{UserID: sub, Email: email, Role: role}, nil
 }

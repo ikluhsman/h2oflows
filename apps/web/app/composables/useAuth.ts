@@ -14,6 +14,10 @@ export function useAuth() {
 
   const isAuthenticated = computed(() => !!user.value)
 
+  // True when the user's Supabase app_metadata.role === "admin".
+  // Set this in the Supabase dashboard: Authentication → Users → Edit → app_metadata: {"role":"admin"}
+  const isAdmin = computed(() => (user.value?.app_metadata as any)?.role === 'admin')
+
   /**
    * Returns the current access token string, or null when unauthenticated.
    * Use this to add Authorization: Bearer <token> headers to API requests.
@@ -26,5 +30,5 @@ export function useAuth() {
     await client.auth.signOut()
   }
 
-  return { user, session, isAuthenticated, getToken, signOut }
+  return { user, session, isAuthenticated, isAdmin, getToken, signOut }
 }

@@ -46,8 +46,8 @@
       </div>
     </div>
 
-    <!-- Admin bar -->
-    <div v-if="reach" class="shrink-0 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60">
+    <!-- Admin bar — only visible to users with app_metadata.role === "admin" -->
+    <div v-if="reach && isAdmin" class="shrink-0 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60">
       <div class="max-w-5xl mx-auto px-3 py-2 flex items-center gap-4 flex-wrap">
         <!-- Fetch river line -->
         <div class="flex items-center gap-2">
@@ -461,6 +461,7 @@ import { featurePanelIcon } from '~/utils/featureIcons'
 const route  = useRoute()
 const config = useRuntimeConfig()
 const store  = useWatchlistStore()
+const { isAdmin, getToken } = useAuth()
 
 // ---- Data -------------------------------------------------------------------
 
@@ -944,7 +945,7 @@ async function fetchCenterline() {
     if (manualLat.value && manualLng.value) {
       url += `?lat=${encodeURIComponent(manualLat.value)}&lng=${encodeURIComponent(manualLng.value)}`
     }
-    const res = await fetch(url, { method: 'POST' })
+    const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${getToken()}` } })
     const text = await res.text()
     let json: any
     try { json = JSON.parse(text) } catch { json = null }
@@ -1015,7 +1016,7 @@ async function deleteReach() {
   if (!confirm(`Permanently delete "${(reach.value as any)?.common_name ?? (reach.value as any)?.name}"?\n\nThis removes all rapids, access points, and features. Gauges are unlinked but kept.`)) return
   deleting.value = true
   try {
-    const res = await fetch(`${config.public.apiBase}/api/v1/reaches/${route.params.slug}`, { method: 'DELETE' })
+    const res = await fetch(`${config.public.apiBase}/api/v1/reaches/${route.params.slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${getToken()}` } })
     if (!res.ok) throw new Error(`Server error ${res.status}`)
     navigateTo('/')
   } catch (err: any) {
@@ -1051,6 +1052,7 @@ async function runImport() {
     form.append('file', kmzFile.value)
     const res = await fetch(`${config.public.apiBase}/api/v1/import/kmz`, {
       method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
       body: form,
     })
     const json = await res.json()

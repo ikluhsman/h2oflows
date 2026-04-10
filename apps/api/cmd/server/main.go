@@ -124,20 +124,24 @@ func main() {
 		r.Get("/reaches/{slug}/conditions", reaches.GetConditions)
 		r.Get("/reaches/{slug}/hazards", reaches.GetHazards)
 		r.Get("/reaches/{slug}/flow-ranges", reaches.GetFlowRanges)
-		r.Put("/reaches/{slug}/flow-ranges", reaches.SetFlowRanges)
-		r.Delete("/reaches/{slug}", reaches.Delete)
-		r.Post("/reaches/{slug}/fetch-centerline", reaches.FetchCenterline)
-		r.Delete("/reaches/{slug}/centerline", reaches.ClearCenterline)
 		r.Post("/reaches/{slug}/ask", reaches.Ask)
 		r.Post("/ask", reaches.GlobalAsk)
+
+		// Admin-only write routes — require authenticated user with role "admin".
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAdmin)
+			r.Put("/reaches/{slug}/flow-ranges", reaches.SetFlowRanges)
+			r.Delete("/reaches/{slug}", reaches.Delete)
+			r.Post("/reaches/{slug}/fetch-centerline", reaches.FetchCenterline)
+			r.Delete("/reaches/{slug}/centerline", reaches.ClearCenterline)
+			r.Post("/import/kmz", imports.ImportKMZ)
+		})
 
 		r.Post("/trips", trips.Create)
 		r.Get("/trips", trips.List)
 		r.Get("/trips/{id}", trips.Get)
 		r.Patch("/trips/{id}", trips.Patch)
 		r.Post("/trips/{id}/describe", trips.Describe)
-
-		r.Post("/import/kmz", imports.ImportKMZ)
 	})
 
 	srv := &http.Server{
