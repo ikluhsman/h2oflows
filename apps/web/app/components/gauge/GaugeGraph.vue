@@ -68,11 +68,6 @@
           <span class="text-gray-500 dark:text-gray-400">
             {{ fr.min_cfs != null ? fr.min_cfs.toLocaleString() : '—' }}–{{ fr.max_cfs != null ? fr.max_cfs.toLocaleString() : '∞' }} cfs
           </span>
-          <DataSourceBadge
-            :source="(fr.data_source as any) ?? 'manual'"
-            :verified="fr.verified"
-            :confidence="fr.ai_confidence ?? undefined"
-          />
         </span>
       </div>
     </div>

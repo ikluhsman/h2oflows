@@ -80,6 +80,9 @@
 import { ref, onMounted } from 'vue'
 import { useTrips, type TripSummary } from '~/composables/useTrips'
 
+// Disable SSR so Supabase session is always available on first render
+definePageMeta({ ssr: false })
+
 const { listTrips } = useTrips()
 const { isAuthenticated } = useAuth()
 

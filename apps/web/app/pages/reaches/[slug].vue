@@ -1,17 +1,12 @@
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
 
-    <!-- Nav bar -->
-    <header class="sticky top-0 z-20 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm">
-      <div class="max-w-5xl mx-auto px-3 py-3 flex items-center gap-3">
-        <NuxtLink to="/" class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 flex items-center gap-1">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          Dashboard
-        </NuxtLink>
-        <span class="text-gray-300 dark:text-gray-700">/</span>
-        <span class="text-sm font-medium truncate">{{ reach?.common_name ?? reach?.name }}</span>
-      </div>
-    </header>
+    <AppHeader>
+      <template v-if="reach">
+        <span class="text-gray-300 dark:text-gray-700 shrink-0">/</span>
+        <span class="text-sm font-medium truncate text-gray-700 dark:text-gray-200">{{ reach.common_name ?? reach.name }}</span>
+      </template>
+    </AppHeader>
 
     <!-- Upstream / downstream pagination -->
     <div v-if="upstreamReach || downstreamReach" class="border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950">
@@ -152,7 +147,6 @@
             </h1>
             <p class="text-gray-500 text-sm mt-0.5">
               {{ reach.region }}
-              <span v-if="reach.length_mi"> · {{ reach.length_mi }} mi</span>
             </p>
           </div>
 
@@ -160,6 +154,24 @@
             <span class="rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 font-bold text-sm">{{ classLabel }}</span>
           </div>
         </div>
+      </section>
+
+      <!-- Reach map (top) -->
+      <section>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Map</h2>
+        <ClientOnly>
+          <ReachMap
+            :name="reach.name"
+            :class-max="reach.class_max"
+            :centerline="displayCenterline"
+            :rapids="reach.rapids"
+            :access="reach.access"
+            :gauges="allGauges"
+            :slug="(reach as any).slug"
+            :river-name="(reach as any).river_name ?? undefined"
+            @gauge-add="(id) => { const g = allGauges.find((x: any) => x.id === id); if (g) addToDashboard(g) }"
+          />
+        </ClientOnly>
       </section>
 
       <!-- River assistant — Ask about this reach -->
@@ -259,23 +271,70 @@
         </div>
       </section>
 
-      <!-- Gauges — one card per gauge linked to this reach -->
-      <section v-if="allGauges.length > 0" class="space-y-4">
+      <!-- Quick stats -->
+      <section>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
+            <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Difficulty</div>
+            <div class="text-lg font-bold text-gray-800 dark:text-gray-100">{{ classLabel }}</div>
+          </div>
+          <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
+            <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Length</div>
+            <div class="text-lg font-bold text-gray-800 dark:text-gray-100">
+              {{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}
+            </div>
+          </div>
+          <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
+            <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Gradient</div>
+            <div class="text-lg font-bold text-gray-800 dark:text-gray-100">—</div>
+          </div>
+          <!-- Current flow — spanning 2 cols on mobile -->
+          <div v-if="allGauges.length > 0" class="col-span-2 sm:col-span-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between gap-4">
+            <div>
+              <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Current Flow</div>
+              <div class="flex items-baseline gap-1.5">
+                <span class="text-3xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
+                  {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
+                </span>
+                <span class="text-gray-500">cfs</span>
+                <span v-if="allGauges[0].last_reading_at" class="text-xs text-gray-400">· {{ relativeTime(allGauges[0].last_reading_at) }}</span>
+              </div>
+              <UBadge
+                v-if="allGauges[0].flow_status && allGauges[0].flow_status !== 'unknown'"
+                :color="flowStatusColor(allGauges[0].flow_status)"
+                variant="subtle"
+                size="xs"
+                class="mt-1.5"
+              >{{ flowStatusLabel(allGauges[0].flow_status) }}</UBadge>
+            </div>
+            <a href="#flow-gauge" class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors">
+              View graph ↓
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Reach Description -->
+      <section v-if="reach.description">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Reach Description</h2>
+        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line">
+          {{ reach.description }}
+        </div>
+      </section>
+
+      <!-- Flow / Gauge section -->
+      <section v-if="allGauges.length > 0" id="flow-gauge" class="space-y-4">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Flow</h2>
         <div
           v-for="g in allGauges"
           :key="g.id"
           class="border border-gray-200 dark:border-gray-700 rounded-xl p-4"
         >
-          <!-- Gauge header: name + relationship label + flow status + dashboard button -->
+          <!-- Gauge header: name + relationship label + dashboard button -->
           <div class="flex items-start justify-between gap-3 mb-3">
             <div class="min-w-0">
-              <div class="flex items-center gap-2 mb-0.5">
-                <div class="text-xs text-gray-400 uppercase tracking-wide">
-                  {{ gaugeRelLabel(g.reach_relationship) }}
-                </div>
-                <UBadge v-if="g.flow_status && g.flow_status !== 'unknown'" :color="flowStatusColor(g.flow_status)" variant="subtle" size="xs">
-                  {{ flowStatusLabel(g.flow_status) }}
-                </UBadge>
+              <div class="text-xs text-gray-400 uppercase tracking-wide mb-0.5">
+                {{ gaugeRelLabel(g.reach_relationship) }}
               </div>
               <div class="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">
                 {{ g.name ?? g.external_id }}
@@ -288,11 +347,11 @@
             <!-- Add / remove dashboard button -->
             <button
               v-if="!onDashboard(g.id)"
-              class="shrink-0 flex items-center gap-1.5 text-xs rounded-lg border border-gray-200 dark:border-gray-700 px-2.5 py-1.5 text-gray-600 dark:text-gray-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+              class="shrink-0 flex items-center gap-1.5 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 text-white font-medium transition-colors"
               @click="addToDashboard(g)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-              Dashboard
+              + Dashboard
             </button>
             <button
               v-else
@@ -307,50 +366,26 @@
           <!-- Graph -->
           <GaugeGraph :gauge-id="g.id" :reach-slug="(reach as any)?.slug ?? null" :current-cfs="g.current_cfs" />
 
-          <!-- CFS + last updated below graph -->
-          <div v-if="g.current_cfs != null" class="mt-3 flex items-end gap-2 border-t border-gray-100 dark:border-gray-800 pt-3">
-            <span class="text-3xl font-bold tabular-nums" :class="cfsColorClass(g.flow_status)">
-              {{ g.current_cfs.toLocaleString() }}
-            </span>
-            <span class="text-gray-500 mb-0.5">cfs</span>
-            <span v-if="g.last_reading_at" class="text-xs text-gray-400 mb-1">
-              · {{ relativeTime(g.last_reading_at) }}
-            </span>
+          <!-- CFS + flow badge below graph -->
+          <div class="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3">
+            <div v-if="g.current_cfs != null" class="flex items-end gap-2">
+              <span class="text-3xl font-bold tabular-nums" :class="cfsColorClass(g.flow_status)">
+                {{ g.current_cfs.toLocaleString() }}
+              </span>
+              <span class="text-gray-500 mb-0.5">cfs</span>
+              <span v-if="g.last_reading_at" class="text-xs text-gray-400 mb-1">
+                · {{ relativeTime(g.last_reading_at) }}
+              </span>
+            </div>
+            <div v-else class="text-gray-400 text-sm">No recent reading</div>
+            <UBadge
+              v-if="g.flow_status && g.flow_status !== 'unknown'"
+              :color="flowStatusColor(g.flow_status)"
+              variant="subtle"
+              size="xs"
+              class="mt-2"
+            >{{ flowStatusLabel(g.flow_status) }}</UBadge>
           </div>
-          <div v-else class="mt-3 text-gray-400 text-sm border-t border-gray-100 dark:border-gray-800 pt-3">No recent reading</div>
-        </div>
-      </section>
-
-      <!-- Reach map -->
-      <section>
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Map</h2>
-        <ClientOnly>
-          <ReachMap
-            :name="reach.name"
-            :class-max="reach.class_max"
-            :centerline="displayCenterline"
-            :rapids="reach.rapids"
-            :access="reach.access"
-            :gauges="allGauges"
-            :slug="(reach as any).slug"
-            :river-name="(reach as any).river_name ?? undefined"
-            @gauge-add="(id) => { const g = allGauges.find((x: any) => x.id === id); if (g) addToDashboard(g) }"
-          />
-        </ClientOnly>
-      </section>
-
-      <!-- Description -->
-      <section v-if="reach.description">
-        <div class="flex items-center gap-2 mb-2">
-          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">About</h2>
-          <DataSourceBadge
-            :source="(reach.description_source as any) ?? 'ai_seed'"
-            :verified="reach.description_verified"
-            :confidence="reach.description_ai_confidence ?? undefined"
-          />
-        </div>
-        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line">
-          {{ reach.description }}
         </div>
       </section>
 
