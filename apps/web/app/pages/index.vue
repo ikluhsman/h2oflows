@@ -413,7 +413,6 @@ async function onKmlSelected(event: Event) {
 
   try {
     const token = await getToken()
-    console.log('[kml upload] token present:', !!token, '| first 20 chars:', token?.slice(0, 20))
     const form = new FormData()
     form.append('file', file)
     const res = await fetch(`${apiBase}/api/v1/import/kmz`, {
