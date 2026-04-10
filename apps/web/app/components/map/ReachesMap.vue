@@ -132,24 +132,25 @@ const INITIAL_BBOX = { west: -116.0, south: 35.5, east: -101.5, north: 45.5 }
 
 // ── Difficulty config ─────────────────────────────────────────────────────────
 
-// Icons: I-II circle, II+ circle+square, III square, III+ square+diamond, IV diamond, V double diamond
-// Lines: I-II green, II+/III blue threshold 3.0, IV near-black, V red
+// Icons: I-II circle, II+ blue square (previewing III), III blue square,
+//        III+ black diamond (previewing IV), IV black diamond, V double diamond
+// Lines: green <3.0, blue 3.0–3.9, black 4.0–4.9, red 5.0+
 const DIFFICULTY = [
-  { maxClass: 2.4, color: '#16a34a', imageId: 'diff-1-2',  label: 'Class I–II'  },
-  { maxClass: 2.9, color: '#16a34a', imageId: 'diff-2-5',  label: 'Class II+'   },
-  { maxClass: 3.4, color: '#3b82f6', imageId: 'diff-3',    label: 'Class III'   },
-  { maxClass: 3.9, color: '#3b82f6', imageId: 'diff-3-5',  label: 'Class III+'  },
-  { maxClass: 4.9, color: '#1f2937', imageId: 'diff-4',    label: 'Class IV'    },
-  { maxClass: 99,  color: '#1f2937', imageId: 'diff-5',    label: 'Class V'     },
+  { maxClass: 2.4, color: '#16a34a', imageId: 'diff-1-2', label: 'Class I–II'  },
+  { maxClass: 2.9, color: '#16a34a', imageId: 'diff-3',   label: 'Class II+'   }, // green line, blue square
+  { maxClass: 3.4, color: '#3b82f6', imageId: 'diff-3',   label: 'Class III'   },
+  { maxClass: 3.9, color: '#3b82f6', imageId: 'diff-4',   label: 'Class III+'  }, // blue line, black diamond
+  { maxClass: 4.9, color: '#1f2937', imageId: 'diff-4',   label: 'Class IV'    },
+  { maxClass: 99,  color: '#1f2937', imageId: 'diff-5',   label: 'Class V'     },
 ]
 
 const DIFFICULTY_LEGEND = [
-  { label: 'Class I–II',  symbol: circleSvg('#16a34a')            },
-  { label: 'Class II+',   symbol: circleSquareSvg('#16a34a', '#3b82f6') },
-  { label: 'Class III',   symbol: squareSvg('#3b82f6')            },
-  { label: 'Class III+',  symbol: squareDiamondSvg('#3b82f6', '#1f2937') },
-  { label: 'Class IV',    symbol: diamondSvg('#1f2937')           },
-  { label: 'Class V',     symbol: dblDiamondSvg('#1f2937')        },
+  { label: 'Class I–II',  symbol: circleSvg('#16a34a')     },
+  { label: 'Class II+',   symbol: squareSvg('#3b82f6')     },
+  { label: 'Class III',   symbol: squareSvg('#3b82f6')     },
+  { label: 'Class III+',  symbol: diamondSvg('#1f2937')    },
+  { label: 'Class IV',    symbol: diamondSvg('#1f2937')    },
+  { label: 'Class V',     symbol: dblDiamondSvg('#1f2937') },
 ]
 
 function difficultyFor(classMax: number | null) {
@@ -163,18 +164,7 @@ function circleSvg(color: string) {
   return `<svg width="16" height="16" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
     <circle cx="10" cy="10" r="8" fill="${color}" stroke="white" stroke-width="1.5"/></svg>`
 }
-// Circle (primary) + small square (hint) — II+
-function circleSquareSvg(circleColor: string, squareColor: string) {
-  return `<svg width="24" height="16" viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="10" cy="10" r="8" fill="${circleColor}" stroke="white" stroke-width="1.5"/>
-    <rect x="19" y="6" width="9" height="9" rx="1" fill="${squareColor}" stroke="white" stroke-width="1.5"/></svg>`
-}
-// Square (primary) + small diamond (hint) — III+
-function squareDiamondSvg(squareColor: string, diamondColor: string) {
-  return `<svg width="24" height="16" viewBox="0 0 30 20" xmlns="http://www.w3.org/2000/svg">
-    <rect x="1" y="2" width="16" height="16" rx="1.5" fill="${squareColor}" stroke="white" stroke-width="1.5"/>
-    <path d="M23.5 4 L28 10 L23.5 16 L19 10 Z" fill="${diamondColor}" stroke="white" stroke-width="1.5"/></svg>`
-}
+
 function squareSvg(color: string) {
   return `<svg width="16" height="16" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
     <rect x="2" y="2" width="16" height="16" rx="1.5" fill="${color}" stroke="white" stroke-width="1.5"/></svg>`
@@ -248,12 +238,10 @@ onMounted(async () => {
 
   map.on('load', async () => {
     await Promise.all([
-      loadSvgImage(map!, 'diff-1-2',  circleSvg('#16a34a'),                        20, 20),
-      loadSvgImage(map!, 'diff-2-5',  circleSquareSvg('#16a34a', '#3b82f6'),       30, 20),
-      loadSvgImage(map!, 'diff-3',    squareSvg('#3b82f6'),                         20, 20),
-      loadSvgImage(map!, 'diff-3-5',  squareDiamondSvg('#3b82f6', '#1f2937'),      30, 20),
-      loadSvgImage(map!, 'diff-4',    diamondSvg('#1f2937'),                        20, 20),
-      loadSvgImage(map!, 'diff-5',    dblDiamondSvg('#1f2937'),                    36, 20),
+      loadSvgImage(map!, 'diff-1-2', circleSvg('#16a34a'),     20, 20),
+      loadSvgImage(map!, 'diff-3',   squareSvg('#3b82f6'),     20, 20),
+      loadSvgImage(map!, 'diff-4',   diamondSvg('#1f2937'),    20, 20),
+      loadSvgImage(map!, 'diff-5',   dblDiamondSvg('#1f2937'), 36, 20),
     ])
     mapReady.value = true
     await loadAllReaches()   // one request — all features, cached server-side

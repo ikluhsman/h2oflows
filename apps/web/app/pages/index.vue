@@ -10,38 +10,7 @@
       <button @click="dismissBanner" class="shrink-0 text-amber-600 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-100 font-medium transition-colors">Dismiss</button>
     </div>
 
-    <!-- Header -->
-    <header class="shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-      <div class="flex items-center gap-2">
-        <svg class="w-6 h-6 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M2 12c2-4 4-6 6-6s4 6 6 6 4-6 6-6" stroke-linecap="round"/>
-          <path d="M2 18c2-4 4-6 6-6s4 6 6 6 4-6 6-6" stroke-linecap="round" opacity="0.4"/>
-        </svg>
-        <span class="text-lg font-bold tracking-tight">H2OFlows</span>
-      </div>
-      <nav class="flex items-center gap-2">
-        <NuxtLink
-          to="/dashboard"
-          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 font-semibold text-sm transition-colors"
-        >Dashboard</NuxtLink>
-        <NuxtLink
-          to="/trips"
-          class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 font-semibold text-sm transition-colors"
-        >My Trips</NuxtLink>
-        <ClientOnly>
-          <button
-            v-if="isAuthenticated"
-            class="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors px-2"
-            @click="handleSignOut"
-          >Sign out</button>
-          <NuxtLink
-            v-else
-            to="/login"
-            class="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors"
-          >Sign in</NuxtLink>
-        </ClientOnly>
-      </nav>
-    </header>
+    <AppHeader />
 
     <!-- Admin bar -->
     <ClientOnly>
@@ -271,9 +240,7 @@
 import { ref, onMounted } from 'vue'
 import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
 
-const { isAuthenticated, isAdmin, signOut, getToken } = useAuth()
-const router = useRouter()
-async function handleSignOut() { await signOut(); router.push('/') }
+const { isAdmin, getToken } = useAuth()
 
 const waveRef = ref<SVGSVGElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
