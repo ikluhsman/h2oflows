@@ -55,10 +55,10 @@
           @mousedown.prevent
           @click="selectFeature(a.id, a.lng, a.lat)"
         >
-          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
-            :style="{ background: accessColor(a.type) }">
-            {{ accessIcon(a.type) }}
-          </span>
+          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center p-0.75"
+            :style="{ background: accessColor(a.type) }"
+            v-html="accessFeatureIcon(a.type)"
+          />
           <span class="truncate text-gray-700 dark:text-gray-300">{{ a.label }}</span>
         </button>
       </template>
@@ -74,9 +74,9 @@
           @mousedown.prevent
           @click="selectFeature(r.id, r.lng, r.lat)"
         >
-          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-blue-500">
-            {{ r.isSurf ? '🌊' : '~' }}
-          </span>
+          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center p-0.75 bg-blue-500"
+            v-html="rapidFeatureIcon(r.isSurf)"
+          />
           <span class="truncate text-gray-700 dark:text-gray-300">{{ r.label }}</span>
           <span v-if="r.classLabel" class="shrink-0 text-[10px] text-gray-400 font-medium">{{ r.classLabel }}</span>
         </button>
@@ -96,7 +96,9 @@
             @mousedown.prevent
             @click="selectFeature(g.id, g.lng!, g.lat!)"
           >
-            <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-cyan-600">~</span>
+            <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center p-0.75 bg-cyan-600"
+              v-html="gaugeFeatureIcon(g.reach_relationship)"
+            />
             <span class="truncate text-gray-700 dark:text-gray-300">{{ g.name ?? g.external_id ?? gaugeRelLabel(g.reach_relationship) }}</span>
           </button>
           <!-- Add to dashboard -->
@@ -183,6 +185,7 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { useRouter } from '#app'
 import { useRuntimeConfig } from '#imports'
+import { accessFeatureIcon, rapidFeatureIcon, gaugeFeatureIcon } from '~/utils/featureIcons'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -223,6 +226,8 @@ const props = defineProps<{
   access: AccessFeature[]
   // Current reach slug — used to exclude self from nearby reach layer
   slug?: string
+  // River name — loads all reaches on the same river instead of viewport bbox
+  riverName?: string
   // Legacy single-gauge props — kept for backwards compat
   gaugeLng?: number | null
   gaugeLat?: number | null
@@ -358,43 +363,27 @@ const BASEMAP_OPTIONS = [
 let map: maplibregl.Map | null = null
 let clickPopup: maplibregl.Popup | null = null
 let allMarkers: maplibregl.Marker[] = []
-let nearbyReachesTimer: ReturnType<typeof setTimeout> | null = null
 
-// ── Nearby reaches ────────────────────────────────────────────────────────────
+// ── Same-river reaches ────────────────────────────────────────────────────────
+// Fetched once on load using river_name. Shown as dimmed lines beneath the
+// current reach; clicking navigates to that reach's detail page.
 
 async function fetchNearbyReaches() {
-  if (!map) return
-  const bounds = map.getBounds()
-  const bbox = [
-    bounds.getWest().toFixed(6),
-    bounds.getSouth().toFixed(6),
-    bounds.getEast().toFixed(6),
-    bounds.getNorth().toFixed(6),
-  ].join(',')
-
+  if (!map || !props.riverName) return
+  const url = `${config.public.apiBase}/api/v1/reaches/map?river_name=${encodeURIComponent(props.riverName)}`
   try {
-    const fc = await $fetch<{ features: any[] }>(
-      `${config.public.apiBase}/api/v1/reaches/map?bbox=${bbox}`
-    )
+    const fc = await $fetch<{ features: any[] }>(url)
     if (!map) return
     const source = map.getSource('other-reaches') as maplibregl.GeoJSONSource | undefined
     if (!source) return
-    // Exclude the current reach so it doesn't dim its own centerline.
     const filtered = {
       type: 'FeatureCollection' as const,
-      features: (fc.features ?? []).filter(
-        f => f.properties?.slug !== props.slug
-      ),
+      features: (fc.features ?? []).filter(f => f.properties?.slug !== props.slug),
     }
     source.setData(filtered)
   } catch {
-    // Silently ignore — nearby reaches are a nice-to-have overlay.
+    // Silently ignore — other-river-reaches are a nice-to-have overlay.
   }
-}
-
-function scheduleFetchNearbyReaches() {
-  if (nearbyReachesTimer) clearTimeout(nearbyReachesTimer)
-  nearbyReachesTimer = setTimeout(fetchNearbyReaches, 300)
 }
 const markerEls = new Map<string, HTMLElement>()
 
@@ -457,7 +446,6 @@ onMounted(async () => {
     fetchNearbyReaches()
   })
 
-  map.on('moveend', scheduleFetchNearbyReaches)
 
   map.on('error', (e) => { console.warn('[ReachMap]', e.error?.message ?? e) })
 
@@ -472,7 +460,6 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (nearbyReachesTimer) clearTimeout(nearbyReachesTimer)
   for (const m of allMarkers) m.remove()
   allMarkers = []
   markerEls.clear()
@@ -597,6 +584,8 @@ function addLayers() {
     const el = document.createElement('div')
     el.dataset.markerId = r.id
     el.className = 'reach-map-rapid-label'
+    el.tabIndex = -1
+    el.addEventListener('mousedown', e => e.preventDefault())
     el.textContent = r.label
     el.title = r.label
     el.addEventListener('click', (e) => {
@@ -637,6 +626,11 @@ function makePinEl(color: string, _imgUrl: string | null, label: string, id: str
   const el = document.createElement('div')
   el.dataset.markerId = id
   el.dataset.pinColor = color
+  // tabindex="-1" keeps the element programmatically focusable but not in the tab order.
+  // mousedown.preventDefault() stops the browser from assigning focus on click, which
+  // would cause window.scroll to track the element as MapLibre repositions it via transform.
+  el.tabIndex = -1
+  el.addEventListener('mousedown', e => e.preventDefault())
   el.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));transition:filter 0.12s'
   el.innerHTML = makePinSvg(color, label)
   return el

@@ -124,82 +124,105 @@ func (h *ReachHandler) StartCacheRefresh(ctx context.Context, interval time.Dura
 //
 // Reaches with no centerline geometry are omitted — they appear as gauge
 // markers via the gauge search endpoint instead.
+// mapBaseSQL is the CTE + SELECT + FROM + JOINs shared by the Map handler.
+// The WHERE clause is appended dynamically based on query parameters.
+const mapBaseSQL = `
+	WITH latest_reading AS (
+		SELECT DISTINCT ON (gauge_id)
+			gauge_id, value
+		FROM gauge_readings
+		WHERE timestamp > NOW() - INTERVAL '48 hours'
+		ORDER BY gauge_id, timestamp DESC
+	)
+	SELECT
+		r.id, r.name, r.slug,
+		r.river_name, r.common_name, r.put_in_name, r.take_out_name,
+		r.class_min,
+		COALESCE(
+			(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL),
+			r.class_max
+		) AS class_max,
+		r.character, r.length_mi,
+		ST_AsGeoJSON(r.centerline::geometry)::json AS centerline,
+		ST_X(r.put_in::geometry)    AS put_in_lng,
+		ST_Y(r.put_in::geometry)    AS put_in_lat,
+		ST_X(r.take_out::geometry)  AS take_out_lng,
+		ST_Y(r.take_out::geometry)  AS take_out_lat,
+		lr.value                    AS current_cfs,
+		g.last_reading_at,
+		fr.label                    AS flow_label,
+		g.id                        AS gauge_id,
+		g.reach_relationship,
+		g.featured                  AS gauge_trusted,
+		g.gauge_notes,
+		g.info_links,
+		CASE
+			WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
+			WHEN fr.label = 'runnable'                 THEN 'runnable'
+			WHEN fr.label = 'below_recommended'        THEN 'caution'
+			WHEN fr.label = 'above_recommended'        THEN 'flood'
+			WHEN fr.label IN ('fun', 'optimal')        THEN 'runnable'
+			WHEN fr.label IN ('minimum', 'pushy')      THEN 'caution'
+			WHEN fr.label = 'too_low'                  THEN 'low'
+			WHEN fr.label IN ('high', 'flood')         THEN 'flood'
+			ELSE                                            'unknown'
+		END AS flow_status
+	FROM reaches r
+	LEFT JOIN gauges g ON g.id = r.primary_gauge_id
+	LEFT JOIN latest_reading lr ON lr.gauge_id = g.id
+	LEFT JOIN LATERAL (
+		SELECT label FROM flow_ranges
+		WHERE gauge_id = g.id
+		  AND (min_cfs IS NULL OR lr.value >= min_cfs)
+		  AND (max_cfs IS NULL OR lr.value <  max_cfs)
+		LIMIT 1
+	) fr ON TRUE
+`
+
+// Map handles GET /api/v1/reaches/map
+//
+// Accepts either (or both):
+//
+//	bbox=west,south,east,north  – spatial viewport filter
+//	river_name=Arkansas River   – same-river filter (case-insensitive)
+//
+// At least one parameter is required. Providing river_name without bbox
+// returns all reaches on that river regardless of viewport, which is the
+// preferred mode for the reach detail page sidebar.
 func (h *ReachHandler) Map(w http.ResponseWriter, r *http.Request) {
-	bbox, err := parseBBoxParam(r)
-	if err != nil {
-		errorResponse(w, http.StatusBadRequest, err.Error())
+	riverName := r.URL.Query().Get("river_name")
+	bboxRaw := r.URL.Query().Get("bbox")
+
+	if riverName == "" && bboxRaw == "" {
+		errorResponse(w, http.StatusBadRequest, "bbox or river_name is required")
 		return
 	}
 
-	rows, err := h.db.Query(r.Context(), `
-		WITH latest_reading AS (
-			-- Most recent reading for each gauge within the last 48 hours.
-			-- Outside this window we treat the status as unknown.
-			SELECT DISTINCT ON (gauge_id)
-				gauge_id, value
-			FROM gauge_readings
-			WHERE timestamp > NOW() - INTERVAL '48 hours'
-			ORDER BY gauge_id, timestamp DESC
+	// Build WHERE clause + args dynamically.
+	where := "WHERE r.centerline IS NOT NULL"
+	args := make([]any, 0, 5)
+	n := 1
+
+	if bboxRaw != "" {
+		bbox, err := parseBBoxParam(r)
+		if err != nil {
+			errorResponse(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		where += fmt.Sprintf(
+			" AND ST_Intersects(r.centerline::geometry, ST_MakeEnvelope($%d, $%d, $%d, $%d, 4326))",
+			n, n+1, n+2, n+3,
 		)
-		SELECT
-			r.id,
-			r.name,
-			r.slug,
-			r.river_name,
-			r.common_name,
-			r.put_in_name,
-			r.take_out_name,
-			r.class_min,
-			COALESCE(
-				(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL),
-				r.class_max
-			) AS class_max,
-			r.character,
-			r.length_mi,
-			ST_AsGeoJSON(r.centerline::geometry)::json        AS centerline,
-			ST_X(r.put_in::geometry)                          AS put_in_lng,
-			ST_Y(r.put_in::geometry)                          AS put_in_lat,
-			ST_X(r.take_out::geometry)                        AS take_out_lng,
-			ST_Y(r.take_out::geometry)                        AS take_out_lat,
-			lr.value                                          AS current_cfs,
-			g.last_reading_at,
-			fr.label                                          AS flow_label,
-			g.id                                              AS gauge_id,
-			g.reach_relationship,
-			g.featured                                        AS gauge_trusted,
-			g.gauge_notes,
-			g.info_links,
-			CASE
-				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
-				WHEN fr.label = 'runnable'                 THEN 'runnable'
-				WHEN fr.label = 'below_recommended'        THEN 'caution'
-				WHEN fr.label = 'above_recommended'        THEN 'flood'
-				-- legacy labels (pre-migration 034) kept for any un-migrated rows
-				WHEN fr.label IN ('fun', 'optimal')        THEN 'runnable'
-				WHEN fr.label IN ('minimum', 'pushy')      THEN 'caution'
-				WHEN fr.label = 'too_low'                  THEN 'low'
-				WHEN fr.label IN ('high', 'flood')         THEN 'flood'
-				ELSE                                            'unknown'
-			END AS flow_status
-		FROM reaches r
-		LEFT JOIN gauges g
-			ON g.id = r.primary_gauge_id
-		LEFT JOIN latest_reading lr
-			ON lr.gauge_id = g.id
-		LEFT JOIN LATERAL (
-			-- Match the reading to the first flow range it falls within.
-			SELECT label FROM flow_ranges
-			WHERE gauge_id = g.id
-			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
-			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
-			LIMIT 1
-		) fr ON TRUE
-		WHERE r.centerline IS NOT NULL
-		  AND ST_Intersects(
-			r.centerline::geometry,
-			ST_MakeEnvelope($1, $2, $3, $4, 4326)
-		  )
-	`, bbox.West, bbox.South, bbox.East, bbox.North)
+		args = append(args, bbox.West, bbox.South, bbox.East, bbox.North)
+		n += 4
+	}
+
+	if riverName != "" {
+		where += fmt.Sprintf(" AND r.river_name ILIKE $%d", n)
+		args = append(args, riverName)
+	}
+
+	rows, err := h.db.Query(r.Context(), mapBaseSQL+where, args...)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "query failed")
 		return

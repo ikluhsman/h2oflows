@@ -333,6 +333,7 @@
             :access="reach.access"
             :gauges="allGauges"
             :slug="(reach as any).slug"
+            :river-name="(reach as any).river_name ?? undefined"
             @gauge-add="(id) => { const g = allGauges.find((x: any) => x.id === id); if (g) addToDashboard(g) }"
           />
         </ClientOnly>
@@ -392,10 +393,11 @@
               >
                 <!-- Icon circle (matches map pin symbols) -->
                 <div
-                  class="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white mt-0.5"
+                  class="shrink-0 w-6 h-6 rounded-full flex items-center justify-center p-1 mt-0.5"
                   :style="{ background: featureIconColor(feat) }"
                   :title="featureTypeLabel(feat)"
-                >{{ featureIconLabel(feat) }}</div>
+                  v-html="featurePanelIcon(feat.type, { isHazard: feat.is_permanent_hazard })"
+                />
 
                 <!-- Content -->
                 <div class="flex-1 min-w-0">
@@ -454,6 +456,7 @@
 import { computed, ref, watch, nextTick } from 'vue'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { gsap } from 'gsap'
+import { featurePanelIcon } from '~/utils/featureIcons'
 
 const route  = useRoute()
 const config = useRuntimeConfig()
@@ -637,19 +640,6 @@ function featureIconColor(feat: RiverFeature): string {
   }
 }
 
-// Icon symbol — mirrors the pin labels used in ReachMap.vue
-function featureIconLabel(feat: RiverFeature): string {
-  if (feat.is_permanent_hazard) return '⚠'
-  switch (feat.type) {
-    case 'rapid':    return '~'
-    case 'put_in':   return '↓'
-    case 'take_out': return '↑'
-    case 'camp':     return '⛺'
-    case 'parking':  return 'P'
-    case 'access':   return '◆'
-    default:         return '·'
-  }
-}
 
 function featurePillClass(feat: RiverFeature): string {
   if (feat.is_permanent_hazard)
