@@ -268,7 +268,13 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 			minCFS    *float64
 			maxCFS    *float64
 		}
+		type gaugeAssoc struct {
+			reachID    string
+			reachName  string
+			externalID string
+		}
 		var flowRanges []reachFlowRange
+		var gaugeAssocs []gaugeAssoc
 
 		for _, folder := range doc.Folders {
 			rid, rslug, rname, created, err := imp.matchOrCreateReach(ctx, folder.Name, doc.Name)
@@ -280,8 +286,16 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				res.Log = append(res.Log, fmt.Sprintf("+ created reach %q (slug: %s)", folder.Name, rslug))
 			}
 			for _, pm := range folder.Placemarks {
-				// Flow range metadata — no coordinates, special keyword name.
+				// Metadata placemarks — no coordinates.
 				if pm.Point == nil {
+					key := strings.ToLower(strings.TrimSpace(pm.Name))
+					if key == "gauge" {
+						if extID := strings.TrimSpace(pm.Description); extID != "" {
+							gaugeAssocs = append(gaugeAssocs, gaugeAssoc{rid, rname, extID})
+							res.Log = append(res.Log, fmt.Sprintf("~ [%s] gauge %s", rname, extID))
+						}
+						continue
+					}
 					if label, minCFS, maxCFS, ok := parseFlowRangePM(pm.Name, pm.Description); ok {
 						flowRanges = append(flowRanges, reachFlowRange{rid, rname, label, minCFS, maxCFS})
 						res.Log = append(res.Log, fmt.Sprintf("~ [%s] flow range %s", rname, label))
@@ -296,6 +310,15 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		for _, fr := range flowRanges {
 			if err := imp.upsertFlowRange(ctx, fr.reachID, fr.label, fr.minCFS, fr.maxCFS); err != nil {
 				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] flow range %s: %v", fr.reachName, fr.label, err))
+			}
+		}
+
+		// Associate gauges by USGS/DWR external ID.
+		for _, ga := range gaugeAssocs {
+			if err := imp.setReachGauge(ctx, ga.reachID, ga.externalID); err != nil {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] gauge %s: %v", ga.reachName, ga.externalID, err))
+			} else {
+				res.Log = append(res.Log, fmt.Sprintf("✓ [%s] linked gauge %s", ga.reachName, ga.externalID))
 			}
 		}
 	}
@@ -723,6 +746,35 @@ func (imp *Importer) upsertFlowRange(ctx context.Context, reachID, label string,
 			max_cfs     = EXCLUDED.max_cfs,
 			data_source = EXCLUDED.data_source
 	`, reachID, label, minCFS, maxCFS)
+	return err
+}
+
+// setReachGauge links a reach to its primary gauge by the gauge's external ID
+// (USGS site number or DWR station abbreviation).  Updates both sides of the
+// bidirectional relationship: reaches.primary_gauge_id and gauges.reach_id.
+func (imp *Importer) setReachGauge(ctx context.Context, reachID, externalID string) error {
+	if imp.DryRun {
+		return nil
+	}
+	var gaugeID string
+	err := imp.pool.QueryRow(ctx, `
+		SELECT id FROM gauges
+		WHERE external_id = $1
+		ORDER BY CASE WHEN source = 'usgs' THEN 0 ELSE 1 END
+		LIMIT 1
+	`, externalID).Scan(&gaugeID)
+	if err != nil {
+		return fmt.Errorf("gauge %q not found: %w", externalID, err)
+	}
+	_, err = imp.pool.Exec(ctx, `
+		UPDATE reaches SET primary_gauge_id = $1 WHERE id = $2
+	`, gaugeID, reachID)
+	if err != nil {
+		return fmt.Errorf("set primary_gauge_id: %w", err)
+	}
+	_, err = imp.pool.Exec(ctx, `
+		UPDATE gauges SET reach_id = $1 WHERE id = $2
+	`, reachID, gaugeID)
 	return err
 }
 

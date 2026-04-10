@@ -56,9 +56,70 @@
           <svg v-else class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           {{ importing ? 'Importing…' : 'Upload KML' }}
         </button>
+        <button
+          class="inline-flex items-center justify-center w-5 h-5 rounded-full border border-gray-600 text-gray-400 hover:text-white hover:border-gray-400 text-xs font-bold transition-colors leading-none"
+          title="KML format guide"
+          @click="showKmlGuide = true"
+        >?</button>
         <span v-if="importMsg" class="text-xs" :class="importError ? 'text-red-400' : 'text-green-400'">{{ importMsg }}</span>
         <input ref="kmlInputRef" type="file" accept=".kml,.kmz" class="hidden" @change="onKmlSelected" />
       </div>
+
+      <!-- KML format guide modal -->
+      <Teleport to="body">
+        <div
+          v-if="showKmlGuide"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          @click.self="showKmlGuide = false"
+        >
+          <div class="w-full max-w-lg bg-gray-900 border border-gray-700 rounded-xl shadow-2xl text-sm text-gray-200 overflow-y-auto max-h-[90vh]">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-gray-700">
+              <h2 class="font-semibold text-white">KML Format Guide</h2>
+              <button class="text-gray-400 hover:text-white transition-colors text-lg leading-none" @click="showKmlGuide = false">&times;</button>
+            </div>
+            <div class="px-5 py-4 space-y-4">
+
+              <section>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Map structure</h3>
+                <ul class="space-y-1 text-gray-300">
+                  <li><span class="text-white font-medium">Document name</span> — used as the river name (e.g. <code class="text-blue-400">South Platte River</code>)</li>
+                  <li><span class="text-white font-medium">Each folder</span> — one reach. Name format: <code class="text-blue-400">Display Name (CommonName,classMin,classMax)</code></li>
+                </ul>
+                <p class="mt-1 text-gray-500 text-xs">Example folder name: <code class="text-blue-300">Buffalo Creek to Foxton (Foxton,3,4)</code></p>
+                <p class="text-gray-500 text-xs">Slug generated: <code class="text-blue-300">south-platte-river-foxton</code></p>
+              </section>
+
+              <section>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Pin name prefixes</h3>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-0.5 text-gray-300">
+                  <span><code class="text-blue-400">Rapid: Name</code></span><span class="text-gray-500">rapid location</span>
+                  <span><code class="text-blue-400">Wave: Name</code></span><span class="text-gray-500">surf wave</span>
+                  <span><code class="text-blue-400">Put-in: Name</code></span><span class="text-gray-500">put-in access</span>
+                  <span><code class="text-blue-400">Take-out: Name</code></span><span class="text-gray-500">take-out access</span>
+                  <span><code class="text-blue-400">Parking: Name</code></span><span class="text-gray-500">parking area</span>
+                  <span><code class="text-blue-400">Hazard: Name</code></span><span class="text-gray-500">permanent hazard</span>
+                  <span><code class="text-blue-400">Campsite: Name</code></span><span class="text-gray-500">campsite</span>
+                  <span><code class="text-blue-400">Shuttle: Name</code></span><span class="text-gray-500">shuttle drop</span>
+                </div>
+              </section>
+
+              <section>
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-1">Metadata placemarks <span class="text-gray-600 normal-case font-normal">(no pin — add to folder data table)</span></h3>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-0.5 text-gray-300">
+                  <span><code class="text-blue-400">gauge</code></span><span class="text-gray-500">USGS site number, e.g. <code class="text-blue-300">09058000</code></span>
+                  <span><code class="text-blue-400">below</code></span><span class="text-gray-500">max CFS for below-recommended, e.g. <code class="text-blue-300">200</code></span>
+                  <span><code class="text-blue-400">low</code></span><span class="text-gray-500">min,max CFS, e.g. <code class="text-blue-300">200,400</code> (optional)</span>
+                  <span><code class="text-blue-400">med</code></span><span class="text-gray-500">min,max CFS, e.g. <code class="text-blue-300">400,800</code></span>
+                  <span><code class="text-blue-400">high</code></span><span class="text-gray-500">min,max CFS, e.g. <code class="text-blue-300">800,1200</code> (optional)</span>
+                  <span><code class="text-blue-400">above</code></span><span class="text-gray-500">min CFS for above-recommended, e.g. <code class="text-blue-300">1200</code></span>
+                </div>
+                <p class="mt-1.5 text-gray-500 text-xs">3-tier (below/med/above) and 5-tier (all five) both work. Omit low and high for 3-tier.</p>
+              </section>
+
+            </div>
+          </div>
+        </div>
+      </Teleport>
     </ClientOnly>
 
     <!-- Hero -->
@@ -329,10 +390,11 @@ function cancelSearch() {
 
 // ── Admin KML upload ──────────────────────────────────────────────────────────
 
-const kmlInputRef = ref<HTMLInputElement | null>(null)
-const importing   = ref(false)
-const importMsg   = ref('')
-const importError = ref(false)
+const kmlInputRef  = ref<HTMLInputElement | null>(null)
+const importing    = ref(false)
+const importMsg    = ref('')
+const importError  = ref(false)
+const showKmlGuide = ref(false)
 
 function triggerKmlUpload() {
   importMsg.value = ''
