@@ -1,32 +1,31 @@
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-    <p class="text-sm text-gray-400">{{ message }}</p>
+    <p class="text-sm text-gray-400">Signing in…</p>
   </div>
 </template>
 
 <script setup lang="ts">
-// Must be client-only — PKCE code verifier lives in sessionStorage (no SSR access).
+// With implicit flow the Supabase client processes the #access_token fragment
+// automatically on initialization. Just wait for the session then redirect.
 definePageMeta({ ssr: false })
 
-const client  = useSupabaseClient()
-const route   = useRoute()
-const message = ref('Signing in…')
+const client = useSupabaseClient()
 
-const code = route.query.code as string | undefined
-
-if (code) {
-  try {
-    const { error } = await client.auth.exchangeCodeForSession(code)
-    if (error) {
-      message.value = `Sign-in failed: ${error.message}`
-    } else {
-      // Hard redirect so the server receives the new session cookie on the next request.
-      window.location.href = '/dashboard'
-    }
-  } catch (e: any) {
-    message.value = `Sign-in failed: ${e?.message ?? 'unknown error'}`
+onMounted(async () => {
+  // Give the client a tick to process the hash fragment
+  const { data } = await client.auth.getSession()
+  if (data.session) {
+    window.location.href = '/dashboard'
+  } else {
+    // Listen for the auth state change triggered by hash processing
+    const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        subscription.unsubscribe()
+        window.location.href = '/dashboard'
+      }
+    })
+    // Timeout fallback
+    setTimeout(() => { window.location.href = '/' }, 5000)
   }
-} else {
-  window.location.href = '/'
-}
+})
 </script>

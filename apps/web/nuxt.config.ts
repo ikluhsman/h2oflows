@@ -10,12 +10,19 @@ export default defineNuxtConfig({
   ],
 
   supabase: {
-    // Don't auto-redirect — we handle navigation ourselves
     redirect: false,
     redirectOptions: {
       login:    '/login',
       callback: '/confirm',
       exclude:  ['/', '/map', '/reaches/*', '/dashboard'],
+    },
+    // Use implicit flow — tokens come back in the URL hash, no PKCE code
+    // verifier needed. Required for static hosting (Netlify) where sessionStorage
+    // doesn't survive the OAuth redirect.
+    clientOptions: {
+      auth: {
+        flowType: 'implicit',
+      },
     },
   },
 
