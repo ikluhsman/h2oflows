@@ -28,6 +28,18 @@
           to="/trips"
           class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 font-semibold text-sm transition-colors"
         >My Trips</NuxtLink>
+        <ClientOnly>
+          <button
+            v-if="isAuthenticated"
+            class="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors px-2"
+            @click="handleSignOut"
+          >Sign out</button>
+          <NuxtLink
+            v-else
+            to="/login"
+            class="inline-flex items-center px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors"
+          >Sign in</NuxtLink>
+        </ClientOnly>
       </nav>
     </header>
 
@@ -179,6 +191,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
+
+const { isAuthenticated, signOut } = useAuth()
+const router = useRouter()
+async function handleSignOut() { await signOut(); router.push('/') }
 
 const waveRef = ref<SVGSVGElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
