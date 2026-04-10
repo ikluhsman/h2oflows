@@ -734,20 +734,43 @@ func (imp *Importer) upsertFlowRange(ctx context.Context, reachID, label string,
 	return err
 }
 
-// setReachGauge links a reach to its primary gauge by the gauge's external ID
-// (USGS site number or DWR station abbreviation).  Updates both sides of the
-// bidirectional relationship: reaches.primary_gauge_id and gauges.reach_id.
+// setReachGauge links a reach to its primary gauge by the gauge's external ID.
+// Accepts bare IDs ("07094500", "PLAGEOCO") or prefixed IDs ("USGS-07094500",
+// "DWR-PLAGEOCO") — the prefix is stripped and used to narrow the source lookup.
 func (imp *Importer) setReachGauge(ctx context.Context, reachID, externalID string) error {
 	if imp.DryRun {
 		return nil
 	}
+
+	// Strip optional source prefix and record it for a more precise query.
+	source := ""
+	bareID := externalID
+	upper := strings.ToUpper(externalID)
+	switch {
+	case strings.HasPrefix(upper, "USGS-"):
+		source = "usgs"
+		bareID = externalID[5:]
+	case strings.HasPrefix(upper, "DWR-"):
+		source = "dwr"
+		bareID = externalID[4:]
+	}
+
 	var gaugeID string
-	err := imp.pool.QueryRow(ctx, `
-		SELECT id FROM gauges
-		WHERE external_id = $1
-		ORDER BY CASE WHEN source = 'usgs' THEN 0 ELSE 1 END
-		LIMIT 1
-	`, externalID).Scan(&gaugeID)
+	var err error
+	if source != "" {
+		err = imp.pool.QueryRow(ctx, `
+			SELECT id FROM gauges
+			WHERE external_id = $1 AND source = $2
+			LIMIT 1
+		`, bareID, source).Scan(&gaugeID)
+	} else {
+		err = imp.pool.QueryRow(ctx, `
+			SELECT id FROM gauges
+			WHERE external_id = $1
+			ORDER BY CASE WHEN source = 'usgs' THEN 0 ELSE 1 END
+			LIMIT 1
+		`, bareID).Scan(&gaugeID)
+	}
 	if err != nil {
 		return fmt.Errorf("gauge %q not found: %w", externalID, err)
 	}
