@@ -1291,10 +1291,7 @@ func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, exp
 	_, err = h.db.Exec(ctx, `
 		UPDATE reaches
 		SET    centerline = ST_GeomFromGeoJSON($1)::geography,
-		       length_mi  = COALESCE(
-		           length_mi,
-		           ROUND((ST_Length(ST_GeomFromGeoJSON($1)::geography) / 1609.344)::numeric, 2)
-		       )
+		       length_mi  = ROUND((ST_Length(ST_GeomFromGeoJSON($1)::geography) / 1609.344)::numeric, 2)
 		WHERE  id = $2
 	`, lineJSON, reachID)
 	if err != nil {

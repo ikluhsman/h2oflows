@@ -930,18 +930,15 @@ func SyncCenterline(ctx context.Context, pool *pgxpool.Pool, slug string, dryRun
 					    ST_SetSRID(ST_MakePoint($5, $6), 4326))                AS take_pt
 			) sub
 		),
-		       length_mi = COALESCE(
-		           length_mi,
-		           ROUND((
-		               ST_Length((
-		                   SELECT ST_LineSubstring(
-		                       ST_GeomFromGeoJSON($2),
-		                       ST_LineLocatePoint(ST_GeomFromGeoJSON($2), ST_ClosestPoint(ST_GeomFromGeoJSON($2), ST_SetSRID(ST_MakePoint($3,$4),4326))),
-		                       ST_LineLocatePoint(ST_GeomFromGeoJSON($2), ST_ClosestPoint(ST_GeomFromGeoJSON($2), ST_SetSRID(ST_MakePoint($5,$6),4326)))
-		                   )::geography
-		               )) / 1609.344
-		           )::numeric, 2)
-		       )
+		       length_mi = ROUND((
+		           ST_Length((
+		               SELECT ST_LineSubstring(
+		                   ST_GeomFromGeoJSON($2),
+		                   ST_LineLocatePoint(ST_GeomFromGeoJSON($2), ST_ClosestPoint(ST_GeomFromGeoJSON($2), ST_SetSRID(ST_MakePoint($3,$4),4326))),
+		                   ST_LineLocatePoint(ST_GeomFromGeoJSON($2), ST_ClosestPoint(ST_GeomFromGeoJSON($2), ST_SetSRID(ST_MakePoint($5,$6),4326)))
+		               )::geography
+		           )) / 1609.344
+		       )::numeric, 2)
 		WHERE slug = $1
 	`, slug, geojson, putInLon, putInLat, takeOutLon, takeOutLat)
 	return err
