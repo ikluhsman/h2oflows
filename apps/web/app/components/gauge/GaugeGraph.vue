@@ -358,6 +358,7 @@ function labelDisplay(label: string): string {
 // Declared after load + buildChart so references are unambiguous at setup time.
 watch(hours, load)
 watch(() => props.gaugeId, load)
+watch(() => props.reachSlug, load)
 watch(() => props.currentCfs, async () => { await nextTick(); buildChart() })
 
 let resizeObserver: ResizeObserver | null = null
