@@ -5,8 +5,9 @@
 </template>
 
 <script setup lang="ts">
-// Exchange the Supabase auth code from the URL for a session, then redirect.
-// This page is the OAuth / magic-link / email-confirm callback target.
+// Must be client-only — PKCE code verifier lives in sessionStorage (no SSR access).
+definePageMeta({ ssr: false })
+
 const client  = useSupabaseClient()
 const route   = useRoute()
 const message = ref('Signing in…')
@@ -19,12 +20,13 @@ if (code) {
     if (error) {
       message.value = `Sign-in failed: ${error.message}`
     } else {
-      await navigateTo('/dashboard')
+      // Hard redirect so the server receives the new session cookie on the next request.
+      window.location.href = '/dashboard'
     }
   } catch (e: any) {
     message.value = `Sign-in failed: ${e?.message ?? 'unknown error'}`
   }
 } else {
-  await navigateTo('/')
+  window.location.href = '/'
 }
 </script>

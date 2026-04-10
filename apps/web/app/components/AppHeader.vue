@@ -29,20 +29,22 @@
       <!-- Page-level action buttons -->
       <slot name="actions" />
 
-      <!-- Auth -->
-      <template v-if="isAuthenticated">
-        <button
-          class="shrink-0 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-          :title="`Signed in as ${user?.email ?? user?.user_metadata?.user_name ?? 'you'}`"
-          @click="handleSignOut"
-        >Sign out</button>
-      </template>
-      <template v-else>
-        <NuxtLink
-          to="/login"
-          class="shrink-0 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-        >Sign in</NuxtLink>
-      </template>
+      <!-- Auth — ClientOnly prevents SSR/client mismatch for session state -->
+      <ClientOnly>
+        <template v-if="isAuthenticated">
+          <button
+            class="shrink-0 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            :title="`Signed in as ${user?.email ?? user?.user_metadata?.user_name ?? 'you'}`"
+            @click="handleSignOut"
+          >Sign out</button>
+        </template>
+        <template v-else>
+          <NuxtLink
+            to="/login"
+            class="shrink-0 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+          >Sign in</NuxtLink>
+        </template>
+      </ClientOnly>
 
       <UColorModeButton size="sm" color="neutral" variant="ghost" class="shrink-0" />
     </div>

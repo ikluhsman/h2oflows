@@ -42,6 +42,8 @@
     </div>
 
     <!-- Admin bar — only visible to users with app_metadata.role === "admin" -->
+    <!-- ClientOnly prevents SSR hydration mismatch (session only available client-side) -->
+    <ClientOnly>
     <div v-if="reach && isAdmin" class="shrink-0 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60">
       <div class="max-w-5xl mx-auto px-3 py-2 flex items-center gap-4 flex-wrap">
         <!-- Fetch river line -->
@@ -122,6 +124,7 @@
         </button>
       </div>
     </div>
+    </ClientOnly>
 
     <div v-if="pending" class="max-w-5xl mx-auto px-3 py-12 text-center text-gray-400">
       Loading…
