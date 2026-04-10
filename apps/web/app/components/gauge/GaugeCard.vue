@@ -52,7 +52,7 @@
     </div>
 
     <!-- Current flow reading -->
-    <div class="flex items-end gap-2 mb-2">
+    <div class="flex items-end gap-2 mb-1.5">
       <span class="text-3xl font-bold tabular-nums" :class="cfsClass">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
       </span>
@@ -60,18 +60,18 @@
       <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" class="mb-1" />
     </div>
 
-    <!-- 12-hour sparkline -->
-    <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" class="mb-2" />
-
     <!-- Flow status badge — shown when status is known or a named band is available -->
-    <div v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" class="flex items-center gap-2">
-      <UBadge :color="statusColor" variant="subtle" size="sm">{{ statusLabel }}</UBadge>
+    <div v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" class="flex items-center gap-2 mb-2">
+      <UBadge :color="statusColor" variant="subtle" size="md">{{ statusLabel }}</UBadge>
       <!-- Flood warning pulse -->
       <span v-if="gauge.flowStatus === 'flood'" class="relative flex h-2 w-2">
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
         <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
       </span>
     </div>
+
+    <!-- 12-hour sparkline -->
+    <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" class="mb-2" />
 
     <!-- Source + external ID (+ featured medal) -->
     <p class="text-xs text-gray-400 mt-2 truncate flex items-center gap-1">

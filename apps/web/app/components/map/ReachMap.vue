@@ -52,6 +52,7 @@
           :key="a.id"
           class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-xs"
           :class="selectedId === a.id ? 'bg-gray-100 dark:bg-gray-800' : ''"
+          @mousedown.prevent
           @click="selectFeature(a.id, a.lng, a.lat)"
         >
           <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
@@ -70,6 +71,7 @@
           :key="r.id"
           class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-xs"
           :class="selectedId === r.id ? 'bg-gray-100 dark:bg-gray-800' : ''"
+          @mousedown.prevent
           @click="selectFeature(r.id, r.lng, r.lat)"
         >
           <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-blue-500">
@@ -91,6 +93,7 @@
         >
           <button
             class="flex-1 flex items-center gap-2 px-3 py-1.5 text-left transition-colors text-xs min-w-0"
+            @mousedown.prevent
             @click="selectFeature(g.id, g.lng!, g.lat!)"
           >
             <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white bg-cyan-600">~</span>
@@ -101,6 +104,7 @@
             v-if="!onDashboard(g.id)"
             class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/40 transition-colors"
             title="Add to dashboard"
+            @mousedown.prevent
             @click.stop="emit('gauge-add', g.id)"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
@@ -177,6 +181,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useWatchlistStore } from '~/stores/watchlist'
+import { useRouter } from '#app'
+import { useRuntimeConfig } from '#imports'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -215,6 +221,8 @@ const props = defineProps<{
   centerline?: any
   rapids: RapidFeature[]
   access: AccessFeature[]
+  // Current reach slug — used to exclude self from nearby reach layer
+  slug?: string
   // Legacy single-gauge props — kept for backwards compat
   gaugeLng?: number | null
   gaugeLat?: number | null
@@ -228,6 +236,9 @@ const emit = defineEmits<{
 
 const watchlist = useWatchlistStore()
 const onDashboard = (id: string) => watchlist.gauges.some(g => g.id === id)
+
+const router = useRouter()
+const config = useRuntimeConfig()
 
 function gaugeSourceUrl(g: GaugeProp): string | null {
   if (g.source === 'usgs' && g.external_id)
@@ -347,6 +358,44 @@ const BASEMAP_OPTIONS = [
 let map: maplibregl.Map | null = null
 let clickPopup: maplibregl.Popup | null = null
 let allMarkers: maplibregl.Marker[] = []
+let nearbyReachesTimer: ReturnType<typeof setTimeout> | null = null
+
+// ── Nearby reaches ────────────────────────────────────────────────────────────
+
+async function fetchNearbyReaches() {
+  if (!map) return
+  const bounds = map.getBounds()
+  const bbox = [
+    bounds.getWest().toFixed(6),
+    bounds.getSouth().toFixed(6),
+    bounds.getEast().toFixed(6),
+    bounds.getNorth().toFixed(6),
+  ].join(',')
+
+  try {
+    const fc = await $fetch<{ features: any[] }>(
+      `${config.public.apiBase}/api/v1/reaches/map?bbox=${bbox}`
+    )
+    if (!map) return
+    const source = map.getSource('other-reaches') as maplibregl.GeoJSONSource | undefined
+    if (!source) return
+    // Exclude the current reach so it doesn't dim its own centerline.
+    const filtered = {
+      type: 'FeatureCollection' as const,
+      features: (fc.features ?? []).filter(
+        f => f.properties?.slug !== props.slug
+      ),
+    }
+    source.setData(filtered)
+  } catch {
+    // Silently ignore — nearby reaches are a nice-to-have overlay.
+  }
+}
+
+function scheduleFetchNearbyReaches() {
+  if (nearbyReachesTimer) clearTimeout(nearbyReachesTimer)
+  nearbyReachesTimer = setTimeout(fetchNearbyReaches, 300)
+}
 const markerEls = new Map<string, HTMLElement>()
 
 // ── Lifecycle ─────────────────────────────────────────────────────────────────
@@ -405,7 +454,10 @@ onMounted(async () => {
     mapReady.value = true
     addLayers()
     fitBounds()
+    fetchNearbyReaches()
   })
+
+  map.on('moveend', scheduleFetchNearbyReaches)
 
   map.on('error', (e) => { console.warn('[ReachMap]', e.error?.message ?? e) })
 
@@ -420,6 +472,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (nearbyReachesTimer) clearTimeout(nearbyReachesTimer)
   for (const m of allMarkers) m.remove()
   allMarkers = []
   markerEls.clear()
@@ -431,6 +484,42 @@ onUnmounted(() => {
 
 function addLayers() {
   if (!map) return
+
+  // Other reaches in the viewport — rendered beneath the current reach.
+  // Populated/updated by fetchNearbyReaches on load and moveend.
+  map.addSource('other-reaches', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  })
+  map.addLayer({
+    id: 'other-reaches-glow',
+    type: 'line',
+    source: 'other-reaches',
+    paint: { 'line-color': ['get', 'flow_color'], 'line-width': 8, 'line-opacity': 0.08, 'line-blur': 4 },
+  })
+  map.addLayer({
+    id: 'other-reaches-line',
+    type: 'line',
+    source: 'other-reaches',
+    paint: { 'line-color': ['get', 'flow_color'], 'line-width': 2, 'line-opacity': 0.35 },
+  })
+  // Wider invisible hit area for click detection on thin lines
+  map.addLayer({
+    id: 'other-reaches-hit',
+    type: 'line',
+    source: 'other-reaches',
+    paint: { 'line-color': 'transparent', 'line-width': 12, 'line-opacity': 0 },
+  })
+  map.on('click', 'other-reaches-hit', (e) => {
+    const slug = e.features?.[0]?.properties?.slug
+    if (slug) router.push(`/reaches/${slug}`)
+  })
+  map.on('mouseenter', 'other-reaches-hit', () => {
+    if (map) map.getCanvas().style.cursor = 'pointer'
+  })
+  map.on('mouseleave', 'other-reaches-hit', () => {
+    if (map) map.getCanvas().style.cursor = ''
+  })
 
   // Centerline — colored by max rapid difficulty
   if (props.centerline) {
@@ -795,7 +884,10 @@ function accessIcon(type: string): string {
 
 function rebuildLayers() {
   if (!map || !mapReady.value) return
-  for (const id of ['centerline-glow', 'centerline']) {
+  for (const id of [
+    'centerline-glow', 'centerline',
+    'other-reaches-hit', 'other-reaches-line', 'other-reaches-glow', 'other-reaches',
+  ]) {
     if (map.getLayer(id)) map.removeLayer(id)
     if (map.getSource(id)) map.removeSource(id)
   }
@@ -804,6 +896,7 @@ function rebuildLayers() {
   markerEls.clear()
   addLayers()
   fitBounds()
+  fetchNearbyReaches()
 }
 
 // Re-add layers when data changes (e.g. after KMZ import refreshes the page, or after OSM centerline fetch)

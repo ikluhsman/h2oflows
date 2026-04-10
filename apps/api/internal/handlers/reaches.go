@@ -906,9 +906,81 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Look up reach ID plus any stored geometry we can use as centre.
+	lineJSON, reachID, fetchErr := h.fetchCenterlineCore(r.Context(), slug, explicitLng, explicitLat)
+	if fetchErr != nil {
+		switch fetchErr.code {
+		case fetchErrNotFound:
+			errorResponse(w, http.StatusNotFound, fetchErr.msg)
+		case fetchErrNoLocation:
+			errorResponse(w, http.StatusBadRequest, fetchErr.msg)
+		case fetchErrOSM:
+			errorResponse(w, http.StatusBadGateway, fetchErr.msg)
+		default:
+			errorResponse(w, http.StatusInternalServerError, fetchErr.msg)
+		}
+		return
+	}
+
+	// Return the computed length alongside the geometry so the frontend can
+	// display it immediately without a separate reach reload.
+	var lengthMi *float64
+	_ = h.db.QueryRow(r.Context(), `SELECT length_mi FROM reaches WHERE id = $1`, reachID).Scan(&lengthMi)
+
+	// Rewarm the map cache so the reach appears on the map immediately.
+	go h.WarmCache(context.Background())
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"centerline": rawGeometry([]byte(lineJSON)),
+		"length_mi":  lengthMi,
+	})
+}
+
+// BackgroundFetchCenterline triggers an automatic centerline fetch for the given
+// slug in a background goroutine. Retries up to 4 times with exponential backoff
+// (0s, 2m, 10m, 30m) to handle transient Overpass API rate limits (HTTP 403/429).
+// Safe to call from an HTTP handler or after a KML import without blocking.
+func (h *ReachHandler) BackgroundFetchCenterline(slug string) {
+	go func() {
+		delays := []time.Duration{0, 2 * time.Minute, 10 * time.Minute, 30 * time.Minute}
+		for i, delay := range delays {
+			if delay > 0 {
+				time.Sleep(delay)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+			_, _, err := h.fetchCenterlineCore(ctx, slug, nil, nil)
+			cancel()
+			if err == nil {
+				go h.WarmCache(context.Background())
+				return
+			}
+			log.Printf("centerline auto-fetch [%s] attempt %d/%d: %s", slug, i+1, len(delays), err.msg)
+		}
+		log.Printf("centerline auto-fetch [%s]: all attempts failed, manual re-fetch required", slug)
+	}()
+}
+
+// fetchErrCode classifies errors from fetchCenterlineCore for HTTP response mapping.
+type fetchErrCode int
+
+const (
+	fetchErrNotFound   fetchErrCode = iota
+	fetchErrNoLocation fetchErrCode = iota
+	fetchErrOSM        fetchErrCode = iota
+	fetchErrDB         fetchErrCode = iota
+)
+
+type fetchCenterlineError struct {
+	code fetchErrCode
+	msg  string
+}
+
+func (e *fetchCenterlineError) Error() string { return e.msg }
+
+// fetchCenterlineCore queries OSM for the reach's river line and stores it.
+// explicitLng/explicitLat are optional manual overrides for the centre point.
+// Returns the stored GeoJSON line string and the reach's internal ID on success.
+func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, explicitLng, explicitLat *float64) (lineJSON, reachID string, ferr *fetchCenterlineError) {
 	var (
-		reachID    string
 		putInLng   *float64
 		putInLat   *float64
 		takeOutLng *float64
@@ -916,7 +988,7 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 		gaugeLng   *float64
 		gaugeLat   *float64
 	)
-	err := h.db.QueryRow(r.Context(), `
+	err := h.db.QueryRow(ctx, `
 		SELECT r.id,
 		       ST_X(r.put_in::geometry)      AS put_in_lng,
 		       ST_Y(r.put_in::geometry)      AS put_in_lat,
@@ -934,26 +1006,19 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 		&gaugeLng, &gaugeLat,
 	)
 	if err != nil {
-		errorResponse(w, http.StatusNotFound, "reach not found")
-		return
+		return "", "", &fetchCenterlineError{fetchErrNotFound, "reach not found"}
 	}
 
 	// Query access points: full bbox for Overpass, plus the put-in/take-out
 	// pair separated by the largest geographic distance to use as chain anchors.
-	// Picking by maximum distance correctly handles rivers of any orientation
-	// (E-W, N-S, or anywhere in between) — earlier versions used MIN/MAX(lng)
-	// which broke on N-S flowing rivers like the South Platte at Deckers,
-	// where a take-out further north can still sit slightly west of another.
 	var (
-		accessMinLng, accessMinLat *float64
-		accessMaxLng, accessMaxLat *float64
-		putInCentreLng, putInCentreLat *float64
+		accessMinLng, accessMinLat         *float64
+		accessMaxLng, accessMaxLat         *float64
+		putInCentreLng, putInCentreLat     *float64
 		takeOutCentreLng, takeOutCentreLat *float64
 	)
-	_ = h.db.QueryRow(r.Context(), `
+	_ = h.db.QueryRow(ctx, `
 		WITH pts AS (
-			-- Use water entry point; fall back to parking location when water point is unknown.
-			-- Parking is close enough to snap the river segment correctly.
 			SELECT access_type,
 			       COALESCE(
 			           ST_X(location::geometry),
@@ -968,8 +1033,6 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 			  AND (location IS NOT NULL OR parking_location IS NOT NULL)
 		),
 		extremes AS (
-			-- Pair of (put_in, take_out) with the maximum geographic distance.
-			-- This identifies the longest reach span regardless of river direction.
 			SELECT p.lng AS put_in_lng,    p.lat AS put_in_lat,
 			       t.lng AS take_out_lng,  t.lat AS take_out_lat
 			FROM pts p, pts t
@@ -993,8 +1056,6 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 		&takeOutCentreLng, &takeOutCentreLat,
 	)
 
-	// Prefer access point geometry over the reaches.put_in / reaches.take_out
-	// columns (which are often NULL for seeded reaches).
 	if putInLng == nil && putInCentreLng != nil {
 		putInLng, putInLat = putInCentreLng, putInCentreLat
 	}
@@ -1002,7 +1063,6 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 		takeOutLng, takeOutLat = takeOutCentreLng, takeOutCentreLat
 	}
 
-	// Resolve a single centre point for single-point fallback mode.
 	var centreLng, centreLat float64
 	switch {
 	case explicitLng != nil && explicitLat != nil:
@@ -1015,18 +1075,13 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 	case gaugeLng != nil:
 		centreLng, centreLat = *gaugeLng, *gaugeLat
 	default:
-		errorResponse(w, http.StatusBadRequest,
-			"no location available — pass ?lat=&lng= with the reach's approximate centre")
-		return
+		return "", "", &fetchCenterlineError{fetchErrNoLocation,
+			"no location available — pass ?lat=&lng= with the reach's approximate centre"}
 	}
 
-	// When we have a full spatial extent from access points, fetch the river
-	// line using the tight bbox around all access points + put-in centroid as
-	// the upstream chain start.  Fall back to a ±0.05° single-centre bbox.
-	var lineJSON string
 	if accessMinLng != nil && putInLng != nil && takeOutLng != nil && explicitLng == nil {
 		lineJSON, err = osm.FetchReachLine(
-			r.Context(),
+			ctx,
 			*accessMinLng, *accessMinLat,
 			*accessMaxLng, *accessMaxLat,
 			*putInLng, *putInLat,
@@ -1035,24 +1090,20 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 	} else {
 		const pad = 0.05
 		lineJSON, err = osm.FetchRiverLine(
-			r.Context(),
+			ctx,
 			centreLng-pad, centreLat-pad,
 			centreLng+pad, centreLat+pad,
 		)
 	}
 	if err != nil {
 		log.Printf("osm fetch for %s: %v", slug, err)
-		errorResponse(w, http.StatusBadGateway, "OSM fetch failed: "+err.Error())
-		return
+		return "", "", &fetchCenterlineError{fetchErrOSM, "OSM fetch failed: " + err.Error()}
 	}
 	if lineJSON == "" {
-		errorResponse(w, http.StatusNotFound, "no waterway found near gauge location")
-		return
+		return "", "", &fetchCenterlineError{fetchErrNotFound, "no waterway found near reach location"}
 	}
 
-	// Store as PostGIS geography and derive length_mi from the line if not set.
-	// ST_Length on a geography returns metres; divide by 1609.344 for miles.
-	_, err = h.db.Exec(r.Context(), `
+	_, err = h.db.Exec(ctx, `
 		UPDATE reaches
 		SET    centerline = ST_GeomFromGeoJSON($1)::geography,
 		       length_mi  = COALESCE(
@@ -1063,22 +1114,10 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 	`, lineJSON, reachID)
 	if err != nil {
 		log.Printf("centerline update for %s: %v", slug, err)
-		errorResponse(w, http.StatusInternalServerError, "failed to save centerline")
-		return
+		return "", "", &fetchCenterlineError{fetchErrDB, "failed to save centerline"}
 	}
 
-	// Return the computed length alongside the geometry so the frontend can
-	// display it immediately without a separate reach reload.
-	var lengthMi *float64
-	_ = h.db.QueryRow(r.Context(), `SELECT length_mi FROM reaches WHERE id = $1`, reachID).Scan(&lengthMi)
-
-	// Rewarm the map cache so the reach appears on the map immediately.
-	go h.WarmCache(context.Background())
-
-	jsonResponse(w, http.StatusOK, map[string]any{
-		"centerline": rawGeometry([]byte(lineJSON)),
-		"length_mi":  lengthMi,
-	})
+	return lineJSON, reachID, nil
 }
 
 // Delete handles DELETE /api/v1/reaches/{slug}

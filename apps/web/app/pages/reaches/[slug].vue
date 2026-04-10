@@ -332,6 +332,7 @@
             :rapids="reach.rapids"
             :access="reach.access"
             :gauges="allGauges"
+            :slug="(reach as any).slug"
             @gauge-add="(id) => { const g = allGauges.find((x: any) => x.id === id); if (g) addToDashboard(g) }"
           />
         </ClientOnly>
@@ -366,7 +367,7 @@
               :class="featuresTab === tab.key
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                 : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
-              @click="featuresTab = tab.key; expandedFeatureKey = null"
+              @click="featuresTab = tab.key"
             >
               {{ tab.label }}
               <span
@@ -378,73 +379,48 @@
             </button>
           </div>
 
-          <!-- Feature rows -->
-          <div v-if="filteredFeatures.length" class="divide-y divide-gray-100 dark:divide-gray-800">
-            <div v-for="feat in filteredFeatures" :key="feat.key">
-
-              <!-- Row summary -->
+          <!-- Feature rows — always expanded, no accordion -->
+          <div
+            ref="featureListRef"
+            class="overflow-hidden"
+          >
+            <div v-if="filteredFeatures.length" class="divide-y divide-gray-100 dark:divide-gray-800">
               <div
-                class="px-4 py-3 flex items-center justify-between gap-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/60 transition-colors select-none"
-                @click="toggleFeature(feat.key)"
+                v-for="feat in filteredFeatures"
+                :key="feat.key"
+                class="px-4 py-3 flex items-start gap-3"
               >
-                <div class="flex items-center gap-2 flex-wrap min-w-0">
-                  <span
-                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium shrink-0"
-                    :class="featurePillClass(feat)"
-                  >{{ featureTypeLabel(feat) }}</span>
-                  <span
-                    v-if="(feat.type === 'rapid' || feat.type === 'hazard') && feat.class_rating"
-                    class="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-mono font-medium text-gray-600 dark:text-gray-300 shrink-0"
-                  >
-                    {{ romanClass(feat.class_rating) }}<span v-if="feat.class_at_high && feat.class_at_high > feat.class_rating" class="text-gray-400 ml-0.5">({{ romanClass(feat.class_at_high) }})</span>
-                  </span>
-                  <span class="text-sm font-medium text-gray-800 dark:text-gray-100">{{ feat.name }}</span>
-                </div>
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-gray-400 transition-transform" :class="{ 'rotate-180': expandedFeatureKey === feat.key }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
-              </div>
+                <!-- Icon circle (matches map pin symbols) -->
+                <div
+                  class="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white mt-0.5"
+                  :style="{ background: featureIconColor(feat) }"
+                  :title="featureTypeLabel(feat)"
+                >{{ featureIconLabel(feat) }}</div>
 
-              <!-- Expanded details card -->
-              <div
-                v-if="expandedFeatureKey === feat.key"
-                class="px-3 pb-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40"
-              >
-                <div class="mt-3 flex gap-3">
-                  <!-- Pin icon column -->
-                  <div
-                    class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                    :class="featurePinBg(feat)"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" :class="featurePinIcon(feat)" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-                    </svg>
-                  </div>
-                  <!-- Content -->
-                  <div class="flex-1 min-w-0 space-y-1.5">
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <span class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ feat.name }}</span>
-                      <span
-                        v-if="(feat.type === 'rapid' || feat.type === 'hazard') && feat.class_rating"
-                        class="text-xs font-mono font-medium text-gray-500 dark:text-gray-400"
-                      >{{ romanClass(feat.class_rating) }}<span v-if="feat.class_at_high && feat.class_at_high > feat.class_rating" class="text-gray-400">({{ romanClass(feat.class_at_high) }})</span></span>
-                    </div>
-                    <p v-if="feat.description" class="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">{{ feat.description }}</p>
-                    <p v-if="feat.portage_description" class="text-xs text-amber-600 dark:text-amber-400">
-                      <span class="font-medium">Portage:</span> {{ feat.portage_description }}
-                    </p>
+                <!-- Content -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-sm font-medium text-gray-800 dark:text-gray-100">{{ feat.name }}</span>
                     <span
-                      v-if="feat.is_permanent_hazard && feat.hazard_type"
-                      class="inline-flex items-center rounded bg-red-50 dark:bg-red-950 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-300"
-                    >⚠ {{ hazardTypeLabel(feat.hazard_type) }}</span>
-                    <p v-if="!feat.description && !feat.portage_description && !(feat.is_permanent_hazard && feat.hazard_type)" class="text-xs text-gray-400 italic">No additional details available.</p>
+                      v-if="(feat.type === 'rapid' || feat.type === 'hazard') && feat.class_rating"
+                      class="text-xs font-mono font-medium text-gray-500 dark:text-gray-400"
+                    >{{ romanClass(feat.class_rating) }}<span v-if="feat.class_at_high && feat.class_at_high > feat.class_rating" class="text-gray-400">({{ romanClass(feat.class_at_high) }})</span></span>
                   </div>
+                  <p v-if="feat.description" class="text-sm text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">{{ feat.description }}</p>
+                  <p v-if="feat.portage_description" class="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                    <span class="font-medium">Portage:</span> {{ feat.portage_description }}
+                  </p>
+                  <span
+                    v-if="feat.is_permanent_hazard && feat.hazard_type"
+                    class="inline-flex items-center rounded bg-red-50 dark:bg-red-950 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-300 mt-0.5"
+                  >⚠ {{ hazardTypeLabel(feat.hazard_type) }}</span>
                 </div>
               </div>
-
             </div>
-          </div>
 
-          <div v-else class="px-4 py-8 text-center text-sm text-gray-400">
-            No features in this category
+            <div v-else class="px-4 py-8 text-center text-sm text-gray-400">
+              No features in this category
+            </div>
           </div>
         </div>
       </section>
@@ -475,8 +451,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { useWatchlistStore } from '~/stores/watchlist'
+import { gsap } from 'gsap'
 
 const route  = useRoute()
 const config = useRuntimeConfig()
@@ -575,11 +552,40 @@ const allFeatures = computed<RiverFeature[]>(() => {
 // ---- Features tab state -------------------------------------------------------
 
 const featuresTab = ref<string>('all')
-const expandedFeatureKey = ref<string | null>(null)
+const featureListRef = ref<HTMLElement | null>(null)
 
-function toggleFeature(key: string) {
-  expandedFeatureKey.value = expandedFeatureKey.value === key ? null : key
-}
+// Animate height when tab changes, then scroll up if container shrank past viewport bottom.
+watch(featuresTab, async () => {
+  const el = featureListRef.value
+  if (!el) return
+  const fromH = el.offsetHeight
+  await nextTick()
+  const toH = el.scrollHeight
+  if (fromH === toH) return
+
+  gsap.fromTo(
+    el,
+    { height: fromH },
+    {
+      height: toH,
+      duration: 0.25,
+      ease: 'power2.out',
+      onComplete: () => {
+        gsap.set(el, { clearProps: 'height' })
+        // Scroll up if the container's new bottom is above the viewport bottom.
+        const rect = el.getBoundingClientRect()
+        const containerDocBottom = rect.top + window.scrollY + toH
+        const viewportBottom = window.scrollY + window.innerHeight
+        if (containerDocBottom < viewportBottom) {
+          const targetY = Math.max(0, containerDocBottom - window.innerHeight + 24)
+          if (targetY < window.scrollY) {
+            window.scrollTo({ top: targetY, behavior: 'smooth' })
+          }
+        }
+      },
+    }
+  )
+})
 
 const featureTabs = computed(() => {
   const f = allFeatures.value
@@ -614,6 +620,34 @@ function featureTypeLabel(feat: RiverFeature): string {
     case 'parking':  return 'Parking'
     case 'access':   return 'Access'
     default:         return 'Feature'
+  }
+}
+
+// Icon circle color — mirrors the pin colors used in ReachMap.vue
+function featureIconColor(feat: RiverFeature): string {
+  if (feat.is_permanent_hazard) return '#ef4444'
+  switch (feat.type) {
+    case 'rapid':    return '#3b82f6'
+    case 'put_in':   return '#22c55e'
+    case 'take_out': return '#ef4444'
+    case 'camp':     return '#f59e0b'
+    case 'parking':  return '#dc2626'
+    case 'access':   return '#94a3b8'
+    default:         return '#94a3b8'
+  }
+}
+
+// Icon symbol — mirrors the pin labels used in ReachMap.vue
+function featureIconLabel(feat: RiverFeature): string {
+  if (feat.is_permanent_hazard) return '⚠'
+  switch (feat.type) {
+    case 'rapid':    return '~'
+    case 'put_in':   return '↓'
+    case 'take_out': return '↑'
+    case 'camp':     return '⛺'
+    case 'parking':  return 'P'
+    case 'access':   return '◆'
+    default:         return '·'
   }
 }
 

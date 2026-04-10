@@ -10,8 +10,9 @@ import (
 
 // Import provides the KMZ/KML file import endpoint.
 type Import struct {
-	Pool        *pgxpool.Pool
-	CacheWarmer func() // optional; called after a successful import to refresh the map cache
+	Pool               *pgxpool.Pool
+	CacheWarmer        func()         // optional; called after a successful import to refresh the map cache
+	CenterlineFetcher  func(slug string) // optional; called for each imported reach to auto-fetch its river line
 }
 
 // ImportKMZ handles POST /api/v1/import/kmz
@@ -53,6 +54,13 @@ func (h *Import) ImportKMZ(w http.ResponseWriter, r *http.Request) {
 	// Rewarm the map cache so imported reaches appear on the map immediately.
 	if h.CacheWarmer != nil {
 		go h.CacheWarmer()
+	}
+
+	// Auto-fetch centerlines for all imported reaches in the background.
+	if h.CenterlineFetcher != nil {
+		for slug := range res.Reaches {
+			h.CenterlineFetcher(slug)
+		}
 	}
 
 	jsonResponse(w, http.StatusOK, res)
