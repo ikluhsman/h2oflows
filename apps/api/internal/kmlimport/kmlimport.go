@@ -508,10 +508,10 @@ func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName, riverNa
 			if !imp.DryRun {
 				_, _ = imp.pool.Exec(ctx, `
 					UPDATE reaches SET
-						common_name = CASE WHEN $2 != '' THEN $2 ELSE common_name END,
-						river_name  = CASE WHEN $3 != '' THEN $3 ELSE river_name  END,
-						class_min   = CASE WHEN $4 IS NOT NULL THEN $4 ELSE class_min END,
-						class_max   = CASE WHEN $5 IS NOT NULL THEN $5 ELSE class_max END
+						common_name = COALESCE(NULLIF($2, ''), common_name),
+						river_name  = COALESCE(NULLIF($3, ''), river_name),
+						class_min   = COALESCE($4::numeric, class_min),
+						class_max   = COALESCE($5::numeric, class_max)
 					WHERE id = $1
 				`, id, commonName, riverName, classMin, classMax)
 			}
@@ -535,10 +535,10 @@ func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName, riverNa
 		INSERT INTO reaches (slug, name, common_name, river_name, class_min, class_max)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (slug) DO UPDATE
-			SET common_name = EXCLUDED.common_name,
-			    river_name  = EXCLUDED.river_name,
-			    class_min   = EXCLUDED.class_min,
-			    class_max   = EXCLUDED.class_max
+			SET common_name = COALESCE(NULLIF(EXCLUDED.common_name, ''), reaches.common_name),
+			    river_name  = COALESCE(NULLIF(EXCLUDED.river_name,  ''), reaches.river_name),
+			    class_min   = COALESCE(EXCLUDED.class_min, reaches.class_min),
+			    class_max   = COALESCE(EXCLUDED.class_max, reaches.class_max)
 		RETURNING id, slug, name
 	`, newSlug, folderName, commonNameVal, riverName, classMin, classMax).Scan(&id, &slug, &name)
 	if err != nil {
