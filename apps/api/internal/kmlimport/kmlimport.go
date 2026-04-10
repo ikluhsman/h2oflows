@@ -788,11 +788,30 @@ func (imp *Importer) setReachGauge(ctx context.Context, reachID, externalID stri
 
 // ── DB upserts ────────────────────────────────────────────────────────────────
 
+// stripClassSuffix removes a trailing "(IV+)" / "(III)" style class annotation
+// from a rapid name so "Phone Boof (IV)" is stored as "Phone Boof".
+func stripClassSuffix(name string) string {
+	open := strings.LastIndex(name, "(")
+	close := strings.LastIndex(name, ")")
+	if open < 0 || close != len(name)-1 {
+		return name
+	}
+	inner := strings.TrimSpace(name[open+1 : close])
+	// Only strip if the parenthetical looks like a class rating.
+	if ParseClassRating(inner) != nil {
+		return strings.TrimSpace(name[:open])
+	}
+	return name
+}
+
 func (imp *Importer) upsertRapidLocation(ctx context.Context, reachID, name, desc string, isSurfWave, isPermanentHazard bool, hazardType string, lon, lat float64) error {
 	if imp.DryRun {
 		return nil
 	}
+	// Strip class suffix from name before storing ("Phone Boof (IV)" → "Phone Boof").
+	// ParseClassRating still sees the full original name+desc for the rating.
 	classRating := ParseClassRating(name, desc)
+	cleanName := stripClassSuffix(name)
 	tag, err := imp.pool.Exec(ctx, `
 		UPDATE rapids
 		SET location             = ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
@@ -802,7 +821,7 @@ func (imp *Importer) upsertRapidLocation(ctx context.Context, reachID, name, des
 		    is_permanent_hazard  = is_permanent_hazard OR $8,
 		    hazard_type          = CASE WHEN $9 <> '' THEN $9 ELSE hazard_type END
 		WHERE reach_id = $1 AND LOWER(name) = LOWER($2)
-	`, reachID, name, lon, lat, desc, classRating, isSurfWave, isPermanentHazard, hazardType)
+	`, reachID, cleanName, lon, lat, desc, classRating, isSurfWave, isPermanentHazard, hazardType)
 	if err != nil {
 		return err
 	}
@@ -820,7 +839,7 @@ func (imp *Importer) upsertRapidLocation(ctx context.Context, reachID, name, des
 			      is_surf_wave        = rapids.is_surf_wave OR EXCLUDED.is_surf_wave,
 			      is_permanent_hazard = rapids.is_permanent_hazard OR EXCLUDED.is_permanent_hazard,
 			      hazard_type         = COALESCE(EXCLUDED.hazard_type, rapids.hazard_type)
-		`, reachID, name, lon, lat, desc, classRating, isSurfWave, isPermanentHazard, hazardType)
+		`, reachID, cleanName, lon, lat, desc, classRating, isSurfWave, isPermanentHazard, hazardType)
 	}
 	return err
 }
