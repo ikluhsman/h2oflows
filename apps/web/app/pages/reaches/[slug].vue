@@ -305,7 +305,7 @@
           </div>
 
           <!-- Graph -->
-          <GaugeGraph :gauge-id="g.id" :current-cfs="g.current_cfs" />
+          <GaugeGraph :gauge-id="g.id" :reach-slug="(reach.value as any)?.slug ?? null" :current-cfs="g.current_cfs" />
 
           <!-- CFS + last updated below graph -->
           <div v-if="g.current_cfs != null" class="mt-3 flex items-end gap-2 border-t border-gray-100 dark:border-gray-800 pt-3">

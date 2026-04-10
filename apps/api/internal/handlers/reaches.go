@@ -172,9 +172,11 @@ const mapBaseSQL = `
 	LEFT JOIN latest_reading lr ON lr.gauge_id = g.id
 	LEFT JOIN LATERAL (
 		SELECT label FROM flow_ranges
-		WHERE gauge_id = g.id
+		WHERE reach_id = r.id
+		  AND craft_type = 'general'
 		  AND (min_cfs IS NULL OR lr.value >= min_cfs)
 		  AND (max_cfs IS NULL OR lr.value <  max_cfs)
+		ORDER BY min_cfs ASC NULLS FIRST
 		LIMIT 1
 	) fr ON TRUE
 `
@@ -389,9 +391,11 @@ func (h *ReachHandler) queryAllFeatures(ctx context.Context) ([]Feature, error) 
 		LEFT JOIN latest_reading lr ON lr.gauge_id = g.id
 		LEFT JOIN LATERAL (
 			SELECT label FROM flow_ranges
-			WHERE gauge_id = g.id
+			WHERE reach_id = r.id
+			  AND craft_type = 'general'
 			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
 			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
+			ORDER BY min_cfs ASC NULLS FIRST
 			LIMIT 1
 		) fr ON TRUE
 		WHERE r.centerline IS NOT NULL
@@ -554,7 +558,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		) lr ON TRUE
 		LEFT JOIN LATERAL (
 			SELECT label FROM flow_ranges
-			WHERE gauge_id = g.id
+			WHERE reach_id = r.id
 			  AND craft_type = 'general'
 			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
 			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
@@ -900,6 +904,164 @@ func (h *ReachHandler) GetConditions(w http.ResponseWriter, r *http.Request) {
 // TODO: implement
 func (h *ReachHandler) GetHazards(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetFlowRanges handles GET /api/v1/reaches/{slug}/flow-ranges
+//
+// Returns the flow range bands for a reach, sorted min_cfs ASC.
+// The frontend overlays these as colored bands on the gauge graph.
+//
+// Query params:
+//
+//	craft=general   craft type filter (default "general")
+func (h *ReachHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	craft := r.URL.Query().Get("craft")
+	if craft == "" {
+		craft = "general"
+	}
+
+	type flowRange struct {
+		Label        string   `json:"label"`
+		MinCFS       *float64 `json:"min_cfs"`
+		MaxCFS       *float64 `json:"max_cfs"`
+		CraftType    string   `json:"craft_type"`
+		ClassMod     *float64 `json:"class_modifier"`
+		SourceURL    *string  `json:"source_url,omitempty"`
+		DataSource   string   `json:"data_source"`
+		AIConfidence *int     `json:"ai_confidence,omitempty"`
+		Verified     bool     `json:"verified"`
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT
+			fr.label,
+			fr.min_cfs,
+			fr.max_cfs,
+			fr.craft_type,
+			fr.class_modifier,
+			fr.source_url,
+			fr.data_source,
+			fr.ai_confidence,
+			fr.verified
+		FROM flow_ranges fr
+		JOIN reaches rch ON rch.id = fr.reach_id
+		WHERE rch.slug   = $1
+		  AND fr.craft_type = $2
+		ORDER BY fr.min_cfs ASC NULLS FIRST
+	`, slug, craft)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "query failed")
+		return
+	}
+	defer rows.Close()
+
+	results := make([]flowRange, 0)
+	for rows.Next() {
+		var fr flowRange
+		if err := rows.Scan(
+			&fr.Label, &fr.MinCFS, &fr.MaxCFS,
+			&fr.CraftType, &fr.ClassMod, &fr.SourceURL,
+			&fr.DataSource, &fr.AIConfidence, &fr.Verified,
+		); err != nil {
+			continue
+		}
+		results = append(results, fr)
+	}
+	if err := rows.Err(); err != nil {
+		errorResponse(w, http.StatusInternalServerError, "scan failed")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, results)
+}
+
+// SetFlowRanges handles PUT /api/v1/reaches/{slug}/flow-ranges
+//
+// Upserts the three canonical bands for a reach+craft combination.
+// Missing bands are deleted.  Body example:
+//
+//	{
+//	  "craft": "general",
+//	  "below_recommended": { "max_cfs": 170 },
+//	  "runnable":          { "min_cfs": 170, "max_cfs": 430 },
+//	  "above_recommended": { "min_cfs": 430 }
+//	}
+func (h *ReachHandler) SetFlowRanges(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	type bandInput struct {
+		MinCFS *float64 `json:"min_cfs"`
+		MaxCFS *float64 `json:"max_cfs"`
+	}
+	var body struct {
+		Craft             string     `json:"craft"`
+		BelowRecommended  *bandInput `json:"below_recommended"`
+		Runnable          *bandInput `json:"runnable"`
+		AboveRecommended  *bandInput `json:"above_recommended"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if body.Craft == "" {
+		body.Craft = "general"
+	}
+
+	// Resolve reach ID.
+	var reachID string
+	err := h.db.QueryRow(r.Context(),
+		`SELECT id FROM reaches WHERE slug = $1`, slug,
+	).Scan(&reachID)
+	if err != nil {
+		errorResponse(w, http.StatusNotFound, "reach not found")
+		return
+	}
+
+	// Also need gauge_id for the row (keeps backward-compat FK intact).
+	var gaugeID *string
+	_ = h.db.QueryRow(r.Context(),
+		`SELECT primary_gauge_id::text FROM reaches WHERE id = $1`, reachID,
+	).Scan(&gaugeID)
+
+	type band struct {
+		label  string
+		input  *bandInput
+	}
+	bands := []band{
+		{"below_recommended", body.BelowRecommended},
+		{"runnable", body.Runnable},
+		{"above_recommended", body.AboveRecommended},
+	}
+
+	for _, b := range bands {
+		if b.input == nil {
+			// Delete this band if it exists.
+			_, _ = h.db.Exec(r.Context(), `
+				DELETE FROM flow_ranges
+				WHERE reach_id = $1 AND label = $2 AND craft_type = $3
+			`, reachID, b.label, body.Craft)
+			continue
+		}
+		// Upsert.
+		_, err := h.db.Exec(r.Context(), `
+			INSERT INTO flow_ranges
+			  (gauge_id, reach_id, label, min_cfs, max_cfs, craft_type, data_source, verified)
+			VALUES ($1, $2, $3, $4, $5, $6, 'manual', true)
+			ON CONFLICT (reach_id, label, craft_type) DO UPDATE
+			  SET min_cfs    = EXCLUDED.min_cfs,
+			      max_cfs    = EXCLUDED.max_cfs,
+			      data_source = 'manual',
+			      verified    = true
+		`, gaugeID, reachID, b.label, b.input.MinCFS, b.input.MaxCFS, body.Craft)
+		if err != nil {
+			errorResponse(w, http.StatusInternalServerError, "upsert failed: "+err.Error())
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // FetchCenterline handles POST /api/v1/reaches/{slug}/fetch-centerline

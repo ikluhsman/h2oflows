@@ -261,21 +261,30 @@ func (h *GaugeHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 		craft = "general"
 	}
 
+	// After migration 039, flow_ranges are per-reach. For the gauge endpoint
+	// (used by sparklines on the dashboard), return ranges for the alphabetically-
+	// first reach that uses this gauge as its primary gauge.
 	rows, err := h.db.Query(r.Context(), `
 		SELECT
-			label,
-			min_cfs,
-			max_cfs,
-			craft_type,
-			class_modifier,
-			source_url,
-			data_source,
-			ai_confidence,
-			verified
-		FROM flow_ranges
-		WHERE gauge_id = $1
-		  AND craft_type = $2
-		ORDER BY min_cfs ASC NULLS FIRST
+			fr.label,
+			fr.min_cfs,
+			fr.max_cfs,
+			fr.craft_type,
+			fr.class_modifier,
+			fr.source_url,
+			fr.data_source,
+			fr.ai_confidence,
+			fr.verified
+		FROM flow_ranges fr
+		JOIN reaches rch ON rch.id = fr.reach_id
+		WHERE rch.primary_gauge_id = $1
+		  AND fr.craft_type         = $2
+		  AND rch.id = (
+			  SELECT id FROM reaches
+			  WHERE primary_gauge_id = $1
+			  ORDER BY slug LIMIT 1
+		  )
+		ORDER BY fr.min_cfs ASC NULLS FIRST
 	`, gaugeID, craft)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "query failed")
@@ -543,6 +552,9 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 		LEFT JOIN LATERAL (
 			SELECT fr.label,
 			       CASE
+			           WHEN fr.label = 'runnable'          THEN 'runnable'
+			           WHEN fr.label = 'below_recommended' THEN 'low'
+			           WHEN fr.label = 'above_recommended' THEN 'flood'
 			           WHEN fr.label IN ('fun', 'optimal')   THEN 'runnable'
 			           WHEN fr.label IN ('minimum', 'pushy') THEN 'caution'
 			           WHEN fr.label = 'too_low'             THEN 'low'
@@ -550,7 +562,13 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			           ELSE 'unknown'
 			       END AS flow_status
 			FROM flow_ranges fr
-			WHERE fr.gauge_id = g.id
+			JOIN reaches rch ON rch.id = fr.reach_id
+			WHERE rch.primary_gauge_id = g.id
+			  AND rch.id = (
+			      SELECT id FROM reaches
+			      WHERE primary_gauge_id = g.id
+			      ORDER BY slug LIMIT 1
+			  )
 			  AND fr.craft_type = 'general'
 			  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
 			  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
@@ -660,6 +678,9 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN LATERAL (
 			SELECT fr.label,
 			       CASE
+			           WHEN fr.label = 'runnable'          THEN 'runnable'
+			           WHEN fr.label = 'below_recommended' THEN 'low'
+			           WHEN fr.label = 'above_recommended' THEN 'flood'
 			           WHEN fr.label IN ('fun', 'optimal')   THEN 'runnable'
 			           WHEN fr.label IN ('minimum', 'pushy') THEN 'caution'
 			           WHEN fr.label = 'too_low'             THEN 'low'
@@ -667,7 +688,13 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			           ELSE 'unknown'
 			       END AS flow_status
 			FROM flow_ranges fr
-			WHERE fr.gauge_id = g.id
+			JOIN reaches rch ON rch.id = fr.reach_id
+			WHERE rch.primary_gauge_id = g.id
+			  AND rch.id = (
+			      SELECT id FROM reaches
+			      WHERE primary_gauge_id = g.id
+			      ORDER BY slug LIMIT 1
+			  )
 			  AND fr.craft_type = 'general'
 			  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
 			  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)

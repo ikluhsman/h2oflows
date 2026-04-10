@@ -108,6 +108,7 @@ interface FlowRange {
 
 const props = defineProps<{
   gaugeId: string
+  reachSlug?: string | null
   currentCfs?: number | null
 }>()
 
@@ -130,9 +131,12 @@ async function load() {
   loading.value = true
   try {
     const since = new Date(Date.now() - hours.value * 3_600_000).toISOString()
+    const flowRangesUrl = props.reachSlug
+      ? `${apiBase}/api/v1/reaches/${props.reachSlug}/flow-ranges`
+      : `${apiBase}/api/v1/gauges/${props.gaugeId}/flow-ranges`
     const [rdRes, frRes] = await Promise.all([
       fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/readings?since=${since}&limit=500`),
-      fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/flow-ranges`),
+      fetch(flowRangesUrl),
     ])
     if (rdRes.ok) readings.value = await rdRes.json()
     if (frRes.ok) flowRanges.value = await frRes.json()
@@ -300,13 +304,21 @@ function lineColor(ranges: FlowRange[], cfs: number | null): string {
     (fr.min_cfs == null || cfs >= fr.min_cfs) &&
     (fr.max_cfs == null || cfs <  fr.max_cfs)
   )
-  if (!match) return '#6b7280'
-  switch (match.label) {
-    case 'runnable':          return '#22c55e'
-    case 'above_recommended': return '#3b82f6'
-    case 'below_recommended': return '#ef4444'
-    default:                  return '#6b7280'
+  if (match) {
+    switch (match.label) {
+      case 'runnable':          return '#22c55e'
+      case 'above_recommended': return '#3b82f6'
+      case 'below_recommended': return '#ef4444'
+      default:                  return '#6b7280'
+    }
   }
+  // No exact match — infer from position relative to known ranges.
+  // This handles gauges that only have a 'runnable' band without flanking bands.
+  const mins = ranges.filter(r => r.min_cfs != null).map(r => r.min_cfs!)
+  const maxs = ranges.filter(r => r.max_cfs != null).map(r => r.max_cfs!)
+  if (mins.length > 0 && cfs < Math.min(...mins)) return '#ef4444'  // below all ranges → red
+  if (maxs.length > 0 && cfs >= Math.max(...maxs)) return '#3b82f6' // above all ranges → blue
+  return '#6b7280'
 }
 
 // ---- Diurnal cycle ----------------------------------------------------------

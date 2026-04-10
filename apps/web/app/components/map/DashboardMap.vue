@@ -223,7 +223,14 @@ async function refreshData() {
         const slugsToTry = [gauge.reachSlug, ...(gauge.reachSlugs ?? [])].filter((s): s is string => !!s)
         for (const slug of slugsToTry) {
           const feature = bySlug.get(slug)
-          if (feature) focusPts.push(...allCoordsOf(feature.geometry))
+          if (feature) {
+            // Guard against null/zero coordinates from OSM data that would
+            // send fitBounds to null island or an extreme zoom-out.
+            const validCoords = allCoordsOf(feature.geometry)
+              .filter(c => Number.isFinite(c[0]) && Number.isFinite(c[1])
+                        && (Math.abs(c[0]) > 0.001 || Math.abs(c[1]) > 0.001))
+            focusPts.push(...validCoords)
+          }
         }
       }
       if (focusPts.length > 0) fitPoints = focusPts
