@@ -261,8 +261,17 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 			pins = append(pins, assignment{best.id, best.slug, best.name, pp.pm, pp.folderName})
 		}
 	} else {
+		type reachFlowRange struct {
+			reachID   string
+			reachName string
+			label     string
+			minCFS    *float64
+			maxCFS    *float64
+		}
+		var flowRanges []reachFlowRange
+
 		for _, folder := range doc.Folders {
-			rid, rslug, rname, created, err := imp.matchOrCreateReach(ctx, folder.Name)
+			rid, rslug, rname, created, err := imp.matchOrCreateReach(ctx, folder.Name, doc.Name)
 			if err != nil {
 				res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — %v", folder.Name, err))
 				continue
@@ -271,7 +280,22 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				res.Log = append(res.Log, fmt.Sprintf("+ created reach %q (slug: %s)", folder.Name, rslug))
 			}
 			for _, pm := range folder.Placemarks {
+				// Flow range metadata — no coordinates, special keyword name.
+				if pm.Point == nil {
+					if label, minCFS, maxCFS, ok := parseFlowRangePM(pm.Name, pm.Description); ok {
+						flowRanges = append(flowRanges, reachFlowRange{rid, rname, label, minCFS, maxCFS})
+						res.Log = append(res.Log, fmt.Sprintf("~ [%s] flow range %s", rname, label))
+					}
+					continue
+				}
 				pins = append(pins, assignment{rid, rslug, rname, pm, ""})
+			}
+		}
+
+		// Upsert flow ranges after reach matching so reach IDs are known.
+		for _, fr := range flowRanges {
+			if err := imp.upsertFlowRange(ctx, fr.reachID, fr.label, fr.minCFS, fr.maxCFS); err != nil {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] flow range %s: %v", fr.reachName, fr.label, err))
 			}
 		}
 	}
@@ -396,43 +420,121 @@ func (res *Result) reachStats(slug, name string) *ReachResult {
 
 // ── Reach matching / creation ─────────────────────────────────────────────────
 
+// folderMeta holds the parsed components of a KML folder name.
+//
+// Format: "Display Name (CommonName,classMin,classMax)"
+// Example: "Buffalo Creek to South Platte Hotel (Foxton,3,4)"
+type folderMeta struct {
+	baseName   string  // "Buffalo Creek to South Platte Hotel"
+	commonName string  // "Foxton" (empty if not present)
+	classMin   float64 // 3.0 (0 if not present)
+	classMax   float64 // 4.0 (0 if not present)
+}
+
+// parseFolderMeta extracts reach metadata from a KML folder name.
+// The trailing parenthetical is optional — if absent, baseName == folderName.
+func parseFolderMeta(folderName string) folderMeta {
+	m := folderMeta{}
+	// Find last '(' … ')' pair.
+	open := strings.LastIndex(folderName, "(")
+	close := strings.LastIndex(folderName, ")")
+	if open < 0 || close <= open {
+		m.baseName = strings.TrimSpace(folderName)
+		return m
+	}
+	m.baseName = strings.TrimSpace(folderName[:open])
+	inner := strings.TrimSpace(folderName[open+1 : close])
+	parts := strings.SplitN(inner, ",", 3)
+	if len(parts) >= 1 {
+		m.commonName = strings.TrimSpace(parts[0])
+	}
+	if len(parts) >= 2 {
+		if v, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64); err == nil {
+			m.classMin = v
+		}
+	}
+	if len(parts) >= 3 {
+		if v, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64); err == nil {
+			m.classMax = v
+		}
+	}
+	return m
+}
+
 // matchOrCreateReach finds an existing reach by folder name or creates a new
 // stub reach so the KML can be imported without pre-seeding in Go code.
 //
-// On creation:
-//   - slug       = slugified folder name (e.g. "Browns Canyon" → "browns-canyon")
-//   - common_name = folder name as-is
-//   - name        = common_name (overwritten by updateReachNaming once pins are loaded)
+// folderName format: "Display Name (CommonName,classMin,classMax)"
+// riverName: the KML document name, used as river_name on new reaches.
+//
+// Slug on creation: slugify(riverName) + "-" + slugify(commonName or baseName)
 //
 // The returned created flag is true when a new row was inserted.
-func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName string) (id, slug, name string, created bool, err error) {
-	// Try to match existing reach first.
-	matchErr := imp.pool.QueryRow(ctx, `
-		SELECT id, slug, name FROM reaches
-		WHERE  LOWER(name)        = LOWER($1)
-		    OR LOWER(slug)        = LOWER($1)
-		    OR LOWER(common_name) = LOWER($1)
-		    OR LOWER(name)   LIKE '%' || LOWER($1) || '%'
-		    OR LOWER($1)     LIKE '%' || LOWER(name) || '%'
-		ORDER BY
-			CASE WHEN LOWER(name)        = LOWER($1) THEN 0
-			     WHEN LOWER(slug)        = LOWER($1) THEN 1
-			     WHEN LOWER(common_name) = LOWER($1) THEN 2
-			     ELSE 3 END
-		LIMIT 1
-	`, folderName).Scan(&id, &slug, &name)
-	if matchErr == nil {
-		return id, slug, name, false, nil
+func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName, riverName string) (id, slug, name string, created bool, err error) {
+	meta := parseFolderMeta(folderName)
+
+	// Build candidate search terms: common name, base name, full folder name.
+	candidates := []string{folderName}
+	if meta.commonName != "" {
+		candidates = append([]string{meta.commonName, meta.baseName}, candidates...)
+	} else {
+		candidates = append([]string{meta.baseName}, candidates...)
 	}
 
-	// No match — create a stub reach from the folder name.
-	newSlug := slugify(folderName)
+	// Try to match existing reach by any candidate.
+	for _, term := range candidates {
+		matchErr := imp.pool.QueryRow(ctx, `
+			SELECT id, slug, name FROM reaches
+			WHERE  LOWER(name)        = LOWER($1)
+			    OR LOWER(slug)        = LOWER($1)
+			    OR LOWER(common_name) = LOWER($1)
+			ORDER BY
+				CASE WHEN LOWER(name)        = LOWER($1) THEN 0
+				     WHEN LOWER(slug)        = LOWER($1) THEN 1
+				     WHEN LOWER(common_name) = LOWER($1) THEN 2
+				     ELSE 3 END
+			LIMIT 1
+		`, term).Scan(&id, &slug, &name)
+		if matchErr == nil {
+			return id, slug, name, false, nil
+		}
+	}
+
+	// No match — derive slug from riverName + commonName (or baseName).
+	identifier := meta.baseName
+	if meta.commonName != "" {
+		identifier = meta.commonName
+	}
+	newSlug := slugify(riverName) + "-" + slugify(identifier)
+
+	// Build INSERT with all available metadata.
+	displayName := meta.baseName
+	if displayName == "" {
+		displayName = folderName
+	}
+	commonNameVal := meta.commonName
+	if commonNameVal == "" {
+		commonNameVal = displayName
+	}
+
+	var classMinArg, classMaxArg interface{}
+	if meta.classMin > 0 {
+		classMinArg = meta.classMin
+	}
+	if meta.classMax > 0 {
+		classMaxArg = meta.classMax
+	}
+
 	err = imp.pool.QueryRow(ctx, `
-		INSERT INTO reaches (slug, name, common_name)
-		VALUES ($1, $2, $2)
-		ON CONFLICT (slug) DO UPDATE SET common_name = EXCLUDED.common_name
+		INSERT INTO reaches (slug, name, common_name, river_name, class_min, class_max)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (slug) DO UPDATE
+			SET common_name = EXCLUDED.common_name,
+			    river_name  = EXCLUDED.river_name,
+			    class_min   = COALESCE(reaches.class_min, EXCLUDED.class_min),
+			    class_max   = COALESCE(reaches.class_max, EXCLUDED.class_max)
 		RETURNING id, slug, name
-	`, newSlug, folderName).Scan(&id, &slug, &name)
+	`, newSlug, displayName, commonNameVal, riverName, classMinArg, classMaxArg).Scan(&id, &slug, &name)
 	if err != nil {
 		return "", "", "", false, fmt.Errorf("create reach %q: %w", folderName, err)
 	}
@@ -553,6 +655,75 @@ func (imp *Importer) inferReachFromText(ctx context.Context, text string) (id, s
 		}
 	}
 	return "", "", "", fmt.Errorf("no reach match found in %q", text)
+}
+
+// ── Flow range parsing ────────────────────────────────────────────────────────
+
+// flowRangeKeywords maps KML placemark names to flow_ranges label values.
+var flowRangeKeywords = map[string]string{
+	"below": "below_recommended",
+	"low":   "low_runnable",
+	"med":   "runnable",
+	"high":  "high_runnable",
+	"above": "above_recommended",
+}
+
+// parseFlowRangePM detects a flow-range metadata placemark and returns the
+// DB label, min/max CFS, and true when the placemark name is a known keyword.
+//
+// Description format:
+//   - "below" / "above": single CFS value — max_cfs or min_cfs respectively
+//   - "low" / "med" / "high": "min,max" pair (or single value treated as min)
+func parseFlowRangePM(name, desc string) (label string, minCFS, maxCFS *float64, ok bool) {
+	label, ok = flowRangeKeywords[strings.ToLower(strings.TrimSpace(name))]
+	if !ok {
+		return "", nil, nil, false
+	}
+	parts := strings.SplitN(strings.TrimSpace(desc), ",", 2)
+	parseVal := func(s string) *float64 {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return nil
+		}
+		if v, err := strconv.ParseFloat(s, 64); err == nil {
+			return &v
+		}
+		return nil
+	}
+	switch label {
+	case "below_recommended":
+		// single value = upper bound (< this)
+		maxCFS = parseVal(parts[0])
+	case "above_recommended":
+		// single value = lower bound (> this)
+		minCFS = parseVal(parts[0])
+	default:
+		// "min,max" or just "min"
+		minCFS = parseVal(parts[0])
+		if len(parts) == 2 {
+			maxCFS = parseVal(parts[1])
+		}
+	}
+	return label, minCFS, maxCFS, true
+}
+
+// upsertFlowRange writes a single flow range band for a reach.
+// gauge_id is intentionally left NULL — KML ranges are reach-level descriptions
+// not tied to a specific gauge reading source.
+func (imp *Importer) upsertFlowRange(ctx context.Context, reachID, label string, minCFS, maxCFS *float64) error {
+	if imp.DryRun {
+		return nil
+	}
+	_, err := imp.pool.Exec(ctx, `
+		INSERT INTO flow_ranges (reach_id, label, min_cfs, max_cfs, craft_type, data_source)
+		VALUES ($1, $2, $3, $4, 'general', 'manual')
+		ON CONFLICT (reach_id, label, craft_type)
+		DO UPDATE SET
+			min_cfs     = EXCLUDED.min_cfs,
+			max_cfs     = EXCLUDED.max_cfs,
+			data_source = EXCLUDED.data_source
+	`, reachID, label, minCFS, maxCFS)
+	return err
 }
 
 // ── DB upserts ────────────────────────────────────────────────────────────────
