@@ -493,8 +493,8 @@ watch(() => props.hoveredSlug, slug => {
 // Icon colors: all black for IV+V — only the line changes for V
 function difficultyColorExpr(): maplibregl.ExpressionSpecification {
   return ['step', ['coalesce', ['get', 'class_max'], 0],
-    '#16a34a',       // 0–2.4  I–II   green
-    2.5, '#3b82f6',  // 2.5–3.9 III   blue
+    '#16a34a',       // 0–2.9  I–II+  green
+    3.0, '#3b82f6',  // 3.0–3.9 III   blue
     4.0, '#1f2937',  // 4.0–4.9 IV    near-black
     5.0, '#dc2626',  // 5.0+    V     red
   ] as any
