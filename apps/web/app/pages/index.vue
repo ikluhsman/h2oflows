@@ -120,8 +120,8 @@
         <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white leading-tight mb-3 text-center">
           A better streamflow<br>dashboard.
         </h1>
-        <p class="text-base sm:text-lg text-gray-500 dark:text-gray-400 mb-8 text-center leading-relaxed">
-          Live gauge data meets paddler knowledge — trip reports, AI flow intel,<br class="hidden sm:block">and a feedback loop that gets smarter with every river mile.
+        <p class="text-base sm:text-lg text-gray-500 dark:text-gray-400 mb-8 text-center">
+          Auto trip tracking · AI flow intel · Community trip reports
         </p>
 
         <!-- Ask anything + action buttons -->
