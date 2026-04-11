@@ -104,6 +104,9 @@
           </svg>
         </div>
 
+        <!-- Wordmark -->
+        <p class="text-2xl font-extrabold tracking-tight text-blue-600 dark:text-blue-400 mb-4">h2oflows</p>
+
         <!-- Badge -->
         <div class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 rounded-full px-3 py-1 mb-5">
           <span class="relative flex h-1.5 w-1.5">
