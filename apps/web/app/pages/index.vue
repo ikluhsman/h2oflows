@@ -121,7 +121,7 @@
           A better streamflow<br>dashboard.
         </h1>
         <p class="text-base sm:text-lg text-gray-500 dark:text-gray-400 mb-8 text-center">
-          Auto trip tracking · AI flow intel · Community trip reports
+          Real-time gauges · AI flow intel · GPS trip tracking
         </p>
 
         <!-- Ask anything + action buttons -->
