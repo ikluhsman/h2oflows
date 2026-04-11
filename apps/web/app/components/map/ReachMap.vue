@@ -5,7 +5,7 @@
     <!-- MapLibre container — ref is on THIS element so MapLibre reads its own clientHeight -->
     <div
       ref="container"
-      class="relative flex-1 min-h-56 sm:min-h-0 bg-gray-100 dark:bg-gray-800"
+      class="relative flex-1 min-h-80 sm:min-h-0 bg-gray-100 dark:bg-gray-800"
     >
       <div
         v-if="!mapReady && hasCoords"
@@ -881,6 +881,7 @@ function rebuildLayers() {
 // Re-add layers when data changes (e.g. after KMZ import refreshes the page, or after OSM centerline fetch)
 watch(allFeatures, rebuildLayers, { deep: true })
 watch(() => props.centerline, rebuildLayers, { deep: true })
+watch(() => props.gauges, rebuildLayers, { deep: true })
 </script>
 
 <style>

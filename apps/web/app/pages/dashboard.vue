@@ -47,7 +47,7 @@
 
       <!-- Gauges grouped by river -->
       <template v-else>
-        <div class="flex items-center justify-between -mb-2">
+        <div class="flex items-center justify-between mb-4">
           <span />
           <UButton size="xs" color="neutral" variant="outline" icon="i-heroicons-plus" @click="searchOpen = true">
             Add gauge
@@ -92,8 +92,15 @@
 
         <!-- Dashboard map -->
         <section>
-          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Gauge Map</h2>
-          <ClientOnly>
+          <div class="flex items-center gap-2 mb-3">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Gauge Map</h2>
+            <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+            <button
+              class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              @click="mapVisible = !mapVisible"
+            >{{ mapVisible ? 'Hide' : 'Show' }}</button>
+          </div>
+          <ClientOnly v-if="mapVisible">
             <DashboardMap
               :gauges="store.gauges"
               @remove-gauge="removeAndSync($event)"
@@ -174,7 +181,14 @@ onMounted(() => {
 onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 
 // ── UI state ─────────────────────────────────────────────────────────────────
-const searchOpen = ref(false)
+const searchOpen  = ref(false)
+const MAP_VIS_KEY = 'h2oflow_dashboard_map_visible'
+const mapVisible  = ref(true)
+onMounted(() => {
+  const saved = localStorage.getItem(MAP_VIS_KEY)
+  if (saved !== null) mapVisible.value = saved !== 'false'
+})
+watch(mapVisible, val => localStorage.setItem(MAP_VIS_KEY, String(val)))
 
 function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
   addAndSync(gauge)

@@ -110,15 +110,15 @@
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"/>
             <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"/>
           </span>
-          Live USGS Streamflow Data
+          Live Streamflow · Community-driven
         </div>
 
         <!-- Headline -->
         <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white leading-tight mb-3 text-center">
-          Know before<br>you go.
+          A better streamflow<br>dashboard.
         </h1>
         <p class="text-base sm:text-lg text-gray-500 dark:text-gray-400 mb-8 text-center leading-relaxed">
-          Live streamflow data. AI-assisted flow intel. Community knowledge.
+          Live gauge data meets paddler knowledge — trip reports, AI flow intel,<br class="hidden sm:block">and a feedback loop that gets smarter with every river mile.
         </p>
 
         <!-- Ask anything + action buttons -->

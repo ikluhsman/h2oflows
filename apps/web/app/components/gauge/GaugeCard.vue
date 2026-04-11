@@ -55,15 +55,16 @@
   <div
     v-else
     class="relative rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden"
-    :class="[cardClass, density === 'compact' ? 'p-2.5' : 'p-4']"
+    :class="[cardClass, density === 'compact' ? 'p-2.5' : density === 'comfortable' ? 'p-3' : 'p-4']"
     @click="emit('open')"
   >
-    <!-- Compact background sparkline — faint, covers full card -->
-    <div v-if="density === 'compact'" class="absolute inset-0 pointer-events-none opacity-20">
+    <!-- Compact: background sparkline along the bottom edge -->
+    <div v-if="density === 'compact'" class="absolute bottom-0 left-0 right-0 h-10 pointer-events-none opacity-35">
       <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" compact class="h-full w-full" />
     </div>
+
     <!-- Gauge name + reach subtitle -->
-    <div class="relative flex items-start justify-between gap-2" :class="density === 'compact' ? 'mb-1.5' : 'mb-3'">
+    <div class="relative flex items-start justify-between gap-2" :class="density === 'compact' ? 'mb-1' : 'mb-2'">
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5">
           <UTooltip :text="tierTooltip">
@@ -73,7 +74,7 @@
             <span class="font-medium truncate" :class="density === 'compact' ? 'text-xs' : 'text-sm'">{{ displayName }}</span>
           </UTooltip>
         </div>
-        <p v-if="!hideReachSubtitle && density !== 'compact'" class="text-xs truncate mt-0.5 pl-4">
+        <p v-if="!hideReachSubtitle && density === 'full'" class="text-xs truncate mt-0.5 pl-4">
           <span v-if="gauge.riverName" class="text-blue-400 dark:text-blue-500 font-medium">{{ gauge.riverName }}</span>
           <span v-if="gauge.riverName && gauge.reachName" class="text-gray-300 dark:text-gray-600"> · </span>
           <span v-if="gauge.reachName" class="text-gray-400">{{ gauge.reachName }}</span>
@@ -82,7 +83,7 @@
 
       <!-- Card actions: Record/Stop + Remove -->
       <div class="flex items-center gap-1 shrink-0">
-        <UTooltip v-if="density !== 'compact'" :text="watchTooltip">
+        <UTooltip v-if="density === 'full'" :text="watchTooltip">
           <button
             class="rounded-lg p-1.5 transition-all duration-150"
             :class="watchButtonClass"
@@ -108,34 +109,37 @@
     </div>
 
     <!-- Current flow reading -->
-    <div class="relative flex items-end gap-2" :class="density === 'compact' ? 'mb-1' : 'mb-1.5'">
-      <span class="font-bold tabular-nums" :class="[cfsClass, density === 'compact' ? 'text-xl' : 'text-3xl']">
+    <div class="relative flex items-baseline gap-2 flex-wrap" :class="density === 'compact' ? 'mb-6' : 'mb-1.5'">
+      <span class="font-bold tabular-nums leading-none" :class="[cfsClass, density === 'compact' ? 'text-xl' : density === 'comfortable' ? 'text-2xl' : 'text-3xl']">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
       </span>
-      <span class="text-xs text-gray-500 mb-0.5">cfs</span>
-      <TrendArrow v-if="currentCfs != null && density !== 'compact'" :gauge-id="gauge.id" class="mb-1" />
+      <span class="text-xs text-gray-500">cfs</span>
+      <TrendArrow v-if="currentCfs != null && density === 'full'" :gauge-id="gauge.id" />
+      <!-- Compact: badge inline with CFS -->
+      <UBadge v-if="density === 'compact' && (gauge.flowStatus !== 'unknown' || gauge.flowBandLabel)" :color="statusColor" variant="subtle" size="xs">{{ statusLabel }}</UBadge>
     </div>
 
-    <!-- Flow status badge -->
-    <div v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" class="flex items-center gap-2" :class="density === 'compact' ? 'mb-1' : 'mb-2'">
-      <UBadge :color="statusColor" variant="subtle" :size="density === 'compact' ? 'xs' : 'md'">{{ statusLabel }}</UBadge>
+    <!-- Flow status badge — comfortable/full only -->
+    <div v-if="density !== 'compact' && (gauge.flowStatus !== 'unknown' || gauge.flowBandLabel)" class="flex items-center gap-2 mb-2">
+      <UBadge :color="statusColor" variant="subtle" :size="density === 'full' ? 'md' : 'sm'">{{ statusLabel }}</UBadge>
       <span v-if="gauge.flowStatus === 'flood'" class="relative flex h-2 w-2">
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
         <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-400" />
       </span>
     </div>
 
-    <!-- Sparkline — hidden in compact mode -->
-    <GaugeSparkline v-if="density !== 'compact'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" class="mb-2" />
+    <!-- Sparkline — comfortable gets compact sparkline; full gets full sparkline -->
+    <GaugeSparkline v-if="density === 'comfortable'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" compact class="mb-1" />
+    <GaugeSparkline v-else-if="density === 'full'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" class="mb-2" />
 
-    <!-- Source + external ID — hidden in compact mode -->
-    <p v-if="density !== 'compact'" class="text-xs text-gray-400 mt-2 truncate flex items-center gap-1">
+    <!-- Source + external ID — full only -->
+    <p v-if="density === 'full'" class="text-xs text-gray-400 mt-2 truncate flex items-center gap-1">
       <UTooltip v-if="gauge.featured" text="Community-verified gauge — trusted data">
         <span class="leading-none" style="filter: drop-shadow(0 0 2px rgba(217,170,0,0.6))">🥇</span>
       </UTooltip>
       {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
     </p>
-    <p v-if="density !== 'compact' && lastUpdatedLabel" class="text-xs text-gray-400 mt-0.5">{{ lastUpdatedLabel }}</p>
+    <p v-if="density === 'full' && lastUpdatedLabel" class="text-xs text-gray-400 mt-0.5">{{ lastUpdatedLabel }}</p>
 
     <!-- GPS permission error -->
     <p v-if="permissionErr && !isActive" class="mt-2 text-xs text-red-400">{{ permissionErr }}</p>

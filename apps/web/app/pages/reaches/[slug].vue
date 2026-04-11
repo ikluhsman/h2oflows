@@ -306,7 +306,7 @@
                 v-if="allGauges[0].flow_status && allGauges[0].flow_status !== 'unknown'"
                 :color="flowStatusColor(allGauges[0].flow_status)"
                 variant="subtle"
-                size="xs"
+                size="sm"
                 class="mt-1.5"
               >{{ flowStatusLabel(allGauges[0].flow_status) }}</UBadge>
             </div>
