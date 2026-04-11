@@ -74,10 +74,17 @@ let fetchSeq       = 0   // incremented on each call; lets an in-flight fetch se
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
 
-
 function difficultyColorExpr(): any {
   return ['step', ['coalesce', ['get', 'class_max'], 0],
     '#16a34a', 3.0, '#3b82f6', 4.0, '#111827', 5.0, '#111827']
+}
+
+// Build a MapLibre match expression that returns full opacity for dashboard
+// slugs and dim opacity for all others.
+function dashOpacityExpr(dashSlugs: string[], full: number, dim: number): any {
+  if (dashSlugs.length === 0) return dim
+  // ['match', ['get', 'slug'], [s1, s2, ...], full, dim]
+  return ['match', ['get', 'slug'], dashSlugs, full, dim]
 }
 
 // ── Geometry helpers ──────────────────────────────────────────────────────────
@@ -157,18 +164,30 @@ async function refreshData() {
 
   let bySlug = new Map<string, any>()
   try {
-    if (slugSet.size > 0) {
-      const res = await fetch(`${apiBase}/api/v1/reaches/map?bbox=${CO_BBOX}`)
-      if (!res.ok) return
-      const fc = await res.json()
-      if (seq !== fetchSeq) return          // a newer call superseded us — discard
-      const matched: any[] = (fc.features ?? []).filter((f: any) => slugSet.has(f.properties.slug))
-      bySlug = new Map(matched.map((f: any) => [f.properties.slug, f]))
-      ;(m.getSource('dash-reaches') as maplibregl.GeoJSONSource | undefined)
-        ?.setData({ type: 'FeatureCollection', features: matched })
-    } else {
-      ;(m.getSource('dash-reaches') as maplibregl.GeoJSONSource | undefined)
-        ?.setData({ type: 'FeatureCollection', features: [] })
+    // Load all reaches (cached server-side) so we can show context lines
+    const res = await fetch(`${apiBase}/api/v1/reaches/map/all`)
+    if (!res.ok) return
+    const fc = await res.json()
+    if (seq !== fetchSeq) return          // a newer call superseded us — discard
+
+    const allFeatures: any[] = fc.features ?? []
+    bySlug = new Map(allFeatures.map((f: any) => [f.properties.slug, f]))
+
+    // Update the single source with all features; opacity expression dims non-dashboard lines
+    const dashSlugs = [...slugSet]
+    ;(m.getSource('dash-reaches') as maplibregl.GeoJSONSource | undefined)
+      ?.setData({ type: 'FeatureCollection', features: allFeatures })
+
+    // Update opacity paint properties to highlight dashboard reaches
+    if (m.getLayer('dash-glow')) {
+      m.setPaintProperty('dash-glow',  'line-opacity', dashOpacityExpr(dashSlugs, 0.12, 0.03))
+      m.setPaintProperty('dash-lines', 'line-opacity', dashOpacityExpr(dashSlugs, 0.9,  0.15))
+      m.setPaintProperty('dash-lines', 'line-width',
+        ['interpolate', ['linear'], ['zoom'], 6,
+          ['match', ['get', 'slug'], dashSlugs, 3.0, 1.0],
+          12,
+          ['match', ['get', 'slug'], dashSlugs, 6.0, 2.0],
+        ])
     }
 
     clearMarkers()
@@ -296,24 +315,24 @@ onMounted(() => {
       data: { type: 'FeatureCollection', features: [] },
     })
 
-    // Glow layer
+    // Glow layer — dashboard reaches get full glow, context reaches very faint
     map!.addLayer({
       id: 'dash-glow', type: 'line', source: 'dash-reaches',
       paint: {
         'line-color': difficultyColorExpr(),
         'line-width': ['interpolate', ['linear'], ['zoom'], 6, 6, 12, 14],
-        'line-opacity': 0.12,
+        'line-opacity': 0.03,  // starts dim; updated to dashboard-aware expr on data load
         'line-blur': 4,
       },
     })
 
-    // Main line layer
+    // Main line layer — dashboard reaches bold, context reaches dim
     map!.addLayer({
       id: 'dash-lines', type: 'line', source: 'dash-reaches',
       paint: {
         'line-color': difficultyColorExpr(),
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2.5, 12, 5],
-        'line-opacity': 0.9,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.0, 12, 2.0],
+        'line-opacity': 0.15, // starts dim; updated on data load
       },
     })
 

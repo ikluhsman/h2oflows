@@ -13,7 +13,7 @@
     <AppHeader class="shrink-0" />
 
     <!-- Map + Sidebar -->
-    <div class="flex-1 overflow-hidden flex">
+    <div class="flex-1 overflow-hidden flex relative">
 
       <!-- Map -->
       <div class="flex-1 min-w-0 relative">
@@ -27,10 +27,26 @@
             @reach-click="onReachClick"
           />
         </ClientOnly>
+
+        <!-- Mobile sidebar toggle button -->
+        <button
+          class="sm:hidden absolute top-2 right-2 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium shadow-md bg-white/95 dark:bg-gray-900/95 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200"
+          @click="sidebarOpen = !sidebarOpen"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+          </svg>
+          {{ sidebarOpen ? 'Hide list' : `${mapReaches.length} reaches` }}
+        </button>
       </div>
 
-      <!-- Reach sidebar -->
-      <aside class="w-72 shrink-0 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col overflow-hidden">
+      <!-- Reach sidebar — hidden on mobile unless toggled -->
+      <aside
+        class="shrink-0 border-l border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col overflow-hidden"
+        :class="sidebarOpen
+          ? 'absolute sm:relative right-0 top-0 bottom-0 w-72 z-10 sm:z-auto shadow-xl sm:shadow-none'
+          : 'hidden sm:flex sm:w-72'"
+      >
 
         <!-- Zoom-out prompt -->
         <div v-if="mapZoom < SIDEBAR_ZOOM" class="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center">
@@ -113,9 +129,10 @@ function dismissBanner() {
 // Zoom level at which the sidebar shows reach details (~state-sized viewport)
 const SIDEBAR_ZOOM = 6.5
 
-const mapZoom    = ref(4)
-const mapReaches = ref<ReachListItem[]>([])
+const mapZoom     = ref(4)
+const mapReaches  = ref<ReachListItem[]>([])
 const hoveredSlug = ref<string | null>(null)
+const sidebarOpen = ref(false)
 
 // DOM ref map for scrolling sidebar to hovered reach
 const reachRefs = new Map<string, HTMLElement>()

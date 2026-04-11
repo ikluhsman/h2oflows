@@ -54,12 +54,16 @@
   <!-- ─── CARD views (compact / comfortable / full) ────────────────────── -->
   <div
     v-else
-    class="relative rounded-xl border transition-all duration-200 cursor-pointer"
+    class="relative rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden"
     :class="[cardClass, density === 'compact' ? 'p-2.5' : 'p-4']"
     @click="emit('open')"
   >
+    <!-- Compact background sparkline — faint, covers full card -->
+    <div v-if="density === 'compact'" class="absolute inset-0 pointer-events-none opacity-20">
+      <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" compact class="h-full w-full" />
+    </div>
     <!-- Gauge name + reach subtitle -->
-    <div class="flex items-start justify-between gap-2" :class="density === 'compact' ? 'mb-1.5' : 'mb-3'">
+    <div class="relative flex items-start justify-between gap-2" :class="density === 'compact' ? 'mb-1.5' : 'mb-3'">
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5">
           <UTooltip :text="tierTooltip">
@@ -104,7 +108,7 @@
     </div>
 
     <!-- Current flow reading -->
-    <div class="flex items-end gap-2" :class="density === 'compact' ? 'mb-1' : 'mb-1.5'">
+    <div class="relative flex items-end gap-2" :class="density === 'compact' ? 'mb-1' : 'mb-1.5'">
       <span class="font-bold tabular-nums" :class="[cfsClass, density === 'compact' ? 'text-xl' : 'text-3xl']">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
       </span>

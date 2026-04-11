@@ -13,27 +13,23 @@
         Trip recording · {{ activeTripLabel }}
       </div>
       <template #actions>
-        <!-- Density toggle -->
-        <div class="hidden sm:flex items-center rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden shrink-0">
-          <UTooltip v-for="d in DENSITIES" :key="d.value" :text="d.label">
-            <button
-              class="px-2 py-1.5 transition-colors"
-              :class="density === d.value
-                ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200'
-                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
-              @click="density = d.value"
-            >
-              <component :is="d.icon" class="w-3.5 h-3.5" />
-            </button>
-          </UTooltip>
+        <!-- Density toggle with current-view label -->
+        <div class="hidden sm:flex items-center gap-1.5 shrink-0">
+          <span class="text-xs text-gray-400 dark:text-gray-500">{{ currentDensityLabel }}</span>
+          <div class="flex items-center rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <UTooltip v-for="d in DENSITIES" :key="d.value" :text="d.label">
+              <button
+                class="px-2 py-1.5 transition-colors"
+                :class="density === d.value
+                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200'
+                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+                @click="density = d.value"
+              >
+                <component :is="d.icon" class="w-3.5 h-3.5" />
+              </button>
+            </UTooltip>
+          </div>
         </div>
-        <NuxtLink
-          to="/trips"
-          class="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors hidden sm:inline"
-        >My Trips</NuxtLink>
-        <UButton size="sm" color="primary" variant="soft" icon="i-heroicons-plus" @click="searchOpen = true">
-          Add gauge
-        </UButton>
       </template>
     </AppHeader>
 
@@ -51,6 +47,12 @@
 
       <!-- Gauges grouped by river -->
       <template v-else>
+        <div class="flex items-center justify-between -mb-2">
+          <span />
+          <UButton size="xs" color="neutral" variant="outline" icon="i-heroicons-plus" @click="searchOpen = true">
+            Add gauge
+          </UButton>
+        </div>
         <section v-for="group in store.byRiver" :key="group.river" class="mb-6">
           <div class="flex items-center gap-2 mb-3">
             <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ group.river }}</h2>
@@ -141,6 +143,10 @@ onMounted(() => {
   if (saved && DENSITIES.some(d => d.value === saved)) density.value = saved
 })
 watch(density, val => localStorage.setItem(DENSITY_KEY, val))
+
+const currentDensityLabel = computed(() =>
+  DENSITIES.find(d => d.value === density.value)?.label ?? ''
+)
 
 const gridClass = computed(() => ({
   'compact':     'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2',

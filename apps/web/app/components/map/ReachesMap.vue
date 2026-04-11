@@ -145,12 +145,10 @@ const DIFFICULTY = [
 ]
 
 const DIFFICULTY_LEGEND = [
-  { label: 'Class I–II',  symbol: circleSvg('#16a34a')     },
-  { label: 'Class II+',   symbol: squareSvg('#3b82f6')     },
-  { label: 'Class III',   symbol: squareSvg('#3b82f6')     },
-  { label: 'Class III+',  symbol: diamondSvg('#1f2937')    },
-  { label: 'Class IV',    symbol: diamondSvg('#1f2937')    },
-  { label: 'Class V',     symbol: dblDiamondSvg('#1f2937') },
+  { label: 'Class I–II', symbol: circleSvg('#16a34a')     },
+  { label: 'Class III',  symbol: squareSvg('#3b82f6')     },
+  { label: 'Class IV',   symbol: diamondSvg('#1f2937')    },
+  { label: 'Class V',    symbol: dblDiamondSvg('#1f2937') },
 ]
 
 function difficultyFor(classMax: number | null) {
