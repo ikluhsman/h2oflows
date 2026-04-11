@@ -3,41 +3,35 @@ import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
 /**
  * useWatchlistSync — wraps watchlist add/remove with server persistence.
  *
- * - When authenticated, changes are mirrored to /api/v1/watchlist immediately.
- * - When anonymous, only localStorage is updated (existing behaviour).
- * - loadFromServer() merges the server watchlist into the local store.
- * - pushLocalToServer() syncs any locally-saved gauges up to the server
- *   (called once after login to handle gauges added while anonymous).
+ * Uses getToken() directly for auth checks — more reliable than isAuthenticated
+ * which can be false immediately after page load while Supabase restores the
+ * session asynchronously. If no token, falls back to localStorage-only.
  */
 export function useWatchlistSync() {
   const store = useWatchlistStore()
   const { apiBase } = useRuntimeConfig().public
-  const { isAuthenticated, getToken } = useAuth()
-
-  async function authedFetch(method: string, path: string, body?: unknown) {
-    const token = await getToken()
-    if (!token) return null
-    return fetch(`${apiBase}${path}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    })
-  }
+  const { getToken } = useAuth()
 
   async function addAndSync(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
     store.addGauge(gauge)
-    if (isAuthenticated.value) {
-      await authedFetch('POST', '/api/v1/watchlist', { gauge_id: gauge.id }).catch(() => {})
+    const token = await getToken()
+    if (token) {
+      fetch(`${apiBase}/api/v1/watchlist`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gauge_id: gauge.id }),
+      }).catch(() => {})
     }
   }
 
   async function removeAndSync(gaugeId: string) {
     store.removeGauge(gaugeId)
-    if (isAuthenticated.value) {
-      await authedFetch('DELETE', `/api/v1/watchlist/${gaugeId}`).catch(() => {})
+    const token = await getToken()
+    if (token) {
+      fetch(`${apiBase}/api/v1/watchlist/${gaugeId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {})
     }
   }
 
@@ -46,8 +40,14 @@ export function useWatchlistSync() {
    * store. Calls the batch API to hydrate metadata for new entries.
    */
   async function loadFromServer() {
-    const res = await authedFetch('GET', '/api/v1/watchlist')
+    const token = await getToken()
+    if (!token) return
+
+    const res = await fetch(`${apiBase}/api/v1/watchlist`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => null)
     if (!res?.ok) return
+
     const data = await res.json()
     const serverIds: string[] = data.gauge_ids ?? []
 
@@ -55,11 +55,11 @@ export function useWatchlistSync() {
     const newIds = serverIds.filter(id => !localIds.has(id))
     if (newIds.length === 0) return
 
-    const token = await getToken()
     const batchRes = await fetch(`${apiBase}/api/v1/gauges/batch?ids=${newIds.join(',')}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-    if (!batchRes.ok) return
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => null)
+    if (!batchRes?.ok) return
+
     const batchData = await batchRes.json()
     for (const f of batchData.features ?? []) {
       const p = f.properties
@@ -94,11 +94,16 @@ export function useWatchlistSync() {
   /**
    * Pushes all locally-stored gauge IDs to the server. Called after login to
    * ensure gauges added while anonymous are persisted to the user's account.
-   * The server's ON CONFLICT DO NOTHING makes this safe to call repeatedly.
    */
   async function pushLocalToServer() {
+    const token = await getToken()
+    if (!token) return
     for (const gauge of store.gauges) {
-      await authedFetch('POST', '/api/v1/watchlist', { gauge_id: gauge.id }).catch(() => {})
+      fetch(`${apiBase}/api/v1/watchlist`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gauge_id: gauge.id }),
+      }).catch(() => {})
     }
   }
 

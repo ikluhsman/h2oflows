@@ -10,31 +10,7 @@
       <button @click="dismissBanner" class="shrink-0 text-amber-600 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-100 font-medium transition-colors">Dismiss</button>
     </div>
 
-    <!-- Header -->
-    <header class="shrink-0 flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 z-10">
-      <div class="flex items-center gap-2">
-        <NuxtLink to="/" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <svg class="w-5 h-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M2 12c2-4 4-6 6-6s4 6 6 6 4-6 6-6" stroke-linecap="round"/>
-            <path d="M2 18c2-4 4-6 6-6s4 6 6 6 4-6 6-6" stroke-linecap="round" opacity="0.4"/>
-          </svg>
-          <span class="text-base font-bold tracking-tight">H2OFlows</span>
-        </NuxtLink>
-      </div>
-      <nav class="flex items-center gap-2">
-        <button
-          class="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-          @click="searchOpen = true"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-          Ask anything…
-        </button>
-        <NuxtLink
-          to="/dashboard"
-          class="text-xs px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors"
-        >Dashboard</NuxtLink>
-      </nav>
-    </header>
+    <AppHeader class="shrink-0" />
 
     <!-- Map + Sidebar -->
     <div class="flex-1 overflow-hidden flex">
@@ -114,89 +90,13 @@
       </aside>
     </div>
 
-    <!-- AI search modal -->
-    <Transition
-      enter-active-class="transition duration-150 ease-out"
-      enter-from-class="opacity-0 scale-95"
-      enter-to-class="opacity-100 scale-100"
-      leave-active-class="transition duration-100 ease-in"
-      leave-from-class="opacity-100 scale-100"
-      leave-to-class="opacity-0 scale-95"
-    >
-      <div
-        v-if="searchOpen"
-        class="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4"
-        @click.self="searchOpen = false"
-      >
-        <div class="w-full max-w-xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-          <form class="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800" @submit.prevent="askQuestion">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input
-              ref="searchInputRef"
-              v-model="searchQuery"
-              type="text"
-              placeholder='Ask anything — e.g. "Browns Canyon at 800 cfs?"'
-              class="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
-              :disabled="searching"
-            />
-            <button
-              v-if="searchQuery"
-              type="button"
-              class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              @click="searchQuery = ''; searchResult = null"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-            </button>
-            <button
-              type="submit"
-              :disabled="searching || !searchQuery.trim()"
-              class="shrink-0 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-semibold transition-colors"
-            >
-              <span v-if="searching" class="flex items-center gap-1">
-                <span class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
-              </span>
-              <span v-else>Ask</span>
-            </button>
-          </form>
-
-          <div v-if="searchResult" class="px-4 py-4 space-y-3 max-h-96 overflow-y-auto">
-            <div
-              v-for="result in (searchResult.results ?? [])"
-              :key="result.reach_slug"
-              class="rounded-lg border border-gray-100 dark:border-gray-800 p-3 space-y-1"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-xs font-semibold uppercase tracking-wide text-blue-500">{{ result.reach_name }}</span>
-                <NuxtLink
-                  :to="`/reaches/${result.reach_slug}`"
-                  class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0"
-                  @click="searchOpen = false"
-                >View reach →</NuxtLink>
-              </div>
-              <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{{ result.answer }}</p>
-            </div>
-            <p v-if="!searchResult.results?.length && searchResult.answer" class="text-sm text-gray-500 leading-relaxed">{{ searchResult.answer }}</p>
-          </div>
-          <p v-else-if="!searching && !searchResult" class="px-4 py-3 text-xs text-gray-400">
-            Try: "What's Foxton like at 300 cfs?" or "Best beginner runs near Denver"
-          </p>
-          <p v-if="searchError" class="px-4 py-3 text-sm text-red-500">{{ searchError }}</p>
-
-          <div class="px-4 py-2.5 border-t border-gray-100 dark:border-gray-800 flex justify-end">
-            <button class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" @click="searchOpen = false">Close</button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import type { ReachListItem } from '~/components/map/ReachesMap.vue'
 
-const { apiBase } = useRuntimeConfig().public
 const router = useRouter()
 
 const showDemoBanner = ref(false)
@@ -271,43 +171,4 @@ function classLabel(classMax: number | null): string {
   return labels[classMax] ?? `Class ${classMax}`
 }
 
-// ── AI search ─────────────────────────────────────────────────────────────────
-
-const searchOpen  = ref(false)
-const searchInputRef = ref<HTMLInputElement>()
-const searchQuery = ref('')
-const searching   = ref(false)
-const searchError = ref('')
-const searchResult = ref<{ results?: { answer: string; reach_slug: string; reach_name: string }[]; answer?: string } | null>(null)
-
-watch(searchOpen, async (open) => {
-  if (open) {
-    searchQuery.value = ''
-    searchResult.value = null
-    searchError.value = ''
-    await nextTick()
-    searchInputRef.value?.focus()
-  }
-})
-
-async function askQuestion() {
-  const q = searchQuery.value.trim()
-  if (!q) return
-  searching.value = true
-  searchError.value = ''
-  searchResult.value = null
-  try {
-    const res = await fetch(`${apiBase}/api/v1/ask`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: q }),
-    })
-    if (!res.ok) throw new Error(`${res.status}`)
-    searchResult.value = await res.json()
-  } catch {
-    searchError.value = 'Something went wrong. Try again.'
-  } finally {
-    searching.value = false
-  }
-}
 </script>

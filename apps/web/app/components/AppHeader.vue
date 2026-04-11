@@ -29,7 +29,18 @@
       <!-- Page-level action buttons -->
       <slot name="actions" />
 
-      <!-- Auth — desktop only, ClientOnly prevents SSR/client mismatch -->
+      <!-- Global Ask button -->
+      <button
+        class="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors shrink-0"
+        @click="askOpen = true"
+      >
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        Ask
+      </button>
+
+      <!-- Auth — desktop only -->
       <ClientOnly>
         <template v-if="isAuthenticated">
           <button
@@ -73,6 +84,16 @@
           : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'"
         @click="menuOpen = false"
       >{{ link.label }}</NuxtLink>
+      <!-- Ask — mobile -->
+      <button
+        class="text-left px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center gap-2"
+        @click="menuOpen = false; askOpen = true"
+      >
+        <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        Ask anything
+      </button>
       <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2">
         <ClientOnly>
           <button
@@ -90,13 +111,96 @@
       </div>
     </div>
   </header>
+
+  <!-- Global Ask modal (Teleport so it's above everything) -->
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition duration-150 ease-out"
+      enter-from-class="opacity-0 scale-95"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-100 ease-in"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-95"
+    >
+      <div
+        v-if="askOpen"
+        class="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4 bg-black/20 backdrop-blur-sm"
+        @click.self="closeAsk"
+      >
+        <div class="w-full max-w-xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <form class="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800" @submit.prevent="askQuestion">
+            <svg class="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <input
+              ref="askInputRef"
+              v-model="askQuery"
+              type="text"
+              placeholder='Ask anything — e.g. "Browns Canyon at 800 cfs?"'
+              class="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
+              :disabled="asking"
+            />
+            <button
+              v-if="askQuery"
+              type="button"
+              class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              @click="askQuery = ''; askResult = null"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+            <button
+              type="submit"
+              :disabled="asking || !askQuery.trim()"
+              class="shrink-0 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-semibold transition-colors"
+            >
+              <span v-if="asking" class="flex items-center gap-1">
+                <span class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
+              </span>
+              <span v-else>Ask</span>
+            </button>
+          </form>
+
+          <div v-if="askResult" class="px-4 py-4 space-y-3 max-h-96 overflow-y-auto">
+            <div
+              v-for="result in (askResult.results ?? [])"
+              :key="result.reach_slug"
+              class="rounded-lg border border-gray-100 dark:border-gray-800 p-3 space-y-1"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-semibold uppercase tracking-wide text-blue-500">{{ result.reach_name }}</span>
+                <NuxtLink
+                  :to="`/reaches/${result.reach_slug}`"
+                  class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0"
+                  @click="closeAsk"
+                >View reach →</NuxtLink>
+              </div>
+              <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{{ result.answer }}</p>
+            </div>
+            <p v-if="!askResult.results?.length && askResult.answer" class="text-sm text-gray-500 leading-relaxed">{{ askResult.answer }}</p>
+          </div>
+          <p v-else-if="!asking && !askResult" class="px-4 py-3 text-xs text-gray-400">
+            Try: "What's Foxton like at 300 cfs?" or "Best beginner runs near Denver"
+          </p>
+          <p v-if="askError" class="px-4 py-3 text-sm text-red-400">{{ askError }}</p>
+
+          <div class="px-4 py-2.5 border-t border-gray-100 dark:border-gray-800 flex justify-end">
+            <button class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" @click="closeAsk">Close</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
+import { ref, nextTick, watch } from 'vue'
+
 const { user, isAuthenticated, signOut } = useAuth()
 const router = useRouter()
 const route = useRoute()
 const menuOpen = ref(false)
+
+const { apiBase } = useRuntimeConfig().public
 
 // Close menu on route change
 watch(() => route.path, () => { menuOpen.value = false })
@@ -111,5 +215,46 @@ async function handleSignOut() {
   menuOpen.value = false
   await signOut()
   router.push('/')
+}
+
+// ── Global Ask ────────────────────────────────────────────────────────────────
+const askOpen     = ref(false)
+const askInputRef = ref<HTMLInputElement>()
+const askQuery    = ref('')
+const asking      = ref(false)
+const askError    = ref('')
+const askResult   = ref<{ results?: { answer: string; reach_slug: string; reach_name: string }[]; answer?: string } | null>(null)
+
+watch(askOpen, async (open) => {
+  if (open) {
+    askQuery.value  = ''
+    askResult.value = null
+    askError.value  = ''
+    await nextTick()
+    askInputRef.value?.focus()
+  }
+})
+
+function closeAsk() { askOpen.value = false }
+
+async function askQuestion() {
+  const q = askQuery.value.trim()
+  if (!q) return
+  asking.value    = true
+  askError.value  = ''
+  askResult.value = null
+  try {
+    const res = await fetch(`${apiBase}/api/v1/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q }),
+    })
+    if (!res.ok) throw new Error(`${res.status}`)
+    askResult.value = await res.json()
+  } catch {
+    askError.value = 'Something went wrong. Try again.'
+  } finally {
+    asking.value = false
+  }
 }
 </script>

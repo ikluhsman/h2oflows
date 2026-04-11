@@ -1,7 +1,7 @@
 <template>
   <div class="w-full" @click.stop>
-    <!-- Window toggle -->
-    <div class="flex justify-end mb-0.5">
+    <!-- Window toggle — hidden in compact mode -->
+    <div v-if="!compact" class="flex justify-end mb-0.5">
       <div class="flex text-xs rounded overflow-hidden border border-gray-200 dark:border-gray-700">
         <button
           class="px-1.5 py-0.5 transition-colors"
@@ -17,7 +17,7 @@
     </div>
 
     <!-- Chart area -->
-    <div class="relative w-full h-10">
+    <div class="relative w-full" :class="compact ? 'h-6' : 'h-10'">
       <div v-if="loading" class="w-full h-full rounded animate-pulse bg-gray-100 dark:bg-gray-800" />
 
       <template v-else-if="points.length >= 2">
@@ -44,6 +44,8 @@ import type { WatchedGauge } from '~/stores/watchlist'
 const props = defineProps<{
   gaugeId: string
   flowStatus: WatchedGauge['flowStatus']
+  // compact — hides the 12h/24h toggle and uses reduced height (for list rows)
+  compact?: boolean
 }>()
 
 const { apiBase } = useRuntimeConfig().public
@@ -114,10 +116,10 @@ const areaPath = computed(() => {
 })
 
 const strokeColor = computed(() => ({
-  runnable: '#10b981', // emerald — go paddle
-  caution:  '#f59e0b', // amber  — marginal, proceed with caution
-  low:      '#ef4444', // red    — too low, don't bother
-  flood:    '#3b82f6', // blue   — too much water
-  unknown:  '#6b7280', // gray   — no data
-}[props.flowStatus] ?? '#6b7280'))
+  runnable: '#34d399', // emerald-400
+  caution:  '#fbbf24', // amber-400
+  low:      '#f87171', // red-400
+  flood:    '#60a5fa', // blue-400
+  unknown:  '#9ca3af', // gray-400
+}[props.flowStatus] ?? '#9ca3af'))
 </script>

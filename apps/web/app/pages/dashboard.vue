@@ -13,6 +13,20 @@
         Trip recording · {{ activeTripLabel }}
       </div>
       <template #actions>
+        <!-- Density toggle -->
+        <div class="hidden sm:flex items-center rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden shrink-0">
+          <UTooltip v-for="d in DENSITIES" :key="d.value" :text="d.label">
+            <button
+              class="px-2 py-1.5 transition-colors"
+              :class="density === d.value
+                ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200'
+                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+              @click="density = d.value"
+            >
+              <component :is="d.icon" class="w-3.5 h-3.5" />
+            </button>
+          </UTooltip>
+        </div>
         <NuxtLink
           to="/trips"
           class="text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors hidden sm:inline"
@@ -41,25 +55,32 @@
           <div class="flex items-center gap-2 mb-3">
             <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ group.river }}</h2>
             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
-            <UTooltip :text="group.gauges.length < 2 ? 'Add another gauge from this river to compare' : 'Compare gauges'">
-              <UButton
-                size="xs" color="neutral" variant="ghost" icon="i-heroicons-chart-bar"
-                :disabled="group.gauges.length < 2"
-                @click="openAggregate(group.river, group.gauges)"
-              >Compare</UButton>
-            </UTooltip>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+
+          <!-- List density: single column rows -->
+          <div v-if="density === 'list'" class="flex flex-col gap-1.5">
             <GaugeCard
               v-for="gauge in group.gauges"
               :key="gauge.id"
               :gauge="gauge"
+              density="list"
+              @open="openGauge(gauge)"
+            />
+          </div>
+
+          <!-- Card densities: grid layout -->
+          <div v-else :class="gridClass">
+            <GaugeCard
+              v-for="gauge in group.gauges"
+              :key="gauge.id"
+              :gauge="gauge"
+              :density="density"
               @open="openGauge(gauge)"
             />
           </div>
         </section>
 
-        <section v-if="aggregateGauges.length >= 2" class="border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+        <section v-if="aggregateGauges.length >= 2" class="border border-gray-300 dark:border-gray-700 rounded-xl p-4">
           <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-sm">{{ aggregateLabel }} · Flow Comparison</h3>
             <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-x-mark" @click="closeAggregate" />
@@ -73,7 +94,7 @@
           <ClientOnly>
             <DashboardMap
               :gauges="store.gauges"
-              @remove-gauge="store.removeGauge($event)"
+              @remove-gauge="removeAndSync($event)"
               @open-gauge="(id) => { const g = store.gauges.find(x => x.id === id); if (g) openGauge(g) }"
             />
           </ClientOnly>
@@ -87,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
 
 definePageMeta({ ssr: false })
@@ -95,19 +116,58 @@ definePageMeta({ ssr: false })
 const store = useWatchlistStore()
 const { refresh } = useWatchlistRefresh()
 const { isAuthenticated } = useAuth()
-const { addAndSync, loadFromServer, pushLocalToServer } = useWatchlistSync()
+const { addAndSync, removeAndSync, loadFromServer, pushLocalToServer } = useWatchlistSync()
+
+// ── Density toggle ────────────────────────────────────────────────────────────
+type Density = 'compact' | 'comfortable' | 'full' | 'list'
+const DENSITY_KEY = 'h2oflow_dashboard_density'
+
+// Inline SVG icon components for the toggle buttons
+const IconGrid4 = { template: `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>` }
+const IconGrid3 = { template: `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="4" height="14" rx="1"/><rect x="6" y="1" width="4" height="14" rx="1"/><rect x="11" y="1" width="4" height="14" rx="1"/></svg>` }
+const IconGrid2 = { template: `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="14" rx="1"/><rect x="9" y="1" width="6" height="14" rx="1"/></svg>` }
+const IconList  = { template: `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2.5" rx="1"/><rect x="1" y="6.75" width="14" height="2.5" rx="1"/><rect x="1" y="11.5" width="14" height="2.5" rx="1"/></svg>` }
+
+const DENSITIES = [
+  { value: 'compact'     as Density, label: 'Compact',     icon: IconGrid4 },
+  { value: 'comfortable' as Density, label: 'Comfortable', icon: IconGrid3 },
+  { value: 'full'        as Density, label: 'Full',        icon: IconGrid2 },
+  { value: 'list'        as Density, label: 'List',        icon: IconList  },
+]
+
+const density = ref<Density>('comfortable')
+onMounted(() => {
+  const saved = localStorage.getItem(DENSITY_KEY) as Density | null
+  if (saved && DENSITIES.some(d => d.value === saved)) density.value = saved
+})
+watch(density, val => localStorage.setItem(DENSITY_KEY, val))
+
+const gridClass = computed(() => ({
+  'compact':     'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2',
+  'comfortable': 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3',
+  'full':        'grid grid-cols-1 sm:grid-cols-2 gap-4',
+}[density.value] ?? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'))
+
+// ── Server sync ───────────────────────────────────────────────────────────────
+let serverSynced = false
+async function syncWithServer() {
+  if (serverSynced) return
+  serverSynced = true
+  await loadFromServer()
+  await pushLocalToServer()
+}
+
+watch(isAuthenticated, (val) => { if (val) syncWithServer() })
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
-onMounted(async () => {
-  if (isAuthenticated.value) {
-    await loadFromServer()
-    await pushLocalToServer()
-  }
+onMounted(() => {
+  if (isAuthenticated.value) syncWithServer()
   refresh()
   refreshTimer = setInterval(refresh, 60_000)
 })
 onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 
+// ── UI state ─────────────────────────────────────────────────────────────────
 const searchOpen = ref(false)
 
 function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {

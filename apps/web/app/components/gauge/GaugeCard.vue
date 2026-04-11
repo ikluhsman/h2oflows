@@ -1,21 +1,75 @@
 <template>
+  <!-- ─── LIST row ─────────────────────────────────────────────────────── -->
   <div
-    class="relative rounded-xl border p-4 transition-all duration-200 cursor-pointer"
+    v-if="density === 'list'"
+    class="flex items-center gap-3 px-3 py-2 rounded-lg border transition-all duration-200 cursor-pointer"
     :class="cardClass"
     @click="emit('open')"
   >
+    <UTooltip :text="tierTooltip">
+      <span class="text-xs shrink-0" :class="tierIconClass">{{ tierIcon }}</span>
+    </UTooltip>
+
+    <div class="min-w-0 flex-1">
+      <span class="text-sm font-medium truncate block">{{ displayName }}</span>
+      <span v-if="gauge.riverName" class="text-xs text-blue-400 truncate block">{{ gauge.riverName }}</span>
+    </div>
+
+    <span class="text-base font-bold tabular-nums shrink-0" :class="cfsClass">
+      {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
+      <span class="text-xs font-normal text-gray-400 dark:text-gray-500">cfs</span>
+    </span>
+
+    <div class="w-16 shrink-0 hidden sm:block">
+      <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" compact />
+    </div>
+
+    <UBadge v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" :color="statusColor" variant="subtle" size="xs" class="shrink-0 hidden sm:flex">
+      {{ statusLabel }}
+    </UBadge>
+
+    <div class="flex items-center gap-0.5 shrink-0">
+      <UTooltip :text="watchTooltip">
+        <button
+          class="rounded p-1 transition-all duration-150"
+          :class="watchButtonClass"
+          :aria-label="watchTooltip"
+          @click.stop="handleWatchClick"
+        >
+          <component :is="watchIcon" class="w-3.5 h-3.5" />
+        </button>
+      </UTooltip>
+      <button
+        class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors"
+        aria-label="Remove gauge"
+        @click.stop="removeAndSync(gauge.id)"
+      >
+        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── CARD views (compact / comfortable / full) ────────────────────── -->
+  <div
+    v-else
+    class="relative rounded-xl border transition-all duration-200 cursor-pointer"
+    :class="[cardClass, density === 'compact' ? 'p-2.5' : 'p-4']"
+    @click="emit('open')"
+  >
     <!-- Gauge name + reach subtitle -->
-    <div class="flex items-start justify-between gap-2 mb-3">
+    <div class="flex items-start justify-between gap-2" :class="density === 'compact' ? 'mb-1.5' : 'mb-3'">
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-1.5">
           <UTooltip :text="tierTooltip">
             <span class="text-xs shrink-0" :class="tierIconClass">{{ tierIcon }}</span>
           </UTooltip>
           <UTooltip :text="displayName" :delay-duration="500">
-            <span class="font-medium text-sm truncate">{{ displayName }}</span>
+            <span class="font-medium truncate" :class="density === 'compact' ? 'text-xs' : 'text-sm'">{{ displayName }}</span>
           </UTooltip>
         </div>
-        <p v-if="!hideReachSubtitle" class="text-xs truncate mt-0.5 pl-4">
+        <p v-if="!hideReachSubtitle && density !== 'compact'" class="text-xs truncate mt-0.5 pl-4">
           <span v-if="gauge.riverName" class="text-blue-400 dark:text-blue-500 font-medium">{{ gauge.riverName }}</span>
           <span v-if="gauge.riverName && gauge.reachName" class="text-gray-300 dark:text-gray-600"> · </span>
           <span v-if="gauge.reachName" class="text-gray-400">{{ gauge.reachName }}</span>
@@ -24,8 +78,7 @@
 
       <!-- Card actions: Record/Stop + Remove -->
       <div class="flex items-center gap-1 shrink-0">
-        <!-- Record / Stop -->
-        <UTooltip :text="watchTooltip">
+        <UTooltip v-if="density !== 'compact'" :text="watchTooltip">
           <button
             class="rounded-lg p-1.5 transition-all duration-150"
             :class="watchButtonClass"
@@ -35,15 +88,14 @@
             <component :is="watchIcon" class="w-4 h-4" />
           </button>
         </UTooltip>
-
-        <!-- Remove gauge -->
         <UTooltip text="Remove gauge">
           <button
-            class="rounded-lg p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-all duration-150"
+            class="rounded-lg transition-all duration-150 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+            :class="density === 'compact' ? 'p-1' : 'p-1.5'"
             aria-label="Remove gauge"
             @click.stop="removeAndSync(gauge.id)"
           >
-            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+            <svg :class="density === 'compact' ? 'w-3 h-3' : 'w-4 h-4'" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
             </svg>
           </button>
@@ -52,40 +104,37 @@
     </div>
 
     <!-- Current flow reading -->
-    <div class="flex items-end gap-2 mb-1.5">
-      <span class="text-3xl font-bold tabular-nums" :class="cfsClass">
+    <div class="flex items-end gap-2" :class="density === 'compact' ? 'mb-1' : 'mb-1.5'">
+      <span class="font-bold tabular-nums" :class="[cfsClass, density === 'compact' ? 'text-xl' : 'text-3xl']">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
       </span>
-      <span class="text-sm text-gray-500 mb-1">cfs</span>
-      <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" class="mb-1" />
+      <span class="text-xs text-gray-500 mb-0.5">cfs</span>
+      <TrendArrow v-if="currentCfs != null && density !== 'compact'" :gauge-id="gauge.id" class="mb-1" />
     </div>
 
-    <!-- Flow status badge — shown when status is known or a named band is available -->
-    <div v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" class="flex items-center gap-2 mb-2">
-      <UBadge :color="statusColor" variant="subtle" size="md">{{ statusLabel }}</UBadge>
-      <!-- Flood warning pulse -->
+    <!-- Flow status badge -->
+    <div v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" class="flex items-center gap-2" :class="density === 'compact' ? 'mb-1' : 'mb-2'">
+      <UBadge :color="statusColor" variant="subtle" :size="density === 'compact' ? 'xs' : 'md'">{{ statusLabel }}</UBadge>
       <span v-if="gauge.flowStatus === 'flood'" class="relative flex h-2 w-2">
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-        <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-400" />
       </span>
     </div>
 
-    <!-- 12-hour sparkline -->
-    <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" class="mb-2" />
+    <!-- Sparkline — hidden in compact mode -->
+    <GaugeSparkline v-if="density !== 'compact'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" class="mb-2" />
 
-    <!-- Source + external ID (+ featured medal) -->
-    <p class="text-xs text-gray-400 mt-2 truncate flex items-center gap-1">
+    <!-- Source + external ID — hidden in compact mode -->
+    <p v-if="density !== 'compact'" class="text-xs text-gray-400 mt-2 truncate flex items-center gap-1">
       <UTooltip v-if="gauge.featured" text="Community-verified gauge — trusted data">
         <span class="leading-none" style="filter: drop-shadow(0 0 2px rgba(217,170,0,0.6))">🥇</span>
       </UTooltip>
       {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
     </p>
-    <p v-if="lastUpdatedLabel" class="text-xs text-gray-400 mt-0.5">{{ lastUpdatedLabel }}</p>
+    <p v-if="density !== 'compact' && lastUpdatedLabel" class="text-xs text-gray-400 mt-0.5">{{ lastUpdatedLabel }}</p>
 
     <!-- GPS permission error -->
-    <p v-if="permissionErr && !isActive" class="mt-2 text-xs text-red-500">
-      {{ permissionErr }}
-    </p>
+    <p v-if="permissionErr && !isActive" class="mt-2 text-xs text-red-400">{{ permissionErr }}</p>
 
     <!-- Active trip indicator -->
     <div
@@ -99,7 +148,7 @@
       Recording trip · {{ activeDuration }}
     </div>
 
-    <!-- Post-trip consent banner — shown briefly after a trip is stopped -->
+    <!-- Post-trip consent banner -->
     <div
       v-if="showConsentBanner"
       class="mt-3 rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/40 p-3 space-y-2"
@@ -132,8 +181,8 @@ import { useOfflineQueue } from '~/composables/useOfflineQueue'
 
 const props = defineProps<{
   gauge: WatchedGauge
-  // When true, suppresses the reach name subtitle (e.g. it's already shown as a section header)
   hideReachSubtitle?: boolean
+  density?: 'compact' | 'comfortable' | 'full' | 'list'
 }>()
 const emit = defineEmits<{ (e: 'open'): void }>()
 
@@ -188,7 +237,6 @@ const statusColor = computed(() => {
 })
 const statusLabel = computed(() => {
   if (props.gauge.flowBandLabel) {
-    // "too_low" → "Too Low", "optimal" → "Optimal", etc.
     return props.gauge.flowBandLabel
       .split('_')
       .map(w => w.charAt(0).toUpperCase() + w.slice(1))
@@ -203,25 +251,23 @@ const statusLabel = computed(() => {
   }
 })
 const cfsClass = computed(() => ({
-  'text-emerald-500': props.gauge.flowStatus === 'runnable',
-  'text-amber-400':   props.gauge.flowStatus === 'caution',
-  'text-red-500':     props.gauge.flowStatus === 'low',
-  'text-blue-500':    props.gauge.flowStatus === 'flood',
-  'text-gray-400':    props.gauge.flowStatus === 'unknown',
+  'text-emerald-400 dark:text-emerald-500': props.gauge.flowStatus === 'runnable',
+  'text-amber-400':                         props.gauge.flowStatus === 'caution',
+  'text-red-400':                           props.gauge.flowStatus === 'low',
+  'text-blue-400 dark:text-blue-500':       props.gauge.flowStatus === 'flood',
+  'text-gray-400':                          props.gauge.flowStatus === 'unknown',
 }))
 
 // --- Card chrome ------------------------------------------------------------
 
 const cardClass = computed(() => ({
-  'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900': !isActive.value,
+  'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900': !isActive.value,
   'border-emerald-400 dark:border-emerald-500 bg-emerald-50/40 dark:bg-emerald-950/30 shadow-emerald-100 dark:shadow-emerald-900/20 shadow-md':
     isActive.value,
 }))
 
 // --- Track button -----------------------------------------------------------
 
-// saved  → "Record" (red circle) — tap to start a flow tracking session
-// active → "Stop"  (stop icon)   — tap to end the session
 const watchIcon = computed(() =>
   isActive.value ? resolveComponent('IconStop') : resolveComponent('IconRecord')
 )
@@ -234,7 +280,6 @@ const watchTooltip = computed(() =>
 )
 
 // deviceId — random UUID generated once per install, stored in localStorage.
-// Identifies anonymous devices for trip attribution without requiring login.
 function getDeviceId(): string {
   const key = 'h2oflow_device_id'
   let id = localStorage.getItem(key)
@@ -245,7 +290,6 @@ function getDeviceId(): string {
   return id
 }
 
-// Post-trip consent — held here until user responds, then enqueued + flushed.
 const showConsentBanner = ref(false)
 const pendingTrip = ref<QueuedTrip | null>(null)
 
@@ -260,11 +304,9 @@ function resolveConsent(share: boolean) {
 
 async function handleWatchClick() {
   if (isActive.value) {
-    // End trip — stop GPS, collect track, hold for consent before upload.
     const track = stopRecording()
     const trip = store.activeTrip
     store.endTrip()
-
     if (trip) {
       pendingTrip.value = {
         queuedAt:     new Date().toISOString(),
@@ -282,12 +324,8 @@ async function handleWatchClick() {
       showConsentBanner.value = true
     }
   } else {
-    // Start trip — request GPS permission and begin recording.
     const ok = await startRecording()
-    if (ok) {
-      store.startTrip(props.gauge.id)
-    }
-    // If permission denied, permissionErr is set — show it below the card.
+    if (ok) store.startTrip(props.gauge.id)
   }
 }
 
