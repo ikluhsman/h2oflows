@@ -120,11 +120,35 @@
         <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white leading-tight mb-3 text-center">
           A better streamflow<br>dashboard.
         </h1>
-        <p class="text-base sm:text-lg text-gray-500 dark:text-gray-400 mb-8 text-center">
-          Real-time gauges · AI flow intel · GPS trip tracking
-        </p>
 
-        <!-- Ask anything + action buttons -->
+        <!-- Feature pills — linked -->
+        <div class="flex items-center gap-2 sm:gap-3 mb-6 text-sm font-medium">
+          <NuxtLink to="/dashboard" class="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Real-time Gauges</NuxtLink>
+          <span class="text-gray-300 dark:text-gray-700">·</span>
+          <NuxtLink to="/map" class="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">GPS Tracking</NuxtLink>
+          <span class="text-gray-300 dark:text-gray-700">·</span>
+          <button type="button" class="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" @click="focusAsk">AI Intel</button>
+        </div>
+
+        <!-- Primary nav buttons -->
+        <div class="flex items-center gap-3 mb-8">
+          <NuxtLink
+            to="/dashboard"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors shadow-sm"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Dashboard
+          </NuxtLink>
+          <NuxtLink
+            to="/map"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-semibold transition-colors shadow-sm"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+            Map
+          </NuxtLink>
+        </div>
+
+        <!-- Ask anything -->
         <div class="w-full max-w-xl mb-4">
           <form @submit.prevent="askQuestion" class="flex gap-2 mb-3">
             <input
@@ -192,33 +216,31 @@
           </NuxtLink>
         </div>
 
-        <!-- Feature tiles -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left mt-10 w-full">
-          <NuxtLink
-            to="/dashboard"
-            class="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 hover:border-blue-200 dark:hover:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors group"
-          >
-            <div class="text-2xl mb-2">📡</div>
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">Gauge dashboard</h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">USGS streamflow updated every 15 minutes. Build a personal dashboard of the runs you care about.</p>
-          </NuxtLink>
-          <NuxtLink
-            to="/map"
-            class="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 hover:border-blue-200 dark:hover:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors group"
-          >
-            <div class="text-2xl mb-2">🗺️</div>
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">Interactive map</h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">Explore every reach in Colorado. Colored by difficulty — green, blue, black — just like the slopes.</p>
-          </NuxtLink>
-          <button
-            type="button"
-            class="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 text-left hover:border-blue-200 dark:hover:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors group"
-            @click="focusAsk"
-          >
-            <div class="text-2xl mb-2">🏄</div>
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">Whitewater intel</h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">Put-in/take-out access, rapid info, and flow bands so you know if your run is on.</p>
-          </button>
+        <!-- App store buttons -->
+        <div class="flex flex-col items-center gap-3 mt-10">
+          <div class="flex items-center gap-4">
+            <!-- Apple App Store -->
+            <a href="#" class="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-black text-white hover:bg-gray-800 transition-colors">
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 21.99 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 21.99C7.79 22.03 6.8 20.68 5.96 19.47C4.25 16.97 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.89C10.1 6.87 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
+              </svg>
+              <div class="text-left">
+                <div class="text-[10px] leading-none opacity-80">Download on the</div>
+                <div class="text-sm font-semibold leading-tight">App Store</div>
+              </div>
+            </a>
+            <!-- Google Play Store -->
+            <a href="#" class="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-black text-white hover:bg-gray-800 transition-colors">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.199l2.608 1.51a.999.999 0 010 1.764l-2.608 1.509-2.544-2.544 2.544-2.239zM5.864 2.658L16.8 8.99l-2.302 2.302-8.634-8.634z"/>
+              </svg>
+              <div class="text-left">
+                <div class="text-[10px] leading-none opacity-80">Get it on</div>
+                <div class="text-sm font-semibold leading-tight">Google Play</div>
+              </div>
+            </a>
+          </div>
+          <p class="text-xs text-gray-400 dark:text-gray-500">Mobile apps coming soon</p>
         </div>
 
       </div>

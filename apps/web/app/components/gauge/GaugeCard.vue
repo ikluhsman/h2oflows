@@ -24,7 +24,7 @@
       <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" compact />
     </div>
 
-    <UBadge v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" :color="statusColor" variant="subtle" size="xs" class="shrink-0 hidden sm:flex">
+    <UBadge v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" :color="statusColor" variant="subtle" size="sm" class="shrink-0 hidden sm:flex">
       {{ statusLabel }}
     </UBadge>
 
@@ -108,19 +108,24 @@
       </div>
     </div>
 
-    <!-- Current flow reading -->
+    <!-- Current flow reading + badge (compact/comfortable: badge right of value on sm+) -->
     <div class="relative flex items-baseline gap-2 flex-wrap" :class="density === 'compact' ? 'mb-6' : 'mb-1.5'">
       <span class="font-bold tabular-nums leading-none" :class="[cfsClass, density === 'compact' ? 'text-xl' : density === 'comfortable' ? 'text-2xl' : 'text-3xl']">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
       </span>
       <span class="text-xs text-gray-500">cfs</span>
       <TrendArrow v-if="currentCfs != null && density === 'full'" :gauge-id="gauge.id" />
-      <!-- Compact: badge inline with CFS -->
-      <UBadge v-if="density === 'compact' && (gauge.flowStatus !== 'unknown' || gauge.flowBandLabel)" :color="statusColor" variant="subtle" size="xs">{{ statusLabel }}</UBadge>
+      <!-- Compact/comfortable: badge inline with CFS on sm+ -->
+      <UBadge
+        v-if="density !== 'full' && (gauge.flowStatus !== 'unknown' || gauge.flowBandLabel)"
+        :color="statusColor" variant="subtle"
+        :size="density === 'compact' ? 'xs' : 'sm'"
+        class="hidden sm:inline-flex"
+      >{{ statusLabel }}</UBadge>
     </div>
 
-    <!-- Flow status badge — comfortable/full only -->
-    <div v-if="density !== 'compact' && (gauge.flowStatus !== 'unknown' || gauge.flowBandLabel)" class="flex items-center gap-2 mb-2">
+    <!-- Flow status badge — full: always shown; compact/comfortable: mobile only -->
+    <div v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" class="flex items-center gap-2 mb-2" :class="density === 'full' ? '' : 'sm:hidden'">
       <UBadge :color="statusColor" variant="subtle" :size="density === 'full' ? 'md' : 'sm'">{{ statusLabel }}</UBadge>
       <span v-if="gauge.flowStatus === 'flood'" class="relative flex h-2 w-2">
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />

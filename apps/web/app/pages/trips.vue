@@ -1,13 +1,6 @@
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
-    <AppHeader>
-      <template #actions>
-        <NuxtLink
-          to="/dashboard"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900 text-gray-700 dark:text-gray-300 font-medium text-sm transition-colors"
-        >Dashboard</NuxtLink>
-      </template>
-    </AppHeader>
+    <AppHeader />
 
     <main class="max-w-3xl mx-auto px-4 py-8">
 

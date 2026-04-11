@@ -487,11 +487,23 @@
 
 
     </main>
+
+    <!-- Scroll-to-top button -->
+    <button
+      ref="scrollTopBtn"
+      class="fixed bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg flex items-center justify-center text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors opacity-0 pointer-events-none"
+      aria-label="Scroll to top"
+      @click="scrollToTop"
+    >
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 15l-6-6-6 6"/>
+      </svg>
+    </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, nextTick } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { gsap } from 'gsap'
 import { featurePanelIcon } from '~/utils/featureIcons'
@@ -501,6 +513,38 @@ const config = useRuntimeConfig()
 const store  = useWatchlistStore()
 const { addAndSync, removeAndSync } = useWatchlistSync()
 const { isAdmin, getToken } = useAuth()
+
+// ---- Scroll-to-top ----------------------------------------------------------
+
+const scrollTopBtn = ref<HTMLButtonElement>()
+let scrollTopShown = false
+
+function onScroll() {
+  const show = window.scrollY > 80
+  if (show === scrollTopShown) return
+  scrollTopShown = show
+  if (!scrollTopBtn.value) return
+  if (show) {
+    gsap.fromTo(scrollTopBtn.value,
+      { opacity: 0, y: 12, scale: 0.9, pointerEvents: 'none' },
+      { opacity: 1, y: 0, scale: 1, pointerEvents: 'auto', duration: 0.3, ease: 'back.out(1.4)' })
+  } else {
+    gsap.to(scrollTopBtn.value,
+      { opacity: 0, y: 8, pointerEvents: 'none', duration: 0.2, ease: 'power2.in' })
+  }
+}
+
+function scrollToTop() {
+  gsap.to(window, { scrollTo: { y: 0 }, duration: 0.4, ease: 'power2.inOut' })
+}
+
+onMounted(() => {
+  import('gsap/ScrollToPlugin').then(({ ScrollToPlugin }) => {
+    gsap.registerPlugin(ScrollToPlugin)
+  })
+  window.addEventListener('scroll', onScroll, { passive: true })
+})
+onUnmounted(() => window.removeEventListener('scroll', onScroll))
 
 // ---- Data -------------------------------------------------------------------
 

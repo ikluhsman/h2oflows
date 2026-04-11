@@ -12,25 +12,6 @@
         </span>
         Trip recording · {{ activeTripLabel }}
       </div>
-      <template #actions>
-        <!-- Density toggle with current-view label -->
-        <div class="hidden sm:flex items-center gap-1.5 shrink-0">
-          <span class="text-xs text-gray-400 dark:text-gray-500">{{ currentDensityLabel }}</span>
-          <div class="flex items-center rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <UTooltip v-for="d in DENSITIES" :key="d.value" :text="d.label">
-              <button
-                class="px-2 py-1.5 transition-colors"
-                :class="density === d.value
-                  ? 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200'
-                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
-                @click="density = d.value"
-              >
-                <component :is="d.icon" class="w-3.5 h-3.5" />
-              </button>
-            </UTooltip>
-          </div>
-        </div>
-      </template>
     </AppHeader>
 
     <main class="max-w-5xl mx-auto px-4 py-6 space-y-8">
@@ -48,7 +29,18 @@
       <!-- Gauges grouped by river -->
       <template v-else>
         <div class="flex items-center justify-between mb-4">
-          <span />
+          <!-- Density segmented control -->
+          <div class="inline-flex items-center rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 p-0.5">
+            <button
+              v-for="d in DENSITIES" :key="d.value"
+              class="px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-150"
+              :class="density === d.value
+                ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+              @click="density = d.value"
+            >{{ d.label }}</button>
+          </div>
+
           <UButton size="xs" color="neutral" variant="outline" icon="i-heroicons-plus" @click="searchOpen = true">
             Add gauge
           </UButton>
@@ -131,17 +123,11 @@ const { addAndSync, removeAndSync, loadFromServer, pushLocalToServer } = useWatc
 type Density = 'compact' | 'comfortable' | 'full' | 'list'
 const DENSITY_KEY = 'h2oflow_dashboard_density'
 
-// Inline SVG icon components for the toggle buttons
-const IconGrid4 = { template: `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>` }
-const IconGrid3 = { template: `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="4" height="14" rx="1"/><rect x="6" y="1" width="4" height="14" rx="1"/><rect x="11" y="1" width="4" height="14" rx="1"/></svg>` }
-const IconGrid2 = { template: `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="14" rx="1"/><rect x="9" y="1" width="6" height="14" rx="1"/></svg>` }
-const IconList  = { template: `<svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="2" width="14" height="2.5" rx="1"/><rect x="1" y="6.75" width="14" height="2.5" rx="1"/><rect x="1" y="11.5" width="14" height="2.5" rx="1"/></svg>` }
-
 const DENSITIES = [
-  { value: 'compact'     as Density, label: 'Compact',     icon: IconGrid4 },
-  { value: 'comfortable' as Density, label: 'Comfortable', icon: IconGrid3 },
-  { value: 'full'        as Density, label: 'Full',        icon: IconGrid2 },
-  { value: 'list'        as Density, label: 'List',        icon: IconList  },
+  { value: 'compact'     as Density, label: 'Compact'     },
+  { value: 'comfortable' as Density, label: 'Comfortable' },
+  { value: 'full'        as Density, label: 'Full'        },
+  { value: 'list'        as Density, label: 'List'        },
 ]
 
 const density = ref<Density>('comfortable')
@@ -150,10 +136,6 @@ onMounted(() => {
   if (saved && DENSITIES.some(d => d.value === saved)) density.value = saved
 })
 watch(density, val => localStorage.setItem(DENSITY_KEY, val))
-
-const currentDensityLabel = computed(() =>
-  DENSITIES.find(d => d.value === density.value)?.label ?? ''
-)
 
 const gridClass = computed(() => ({
   'compact':     'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2',
