@@ -1,7 +1,8 @@
-import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
+import { useWatchlistStore } from '~/stores/watchlist'
+import { featureToWatchedGauge } from '~/composables/useWatchlistSync'
 
 // Fetches fresh metadata + current_cfs for all watched gauges from the API.
-// Called on dashboard mount so persisted watchlist data stays in sync.
+// Sends reach context so each (gauge, reach) pair gets the correct flow band coloring.
 export function useWatchlistRefresh() {
   const store = useWatchlistStore()
   const { apiBase } = useRuntimeConfig().public
@@ -9,7 +10,11 @@ export function useWatchlistRefresh() {
   async function refresh() {
     if (store.gauges.length === 0) return
 
-    const ids = store.gauges.map(g => g.id).join(',')
+    // Build "uuid:reach-slug" pairs for gauges with reach context; plain "uuid" for standalone.
+    const ids = store.gauges
+      .map(g => g.contextReachSlug ? `${g.id}:${g.contextReachSlug}` : g.id)
+      .join(',')
+
     try {
       const res = await fetch(`${apiBase}/api/v1/gauges/batch?ids=${ids}`)
       if (!res.ok) return
@@ -17,30 +22,7 @@ export function useWatchlistRefresh() {
       for (const f of data.features ?? []) {
         const p = f.properties
         const coords = f.geometry?.coordinates as [number, number] | undefined
-        store.refreshFromApi({
-          id:            p.id,
-          externalId:    p.external_id,
-          source:        p.source,
-          name:          p.name ?? null,
-          featured:      p.featured ?? false,
-          reachId:           p.reach_id ?? null,
-          reachName:         p.reach_name ?? null,
-          reachNames:        p.reach_names ?? [],
-          reachSlug:         p.reach_slug ?? null,
-          reachSlugs:        p.reach_slugs ?? [],
-          reachRelationship: p.reach_relationship ?? null,
-          pollTier:      p.poll_tier,
-          watershedName: p.watershed_name ?? null,
-          basinName:     p.basin_name ?? null,
-          riverName:     p.river_name ?? null,
-          stateAbbr:     p.state_abbr ?? null,
-          lng:           coords?.[0] ?? null,
-          lat:           coords?.[1] ?? null,
-          currentCfs:    p.current_cfs ?? null,
-          flowStatus:    p.flow_status ?? 'unknown',
-          flowBandLabel: p.flow_band_label ?? null,
-          lastReadingAt: p.last_reading_at ?? null,
-        } satisfies Omit<WatchedGauge, 'watchState' | 'activeSince'>)
+        store.refreshFromApi(featureToWatchedGauge(p, coords))
       }
     } catch {
       // Non-fatal — stale data is better than crashing the dashboard

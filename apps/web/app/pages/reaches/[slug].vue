@@ -454,6 +454,17 @@
                     v-if="feat.is_permanent_hazard && feat.hazard_type"
                     class="inline-flex items-center rounded bg-red-50 dark:bg-red-950 px-1.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-300 mt-0.5"
                   >⚠ {{ hazardTypeLabel(feat.hazard_type) }}</span>
+                  <!-- Directions link for put-ins and take-outs -->
+                  <a
+                    v-if="(feat.type === 'put_in' || feat.type === 'take_out') && feat.lat != null && feat.lng != null"
+                    :href="`https://www.google.com/maps/dir/?api=1&destination=${feat.lat},${feat.lng}`"
+                    target="_blank"
+                    rel="noopener"
+                    class="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 font-medium mt-1.5 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+                    Get directions
+                  </a>
                 </div>
               </div>
             </div>
@@ -461,6 +472,70 @@
             <div v-else class="px-4 py-8 text-center text-sm text-gray-400">
               No features in this category
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Run notes -->
+      <section v-if="reach">
+        <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-950">
+          <button
+            class="w-full flex items-center justify-between px-4 py-3 text-left"
+            @click="noteFormOpen = !noteFormOpen"
+          >
+            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Share a note</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-4 h-4 text-gray-400 transition-transform"
+              :class="noteFormOpen ? 'rotate-180' : ''"
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            ><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+
+          <div v-if="noteFormOpen" class="border-t border-gray-100 dark:border-gray-800 px-4 py-4 space-y-4">
+            <div v-if="noteSubmitted" class="text-center py-2">
+              <p class="text-sm font-medium text-emerald-600 dark:text-emerald-400">Thanks for sharing!</p>
+              <p class="text-xs text-gray-400 mt-0.5">Your note helps other paddlers plan their run.</p>
+              <button
+                class="mt-3 text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2"
+                @click="noteSubmitted = false; noteText = ''; noteImpression = null"
+              >Add another</button>
+            </div>
+
+            <template v-else>
+              <!-- Flow impression -->
+              <div>
+                <p class="text-xs text-gray-500 mb-2">How were flows?</p>
+                <div class="flex gap-2">
+                  <button
+                    v-for="opt in impressionOptions"
+                    :key="opt.value"
+                    class="flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition-colors"
+                    :class="noteImpression === opt.value
+                      ? `${opt.activeClass} border-transparent`
+                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'"
+                    @click="noteImpression = opt.value"
+                  >{{ opt.label }}</button>
+                </div>
+              </div>
+
+              <!-- Note text -->
+              <textarea
+                v-model="noteText"
+                placeholder="Optional: conditions, hazards, shuttle info…"
+                rows="3"
+                class="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-gray-700 dark:text-gray-300 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-400/40"
+              />
+
+              <div class="flex items-center justify-between gap-3">
+                <p class="text-xs text-gray-400">Helps AI-powered answers get better over time</p>
+                <button
+                  class="shrink-0 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-semibold transition-colors"
+                  :disabled="!noteImpression"
+                  @click="submitNote"
+                >Submit</button>
+              </div>
+            </template>
           </div>
         </div>
       </section>
@@ -581,6 +656,7 @@ interface RiverFeature {
   // sorting — river_order is 0→1 along centerline (preferred); lng is fallback
   river_order?: number | null
   lng?:         number | null
+  lat?:         number | null
 }
 
 // All features sorted upstream → downstream (including camps and parking).
@@ -620,6 +696,7 @@ const allFeatures = computed<RiverFeature[]>(() => {
       description: acc.notes ?? acc.directions,
       river_order: acc.river_order,
       lng: acc.water_lng ?? acc.parking_lng,
+      lat: acc.water_lat ?? acc.parking_lat,
     })
   }
 
@@ -924,38 +1001,46 @@ function gaugeRelLabel(rel: string | null | undefined): string {
 }
 
 function onDashboard(gaugeId: string): boolean {
-  return store.gauges.some(g => g.id === gaugeId)
+  const reachSlug = (reach.value as any)?.slug ?? null
+  return store.gauges.some(g => g.id === gaugeId && (g.contextReachSlug ?? null) === reachSlug)
 }
 
 function addToDashboard(g: any) {
+  const r = reach.value as any
+  const putIn   = r?.put_in_name  ?? null
+  const takeOut = r?.take_out_name ?? null
   addAndSync({
-    id:               g.id,
-    externalId:       g.external_id,
-    source:           g.source ?? '',
-    name:             g.name ?? null,
-    reachId:          (reach.value as any)?.id ?? null,
-    reachName:        (reach.value as any)?.common_name ?? (reach.value as any)?.name ?? null,
-    reachNames:       [],
-    reachSlug:        (reach.value as any)?.slug ?? null,
-    reachSlugs:       [],
-    reachRelationship: g.reach_relationship ?? 'primary',
-    featured:         g.featured ?? false,
-    pollTier:         g.featured ? 'trusted' : 'cold',
-    watershedName:    (reach.value as any)?.watershed_name ?? null,
-    basinName:        null,
-    riverName:        (reach.value as any)?.river_name ?? null,
-    stateAbbr:        null,
-    lat:              g.lat ?? null,
-    lng:              g.lng ?? null,
-    currentCfs:       g.current_cfs ?? null,
-    flowStatus:       g.flow_status ?? 'unknown',
-    flowBandLabel:    null,
-    lastReadingAt:    g.last_reading_at ?? null,
+    id:                     g.id,
+    externalId:             g.external_id,
+    source:                 g.source ?? '',
+    name:                   g.name ?? null,
+    contextReachSlug:       r?.slug ?? null,
+    contextReachCommonName: r?.common_name ?? r?.name ?? null,
+    contextReachFullName:   putIn && takeOut ? `${putIn} to ${takeOut}` : null,
+    contextReachRiverName:  r?.river_name ?? null,
+    reachId:                r?.id ?? null,
+    reachName:              r?.common_name ?? r?.name ?? null,
+    reachNames:             [],
+    reachSlug:              r?.slug ?? null,
+    reachSlugs:             [],
+    reachCommonNames:       [],
+    reachRelationship:      g.reach_relationship ?? 'primary',
+    watershedName:          r?.watershed_name ?? null,
+    basinName:              null,
+    riverName:              r?.river_name ?? null,
+    stateAbbr:              null,
+    lat:                    g.lat ?? null,
+    lng:                    g.lng ?? null,
+    currentCfs:             g.current_cfs ?? null,
+    flowStatus:             g.flow_status ?? 'unknown',
+    flowBandLabel:          null,
+    lastReadingAt:          g.last_reading_at ?? null,
   })
 }
 
 function removeFromDashboard(gaugeId: string) {
-  removeAndSync(gaugeId)
+  const reachSlug = (reach.value as any)?.slug ?? null
+  removeAndSync(gaugeId, reachSlug)
 }
 
 function flowStatusColor(status: string): string {
@@ -1089,6 +1174,27 @@ async function sendQuestion(question: string) {
   } finally {
     chatLoading.value = false
   }
+}
+
+// ---- Run notes --------------------------------------------------------------
+
+const noteFormOpen   = ref(false)
+const noteImpression = ref<'too_low' | 'good' | 'high' | null>(null)
+const noteText       = ref('')
+const noteSubmitted  = ref(false)
+
+const impressionOptions = [
+  { value: 'too_low' as const, label: 'Too low',   activeClass: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' },
+  { value: 'good'    as const, label: 'About right', activeClass: 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' },
+  { value: 'high'    as const, label: 'High / Flood', activeClass: 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300' },
+]
+
+const { submit: submitRunNote } = useRunNotes(String(route.params.slug))
+
+function submitNote() {
+  if (!noteImpression.value) return
+  submitRunNote({ flow_impression: noteImpression.value, note_text: noteText.value.trim() })
+  noteSubmitted.value = true
 }
 
 // ---- Delete reach -----------------------------------------------------------

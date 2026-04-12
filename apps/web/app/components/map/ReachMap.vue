@@ -47,20 +47,36 @@
       <!-- Access group -->
       <template v-if="accessFeatures.length > 0">
         <p class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Access</p>
-        <button
+        <div
           v-for="a in accessFeatures"
           :key="a.id"
-          class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-xs"
-          :class="selectedId === a.id ? 'bg-gray-100 dark:bg-gray-800' : ''"
-          @mousedown.prevent
-          @click="selectFeature(a.id, a.lng, a.lat)"
+          class="flex items-center gap-1 pr-1.5"
+          :class="selectedId === a.id ? 'bg-gray-100 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'"
         >
-          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center p-0.75"
-            :style="{ background: accessColor(a.type) }"
-            v-html="accessFeatureIcon(a.type)"
-          />
-          <span class="truncate text-gray-700 dark:text-gray-300">{{ a.label }}</span>
-        </button>
+          <button
+            class="flex-1 flex items-center gap-2 px-3 py-1.5 text-left transition-colors text-xs min-w-0"
+            @mousedown.prevent
+            @click="selectFeature(a.id, a.lng, a.lat)"
+          >
+            <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center p-0.75"
+              :style="{ background: accessColor(a.type) }"
+              v-html="accessFeatureIcon(a.type)"
+            />
+            <span class="truncate text-gray-700 dark:text-gray-300">{{ a.label }}</span>
+          </button>
+          <a
+            v-if="a.type === 'put_in' || a.type === 'take_out'"
+            :href="`https://www.google.com/maps/dir/?api=1&destination=${a.lat},${a.lng}`"
+            target="_blank"
+            rel="noopener"
+            class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors"
+            title="Get directions"
+            @mousedown.prevent
+            @click.stop
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          </a>
+        </div>
       </template>
 
       <!-- Rapids group -->
@@ -142,7 +158,19 @@
         </div>
         <p v-if="selectedFeature.subtitle" class="text-xs text-gray-400 mt-0.5">{{ selectedFeature.subtitle }}</p>
         <p v-if="selectedFeature.desc" class="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed line-clamp-3">{{ selectedFeature.desc }}</p>
-        <p v-else-if="!selectedFeature.gaugeId" class="text-xs text-gray-400 mt-1 italic">No description available.</p>
+        <p v-else-if="!selectedFeature.gaugeId && !selectedFeature.directionsUrl" class="text-xs text-gray-400 mt-1 italic">No description available.</p>
+        <!-- Access directions link -->
+        <div v-if="selectedFeature.directionsUrl" class="flex items-center gap-3 mt-2">
+          <a
+            :href="selectedFeature.directionsUrl"
+            target="_blank"
+            rel="noopener"
+            class="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+            Get directions
+          </a>
+        </div>
         <!-- Gauge actions: add to dashboard + source link -->
         <div v-if="selectedFeature.gaugeId" class="flex items-center gap-3 mt-2">
           <button
@@ -297,12 +325,15 @@ const selectedFeature = computed(() => {
   }
   const access = accessFeatures.value.find(a => a.id === selectedId.value)
   if (access) return {
-    title:       access.label !== accessTypeLabel(access.type) ? access.label : accessTypeLabel(access.type),
-    classLabel:  null as string | null,
-    subtitle:    access.label !== accessTypeLabel(access.type) ? accessTypeLabel(access.type) : null,
-    desc:        access.notes || null,
-    pinColor:    accessColor(access.type),
-    circleIcon:  accessFeatureIcon(access.type),
+    title:         access.label !== accessTypeLabel(access.type) ? access.label : accessTypeLabel(access.type),
+    classLabel:    null as string | null,
+    subtitle:      access.label !== accessTypeLabel(access.type) ? accessTypeLabel(access.type) : null,
+    desc:          access.notes || null,
+    pinColor:      accessColor(access.type),
+    circleIcon:    accessFeatureIcon(access.type),
+    directionsUrl: (access.type === 'put_in' || access.type === 'take_out')
+      ? `https://www.google.com/maps/dir/?api=1&destination=${access.lat},${access.lng}`
+      : null,
   }
   const gauge = gaugeFeatures.value.find(g => g.id === selectedId.value)
   if (gauge) return {

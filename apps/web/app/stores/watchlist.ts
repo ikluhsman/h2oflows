@@ -1,19 +1,28 @@
 import { defineStore } from 'pinia'
 
 // A gauge the user has saved to their dashboard.
+// A watchlist item is identified by (id, contextReachSlug) — the same gauge
+// can appear more than once when added in the context of different reaches
+// (e.g. PLAGRACO for Bailey and PLAGRACO for Foxton are separate items).
 export interface WatchedGauge {
   id: string
   externalId: string
   source: string
   name: string | null
+  // Reach context — the specific reach this watchlist item is scoped to.
+  // null = standalone gauge add with no reach context.
+  contextReachSlug: string | null
+  contextReachCommonName: string | null  // e.g. "Foxton"
+  contextReachFullName: string | null   // e.g. "Buffalo Creek to South Platte"
+  contextReachRiverName: string | null  // e.g. "South Platte River"
+  // All reaches associated with this gauge (for informational display)
   reachId: string | null
   reachName: string | null          // combined display string e.g. "Bailey / Foxton"
   reachNames: string[]              // individual reach names, parallel to reachSlugs
   reachSlug: string | null
   reachSlugs: string[]              // all reaches that use this gauge as primary
+  reachCommonNames: string[]        // common names parallel to reachSlugs
   reachRelationship: string | null  // primary | upstream_indicator | downstream_indicator | tributary
-  featured: boolean
-  pollTier: 'trusted' | 'demand' | 'cold'
   watershedName: string | null
   basinName: string | null
   riverName: string | null
@@ -23,20 +32,21 @@ export interface WatchedGauge {
   lng: number | null
   // Latest reading — refreshed by the dashboard poller
   currentCfs: number | null
+  // Flow status resolved against the context reach's flow ranges.
+  // For standalone gauges (no contextReachSlug), uses the alphabetically-first reach.
   flowStatus: 'runnable' | 'caution' | 'low' | 'flood' | 'unknown'
   // Named flow band from flow_ranges (e.g. "optimal", "fun") — null if no ranges seeded
   flowBandLabel: string | null
   lastReadingAt: string | null
-  // Watch state
+  // Watch state — kept for trip recorder removal in Phase 8
   watchState: 'saved' | 'active'
-  // When the active trip was started (ISO string)
   activeSince: string | null
 }
 
 export const useWatchlistStore = defineStore('watchlist', {
   state: () => ({
     gauges: [] as WatchedGauge[],
-    // Active trip — set when any gauge transitions to 'active' watch state
+    // Active trip — kept for trip recorder removal in Phase 8
     activeTrip: null as {
       gaugeId: string
       reachSlug: string | null
@@ -47,39 +57,23 @@ export const useWatchlistStore = defineStore('watchlist', {
   }),
 
   getters: {
-    // Gauges grouped by reach name for the main dashboard layout.
-    // Gauges without a reach fall into the null bucket, rendered last as "Other Gauges".
+    // Gauges grouped by context reach for the main dashboard layout.
+    // Groups by contextReachSlug; standalone gauges fall into the null bucket last.
+    // Migrated gauges without contextReachSlug are treated as standalone (null).
     byReach(state): { reach: string | null; gauges: WatchedGauge[] }[] {
       const map = new Map<string | null, WatchedGauge[]>()
       for (const g of state.gauges) {
-        const key = g.reachName ?? null
+        const key = g.contextReachSlug ?? null
         if (!map.has(key)) map.set(key, [])
         map.get(key)!.push(g)
       }
-      // Sort: named reaches first (insertion order), null last
+      // Named reaches first (insertion order), null/standalone last
       const result: { reach: string | null; gauges: WatchedGauge[] }[] = []
       for (const [reach, gauges] of map) {
         if (reach !== null) result.push({ reach, gauges })
       }
       if (map.has(null)) result.push({ reach: null, gauges: map.get(null)! })
       return result
-    },
-
-    // Gauges grouped by river/watershed — used by the dashboard.
-    // Named rivers sorted alphabetically; ungrouped gauges fall into "Other" at the end.
-    byRiver(state): { river: string; gauges: WatchedGauge[] }[] {
-      const map = new Map<string, WatchedGauge[]>()
-      for (const g of state.gauges) {
-        const key = g.watershedName ?? 'Other'
-        if (!map.has(key)) map.set(key, [])
-        map.get(key)!.push(g)
-      }
-      const named = [...map.entries()]
-        .filter(([k]) => k !== 'Other')
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([river, gauges]) => ({ river, gauges }))
-      const other = map.get('Other')
-      return other ? [...named, { river: 'Other', gauges: other }] : named
     },
 
     // Gauges grouped by watershed — used by the aggregate graph picker
@@ -102,44 +96,41 @@ export const useWatchlistStore = defineStore('watchlist', {
   },
 
   actions: {
+    // Identity: (id, contextReachSlug). The same gauge UUID can exist multiple
+    // times with different reach contexts. null and undefined both mean standalone.
     addGauge(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
-      if (this.gauges.find(g => g.id === gauge.id)) return
-      this.gauges.push({ ...gauge, watchState: 'saved', activeSince: null })
+      const slug = gauge.contextReachSlug ?? null
+      if (this.gauges.find(g => g.id === gauge.id && (g.contextReachSlug ?? null) === slug)) return
+      this.gauges.push({ ...gauge, contextReachSlug: slug, watchState: 'saved', activeSince: null })
     },
 
-    removeGauge(gaugeId: string) {
-      // If this gauge had an active trip, end it first
-      if (this.activeGauge?.id === gaugeId) {
-        this.endTrip()
+    removeGauge(gaugeId: string, contextReachSlug?: string | null) {
+      // If removing a specific (gauge, reach) pair
+      const slug = contextReachSlug !== undefined ? (contextReachSlug ?? null) : null
+      if (contextReachSlug !== undefined) {
+        this.gauges = this.gauges.filter(g => !(g.id === gaugeId && (g.contextReachSlug ?? null) === slug))
+      } else {
+        // Legacy: remove all entries for this gauge ID
+        this.gauges = this.gauges.filter(g => g.id !== gaugeId)
       }
-      this.gauges = this.gauges.filter(g => g.id !== gaugeId)
     },
 
     // Transition a gauge from 'saved' → 'active' and start trip recording.
-    // Only one gauge can be active at a time.
     startTrip(gaugeId: string) {
       const gauge = this.gauges.find(g => g.id === gaugeId)
       if (!gauge) return
-
-      // End any existing active trip first
-      if (this.activeGauge && this.activeGauge.id !== gaugeId) {
-        this.endTrip()
-      }
-
+      if (this.activeGauge && this.activeGauge.id !== gaugeId) this.endTrip()
       gauge.watchState = 'active'
       gauge.activeSince = new Date().toISOString()
-
       this.activeTrip = {
         gaugeId,
-        reachSlug: gauge.reachSlug,
-        reachName: gauge.reachName,
+        reachSlug: gauge.contextReachSlug,
+        reachName: gauge.contextReachCommonName ?? gauge.reachName,
         startedAt: gauge.activeSince,
         startCfs: gauge.currentCfs,
       }
     },
 
-    // Transition back to 'saved' and close the trip record.
-    // The caller is responsible for handing off the trip data to the upload queue.
     endTrip() {
       const active = this.activeGauge
       if (!active) return
@@ -148,7 +139,6 @@ export const useWatchlistStore = defineStore('watchlist', {
       this.activeTrip = null
     },
 
-    // Update the latest reading for a gauge (called by the dashboard refresh).
     updateReading(gaugeId: string, cfs: number, flowStatus: WatchedGauge['flowStatus'], readingAt: string) {
       const gauge = this.gauges.find(g => g.id === gaugeId)
       if (!gauge) return
@@ -157,34 +147,36 @@ export const useWatchlistStore = defineStore('watchlist', {
       gauge.lastReadingAt = readingAt
     },
 
-    // Refresh gauge metadata from the API (watershed, reach name, current cfs, etc.)
-    // Called on dashboard mount to sync persisted watchlist with fresh server data.
+    // Refresh gauge metadata from the API. Matched by (id, contextReachSlug).
+    // The API echoes back context_reach_slug so we can find the right watchlist item.
     refreshFromApi(fresh: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
-      const gauge = this.gauges.find(g => g.id === fresh.id)
+      const slug = fresh.contextReachSlug ?? null
+      const gauge = this.gauges.find(g => g.id === fresh.id && (g.contextReachSlug ?? null) === slug)
       if (!gauge) return
-      gauge.name          = fresh.name
-      gauge.featured      = fresh.featured
-      gauge.reachId           = fresh.reachId
-      gauge.reachName         = fresh.reachName
-      gauge.reachNames        = fresh.reachNames
-      gauge.reachSlug         = fresh.reachSlug
-      gauge.reachSlugs        = fresh.reachSlugs
-      gauge.reachRelationship = fresh.reachRelationship
-      gauge.pollTier      = fresh.pollTier
-      gauge.watershedName = fresh.watershedName
-      gauge.basinName     = fresh.basinName
-      gauge.riverName     = fresh.riverName
-      gauge.stateAbbr     = fresh.stateAbbr
-      gauge.lat           = fresh.lat
-      gauge.lng           = fresh.lng
-      gauge.currentCfs    = fresh.currentCfs
-      gauge.flowStatus    = fresh.flowStatus
-      gauge.flowBandLabel = fresh.flowBandLabel
-      gauge.lastReadingAt = fresh.lastReadingAt
+      gauge.name                  = fresh.name
+      gauge.contextReachSlug      = slug
+      gauge.contextReachCommonName = fresh.contextReachCommonName ?? null
+      gauge.contextReachFullName  = fresh.contextReachFullName ?? null
+      gauge.contextReachRiverName = fresh.contextReachRiverName ?? null
+      gauge.reachId               = fresh.reachId
+      gauge.reachName             = fresh.reachName
+      gauge.reachNames            = fresh.reachNames
+      gauge.reachSlug             = fresh.reachSlug
+      gauge.reachSlugs            = fresh.reachSlugs
+      gauge.reachCommonNames      = fresh.reachCommonNames ?? []
+      gauge.reachRelationship     = fresh.reachRelationship
+      gauge.watershedName         = fresh.watershedName
+      gauge.basinName             = fresh.basinName
+      gauge.riverName             = fresh.riverName
+      gauge.stateAbbr             = fresh.stateAbbr
+      gauge.lat                   = fresh.lat
+      gauge.lng                   = fresh.lng
+      gauge.currentCfs            = fresh.currentCfs
+      gauge.flowStatus            = fresh.flowStatus
+      gauge.flowBandLabel         = fresh.flowBandLabel
+      gauge.lastReadingAt         = fresh.lastReadingAt
     },
   },
 
-  // Persist to localStorage so the watchlist survives page reloads.
-  // On mobile this will eventually move to IndexedDB via a Capacitor plugin.
   persist: true,
 })

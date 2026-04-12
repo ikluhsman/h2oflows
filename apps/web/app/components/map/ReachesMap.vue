@@ -424,33 +424,6 @@ function updateLayers(features: ReachFeature[]) {
   map.addSource('diff-markers', {
     type: 'geojson',
     data: markerFC,
-    cluster: true,
-    clusterMaxZoom: 11,
-    clusterRadius: 48,
-  })
-
-  map.addLayer({
-    id: 'diff-clusters', type: 'circle', source: 'diff-markers',
-    filter: ['has', 'point_count'],
-    paint: {
-      'circle-color': '#1d4ed8',
-      'circle-radius': ['step', ['get', 'point_count'], 16, 5, 20, 15, 24],
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#fff',
-      'circle-opacity': 0.88,
-    },
-  })
-
-  map.addLayer({
-    id: 'diff-cluster-count', type: 'symbol', source: 'diff-markers',
-    filter: ['has', 'point_count'],
-    layout: {
-      'text-field': '{point_count_abbreviated}',
-      'text-font': ['Noto Sans Bold'],
-      'text-size': 12,
-      'text-allow-overlap': true,
-    },
-    paint: { 'text-color': '#fff' },
   })
 
   map.addLayer({
@@ -464,17 +437,6 @@ function updateLayers(features: ReachFeature[]) {
     },
   })
 
-  map.on('click', 'diff-clusters', async e => {
-    if (!map || !e.features?.length) return
-    const clusterId = e.features[0].properties?.cluster_id as number
-    const src = map.getSource('diff-markers') as maplibregl.GeoJSONSource
-    const zoom = await src.getClusterExpansionZoom(clusterId)
-    const coords = (e.features[0].geometry as GeoJSON.Point).coordinates as [number, number]
-    map.flyTo({ center: coords, zoom })
-  })
-
-  map.on('mouseenter', 'diff-clusters', () => { if (map) map.getCanvas().style.cursor = 'pointer' })
-  map.on('mouseleave', 'diff-clusters', () => { if (map) map.getCanvas().style.cursor = '' })
   map.on('mouseenter', 'diff-points',   () => { if (map) map.getCanvas().style.cursor = 'pointer' })
   map.on('mouseleave', 'diff-points',   () => { if (map) map.getCanvas().style.cursor = '' })
 }

@@ -83,6 +83,7 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 			reachID             *string
 			reachNamesRaw       []string
 			reachSlugsRaw       []string
+			reachCommonNamesRaw []string
 			reachRelationship   *string
 			lastReadingAt       *time.Time
 			lng                 float64
@@ -98,7 +99,8 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 		)
 		if err := rows.Scan(
 			&id, &externalID, &source, &name, &status,
-			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlugsRaw, &reachRelationship, &lastReadingAt,
+			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlugsRaw, &reachCommonNamesRaw,
+			&reachRelationship, &lastReadingAt,
 			&lng, &lat, &stateAbbr, &basinName, &watershedName, &riverName,
 			&currentCFS, &flowStatus, &flowBandLabel, &pollTier,
 		); err != nil {
@@ -109,28 +111,29 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 			Type:     "Feature",
 			Geometry: PointGeometry{Type: "Point", Coordinates: [2]float64{lng, lat}},
 			Properties: map[string]any{
-				"id":                 id,
-				"external_id":        externalID,
-				"source":             source,
-				"name":               name,
-				"status":             status,
-				"featured":           featured,
-				"prominence_score":   prominenceScore,
-				"reach_id":           reachID,
-				"reach_name":         combineReachNames(reachNamesRaw),
-				"reach_names":        reachNamesRaw,
-				"reach_slug":         firstOrNil(reachSlugsRaw),
-				"reach_slugs":        reachSlugsRaw,
-				"reach_relationship": reachRelationship,
-				"last_reading_at":    lastReadingAt,
-				"state_abbr":         stateAbbr,
-				"basin_name":         basinName,
-				"watershed_name":     watershedName,
-				"river_name":         riverName,
-				"current_cfs":        currentCFS,
-				"flow_status":        flowStatus,
-				"flow_band_label":    flowBandLabel,
-				"poll_tier":          pollTier,
+				"id":                  id,
+				"external_id":         externalID,
+				"source":              source,
+				"name":                name,
+				"status":              status,
+				"featured":            featured,
+				"prominence_score":    prominenceScore,
+				"reach_id":            reachID,
+				"reach_name":          combineReachNames(reachNamesRaw),
+				"reach_names":         reachNamesRaw,
+				"reach_slug":          firstOrNil(reachSlugsRaw),
+				"reach_slugs":         reachSlugsRaw,
+				"reach_common_names":  reachCommonNamesRaw,
+				"reach_relationship":  reachRelationship,
+				"last_reading_at":     lastReadingAt,
+				"state_abbr":          stateAbbr,
+				"basin_name":          basinName,
+				"watershed_name":      watershedName,
+				"river_name":          riverName,
+				"current_cfs":         currentCFS,
+				"flow_status":         flowStatus,
+				"flow_band_label":     flowBandLabel,
+				"poll_tier":           pollTier,
 			},
 		})
 	}
@@ -533,6 +536,11 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 				WHERE ra.primary_gauge_id = g.id
 				ORDER BY ra.name LIMIT 4
 			)                  AS reach_slugs,
+			ARRAY(
+				SELECT COALESCE(ra.common_name, ra.name) FROM reaches ra
+				WHERE ra.primary_gauge_id = g.id
+				ORDER BY ra.name LIMIT 4
+			)                  AS reach_common_names,
 			%s                 AS reach_relationship,
 			g.last_reading_at,
 			COALESCE(ST_X(g.location::geometry), 0) AS lng,
@@ -623,25 +631,58 @@ func parseFloats(ss []string) ([]float64, error) {
 	return out, nil
 }
 
-// BatchGet handles GET /api/v1/gauges/batch?ids=uuid1,uuid2,...
+// BatchGet handles GET /api/v1/gauges/batch?ids=uuid1:reach-slug,uuid2,uuid3:other-slug
 //
-// Returns a GeoJSON FeatureCollection of fresh gauge data for the given IDs.
-// The frontend calls this on dashboard mount to refresh cached watchlist data
-// (current_cfs, watershed_name, etc.) without asking the user to re-add gauges.
+// IDs may be plain gauge UUIDs or "uuid:reach-slug" pairs. When a reach slug is
+// present the flow ranges and context reach metadata are resolved for that specific
+// reach rather than falling back to the alphabetically-first associated reach.
+// The same gauge UUID can appear multiple times with different reach slugs.
+//
+// Returns a GeoJSON FeatureCollection. Each feature echoes back context_reach_slug
+// so the frontend can match features to the correct (gauge, reach) watchlist items.
 func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 	raw := strings.TrimSpace(r.URL.Query().Get("ids"))
 	if raw == "" {
 		jsonResponse(w, http.StatusOK, newFeatureCollection(nil))
 		return
 	}
-	ids := strings.Split(raw, ",")
-	if len(ids) > 200 {
-		ids = ids[:200]
+
+	// Parse "uuid1:reach-slug,uuid2,uuid3:other-slug" into parallel slices.
+	// Empty string in reachSlugs means no reach context (standalone gauge).
+	parts := strings.Split(raw, ",")
+	if len(parts) > 200 {
+		parts = parts[:200]
+	}
+	gaugeIDs := make([]string, 0, len(parts))
+	reachSlugs := make([]string, 0, len(parts)) // "" = no context
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if i := strings.IndexByte(part, ':'); i >= 0 {
+			gaugeIDs = append(gaugeIDs, part[:i])
+			reachSlugs = append(reachSlugs, part[i+1:])
+		} else {
+			gaugeIDs = append(gaugeIDs, part)
+			reachSlugs = append(reachSlugs, "")
+		}
+	}
+	if len(gaugeIDs) == 0 {
+		jsonResponse(w, http.StatusOK, newFeatureCollection(nil))
+		return
 	}
 
+	// ctx CTE: one row per requested (gauge_id, reach_slug) pair.
+	// NULLIF converts "" back to NULL so SQL COALESCE logic works correctly.
 	rows, err := h.db.Query(r.Context(), `
+		WITH ctx AS (
+			SELECT unnest($1::uuid[])                      AS gauge_id,
+			       NULLIF(unnest($2::text[]), '')::text    AS reach_slug
+		)
 		SELECT
 			g.id,
+			ctx.reach_slug                   AS context_reach_slug,
 			g.external_id,
 			g.source,
 			g.name,
@@ -653,51 +694,67 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				SELECT ra.name FROM reaches ra
 				WHERE ra.primary_gauge_id = g.id
 				ORDER BY ra.name LIMIT 4
-			)                  AS reach_names,
+			)                                AS reach_names,
 			ARRAY(
 				SELECT ra.slug FROM reaches ra
 				WHERE ra.primary_gauge_id = g.id
 				ORDER BY ra.name LIMIT 4
-			)                  AS reach_slugs,
+			)                                AS reach_slugs,
+			ARRAY(
+				SELECT COALESCE(ra.common_name, ra.name) FROM reaches ra
+				WHERE ra.primary_gauge_id = g.id
+				ORDER BY ra.name LIMIT 4
+			)                                AS reach_common_names,
 			g.reach_relationship,
 			g.last_reading_at,
-			ST_X(g.location::geometry) AS lng,
-			ST_Y(g.location::geometry) AS lat,
+			ST_X(g.location::geometry)       AS lng,
+			ST_Y(g.location::geometry)       AS lat,
 			g.state_abbr,
 			g.basin_name,
 			g.watershed_name,
-			(SELECT ra.river_name FROM reaches ra
-			 WHERE ra.primary_gauge_id = g.id AND ra.river_name IS NOT NULL
-			 ORDER BY ra.name LIMIT 1
-			) AS river_name,
+			ctx_reach.common_name            AS context_reach_common_name,
+			ctx_reach.full_name              AS context_reach_full_name,
+			ctx_reach.river_name             AS context_reach_river_name,
 			g.current_cfs,
 			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
-			fr_band.label                            AS flow_band_label,
-			CASE
-				WHEN g.reach_id IS NOT NULL                              THEN 'trusted'
-				WHEN g.last_requested_at > NOW() - INTERVAL '7 days'     THEN 'demand'
-				ELSE                                                           'cold'
-			END AS poll_tier
-		FROM gauges g
+			fr_band.label                    AS flow_band_label
+		FROM ctx
+		JOIN gauges g ON g.id = ctx.gauge_id
+		LEFT JOIN LATERAL (
+			-- Resolve the context reach: use the requested slug if provided,
+			-- otherwise fall back to the alphabetically-first associated reach.
+			SELECT
+				COALESCE(rctx.common_name, rctx.name) AS common_name,
+				CASE WHEN rctx.put_in_name IS NOT NULL AND rctx.take_out_name IS NOT NULL
+				     THEN rctx.put_in_name || ' to ' || rctx.take_out_name
+				     ELSE NULL END                     AS full_name,
+				rctx.river_name
+			FROM reaches rctx
+			WHERE rctx.primary_gauge_id = g.id
+			  AND rctx.slug = COALESCE(
+			      ctx.reach_slug,
+			      (SELECT slug FROM reaches WHERE primary_gauge_id = g.id ORDER BY slug LIMIT 1)
+			  )
+			LIMIT 1
+		) ctx_reach ON TRUE
 		LEFT JOIN LATERAL (
 			SELECT fr.label,
 			       CASE
-			           WHEN fr.label = 'runnable'          THEN 'runnable'
-			           WHEN fr.label = 'below_recommended' THEN 'low'
-			           WHEN fr.label = 'above_recommended' THEN 'flood'
 			           WHEN fr.label IN ('fun', 'optimal')   THEN 'runnable'
 			           WHEN fr.label IN ('minimum', 'pushy') THEN 'caution'
 			           WHEN fr.label = 'too_low'             THEN 'low'
 			           WHEN fr.label IN ('high', 'flood')    THEN 'flood'
+			           WHEN fr.label = 'runnable'            THEN 'runnable'
+			           WHEN fr.label = 'below_recommended'   THEN 'low'
+			           WHEN fr.label = 'above_recommended'   THEN 'flood'
 			           ELSE 'unknown'
 			       END AS flow_status
 			FROM flow_ranges fr
 			JOIN reaches rch ON rch.id = fr.reach_id
 			WHERE rch.primary_gauge_id = g.id
-			  AND rch.id = (
-			      SELECT id FROM reaches
-			      WHERE primary_gauge_id = g.id
-			      ORDER BY slug LIMIT 1
+			  AND rch.slug = COALESCE(
+			      ctx.reach_slug,
+			      (SELECT slug FROM reaches WHERE primary_gauge_id = g.id ORDER BY slug LIMIT 1)
 			  )
 			  AND fr.craft_type = 'general'
 			  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
@@ -705,8 +762,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			ORDER BY fr.min_cfs ASC NULLS FIRST
 			LIMIT 1
 		) fr_band ON TRUE
-		WHERE g.id = ANY($1)
-	`, ids)
+	`, gaugeIDs, reachSlugs)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "query failed")
 		return
@@ -716,34 +772,40 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 	features := make([]Feature, 0)
 	for rows.Next() {
 		var (
-			id                string
-			externalID        string
-			source            string
-			name              *string
-			status            string
-			featured          bool
-			prominenceScore   float64
-			reachID           *string
-			reachNamesRaw     []string
-			reachSlugsRaw     []string
-			reachRelationship *string
-			lastReadingAt     *time.Time
-			lng               *float64
-			lat               *float64
-			stateAbbr         *string
-			basinName         *string
-			watershedName     *string
-			riverName         *string
-			currentCFS        *float64
-			flowStatus        string
-			flowBandLabel     *string
-			pollTier          string
+			id                     string
+			contextReachSlug       *string
+			externalID             string
+			source                 string
+			name                   *string
+			status                 string
+			featured               bool
+			prominenceScore        float64
+			reachID                *string
+			reachNamesRaw          []string
+			reachSlugsRaw          []string
+			reachCommonNamesRaw    []string
+			reachRelationship      *string
+			lastReadingAt          *time.Time
+			lng                    *float64
+			lat                    *float64
+			stateAbbr              *string
+			basinName              *string
+			watershedName          *string
+			contextReachCommonName *string
+			contextReachFullName   *string
+			contextReachRiverName  *string
+			currentCFS             *float64
+			flowStatus             string
+			flowBandLabel          *string
 		)
 		if err := rows.Scan(
-			&id, &externalID, &source, &name, &status,
-			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlugsRaw, &reachRelationship, &lastReadingAt,
-			&lng, &lat, &stateAbbr, &basinName, &watershedName, &riverName,
-			&currentCFS, &flowStatus, &flowBandLabel, &pollTier,
+			&id, &contextReachSlug, &externalID, &source, &name, &status,
+			&featured, &prominenceScore, &reachID,
+			&reachNamesRaw, &reachSlugsRaw, &reachCommonNamesRaw,
+			&reachRelationship, &lastReadingAt,
+			&lng, &lat, &stateAbbr, &basinName, &watershedName,
+			&contextReachCommonName, &contextReachFullName, &contextReachRiverName,
+			&currentCFS, &flowStatus, &flowBandLabel,
 		); err != nil {
 			continue
 		}
@@ -755,28 +817,31 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			Type:     "Feature",
 			Geometry: geom,
 			Properties: map[string]any{
-				"id":                 id,
-				"external_id":        externalID,
-				"source":             source,
-				"name":               name,
-				"status":             status,
-				"featured":           featured,
-				"prominence_score":   prominenceScore,
-				"reach_id":           reachID,
-				"reach_name":         combineReachNames(reachNamesRaw),
-				"reach_names":        reachNamesRaw,
-				"reach_slug":         firstOrNil(reachSlugsRaw),
-				"reach_slugs":        reachSlugsRaw,
-				"reach_relationship": reachRelationship,
-				"last_reading_at":    lastReadingAt,
-				"state_abbr":         stateAbbr,
-				"basin_name":         basinName,
-				"watershed_name":     watershedName,
-				"river_name":         riverName,
-				"current_cfs":        currentCFS,
-				"flow_status":        flowStatus,
-				"flow_band_label":    flowBandLabel,
-				"poll_tier":          pollTier,
+				"id":                          id,
+				"context_reach_slug":          contextReachSlug,
+				"external_id":                 externalID,
+				"source":                      source,
+				"name":                        name,
+				"status":                      status,
+				"featured":                    featured,
+				"prominence_score":            prominenceScore,
+				"reach_id":                    reachID,
+				"reach_name":                  combineReachNames(reachNamesRaw),
+				"reach_names":                 reachNamesRaw,
+				"reach_slug":                  firstOrNil(reachSlugsRaw),
+				"reach_slugs":                 reachSlugsRaw,
+				"reach_common_names":          reachCommonNamesRaw,
+				"reach_relationship":          reachRelationship,
+				"last_reading_at":             lastReadingAt,
+				"state_abbr":                  stateAbbr,
+				"basin_name":                  basinName,
+				"watershed_name":              watershedName,
+				"context_reach_common_name":   contextReachCommonName,
+				"context_reach_full_name":     contextReachFullName,
+				"context_reach_river_name":    contextReachRiverName,
+				"current_cfs":                 currentCFS,
+				"flow_status":                 flowStatus,
+				"flow_band_label":             flowBandLabel,
 			},
 		})
 	}

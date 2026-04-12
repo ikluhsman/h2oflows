@@ -1,18 +1,6 @@
 <template>
   <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
-    <AppHeader>
-      <!-- Active trip banner -->
-      <div
-        v-if="store.hasActiveTrip"
-        class="flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 rounded-full px-3 py-1"
-      >
-        <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-        </span>
-        Trip recording · {{ activeTripLabel }}
-      </div>
-    </AppHeader>
+    <AppHeader />
 
     <main class="max-w-5xl mx-auto px-4 py-6 space-y-8">
 
@@ -21,7 +9,7 @@
         <div class="text-5xl">🌊</div>
         <h2 class="text-xl font-semibold">No gauges yet</h2>
         <p class="text-gray-500 max-w-sm text-sm">
-          Search for a river gauge, section, or put-in and add it to your dashboard.
+          Search for a reach or gauge and add it to your dashboard.
         </p>
         <UButton color="primary" @click="searchOpen = true">Find a gauge</UButton>
       </div>
@@ -45,9 +33,9 @@
             Add gauge
           </UButton>
         </div>
-        <section v-for="group in store.byRiver" :key="group.river" class="mb-6">
+        <section v-for="group in store.byReach" :key="group.reach ?? 'other'" class="mb-6">
           <div class="flex items-center gap-2 mb-3">
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ group.river }}</h2>
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ group.reach ?? 'Other Gauges' }}</h2>
             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
           </div>
 
@@ -175,15 +163,6 @@ watch(mapVisible, val => localStorage.setItem(MAP_VIS_KEY, String(val)))
 function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
   addAndSync(gauge)
 }
-
-const activeTripLabel = computed(() => {
-  const trip = store.activeTrip
-  if (!trip) return ''
-  const ms = Date.now() - new Date(trip.startedAt).getTime()
-  const h = Math.floor(ms / 3_600_000)
-  const m = Math.floor((ms % 3_600_000) / 60_000)
-  return trip.reachName ? `${trip.reachName} · ${h > 0 ? `${h}h ` : ''}${m}m` : `${h > 0 ? `${h}h ` : ''}${m}m`
-})
 
 const detailOpen  = ref(false)
 const detailGauge = ref<WatchedGauge | null>(null)

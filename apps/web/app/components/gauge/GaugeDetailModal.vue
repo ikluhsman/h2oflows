@@ -24,8 +24,12 @@
 
     <template #body>
       <div class="space-y-4">
-        <!-- 48-hour graph -->
-        <GaugeGraph :gauge-id="gauge.id" :current-cfs="gauge.currentCfs" :no-ranges="true" />
+        <!-- 48-hour graph — use context reach's flow ranges when available -->
+        <GaugeGraph
+          :gauge-id="gauge.id"
+          :current-cfs="gauge.currentCfs"
+          :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug"
+        />
 
         <!-- Last updated -->
         <p v-if="gauge.lastReadingAt" class="text-xs text-gray-500">
@@ -61,7 +65,10 @@ const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ gauge: WatchedGauge }>()
 
 const displayName = computed(() =>
-  props.gauge.reachName ?? props.gauge.name ?? props.gauge.externalId
+  props.gauge.contextReachCommonName
+  ?? props.gauge.reachName
+  ?? props.gauge.name
+  ?? props.gauge.externalId
 )
 
 // Zip reachNames + reachSlugs into link objects. Falls back to the single
