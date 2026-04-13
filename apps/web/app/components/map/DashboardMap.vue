@@ -80,7 +80,12 @@ let fetchSeq       = 0   // incremented on each call; lets an in-flight fetch se
 
 function difficultyColorExpr(): any {
   return ['step', ['coalesce', ['get', 'class_max'], 0],
-    '#16a34a', 3.0, '#3b82f6', 4.0, '#111827', 5.0, '#111827']
+    '#6b7280',        // 0 = gray (no class)
+    0.5, '#16a34a',   // I-II = green
+    3.0, '#3b82f6',   // III = blue
+    4.0, '#111827',   // IV = near-black
+    5.0, '#dc2626',   // V+ = red
+  ]
 }
 
 function classLabel(c: number): string {
@@ -191,12 +196,18 @@ async function refreshData() {
     // Update opacity paint properties to highlight dashboard reaches
     if (m.getLayer('dash-glow')) {
       m.setPaintProperty('dash-glow',  'line-opacity', dashOpacityExpr(dashSlugs, 0.15, 0.08))
+      m.setPaintProperty('dash-glow',  'line-width',
+        ['interpolate', ['linear'], ['zoom'], 6,
+          ['match', ['get', 'slug'], dashSlugs, 5, 3],
+          12,
+          ['match', ['get', 'slug'], dashSlugs, 10, 6],
+        ])
       m.setPaintProperty('dash-lines', 'line-opacity', dashOpacityExpr(dashSlugs, 0.95, 0.65))
       m.setPaintProperty('dash-lines', 'line-width',
         ['interpolate', ['linear'], ['zoom'], 6,
-          ['match', ['get', 'slug'], dashSlugs, 3.0, 1.5],
+          ['match', ['get', 'slug'], dashSlugs, 2.0, 1.5],
           12,
-          ['match', ['get', 'slug'], dashSlugs, 6.0, 3.0],
+          ['match', ['get', 'slug'], dashSlugs, 4.0, 3.0],
         ])
     }
 
@@ -361,10 +372,15 @@ onMounted(() => {
       map!.getCanvas().style.cursor = 'pointer'
       const props = e.features?.[0]?.properties
       if (props?.name) {
-        const classMax = props.class_max as number | null
-        const label = classMax != null ? ` · Class ${classLabel(classMax)}` : ''
+        const commonName = props.common_name ?? props.name
+        const fullName   = props.name
+        const classMax   = props.class_max as number | null
+        const classStr   = classMax != null ? ` · Class ${classLabel(classMax)}` : ''
+        const subtitle   = commonName !== fullName
+          ? `<br><span style="opacity:0.65;font-size:0.7rem;font-weight:400">${fullName}</span>`
+          : ''
         reachTooltip.setLngLat(e.lngLat).setHTML(
-          `<strong>${props.name}</strong>${label}`
+          `<strong>${commonName}</strong>${classStr}${subtitle}`
         ).addTo(map!)
       }
     })

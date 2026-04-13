@@ -116,13 +116,21 @@
               @mouseleave="hoveredSlug = null"
               @click="navigateTo(`/reaches/${r.slug}`)"
             >
-              <div class="flex items-center gap-2 min-w-0">
+              <div class="flex items-start gap-2 min-w-0">
                 <!-- Flow status dot -->
                 <span
-                  class="w-2 h-2 rounded-full shrink-0"
+                  class="w-2 h-2 rounded-full shrink-0 mt-1"
                   :style="{ background: flowStatusColor(r.flow_status) }"
                 />
-                <span class="text-sm font-medium truncate text-gray-800 dark:text-gray-200">{{ r.name }}</span>
+                <div class="min-w-0">
+                  <span class="text-sm font-medium truncate block text-gray-800 dark:text-gray-200">
+                    {{ r.common_name ?? r.name }}
+                  </span>
+                  <span
+                    v-if="r.common_name && r.common_name !== r.name"
+                    class="text-xs text-gray-400 truncate block"
+                  >{{ r.name }}</span>
+                </div>
               </div>
               <div class="flex items-center justify-between mt-0.5 pl-4">
                 <span class="text-xs text-gray-400">{{ classLabel(r.class_max) }}</span>

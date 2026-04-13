@@ -51,7 +51,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 
 export interface ReachListItem {
   slug:        string
-  name:        string
+  name:        string        // full display form: "put_in to take_out" or reach name
+  common_name: string | null // short common name: "Foxton", "The Numbers", etc.
   class_max:   number | null
   flow_status: string
   current_cfs: number | null
@@ -311,6 +312,7 @@ function filterVisible() {
   emit('reaches-updated', visible.map(f => ({
     slug:        f.properties.slug,
     name:        displayName(f.properties),
+    common_name: f.properties.common_name ?? null,
     class_max:   f.properties.class_max,
     flow_status: f.properties.flow_status ?? 'unknown',
     current_cfs: f.properties.current_cfs ?? null,

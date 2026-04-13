@@ -513,7 +513,12 @@ function addLayers() {
   })
   // Difficulty color expression — mirrors reachLineColor() and DashboardMap
   const difficultyExpr = ['step', ['coalesce', ['get', 'class_max'], 0],
-    '#6b7280', 2.5, '#16a34a', 4.0, '#3b82f6', 5.0, '#475569', 6.0, '#dc2626']
+    '#6b7280',        // 0 = gray (no class)
+    0.5, '#16a34a',   // I-II = green
+    3.0, '#3b82f6',   // III = blue
+    4.0, '#111827',   // IV = near-black
+    5.0, '#dc2626',   // V+ = red
+  ]
   map.addLayer({
     id: 'other-reaches-glow',
     type: 'line',
@@ -524,7 +529,7 @@ function addLayers() {
     id: 'other-reaches-line',
     type: 'line',
     source: 'other-reaches',
-    paint: { 'line-color': difficultyExpr, 'line-width': 2.5, 'line-opacity': 0.55 },
+    paint: { 'line-color': difficultyExpr, 'line-width': 2.5, 'line-opacity': 0.65 },
   })
   // Hover highlight — filtered to only the hovered feature
   map.addLayer({
