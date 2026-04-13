@@ -25,7 +25,16 @@ type coord [2]float64
 // so the full river section is captured. Returns ("", nil) if no waterways found.
 func FetchReachLine(ctx context.Context, minLon, minLat, maxLon, maxLat, startLng, startLat, endLng, endLat float64) (string, error) {
 	const pad = 0.01 // small extra padding around the access-point bbox
-	tagged, err := fetchTaggedWays(ctx, minLon-pad, minLat-pad, maxLon+pad, maxLat+pad)
+
+	// Always expand the bbox to include the explicit put-in and take-out so
+	// that downstream OSM ways aren't missed when access points don't reach
+	// the full extent of the run (e.g. a take-out 10 km outside the access hull).
+	bboxMinLon := math.Min(minLon, math.Min(startLng, endLng)) - pad
+	bboxMinLat := math.Min(minLat, math.Min(startLat, endLat)) - pad
+	bboxMaxLon := math.Max(maxLon, math.Max(startLng, endLng)) + pad
+	bboxMaxLat := math.Max(maxLat, math.Max(startLat, endLat)) + pad
+
+	tagged, err := fetchTaggedWays(ctx, bboxMinLon, bboxMinLat, bboxMaxLon, bboxMaxLat)
 	if err != nil {
 		return "", err
 	}
@@ -52,6 +61,25 @@ func FetchReachLine(ctx context.Context, minLon, minLat, maxLon, maxLat, startLn
 	// endpoint is near the put-in. Instead, join them at shared junction
 	// nodes and let extractSubChain clip to [put-in, take-out].
 	full := stitchWays(ways)
+
+	// If stitchWays produces a chain whose end is far from the take-out,
+	// fall back to chainWays which tolerates gaps in OSM coverage. This
+	// handles canyons and wilderness segments where ways aren't perfectly
+	// connected at junctions (e.g. Ruby Horsethief, GJ to Loma).
+	// Threshold: ~2 km in degrees (rough, avoids sqrt).
+	const shortChainThresh2 = 0.018 * 0.018 // ≈ 2 km squared
+	if len(full) >= 2 {
+		tail := full[len(full)-1]
+		if dist2(tail, endLng, endLat) > shortChainThresh2 {
+			if fallback := chainWays(ways, startLng, startLat, endLng, endLat); len(fallback) > len(full) {
+				full = fallback
+			}
+		}
+	} else {
+		// stitchWays returned nothing — try chainWays directly.
+		full = chainWays(ways, startLng, startLat, endLng, endLat)
+	}
+
 	if len(full) < 2 {
 		return "", nil
 	}
