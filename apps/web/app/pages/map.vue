@@ -12,6 +12,34 @@
 
     <AppHeader class="shrink-0" />
 
+    <!-- Admin bar -->
+    <div v-if="isAdmin" class="shrink-0 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2 flex items-center gap-3 text-sm">
+      <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">Admin</span>
+      <button
+        class="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors disabled:opacity-50"
+        :disabled="importing"
+        @click="triggerKmlUpload"
+      >{{ importing ? 'Importing…' : 'Import KMZ' }}</button>
+      <button
+        class="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+        @click="showKmlGuide = !showKmlGuide"
+      >KML Format Guide</button>
+      <span v-if="importMsg" class="text-xs" :class="importError ? 'text-red-500' : 'text-green-600'">{{ importMsg }}</span>
+      <input ref="kmlInputRef" type="file" accept=".kmz,.kml" class="hidden" @change="onKmlSelected" />
+    </div>
+
+    <!-- KML Format Guide -->
+    <div v-if="showKmlGuide" class="shrink-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 text-xs text-gray-600 dark:text-gray-400 space-y-1.5 max-h-48 overflow-y-auto">
+      <p class="font-semibold text-gray-700 dark:text-gray-300">Expected KMZ/KML format:</p>
+      <ul class="list-disc pl-4 space-y-0.5">
+        <li>One <strong>folder per reach</strong> — folder name = reach name (e.g. "Bailey")</li>
+        <li>First <strong>Placemark</strong> in folder with <code>description</code> = metadata (common_name, gauge, class, flow ranges)</li>
+        <li>LineString placemarks = reach centerline geometry</li>
+        <li>Point placemarks = river features (put_in, take_out, rapid, camp, etc.)</li>
+      </ul>
+      <button class="text-blue-500 hover:text-blue-400 font-medium" @click="showKmlGuide = false">Close</button>
+    </div>
+
     <!-- Map + Sidebar -->
     <div class="flex-1 overflow-hidden flex relative">
 
@@ -114,6 +142,8 @@ import { ref, nextTick, onMounted } from 'vue'
 import type { ReachListItem } from '~/components/map/ReachesMap.vue'
 
 const router = useRouter()
+const { isAdmin, getToken } = useAuth()
+const { apiBase } = useRuntimeConfig().public
 
 const showDemoBanner = ref(false)
 onMounted(() => {
@@ -186,6 +216,54 @@ function classLabel(classMax: number | null): string {
     5: 'Class V', 5.5: 'Class V+', 6: 'Class VI',
   }
   return labels[classMax] ?? `Class ${classMax}`
+}
+
+// ── Admin KML upload ──────────────────────────────────────────────────────────
+
+const kmlInputRef  = ref<HTMLInputElement | null>(null)
+const importing    = ref(false)
+const importMsg    = ref('')
+const importError  = ref(false)
+const showKmlGuide = ref(false)
+
+function triggerKmlUpload() {
+  importMsg.value = ''
+  importError.value = false
+  kmlInputRef.value?.click()
+}
+
+async function onKmlSelected(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  ;(event.target as HTMLInputElement).value = ''
+
+  importing.value = true
+  importMsg.value = ''
+  importError.value = false
+
+  try {
+    const token = await getToken()
+    const form = new FormData()
+    form.append('file', file)
+    const res = await fetch(`${apiBase}/api/v1/import/kmz`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    })
+    const json = await res.json()
+    if (!res.ok) {
+      importError.value = true
+      importMsg.value = json.error ?? `Error ${res.status}`
+    } else {
+      const reachCount = Object.keys(json.reaches ?? {}).length
+      importMsg.value = `Imported ${reachCount} reach${reachCount !== 1 ? 'es' : ''}`
+    }
+  } catch (err: any) {
+    importError.value = true
+    importMsg.value = err?.message ?? 'Upload failed'
+  } finally {
+    importing.value = false
+  }
 }
 
 </script>

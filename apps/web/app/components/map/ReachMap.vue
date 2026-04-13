@@ -99,18 +99,19 @@
       </template>
 
       <!-- Gauges group -->
-      <template v-if="gaugeFeatures.length > 0">
+      <template v-if="allGauges.length > 0">
         <p class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Gauges</p>
         <div
-          v-for="g in gaugeFeatures"
+          v-for="g in allGauges"
           :key="g.id"
           class="flex items-center gap-1 pr-1.5"
           :class="selectedId === g.id ? 'bg-gray-100 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'"
         >
           <button
             class="flex-1 flex items-center gap-2 px-3 py-1.5 text-left transition-colors text-xs min-w-0"
+            :class="g.lng == null || g.lat == null ? 'opacity-50 cursor-default' : ''"
             @mousedown.prevent
-            @click="selectFeature(g.id, g.lng!, g.lat!)"
+            @click="g.lng != null && g.lat != null && selectFeature(g.id, g.lng, g.lat)"
           >
             <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center p-0.75 bg-cyan-600"
               v-html="gaugeFeatureIcon(g.reach_relationship)"
@@ -350,16 +351,19 @@ const selectedFeature = computed(() => {
 })
 
 
-// Gauges with valid coordinates (from array or legacy single props)
-const gaugeFeatures = computed<GaugeProp[]>(() => {
-  if (props.gauges && props.gauges.length > 0) {
-    return props.gauges.filter(g => g.lng != null && g.lat != null)
-  }
+// All gauges — shown in the sidebar regardless of coordinates
+const allGauges = computed<GaugeProp[]>(() => {
+  if (props.gauges && props.gauges.length > 0) return props.gauges
   if (props.gaugeLng != null && props.gaugeLat != null) {
     return [{ id: 'gauge', lng: props.gaugeLng, lat: props.gaugeLat }]
   }
   return []
 })
+
+// Gauges with valid coordinates — used for map markers and bounds
+const gaugeFeatures = computed<GaugeProp[]>(() =>
+  allGauges.value.filter(g => g.lng != null && g.lat != null)
+)
 
 const hasCoords = computed(() =>
   props.centerline || allFeatures.value.length > 0 || gaugeFeatures.value.length > 0
@@ -498,30 +502,43 @@ function addLayers() {
     id: 'other-reaches-glow',
     type: 'line',
     source: 'other-reaches',
-    paint: { 'line-color': ['get', 'flow_color'], 'line-width': 8, 'line-opacity': 0.08, 'line-blur': 4 },
+    paint: { 'line-color': ['get', 'flow_color'], 'line-width': 8, 'line-opacity': 0.15, 'line-blur': 4 },
   })
   map.addLayer({
     id: 'other-reaches-line',
     type: 'line',
     source: 'other-reaches',
-    paint: { 'line-color': ['get', 'flow_color'], 'line-width': 2, 'line-opacity': 0.35 },
+    paint: { 'line-color': ['get', 'flow_color'], 'line-width': 2.5, 'line-opacity': 0.55 },
+  })
+  // Hover highlight — filtered to only the hovered feature
+  map.addLayer({
+    id: 'other-reaches-hover',
+    type: 'line',
+    source: 'other-reaches',
+    filter: ['==', ['get', 'slug'], ''],
+    paint: { 'line-color': ['get', 'flow_color'], 'line-width': 5, 'line-opacity': 0.7 },
   })
   // Wider invisible hit area for click detection on thin lines
   map.addLayer({
     id: 'other-reaches-hit',
     type: 'line',
     source: 'other-reaches',
-    paint: { 'line-color': 'transparent', 'line-width': 12, 'line-opacity': 0 },
+    paint: { 'line-color': 'transparent', 'line-width': 14, 'line-opacity': 0 },
   })
   map.on('click', 'other-reaches-hit', (e) => {
     const slug = e.features?.[0]?.properties?.slug
     if (slug) router.push(`/reaches/${slug}`)
   })
-  map.on('mouseenter', 'other-reaches-hit', () => {
-    if (map) map.getCanvas().style.cursor = 'pointer'
+  map.on('mouseenter', 'other-reaches-hit', (e) => {
+    if (!map) return
+    map.getCanvas().style.cursor = 'pointer'
+    const slug = e.features?.[0]?.properties?.slug
+    if (slug) map.setFilter('other-reaches-hover', ['==', ['get', 'slug'], slug])
   })
   map.on('mouseleave', 'other-reaches-hit', () => {
-    if (map) map.getCanvas().style.cursor = ''
+    if (!map) return
+    map.getCanvas().style.cursor = ''
+    map.setFilter('other-reaches-hover', ['==', ['get', 'slug'], ''])
   })
 
   // Centerline — colored by max rapid difficulty
@@ -896,7 +913,7 @@ function rebuildLayers() {
   if (!map || !mapReady.value) return
   for (const id of [
     'centerline-glow', 'centerline',
-    'other-reaches-hit', 'other-reaches-line', 'other-reaches-glow', 'other-reaches',
+    'other-reaches-hit', 'other-reaches-hover', 'other-reaches-line', 'other-reaches-glow', 'other-reaches',
   ]) {
     if (map.getLayer(id)) map.removeLayer(id)
     if (map.getSource(id)) map.removeSource(id)

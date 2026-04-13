@@ -57,6 +57,17 @@
         </template>
       </ClientOnly>
 
+      <!-- Dashboard shortcut — always visible -->
+      <NuxtLink
+        to="/dashboard"
+        class="shrink-0 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+        title="Flow Dashboard"
+      >
+        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
+        </svg>
+      </NuxtLink>
+
       <UColorModeButton size="sm" color="neutral" variant="ghost" class="shrink-0" />
 
       <!-- Hamburger — mobile only -->

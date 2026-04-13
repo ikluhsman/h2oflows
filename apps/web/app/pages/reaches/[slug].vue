@@ -6,6 +6,17 @@
         <span class="text-gray-300 dark:text-gray-700 shrink-0">/</span>
         <span class="text-sm font-medium truncate text-gray-700 dark:text-gray-200">{{ reach.common_name ?? reach.name }}</span>
       </template>
+      <template #actions>
+        <button
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shrink-0"
+          @click="openShareForm"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+          Share
+        </button>
+      </template>
     </AppHeader>
 
     <!-- Upstream / downstream pagination -->
@@ -477,7 +488,7 @@
       </section>
 
       <!-- Share your experience -->
-      <section v-if="reach">
+      <section v-if="reach" ref="shareSection">
         <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-950">
           <button
             class="w-full flex items-center justify-between px-4 py-3 text-left"
@@ -1230,6 +1241,7 @@ async function sendQuestion(question: string) {
 
 // ---- Share your experience --------------------------------------------------
 
+const shareSection   = ref<HTMLElement>()
 const noteFormOpen   = ref(false)
 const noteType       = ref<'trip_report' | 'flow_update' | 'hazard_alert' | 'general'>('flow_update')
 const noteImpression = ref<'too_low' | 'good' | 'high' | null>(null)
@@ -1274,6 +1286,11 @@ function submitNote() {
     observed_at: noteObservedAt.value ? new Date(noteObservedAt.value).toISOString() : new Date().toISOString(),
   })
   noteSubmitted.value = true
+}
+
+function openShareForm() {
+  noteFormOpen.value = true
+  nextTick(() => shareSection.value?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
 }
 
 function resetNoteForm() {

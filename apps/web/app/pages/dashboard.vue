@@ -103,6 +103,7 @@ import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
 definePageMeta({ ssr: false })
 
 const store = useWatchlistStore()
+store.deduplicate()
 const { refresh } = useWatchlistRefresh()
 const { isAuthenticated } = useAuth()
 const { addAndSync, removeAndSync, loadFromServer, pushLocalToServer } = useWatchlistSync()

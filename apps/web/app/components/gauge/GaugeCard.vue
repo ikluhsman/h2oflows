@@ -148,8 +148,12 @@ const contextFullName = computed(() => props.gauge.contextReachFullName ?? null)
 // --- Flow status ------------------------------------------------------------
 
 const statusColor = computed(() => {
+  const band = props.gauge.flowBandLabel
+  if (band === 'low_runnable')  return 'lime'
+  if (band === 'med_runnable')  return 'emerald'
+  if (band === 'high_runnable') return 'green'
   switch (props.gauge.flowStatus) {
-    case 'runnable': return 'success'
+    case 'runnable': return 'emerald'
     case 'caution':  return 'warning'
     case 'low':      return 'error'
     case 'flood':    return 'info'
@@ -171,13 +175,19 @@ const statusLabel = computed(() => {
     default:         return 'Unknown'
   }
 })
-const cfsClass = computed(() => ({
-  'text-emerald-400 dark:text-emerald-500': props.gauge.flowStatus === 'runnable',
-  'text-amber-400':                         props.gauge.flowStatus === 'caution',
-  'text-red-400':                           props.gauge.flowStatus === 'low',
-  'text-blue-400 dark:text-blue-500':       props.gauge.flowStatus === 'flood',
-  'text-gray-400':                          props.gauge.flowStatus === 'unknown',
-}))
+const cfsClass = computed(() => {
+  const band = props.gauge.flowBandLabel
+  if (band === 'low_runnable')  return 'text-lime-500'
+  if (band === 'med_runnable')  return 'text-emerald-500'
+  if (band === 'high_runnable') return 'text-green-600 dark:text-green-500'
+  return {
+    'text-emerald-400 dark:text-emerald-500': props.gauge.flowStatus === 'runnable',
+    'text-amber-400':                         props.gauge.flowStatus === 'caution',
+    'text-red-400':                           props.gauge.flowStatus === 'low',
+    'text-blue-400 dark:text-blue-500':       props.gauge.flowStatus === 'flood',
+    'text-gray-400':                          !props.gauge.flowStatus || props.gauge.flowStatus === 'unknown',
+  }
+})
 
 // --- Card chrome ------------------------------------------------------------
 

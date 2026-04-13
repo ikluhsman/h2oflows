@@ -119,7 +119,20 @@ export const useWatchlistStore = defineStore('watchlist', {
     addGauge(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
       const slug = gauge.contextReachSlug ?? null
       if (this.gauges.find(g => g.id === gauge.id && (g.contextReachSlug ?? null) === slug)) return
+      // If adding with a reach context, remove any standalone version of the same gauge
+      if (slug) this.gauges = this.gauges.filter(g => !(g.id === gauge.id && !g.contextReachSlug))
       this.gauges.push({ ...gauge, contextReachSlug: slug, watchState: 'saved', activeSince: null })
+    },
+
+    // Remove exact duplicates that may have leaked through localStorage migration or race conditions
+    deduplicate() {
+      const seen = new Set<string>()
+      this.gauges = this.gauges.filter(g => {
+        const key = `${g.id}::${g.contextReachSlug ?? ''}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
     },
 
     removeGauge(gaugeId: string, contextReachSlug?: string | null) {
