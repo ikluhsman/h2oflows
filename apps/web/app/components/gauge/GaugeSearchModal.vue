@@ -18,53 +18,45 @@
         </div>
 
         <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800 max-h-80 overflow-y-auto">
-          <li
-            v-for="g in results"
-            :key="g.id"
-            class="py-2.5 px-1"
-          >
-            <!-- Gauge header -->
-            <div class="flex items-start justify-between gap-2">
+          <template v-for="g in results" :key="g.id">
+            <!-- Gauge has reaches: one flat row per reach -->
+            <template v-if="g.reachSlugs.length">
+              <li
+                v-for="(slug, i) in g.reachSlugs"
+                :key="slug"
+                class="flex items-center justify-between gap-2 py-2.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-900 rounded"
+              >
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium truncate">{{ g.reachCommonNames[i] ?? g.reachNames[i] ?? slug }}</p>
+                  <p class="text-xs text-gray-400 truncate">
+                    {{ g.source.toUpperCase() }} · {{ g.externalId }}<template v-if="g.stateAbbr">, {{ g.stateAbbr }}</template>
+                    <template v-if="g.reachRelationship && g.reachRelationship !== 'primary' && i === 0">
+                      · {{ relationshipLabel(g.reachRelationship) }}
+                    </template>
+                  </p>
+                </div>
+                <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
+                  @click="selectWithContext(g, slug, g.reachCommonNames[i] ?? g.reachNames[i] ?? null)"
+                >Add</UButton>
+              </li>
+            </template>
+
+            <!-- Gauge has no reaches: standalone row -->
+            <li
+              v-else
+              class="flex items-center justify-between gap-2 py-2.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-900 rounded"
+            >
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-medium truncate">{{ g.name ?? g.externalId }}</p>
                 <p class="text-xs text-gray-400 truncate">
                   {{ g.source.toUpperCase() }} · {{ g.externalId }}<template v-if="g.stateAbbr">, {{ g.stateAbbr }}</template>
                 </p>
               </div>
-              <!-- No reaches: just a plain Add button -->
-              <UButton
-                v-if="!g.reachSlugs.length"
-                size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
+              <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
                 @click="selectWithContext(g, null, null)"
               >Add</UButton>
-            </div>
-
-            <!-- Per-reach add rows -->
-            <div v-if="g.reachSlugs.length" class="mt-1.5 space-y-1">
-              <div
-                v-for="(slug, i) in g.reachSlugs"
-                :key="slug"
-                class="flex items-center justify-between pl-3 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-900"
-              >
-                <span class="text-xs text-gray-600 dark:text-gray-300 truncate">
-                  {{ g.reachCommonNames[i] ?? g.reachNames[i] ?? slug }}
-                  <span v-if="g.reachRelationship && g.reachRelationship !== 'primary' && i === 0" class="text-gray-400 ml-1">
-                    {{ relationshipLabel(g.reachRelationship) }}
-                  </span>
-                </span>
-                <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
-                  @click="selectWithContext(g, slug, g.reachCommonNames[i] ?? g.reachNames[i] ?? null)"
-                >Add</UButton>
-              </div>
-              <!-- Standalone option for multi-reach gauges -->
-              <div class="flex items-center justify-between pl-3 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-900">
-                <span class="text-xs text-gray-400">Add as standalone gauge</span>
-                <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-plus"
-                  @click="selectWithContext(g, null, null)"
-                >Add</UButton>
-              </div>
-            </div>
-          </li>
+            </li>
+          </template>
         </ul>
       </div>
     </template>

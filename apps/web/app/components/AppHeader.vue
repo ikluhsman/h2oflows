@@ -10,17 +10,6 @@
         <span class="text-sm font-bold tracking-tight hidden sm:inline">H2OFlows</span>
       </NuxtLink>
 
-      <!-- Primary nav — desktop -->
-      <nav class="hidden sm:flex items-center gap-0.5">
-        <NuxtLink
-          v-for="link in navLinks" :key="link.to" :to="link.to"
-          class="px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors"
-          :class="$route.path.startsWith(link.to) && link.to !== '/'
-            ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-900'"
-        >{{ link.label }}</NuxtLink>
-      </nav>
-
       <!-- Breadcrumb / page-level content injected by each page -->
       <div class="flex items-center gap-2 min-w-0 flex-1">
         <slot />
@@ -68,6 +57,17 @@
         </svg>
       </NuxtLink>
 
+      <!-- Map shortcut — always visible -->
+      <NuxtLink
+        to="/map"
+        class="shrink-0 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+        title="Interactive Map"
+      >
+        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+        </svg>
+      </NuxtLink>
+
       <UColorModeButton size="sm" color="neutral" variant="ghost" class="shrink-0" />
 
       <!-- Hamburger — mobile only -->
@@ -87,14 +87,6 @@
 
     <!-- Mobile menu dropdown -->
     <div v-if="menuOpen" class="sm:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 px-4 py-3 flex flex-col gap-1">
-      <NuxtLink
-        v-for="link in navLinks" :key="link.to" :to="link.to"
-        class="px-3 py-2 rounded-md text-sm font-medium transition-colors"
-        :class="$route.path.startsWith(link.to) && link.to !== '/'
-          ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'"
-        @click="menuOpen = false"
-      >{{ link.label }}</NuxtLink>
       <!-- Ask — mobile -->
       <button
         class="text-left px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center gap-2"
@@ -215,11 +207,6 @@ const { apiBase } = useRuntimeConfig().public
 
 // Close menu on route change
 watch(() => route.path, () => { menuOpen.value = false })
-
-const navLinks = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/map',       label: 'Map'       },
-]
 
 async function handleSignOut() {
   menuOpen.value = false

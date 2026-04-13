@@ -120,6 +120,8 @@ export const useWatchlistStore = defineStore('watchlist', {
         const key = g.contextReachBasinGroup
           ?? cleanBasinName(g.watershedName)
           ?? cleanBasinName(g.basinName)
+          ?? cleanBasinName(g.contextReachRiverName)
+          ?? cleanBasinName(g.riverName)
           ?? 'Other'
         if (!map.has(key)) map.set(key, [])
         map.get(key)!.push(g)

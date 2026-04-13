@@ -457,7 +457,16 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 					    OR ra.river_name  ILIKE $%d
 					    OR similarity(ra.name, $%d) > 0.25
 					    OR similarity(COALESCE(ra.common_name, ''), $%d) > 0.25)
-				  ))`, likeN, likeN, termN, likeN, likeN, likeN, termN, termN))
+				  )
+				  OR EXISTS (
+					SELECT 1 FROM reaches ra
+					WHERE ra.primary_gauge_id = g.id
+					  AND (ra.name ILIKE $%d
+					    OR ra.common_name ILIKE $%d
+					    OR ra.river_name  ILIKE $%d
+					    OR similarity(ra.name, $%d) > 0.25
+					    OR similarity(COALESCE(ra.common_name, ''), $%d) > 0.25)
+				  ))`, likeN, likeN, termN, likeN, likeN, likeN, termN, termN, likeN, likeN, likeN, termN, termN))
 		}
 		if len(textClauses) > 0 {
 			where = append(where, "("+strings.Join(textClauses, " OR ")+")")
