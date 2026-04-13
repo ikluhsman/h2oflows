@@ -102,7 +102,8 @@ func main() {
 	// Warm the reach map cache immediately, then refresh every poll cycle.
 	reaches.WarmCache(context.Background())
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
-	trips   := handlers.NewTripHandler(pool, describer)
+	trips         := handlers.NewTripHandler(pool, describer)
+	contributions := handlers.NewContributionHandler(pool)
 	imports := &handlers.Import{
 		Pool:              pool,
 		CacheWarmer:       func() { reaches.WarmCache(context.Background()) },
@@ -145,6 +146,14 @@ func main() {
 			r.Delete("/reaches/{slug}/centerline", reaches.ClearCenterline)
 			r.Post("/import/kmz", imports.ImportKMZ)
 		})
+
+		r.Post("/reaches/{slug}/contributions", contributions.CreateContribution)
+		r.Post("/reaches/{slug}/trip-reports", contributions.CreateTripReport)
+		r.Get("/reaches/{slug}/trip-reports", contributions.ListTripReports)
+		r.Get("/trip-reports/{slug}", contributions.GetTripReport)
+		r.Patch("/trip-reports/{slug}", contributions.PatchTripReport)
+		r.Delete("/trip-reports/{slug}", contributions.DeleteTripReport)
+		r.Post("/proximity-events", contributions.CreateProximityEvent)
 
 		r.Post("/trips", trips.Create)
 		r.Get("/trips", trips.List)

@@ -491,7 +491,14 @@
         </div>
       </section>
 
-      <!-- Share modal placeholder — full implementation in Phase B2 -->
+      <!-- Share modal -->
+      <ReachShareModal
+        v-model:open="shareModalOpen"
+        :reach-slug="(reach as any).slug"
+        :reach-name="(reach as any).common_name ?? (reach as any).name"
+        :current-cfs="(reach as any)?.gauge?.current_cfs ?? null"
+        :flow-status="(reach as any)?.gauge?.flow_status ?? null"
+      />
 
       <!-- Tributary / other related reaches -->
       <section v-if="tributaryReaches.length > 0">
@@ -1138,12 +1145,12 @@ async function sendQuestion(question: string) {
   }
 }
 
-// ---- Share (placeholder — full modal in Phase B2) --------------------------
+// ---- Share modal ------------------------------------------------------------
 
-const toast = useToast()
+const shareModalOpen = ref(false)
 
 function openShareForm() {
-  toast.add({ title: 'Trip reports coming soon!', description: 'Share modal is in development.', color: 'info' })
+  shareModalOpen.value = true
 }
 
 // ---- Delete reach -----------------------------------------------------------
