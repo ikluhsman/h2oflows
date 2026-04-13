@@ -17,7 +17,7 @@
           No gauges found for "{{ query }}"
         </div>
 
-        <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800 max-h-80 overflow-y-auto">
+        <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800 max-h-[60vh] overflow-y-auto">
           <template v-for="g in results" :key="g.id">
             <!-- Gauge has reaches: one flat row per reach -->
             <template v-if="g.reachSlugs.length">
@@ -58,6 +58,11 @@
             </li>
           </template>
         </ul>
+      </div>
+    </template>
+    <template #footer>
+      <div class="flex justify-end">
+        <UButton variant="ghost" color="neutral" size="sm" @click="open = false">Cancel</UButton>
       </div>
     </template>
   </UModal>

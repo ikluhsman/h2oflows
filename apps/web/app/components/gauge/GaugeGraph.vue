@@ -224,7 +224,10 @@ function buildChart() {
 
 const BAND_COLORS: Record<string, string> = {
   below_recommended: 'rgba(239,68,68,0.22)',
+  low_runnable:      'rgba(132,204,22,0.25)',
   runnable:          'rgba(34,197,94,0.30)',
+  med_runnable:      'rgba(16,185,129,0.28)',
+  high_runnable:     'rgba(22,163,74,0.25)',
   above_recommended: 'rgba(59,130,246,0.25)',
 }
 
@@ -235,7 +238,10 @@ function bandColor(label: string): string {
 
 const BAND_COLORS_SOLID: Record<string, string> = {
   below_recommended: '#ef4444',
+  low_runnable:      '#84cc16',
   runnable:          '#22c55e',
+  med_runnable:      '#10b981',
+  high_runnable:     '#16a34a',
   above_recommended: '#3b82f6',
 }
 
@@ -347,7 +353,10 @@ function formatHour(h: number): string {
 
 const LABEL_DISPLAY: Record<string, string> = {
   below_recommended: 'Below Recommended',
+  low_runnable:      'Low Runnable',
   runnable:          'Runnable',
+  med_runnable:      'Mid Runnable',
+  high_runnable:     'High Runnable',
   above_recommended: 'Above Recommended',
 }
 

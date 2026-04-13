@@ -12,7 +12,7 @@
     </div>
 
     <div class="w-40 shrink-0 hidden sm:block">
-      <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" compact />
+      <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact />
     </div>
 
     <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" size="lg" class="shrink-0 hidden sm:block" />
@@ -46,7 +46,7 @@
   >
     <!-- Compact: background sparkline along the bottom edge -->
     <div v-if="density === 'compact'" class="absolute bottom-0 left-0 right-0 h-10 pointer-events-none opacity-35">
-      <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" compact class="h-full w-full" />
+      <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact class="h-full w-full" />
     </div>
 
     <!-- Gauge name + reach subtitle -->
@@ -55,7 +55,7 @@
         <UTooltip :text="displayName" :delay-duration="500">
           <span class="font-medium truncate block" :class="density === 'compact' ? 'text-xs' : 'text-sm'">{{ displayName }}</span>
         </UTooltip>
-        <span v-if="gauge.contextReachRiverName ?? gauge.riverName" class="text-xs text-blue-400/70 truncate block">{{ gauge.contextReachRiverName ?? gauge.riverName }}</span>
+        <span v-if="density === 'full' && (gauge.contextReachRiverName ?? gauge.riverName)" class="text-xs text-blue-400/70 truncate block">{{ gauge.contextReachRiverName ?? gauge.riverName }}</span>
         <!-- Full: reach full name + gauge source/id as subtitle -->
         <p v-if="!hideReachSubtitle && density === 'full'" class="text-xs truncate mt-0.5">
           <span v-if="contextFullName" class="text-gray-400">{{ contextFullName }}</span>
@@ -109,8 +109,8 @@
     </div>
 
     <!-- Sparkline — comfortable gets compact sparkline; full gets full sparkline -->
-    <GaugeSparkline v-if="density === 'comfortable'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" compact class="mb-1" />
-    <GaugeSparkline v-else-if="density === 'full'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" class="mb-2" />
+    <GaugeSparkline v-if="density === 'comfortable'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact class="mb-1" />
+    <GaugeSparkline v-else-if="density === 'full'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" class="mb-2" />
 
     <!-- Last updated — full only, when no subtitle already shows source info -->
     <p v-if="density === 'full' && !contextFullName" class="text-xs text-gray-400 mt-1 truncate">

@@ -45,7 +45,7 @@ import type { WatchedGauge } from '~/stores/watchlist'
 const props = defineProps<{
   gaugeId: string
   flowStatus: WatchedGauge['flowStatus']
-  // compact — hides the 12h/24h toggle and uses reduced height (for list rows)
+  flowBandLabel?: string | null
   compact?: boolean
 }>()
 
@@ -116,11 +116,21 @@ const areaPath = computed(() => {
   return `${toPath(pts)} L${last.x.toFixed(1)},40 L0,40 Z`
 })
 
-const strokeColor = computed(() => ({
-  runnable: '#34d399', // emerald-400
-  caution:  '#fbbf24', // amber-400
-  low:      '#f87171', // red-400
-  flood:    '#60a5fa', // blue-400
-  unknown:  '#9ca3af', // gray-400
-}[props.flowStatus] ?? '#9ca3af'))
+const strokeColor = computed(() => {
+  const band = props.flowBandLabel
+  if (band === 'low_runnable')       return '#84cc16'
+  if (band === 'med_runnable')       return '#34d399'
+  if (band === 'high_runnable')      return '#22c55e'
+  if (band === 'below_recommended')  return '#f87171'
+  if (band === 'above_recommended')  return '#60a5fa'
+  if (band === 'runnable')           return '#34d399'
+
+  return {
+    runnable: '#34d399',
+    caution:  '#fbbf24',
+    low:      '#f87171',
+    flood:    '#60a5fa',
+    unknown:  '#9ca3af',
+  }[props.flowStatus] ?? '#9ca3af'
+})
 </script>

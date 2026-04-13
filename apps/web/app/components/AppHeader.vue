@@ -20,13 +20,14 @@
 
       <!-- Global Ask button -->
       <button
-        class="hidden sm:flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors shrink-0"
+        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+        title="Ask anything"
         @click="askOpen = true"
       >
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
-        Ask
+        <span class="text-xs font-medium">Ask</span>
       </button>
 
       <!-- Auth — desktop only -->
@@ -49,23 +50,31 @@
       <!-- Dashboard shortcut — always visible -->
       <NuxtLink
         to="/dashboard"
-        class="shrink-0 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md transition-colors"
+        :class="route.path === '/dashboard'
+          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
+          : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
         title="Flow Dashboard"
       >
         <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
         </svg>
+        <span class="hidden sm:inline text-xs font-medium">Dashboard</span>
       </NuxtLink>
 
       <!-- Map shortcut — always visible -->
       <NuxtLink
         to="/map"
-        class="shrink-0 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md transition-colors"
+        :class="route.path === '/map'
+          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
+          : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
         title="Interactive Map"
       >
         <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
         </svg>
+        <span class="hidden sm:inline text-xs font-medium">Map</span>
       </NuxtLink>
 
       <UColorModeButton size="sm" color="neutral" variant="ghost" class="shrink-0" />

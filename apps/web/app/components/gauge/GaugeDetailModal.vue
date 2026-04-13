@@ -3,7 +3,13 @@
     <template #header>
       <div class="flex items-center justify-between gap-3 w-full">
         <div class="min-w-0">
-          <h2 class="font-semibold truncate">{{ displayName }}</h2>
+          <NuxtLink
+            v-if="primaryReachSlug"
+            :to="`/reaches/${primaryReachSlug}`"
+            class="font-semibold truncate block hover:text-blue-500 transition-colors"
+            @click="open = false"
+          >{{ displayName }}</NuxtLink>
+          <h2 v-else class="font-semibold truncate">{{ displayName }}</h2>
           <p class="text-xs text-gray-400 truncate mt-0.5">
             <a :href="sourceUrl" target="_blank" rel="noopener" class="hover:text-blue-400 underline underline-offset-2">
               {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
@@ -19,6 +25,16 @@
           </span>
           <span class="text-xs text-gray-500 ml-1">cfs</span>
         </div>
+
+        <button
+          class="shrink-0 p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          aria-label="Close"
+          @click="open = false"
+        >
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6 6 18M6 6l12 12"/>
+          </svg>
+        </button>
       </div>
     </template>
 
@@ -36,25 +52,6 @@
           Last reading {{ lastReadingRelative }}
         </p>
 
-        <!-- Reach links — one per reach that uses this gauge -->
-        <div v-if="reachLinks.length > 0" class="border-t border-gray-100 dark:border-gray-800 pt-3 space-y-1.5">
-          <p class="text-xs text-gray-400 mb-2">{{ reachLinks.length === 1 ? 'Reach' : 'Reaches on this gauge' }}</p>
-          <NuxtLink
-            v-for="r in reachLinks"
-            :key="r.slug"
-            :to="`/reaches/${r.slug}`"
-            class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            @click="open = false"
-          >
-            <div class="min-w-0">
-              <div class="text-sm font-medium truncate">{{ r.commonName ?? r.name }}</div>
-              <div v-if="r.commonName && r.commonName !== r.name" class="text-xs text-gray-400 truncate">{{ r.name }}</div>
-            </div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 18l6-6-6-6"/>
-            </svg>
-          </NuxtLink>
-        </div>
       </div>
     </template>
   </UModal>
@@ -74,24 +71,9 @@ const displayName = computed(() =>
   ?? props.gauge.externalId
 )
 
-// Zip reachNames + reachSlugs into link objects. Falls back to the single
-// reachName/reachSlug fields for gauges loaded from an older persisted state.
-const reachLinks = computed(() => {
-  const names       = props.gauge.reachNames       ?? []
-  const slugs       = props.gauge.reachSlugs       ?? []
-  const commonNames = props.gauge.reachCommonNames  ?? []
-  if (names.length > 0 && slugs.length > 0) {
-    return slugs.map((slug: string, i: number) => ({
-      slug,
-      name:       names[i]       ?? slug,
-      commonName: commonNames[i] || null,
-    }))
-  }
-  if (props.gauge.reachSlug && props.gauge.reachName) {
-    return [{ slug: props.gauge.reachSlug, name: props.gauge.reachName, commonName: props.gauge.contextReachCommonName ?? null }]
-  }
-  return []
-})
+const primaryReachSlug = computed(() =>
+  props.gauge.contextReachSlug ?? props.gauge.reachSlug ?? props.gauge.reachSlugs?.[0] ?? null
+)
 
 const sourceUrl = computed(() => {
   switch (props.gauge.source) {
