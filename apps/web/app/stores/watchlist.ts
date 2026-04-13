@@ -76,6 +76,24 @@ export const useWatchlistStore = defineStore('watchlist', {
       return result
     },
 
+    // Gauges grouped by river name for the main dashboard layout.
+    byRiver(state): { river: string | null; gauges: WatchedGauge[] }[] {
+      const map = new Map<string | null, WatchedGauge[]>()
+      for (const g of state.gauges) {
+        const key = g.contextReachRiverName ?? g.riverName ?? g.watershedName ?? null
+        if (!map.has(key)) map.set(key, [])
+        map.get(key)!.push(g)
+      }
+      const named: { river: string; gauges: WatchedGauge[] }[] = []
+      for (const [river, gauges] of map) {
+        if (river !== null) named.push({ river, gauges })
+      }
+      named.sort((a, b) => a.river.localeCompare(b.river))
+      const result: { river: string | null; gauges: WatchedGauge[] }[] = [...named]
+      if (map.has(null)) result.push({ river: null, gauges: map.get(null)! })
+      return result
+    },
+
     // Gauges grouped by watershed — used by the aggregate graph picker
     byWatershed(state): Record<string, WatchedGauge[]> {
       return state.gauges.reduce((acc, g) => {

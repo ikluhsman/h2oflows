@@ -18,6 +18,7 @@
 
     <!-- Chart area -->
     <div class="relative w-full" :class="compact ? 'h-6' : 'h-10'">
+      <span v-if="compact" class="absolute top-0 right-0 text-[9px] leading-none text-gray-400 dark:text-gray-500 font-mono z-10 pointer-events-none">{{ hours }}h</span>
       <div v-if="loading" class="w-full h-full rounded animate-pulse bg-gray-100 dark:bg-gray-800" />
 
       <template v-else-if="points.length >= 2">

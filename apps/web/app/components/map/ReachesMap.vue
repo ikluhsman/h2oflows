@@ -428,10 +428,10 @@ function updateLayers(features: ReachFeature[]) {
 
   map.addLayer({
     id: 'diff-points', type: 'symbol', source: 'diff-markers',
-    filter: ['!', ['has', 'point_count']],
+    minzoom: 9,
     layout: {
       'icon-image': ['get', 'icon'],
-      'icon-size': 1.1,
+      'icon-size': 0.9,
       'icon-allow-overlap': true,
       'icon-ignore-placement': true,
     },

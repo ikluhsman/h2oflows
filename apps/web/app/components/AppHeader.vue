@@ -207,7 +207,6 @@ watch(() => route.path, () => { menuOpen.value = false })
 
 const navLinks = [
   { to: '/dashboard', label: 'Dashboard' },
-  { to: '/trips',     label: 'My Trips'  },
   { to: '/map',       label: 'Map'       },
 ]
 

@@ -33,9 +33,9 @@
             Add gauge
           </UButton>
         </div>
-        <section v-for="group in store.byReach" :key="group.reach ?? 'other'" class="mb-6">
+        <section v-for="group in store.byRiver" :key="group.river ?? 'other'" class="mb-6">
           <div class="flex items-center gap-2 mb-3">
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ group.reach ?? 'Other Gauges' }}</h2>
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ group.river ?? 'Other Gauges' }}</h2>
             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
           </div>
 

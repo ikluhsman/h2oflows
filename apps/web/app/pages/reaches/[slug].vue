@@ -476,14 +476,14 @@
         </div>
       </section>
 
-      <!-- Run notes -->
+      <!-- Share your experience -->
       <section v-if="reach">
         <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-950">
           <button
             class="w-full flex items-center justify-between px-4 py-3 text-left"
             @click="noteFormOpen = !noteFormOpen"
           >
-            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Share a note</span>
+            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Share your experience</span>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="w-4 h-4 text-gray-400 transition-transform"
@@ -498,11 +498,37 @@
               <p class="text-xs text-gray-400 mt-0.5">Your note helps other paddlers plan their run.</p>
               <button
                 class="mt-3 text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2"
-                @click="noteSubmitted = false; noteText = ''; noteImpression = null"
+                @click="resetNoteForm"
               >Add another</button>
             </div>
 
             <template v-else>
+              <!-- Note type -->
+              <div>
+                <p class="text-xs text-gray-500 mb-2">What are you sharing?</p>
+                <div class="flex flex-wrap gap-1.5">
+                  <button
+                    v-for="nt in noteTypeOptions"
+                    :key="nt.value"
+                    class="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+                    :class="noteType === nt.value
+                      ? 'bg-blue-600 border-blue-600 text-white'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'"
+                    @click="noteType = nt.value"
+                  >{{ nt.label }}</button>
+                </div>
+              </div>
+
+              <!-- When -->
+              <div>
+                <p class="text-xs text-gray-500 mb-2">When were you on the water?</p>
+                <input
+                  v-model="noteObservedAt"
+                  type="datetime-local"
+                  class="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-400/40"
+                />
+              </div>
+
               <!-- Flow impression -->
               <div>
                 <p class="text-xs text-gray-500 mb-2">How were flows?</p>
@@ -522,12 +548,38 @@
               <!-- Note text -->
               <textarea
                 v-model="noteText"
-                placeholder="Optional: conditions, hazards, shuttle info…"
+                placeholder="Conditions, hazards, shuttle info, beta…"
                 rows="3"
                 class="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-gray-700 dark:text-gray-300 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-400/40"
               />
 
-              <div class="flex items-center justify-between gap-3">
+              <!-- Photos placeholder -->
+              <div class="rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700 px-4 py-5 flex flex-col items-center gap-1.5 opacity-50 cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span class="text-xs text-gray-400">Add photos</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">Coming soon</span>
+              </div>
+
+              <!-- Share targets -->
+              <div>
+                <p class="text-xs text-gray-500 mb-2">Share to</p>
+                <div class="space-y-2">
+                  <label class="flex items-center gap-2.5 text-xs">
+                    <input type="checkbox" checked disabled class="rounded border-gray-300 text-blue-600 cursor-not-allowed" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    <span class="text-gray-700 dark:text-gray-300 font-medium">h2oflows</span>
+                  </label>
+                  <label v-for="target in futureShareTargets" :key="target.name" class="flex items-center gap-2.5 text-xs opacity-40 cursor-not-allowed">
+                    <input type="checkbox" disabled class="rounded border-gray-300 cursor-not-allowed" />
+                    <span class="w-4 h-4 flex items-center justify-center text-gray-400" v-html="target.icon" />
+                    <span class="text-gray-500">{{ target.name }}</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">Coming soon</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Submit -->
+              <div class="flex items-center justify-between gap-3 pt-1">
                 <p class="text-xs text-gray-400">Helps AI-powered answers get better over time</p>
                 <button
                   class="shrink-0 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-semibold transition-colors"
@@ -1176,25 +1228,60 @@ async function sendQuestion(question: string) {
   }
 }
 
-// ---- Run notes --------------------------------------------------------------
+// ---- Share your experience --------------------------------------------------
 
 const noteFormOpen   = ref(false)
+const noteType       = ref<'trip_report' | 'flow_update' | 'hazard_alert' | 'general'>('flow_update')
 const noteImpression = ref<'too_low' | 'good' | 'high' | null>(null)
 const noteText       = ref('')
+const noteObservedAt = ref('')
 const noteSubmitted  = ref(false)
 
+const noteTypeOptions = [
+  { value: 'flow_update'   as const, label: 'Flow Update' },
+  { value: 'trip_report'   as const, label: 'Trip Report' },
+  { value: 'hazard_alert'  as const, label: 'Hazard Alert' },
+  { value: 'general'       as const, label: 'General' },
+]
+
 const impressionOptions = [
-  { value: 'too_low' as const, label: 'Too low',   activeClass: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' },
-  { value: 'good'    as const, label: 'About right', activeClass: 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' },
+  { value: 'too_low' as const, label: 'Too low',      activeClass: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' },
+  { value: 'good'    as const, label: 'About right',  activeClass: 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' },
   { value: 'high'    as const, label: 'High / Flood', activeClass: 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300' },
 ]
+
+const futureShareTargets = [
+  { name: 'American Whitewater', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s2-4 5-4 5 8 8 8 5-4 5-4"/><path d="M2 6s2-4 5-4 5 8 8 8 5-4 5-4"/><path d="M2 18s2-4 5-4 5 8 8 8 5-4 5-4"/></svg>' },
+  { name: 'Instagram',           icon: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1"/></svg>' },
+  { name: 'X (Twitter)',         icon: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l11.7 16h4.3M4 20L20 4"/></svg>' },
+  { name: 'YouTube / Vimeo',     icon: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="4"/><polygon points="10 8 16 12 10 16 10 8"/></svg>' },
+]
+
+watch(noteFormOpen, (open) => {
+  if (open && !noteObservedAt.value) {
+    noteObservedAt.value = new Date().toISOString().slice(0, 16)
+  }
+})
 
 const { submit: submitRunNote } = useRunNotes(String(route.params.slug))
 
 function submitNote() {
   if (!noteImpression.value) return
-  submitRunNote({ flow_impression: noteImpression.value, note_text: noteText.value.trim() })
+  submitRunNote({
+    note_type: noteType.value,
+    flow_impression: noteImpression.value,
+    note_text: noteText.value.trim(),
+    observed_at: noteObservedAt.value ? new Date(noteObservedAt.value).toISOString() : new Date().toISOString(),
+  })
   noteSubmitted.value = true
+}
+
+function resetNoteForm() {
+  noteSubmitted.value = false
+  noteType.value = 'flow_update'
+  noteImpression.value = null
+  noteText.value = ''
+  noteObservedAt.value = new Date().toISOString().slice(0, 16)
 }
 
 // ---- Delete reach -----------------------------------------------------------

@@ -176,6 +176,8 @@
             </button>
           </form>
 
+          <p v-if="searching" class="text-sm text-gray-400 dark:text-gray-500 animate-pulse text-center -mt-1 mb-2">{{ loadingVerb }}…</p>
+
           <!-- Answer cards — one per matched reach -->
           <div v-if="searchResult && searchResult.results.length > 0" class="mb-3 flex flex-col gap-2">
             <div
@@ -343,6 +345,27 @@ const searching        = ref(false)
 const searchError      = ref('')
 const searchResult     = ref<AskResult | null>(null)
 const searchController = ref<AbortController | null>(null)
+
+const LOADING_VERBS = [
+  'Thinking', 'Pondering', 'Perusing', 'Flibbertigibbeting',
+  'Eddying', 'Stoking', 'Paddling', 'Navigating', 'Formulating',
+  'Hydrating', 'Pumping', 'Rolling', 'Ferrying', 'Scouting',
+  'Reading the water', 'Catching an eddy', 'Running the rapid',
+]
+const loadingVerb = ref(LOADING_VERBS[0])
+let verbInterval: ReturnType<typeof setInterval> | null = null
+
+watch(searching, (active) => {
+  if (active) {
+    loadingVerb.value = LOADING_VERBS[Math.floor(Math.random() * LOADING_VERBS.length)]
+    verbInterval = setInterval(() => {
+      loadingVerb.value = LOADING_VERBS[Math.floor(Math.random() * LOADING_VERBS.length)]
+    }, 2000)
+  } else {
+    if (verbInterval) { clearInterval(verbInterval); verbInterval = null }
+  }
+})
+onUnmounted(() => { if (verbInterval) clearInterval(verbInterval) })
 
 async function askQuestion() {
   // Cancel any in-flight request before starting a new one

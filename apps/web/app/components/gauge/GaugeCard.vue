@@ -11,20 +11,20 @@
       <span v-if="gauge.riverName" class="text-xs text-blue-400 truncate block">{{ gauge.riverName }}</span>
     </div>
 
-    <span class="text-base font-bold tabular-nums shrink-0" :class="cfsClass">
-      {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
-      <span class="text-xs font-normal text-gray-400 dark:text-gray-500">cfs</span>
-    </span>
-
-    <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" class="shrink-0 text-base hidden sm:block" />
-
-    <div class="w-16 shrink-0 hidden sm:block">
+    <div class="w-40 shrink-0 hidden sm:block">
       <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" compact />
     </div>
+
+    <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" size="lg" class="shrink-0 hidden sm:block" />
 
     <UBadge v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" :color="statusColor" variant="subtle" size="sm" class="shrink-0 hidden sm:flex">
       {{ statusLabel }}
     </UBadge>
+
+    <span class="text-base font-bold tabular-nums shrink-0 min-w-16 text-right" :class="cfsClass">
+      {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
+      <span class="text-xs font-normal text-gray-400 dark:text-gray-500">cfs</span>
+    </span>
 
     <button
       class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"

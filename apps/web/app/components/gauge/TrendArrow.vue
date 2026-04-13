@@ -5,7 +5,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 
-const props = defineProps<{ gaugeId: string }>()
+const props = withDefaults(defineProps<{ gaugeId: string; size?: 'sm' | 'lg' }>(), { size: 'sm' })
 
 // Trend derived from the two most recent readings fetched from the API.
 // Falls back to 'flat' if unavailable (no history yet, API error, etc.).
@@ -35,7 +35,8 @@ const arrowClass = computed(() => ({
   'text-red-500':    trend.value === 'rising',
   'text-blue-400':   trend.value === 'falling',
   'text-gray-400':   trend.value === 'flat',
-  'text-sm font-semibold': true,
+  'text-sm font-semibold': props.size === 'sm',
+  'text-xl font-bold': props.size === 'lg',
 }))
 const arrowTitle = computed(() => ({
   rising:  'Rising',
