@@ -20,31 +20,52 @@
 
       <!-- Global Ask button -->
       <button
-        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+        class="shrink-0 hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
         title="Ask anything"
         @click="askOpen = true"
       >
-        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
-        <span class="text-xs font-medium">Ask</span>
+        <span class="text-xs">Ask anything…</span>
       </button>
 
-      <!-- Auth — desktop only -->
+      <!-- Auth — avatar dropdown on desktop -->
       <ClientOnly>
-        <template v-if="isAuthenticated">
+        <div class="hidden sm:block relative shrink-0" data-user-menu>
           <button
-            class="hidden sm:inline shrink-0 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-            :title="`Signed in as ${user?.email ?? user?.user_metadata?.user_name ?? 'you'}`"
-            @click="handleSignOut"
-          >Sign out</button>
-        </template>
-        <template v-else>
-          <NuxtLink
-            to="/login"
-            class="hidden sm:inline shrink-0 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-          >Sign in</NuxtLink>
-        </template>
+            class="flex items-center justify-center w-7 h-7 rounded-full transition-colors"
+            :class="isAuthenticated
+              ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'"
+            :title="isAuthenticated ? `Signed in as ${user?.email ?? user?.user_metadata?.user_name ?? 'you'}` : 'Sign in'"
+            @click="userMenuOpen = !userMenuOpen"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/>
+            </svg>
+          </button>
+          <div
+            v-if="userMenuOpen"
+            class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-30"
+          >
+            <template v-if="isAuthenticated">
+              <p class="px-3 py-1.5 text-xs text-gray-400 truncate">{{ user?.email ?? user?.user_metadata?.user_name }}</p>
+              <div class="border-t border-gray-100 dark:border-gray-800" />
+              <button
+                class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                @click="userMenuOpen = false; handleSignOut()"
+              >Sign out</button>
+            </template>
+            <template v-else>
+              <NuxtLink
+                to="/login"
+                class="block px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                @click="userMenuOpen = false"
+              >Sign in</NuxtLink>
+            </template>
+          </div>
+        </div>
       </ClientOnly>
 
       <!-- Dashboard shortcut — always visible -->
@@ -205,17 +226,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch } from 'vue'
+import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 
 const { user, isAuthenticated, signOut } = useAuth()
 const router = useRouter()
 const route = useRoute()
 const menuOpen = ref(false)
+const userMenuOpen = ref(false)
 
 const { apiBase } = useRuntimeConfig().public
 
-// Close menu on route change
-watch(() => route.path, () => { menuOpen.value = false })
+// Close menus on route change
+watch(() => route.path, () => { menuOpen.value = false; userMenuOpen.value = false })
+
+function onDocClick(e: MouseEvent) {
+  if (userMenuOpen.value && !(e.target as HTMLElement).closest('[data-user-menu]')) {
+    userMenuOpen.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', onDocClick))
+onUnmounted(() => document.removeEventListener('click', onDocClick))
 
 async function handleSignOut() {
   menuOpen.value = false

@@ -11,6 +11,12 @@
  * 48h rolling cache — no extra API calls required.
  */
 
+export interface DiurnalForecast {
+  cfs:  number
+  hour: number   // 0–23 local time
+  label: string  // e.g. "~216 cfs by 3pm"
+}
+
 export interface DiurnalPattern {
   detected:          boolean
   phase:             'rising' | 'falling' | 'near_peak' | 'near_trough' | 'stable' | null
@@ -18,6 +24,7 @@ export interface DiurnalPattern {
   peakCfs:           number | null
   troughCfs:         number | null
   swingPct:          number | null   // (peak − trough) / trough × 100
+  forecast:          DiurnalForecast | null  // 4h look-ahead
 }
 
 interface Reading {
@@ -32,6 +39,7 @@ const NULL_PATTERN: DiurnalPattern = {
   peakCfs:           null,
   troughCfs:         null,
   swingPct:          null,
+  forecast:          null,
 }
 
 /**
@@ -77,6 +85,9 @@ export function useDiurnalPattern(readings: Reading[]): DiurnalPattern {
   // Pattern confirmed. Now determine today's phase.
   const phase = detectPhase(today, yPeak.cfs, yTrough.cfs)
 
+  // 4-hour look-ahead: estimate CFS by interpolating yesterday's hourly curve.
+  const forecast = computeForecast(yesterday, 4)
+
   return {
     detected:          true,
     phase,
@@ -84,6 +95,7 @@ export function useDiurnalPattern(readings: Reading[]): DiurnalPattern {
     peakCfs:           yPeak.cfs,
     troughCfs:         yTrough.cfs,
     swingPct:          Math.round(swing),
+    forecast,
   }
 }
 
@@ -122,6 +134,39 @@ function detectPhase(
   if (delta / oldest >  0.02) return 'rising'
   if (delta / oldest < -0.02) return 'falling'
   return 'stable'
+}
+
+/**
+ * Estimate what CFS will be `hoursAhead` hours from now, using yesterday's
+ * hourly profile as the template. Finds the reading from yesterday at the
+ * same hour-of-day as the target time.
+ */
+function computeForecast(yesterday: Reading[], hoursAhead: number): DiurnalForecast | null {
+  if (yesterday.length < 8) return null
+
+  const targetTime = new Date(Date.now() + hoursAhead * 3_600_000)
+  const targetHour = targetTime.getHours()
+
+  // Bucket yesterday's readings by hour, take the average per bucket.
+  const buckets = new Map<number, number[]>()
+  for (const r of yesterday) {
+    const h = new Date(r.timestamp).getHours()
+    if (!buckets.has(h)) buckets.set(h, [])
+    buckets.get(h)!.push(r.cfs)
+  }
+
+  const hourAvg = buckets.get(targetHour)
+  if (!hourAvg || hourAvg.length === 0) return null
+
+  const cfs = Math.round(hourAvg.reduce((a, b) => a + b, 0) / hourAvg.length)
+  const ampm = targetHour >= 12 ? 'pm' : 'am'
+  const display = targetHour % 12 === 0 ? 12 : targetHour % 12
+
+  return {
+    cfs,
+    hour: targetHour,
+    label: `~${cfs.toLocaleString()} cfs by ${display}${ampm}`,
+  }
 }
 
 // ---- Tiny helpers -----------------------------------------------------------

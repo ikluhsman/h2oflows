@@ -112,6 +112,19 @@
     <GaugeSparkline v-if="density === 'comfortable'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact class="mb-1" />
     <GaugeSparkline v-else-if="density === 'full'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" class="mb-2" />
 
+    <!-- Diurnal forecast — compact/comfortable: one-liner; full: richer summary -->
+    <p v-if="diurnal.detected && diurnal.forecast && density !== 'full'" class="relative text-[10px] text-gray-400 dark:text-gray-500 truncate">
+      {{ diurnal.forecast.label }}
+    </p>
+    <div v-if="diurnal.detected && density === 'full'" class="flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 mb-1">
+      <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      <span class="truncate">
+        {{ diurnalPhaseLabel }}
+        <template v-if="diurnal.forecast"> · {{ diurnal.forecast.label }}</template>
+        <template v-if="diurnal.swingPct != null"> · {{ diurnal.swingPct }}% swing</template>
+      </span>
+    </div>
+
     <!-- Last updated — full only, when no subtitle already shows source info -->
     <p v-if="density === 'full' && !contextFullName" class="text-xs text-gray-400 mt-1 truncate">
       {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
@@ -123,6 +136,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
+import { useDiurnalCache } from '~/composables/useDiurnalCache'
 
 const props = defineProps<{
   gauge: WatchedGauge
@@ -132,6 +146,19 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'open'): void }>()
 
 const { removeAndSync } = useWatchlistSync()
+
+const { pattern: diurnal } = useDiurnalCache(props.gauge.id)
+
+const diurnalPhaseLabel = computed(() => {
+  switch (diurnal.value.phase) {
+    case 'rising':       return 'Rising'
+    case 'falling':      return 'Falling'
+    case 'near_peak':    return 'Near peak'
+    case 'near_trough':  return 'Near trough'
+    case 'stable':       return 'Stable'
+    default:             return ''
+  }
+})
 
 const currentCfs = computed(() => props.gauge.currentCfs)
 
@@ -150,9 +177,12 @@ const contextFullName = computed(() => props.gauge.contextReachFullName ?? null)
 
 const statusColor = computed(() => {
   const band = props.gauge.flowBandLabel
-  if (band === 'low_runnable')  return 'lime'
-  if (band === 'med_runnable')  return 'emerald'
-  if (band === 'high_runnable') return 'green'
+  if (band === 'below_recommended') return 'error'
+  if (band === 'low_runnable')      return 'lime'
+  if (band === 'runnable')          return 'emerald'
+  if (band === 'med_runnable')      return 'emerald'
+  if (band === 'high_runnable')     return 'green'
+  if (band === 'above_recommended') return 'info'
   switch (props.gauge.flowStatus) {
     case 'runnable': return 'emerald'
     case 'caution':  return 'warning'
