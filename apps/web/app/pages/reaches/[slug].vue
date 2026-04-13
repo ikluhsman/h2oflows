@@ -165,27 +165,23 @@
           </div>
 
           <div class="flex items-center gap-2 shrink-0">
-            <span class="rounded-lg bg-gray-100 dark:bg-gray-800 px-3 py-1.5 font-bold text-sm">{{ classLabel }}</span>
+            <span class="rounded-lg px-3 py-1.5 font-bold text-sm text-white" :style="{ backgroundColor: difficultyColor }">{{ classLabel }}</span>
+            <UBadge
+              v-if="allGauges.length > 0 && allGauges[0].flow_status && allGauges[0].flow_status !== 'unknown'"
+              :color="flowStatusColor(allGauges[0].flow_status)"
+              variant="subtle"
+              size="md"
+            >{{ flowStatusLabel(allGauges[0].flow_status) }}</UBadge>
           </div>
         </div>
-      </section>
-
-      <!-- Reach map (top) -->
-      <section>
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Map</h2>
-        <ClientOnly>
-          <ReachMap
-            :name="reach.name"
-            :class-max="reach.class_max"
-            :centerline="displayCenterline"
-            :rapids="reach.rapids"
-            :access="reach.access"
-            :gauges="allGauges"
-            :slug="(reach as any).slug"
-            :river-name="(reach as any).river_name ?? undefined"
-            @gauge-add="(id) => { const g = allGauges.find((x: any) => x.id === id); if (g) addToDashboard(g) }"
-          />
-        </ClientOnly>
+        <!-- Inline current flow -->
+        <div v-if="allGauges.length > 0 && allGauges[0].current_cfs != null" class="flex items-baseline gap-1.5 mt-2">
+          <span class="text-2xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
+            {{ allGauges[0].current_cfs.toLocaleString() }}
+          </span>
+          <span class="text-sm text-gray-500">cfs</span>
+          <span v-if="allGauges[0].last_reading_at" class="text-xs text-gray-400">· {{ relativeTime(allGauges[0].last_reading_at) }}</span>
+        </div>
       </section>
 
       <!-- River assistant — Ask about this reach -->
@@ -285,45 +281,53 @@
         </div>
       </section>
 
-      <!-- Quick stats -->
+      <!-- Reach map -->
       <section>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
-            <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Difficulty</div>
-            <div class="text-lg font-bold text-gray-800 dark:text-gray-100">{{ classLabel }}</div>
-          </div>
-          <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
-            <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Length</div>
-            <div class="text-lg font-bold text-gray-800 dark:text-gray-100">
-              {{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}
+        <ClientOnly>
+          <ReachMap
+            :name="reach.name"
+            :class-max="reach.class_max"
+            :centerline="displayCenterline"
+            :rapids="reach.rapids"
+            :access="reach.access"
+            :gauges="allGauges"
+            :slug="(reach as any).slug"
+            :river-name="(reach as any).river_name ?? undefined"
+            @gauge-add="(id) => { const g = allGauges.find((x: any) => x.id === id); if (g) addToDashboard(g) }"
+          />
+        </ClientOnly>
+      </section>
+
+      <!-- Quick stats — consolidated -->
+      <section>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
+          <div class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 flex-wrap gap-y-2">
+            <div class="pr-4">
+              <div class="text-[10px] text-gray-400 uppercase tracking-wide">Difficulty</div>
+              <div class="text-sm font-bold" :style="{ color: difficultyColor }">{{ classLabel }}</div>
             </div>
-          </div>
-          <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
-            <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Gradient</div>
-            <div class="text-lg font-bold text-gray-800 dark:text-gray-100">—</div>
-          </div>
-          <!-- Current flow — spanning 2 cols on mobile -->
-          <div v-if="allGauges.length > 0" class="col-span-2 sm:col-span-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between gap-4">
-            <div>
-              <div class="text-xs text-gray-400 uppercase tracking-wide mb-1">Current Flow</div>
-              <div class="flex items-baseline gap-1.5">
-                <span class="text-3xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
-                  {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
-                </span>
-                <span class="text-gray-500">cfs</span>
-                <span v-if="allGauges[0].last_reading_at" class="text-xs text-gray-400">· {{ relativeTime(allGauges[0].last_reading_at) }}</span>
+            <div class="px-4">
+              <div class="text-[10px] text-gray-400 uppercase tracking-wide">Length</div>
+              <div class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}</div>
+            </div>
+            <div class="px-4">
+              <div class="text-[10px] text-gray-400 uppercase tracking-wide">Gradient</div>
+              <div class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ reach.gradient_fpm != null ? `${reach.gradient_fpm} ft/mi` : '—' }}</div>
+            </div>
+            <div v-if="allGauges.length > 0" class="pl-4 flex-1 flex items-center justify-between gap-3">
+              <div>
+                <div class="text-[10px] text-gray-400 uppercase tracking-wide">Flow</div>
+                <div class="flex items-baseline gap-1">
+                  <span class="text-sm font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
+                    {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
+                  </span>
+                  <span class="text-xs text-gray-500">cfs</span>
+                </div>
               </div>
-              <UBadge
-                v-if="allGauges[0].flow_status && allGauges[0].flow_status !== 'unknown'"
-                :color="flowStatusColor(allGauges[0].flow_status)"
-                variant="subtle"
-                size="sm"
-                class="mt-1.5"
-              >{{ flowStatusLabel(allGauges[0].flow_status) }}</UBadge>
+              <a href="#flow-gauge" class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors">
+                Graph ↓
+              </a>
             </div>
-            <a href="#flow-gauge" class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors">
-              View graph ↓
-            </a>
           </div>
         </div>
       </section>
@@ -487,121 +491,7 @@
         </div>
       </section>
 
-      <!-- Share your experience -->
-      <section v-if="reach" ref="shareSection">
-        <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-950">
-          <button
-            class="w-full flex items-center justify-between px-4 py-3 text-left"
-            @click="noteFormOpen = !noteFormOpen"
-          >
-            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Share your experience</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-4 h-4 text-gray-400 transition-transform"
-              :class="noteFormOpen ? 'rotate-180' : ''"
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            ><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-
-          <div v-if="noteFormOpen" class="border-t border-gray-100 dark:border-gray-800 px-4 py-4 space-y-4">
-            <div v-if="noteSubmitted" class="text-center py-2">
-              <p class="text-sm font-medium text-emerald-600 dark:text-emerald-400">Thanks for sharing!</p>
-              <p class="text-xs text-gray-400 mt-0.5">Your note helps other paddlers plan their run.</p>
-              <button
-                class="mt-3 text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 underline underline-offset-2"
-                @click="resetNoteForm"
-              >Add another</button>
-            </div>
-
-            <template v-else>
-              <!-- Note type -->
-              <div>
-                <p class="text-xs text-gray-500 mb-2">What are you sharing?</p>
-                <div class="flex flex-wrap gap-1.5">
-                  <button
-                    v-for="nt in noteTypeOptions"
-                    :key="nt.value"
-                    class="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
-                    :class="noteType === nt.value
-                      ? 'bg-blue-600 border-blue-600 text-white'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'"
-                    @click="noteType = nt.value"
-                  >{{ nt.label }}</button>
-                </div>
-              </div>
-
-              <!-- When -->
-              <div>
-                <p class="text-xs text-gray-500 mb-2">When were you on the water?</p>
-                <input
-                  v-model="noteObservedAt"
-                  type="datetime-local"
-                  class="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-400/40"
-                />
-              </div>
-
-              <!-- Flow impression -->
-              <div>
-                <p class="text-xs text-gray-500 mb-2">How were flows?</p>
-                <div class="flex gap-2">
-                  <button
-                    v-for="opt in impressionOptions"
-                    :key="opt.value"
-                    class="flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition-colors"
-                    :class="noteImpression === opt.value
-                      ? `${opt.activeClass} border-transparent`
-                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'"
-                    @click="noteImpression = opt.value"
-                  >{{ opt.label }}</button>
-                </div>
-              </div>
-
-              <!-- Note text -->
-              <textarea
-                v-model="noteText"
-                placeholder="Conditions, hazards, shuttle info, beta…"
-                rows="3"
-                class="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-gray-700 dark:text-gray-300 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:focus:ring-blue-400/40"
-              />
-
-              <!-- Photos placeholder -->
-              <div class="rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700 px-4 py-5 flex flex-col items-center gap-1.5 opacity-50 cursor-not-allowed">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                <span class="text-xs text-gray-400">Add photos</span>
-                <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">Coming soon</span>
-              </div>
-
-              <!-- Share targets -->
-              <div>
-                <p class="text-xs text-gray-500 mb-2">Share to</p>
-                <div class="space-y-2">
-                  <label class="flex items-center gap-2.5 text-xs">
-                    <input type="checkbox" checked disabled class="rounded border-gray-300 text-blue-600 cursor-not-allowed" />
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                    <span class="text-gray-700 dark:text-gray-300 font-medium">h2oflows</span>
-                  </label>
-                  <label v-for="target in futureShareTargets" :key="target.name" class="flex items-center gap-2.5 text-xs opacity-40 cursor-not-allowed">
-                    <input type="checkbox" disabled class="rounded border-gray-300 cursor-not-allowed" />
-                    <span class="w-4 h-4 flex items-center justify-center text-gray-400" v-html="target.icon" />
-                    <span class="text-gray-500">{{ target.name }}</span>
-                    <span class="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400">Coming soon</span>
-                  </label>
-                </div>
-              </div>
-
-              <!-- Submit -->
-              <div class="flex items-center justify-between gap-3 pt-1">
-                <p class="text-xs text-gray-400">Helps AI-powered answers get better over time</p>
-                <button
-                  class="shrink-0 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-semibold transition-colors"
-                  :disabled="!noteImpression"
-                  @click="submitNote"
-                >Submit</button>
-              </div>
-            </template>
-          </div>
-        </div>
-      </section>
+      <!-- Share modal placeholder — full implementation in Phase B2 -->
 
       <!-- Tributary / other related reaches -->
       <section v-if="tributaryReaches.length > 0">
@@ -962,6 +852,15 @@ const classLabel = computed(() => {
   return base
 })
 
+const difficultyColor = computed(() => {
+  const c = (reach.value as any)?.class_max
+  if (c == null) return '#6b7280'
+  if (c < 3.0) return '#16a34a'
+  if (c < 4.0) return '#3b82f6'
+  if (c < 5.0) return '#1f2937'
+  return '#dc2626'
+})
+
 const statusColor = computed(() => {
   switch (reach.value?.gauge.flow_status) {
     case 'runnable': return 'success'
@@ -1194,7 +1093,7 @@ async function fetchCenterline() {
 
 // ---- River assistant chat ---------------------------------------------------
 
-const showChat      = ref(false)
+const showChat      = ref(true)
 const chatMessages  = ref<{ role: 'user' | 'assistant'; content: string }[]>([])
 const chatInput     = ref('')
 const chatLoading   = ref(false)
@@ -1239,66 +1138,12 @@ async function sendQuestion(question: string) {
   }
 }
 
-// ---- Share your experience --------------------------------------------------
+// ---- Share (placeholder — full modal in Phase B2) --------------------------
 
-const shareSection   = ref<HTMLElement>()
-const noteFormOpen   = ref(false)
-const noteType       = ref<'trip_report' | 'flow_update' | 'hazard_alert' | 'general'>('flow_update')
-const noteImpression = ref<'too_low' | 'good' | 'high' | null>(null)
-const noteText       = ref('')
-const noteObservedAt = ref('')
-const noteSubmitted  = ref(false)
-
-const noteTypeOptions = [
-  { value: 'flow_update'   as const, label: 'Flow Update' },
-  { value: 'trip_report'   as const, label: 'Trip Report' },
-  { value: 'hazard_alert'  as const, label: 'Hazard Alert' },
-  { value: 'general'       as const, label: 'General' },
-]
-
-const impressionOptions = [
-  { value: 'too_low' as const, label: 'Too low',      activeClass: 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' },
-  { value: 'good'    as const, label: 'About right',  activeClass: 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300' },
-  { value: 'high'    as const, label: 'High / Flood', activeClass: 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300' },
-]
-
-const futureShareTargets = [
-  { name: 'American Whitewater', icon: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s2-4 5-4 5 8 8 8 5-4 5-4"/><path d="M2 6s2-4 5-4 5 8 8 8 5-4 5-4"/><path d="M2 18s2-4 5-4 5 8 8 8 5-4 5-4"/></svg>' },
-  { name: 'Instagram',           icon: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1"/></svg>' },
-  { name: 'X (Twitter)',         icon: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l11.7 16h4.3M4 20L20 4"/></svg>' },
-  { name: 'YouTube / Vimeo',     icon: '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="4"/><polygon points="10 8 16 12 10 16 10 8"/></svg>' },
-]
-
-watch(noteFormOpen, (open) => {
-  if (open && !noteObservedAt.value) {
-    noteObservedAt.value = new Date().toISOString().slice(0, 16)
-  }
-})
-
-const { submit: submitRunNote } = useRunNotes(String(route.params.slug))
-
-function submitNote() {
-  if (!noteImpression.value) return
-  submitRunNote({
-    note_type: noteType.value,
-    flow_impression: noteImpression.value,
-    note_text: noteText.value.trim(),
-    observed_at: noteObservedAt.value ? new Date(noteObservedAt.value).toISOString() : new Date().toISOString(),
-  })
-  noteSubmitted.value = true
-}
+const toast = useToast()
 
 function openShareForm() {
-  noteFormOpen.value = true
-  nextTick(() => shareSection.value?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
-}
-
-function resetNoteForm() {
-  noteSubmitted.value = false
-  noteType.value = 'flow_update'
-  noteImpression.value = null
-  noteText.value = ''
-  noteObservedAt.value = new Date().toISOString().slice(0, 16)
+  toast.add({ title: 'Trip reports coming soon!', description: 'Share modal is in development.', color: 'info' })
 }
 
 // ---- Delete reach -----------------------------------------------------------

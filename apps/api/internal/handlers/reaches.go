@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/h2oflow/h2oflow/apps/api/internal/ai"
+	"github.com/h2oflow/h2oflow/apps/api/internal/elevation"
 	"github.com/h2oflow/h2oflow/apps/api/internal/osm"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -515,6 +516,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			r.class_hardest,
 			r.character,
 			r.length_mi,
+			r.gradient_fpm,
 			r.description,
 			r.description_source,
 			r.description_ai_confidence,
@@ -569,7 +571,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 	`, slug).Scan(
 		&reach.ID, &reach.Slug, &reach.Name, &reach.Region,
 		&reach.ClassMin, &reach.ClassMax, &reach.ClassHardest, &reach.Character, &reach.LengthMi,
-		&reach.Description, &reach.DescriptionSource,
+		&reach.GradientFPM, &reach.Description, &reach.DescriptionSource,
 		&reach.DescriptionConfidence, &reach.DescriptionVerified,
 		&reach.AWReachID, &reach.WatershedName,
 		&reach.RiverName, &reach.CommonName, &reach.PutInName, &reach.TakeOutName,
@@ -802,6 +804,7 @@ type reachDetail struct {
 	ClassHardest            *float64        `json:"class_hardest"`
 	Character               *string         `json:"character"`
 	LengthMi                *float64        `json:"length_mi"`
+	GradientFPM             *float64        `json:"gradient_fpm"`
 	Description             *string         `json:"description"`
 	DescriptionSource       *string         `json:"description_source"`
 	DescriptionConfidence   *int            `json:"description_ai_confidence"`
@@ -1298,6 +1301,45 @@ func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, exp
 		log.Printf("centerline update for %s: %v", slug, err)
 		return "", "", &fetchCenterlineError{fetchErrDB, "failed to save centerline"}
 	}
+
+	// Calculate gradient (ft/mi) from USGS elevation at first and last coordinates.
+	// Non-fatal — gradient is a nice-to-have enhancement.
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		var geom struct {
+			Coordinates [][2]float64 `json:"coordinates"`
+		}
+		if err := json.Unmarshal([]byte(lineJSON), &geom); err != nil || len(geom.Coordinates) < 2 {
+			return
+		}
+		first := geom.Coordinates[0]
+		last := geom.Coordinates[len(geom.Coordinates)-1]
+
+		elevStart, err := elevation.QueryElevation(bgCtx, first[0], first[1])
+		if err != nil {
+			log.Printf("gradient elevation (start) for %s: %v", slug, err)
+			return
+		}
+		elevEnd, err := elevation.QueryElevation(bgCtx, last[0], last[1])
+		if err != nil {
+			log.Printf("gradient elevation (end) for %s: %v", slug, err)
+			return
+		}
+
+		var lengthMi float64
+		if err := h.db.QueryRow(bgCtx, `SELECT COALESCE(length_mi, 0) FROM reaches WHERE id = $1`, reachID).Scan(&lengthMi); err != nil || lengthMi <= 0 {
+			return
+		}
+
+		gradient := (elevStart - elevEnd) / lengthMi
+		if _, err := h.db.Exec(bgCtx, `UPDATE reaches SET gradient_fpm = ROUND($1::numeric, 1) WHERE id = $2`, gradient, reachID); err != nil {
+			log.Printf("gradient update for %s: %v", slug, err)
+		} else {
+			log.Printf("gradient for %s: %.1f ft/mi (elev %.0f→%.0f, %.2f mi)", slug, gradient, elevStart, elevEnd, lengthMi)
+		}
+	}()
 
 	return lineJSON, reachID, nil
 }

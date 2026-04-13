@@ -1,11 +1,16 @@
 <template>
   <!-- Map + feature list side-by-side on sm+, stacked on mobile -->
-  <div class="rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:h-140">
+  <div
+    :class="isFullscreen
+      ? 'fixed inset-0 z-50 flex flex-col sm:flex-row bg-white dark:bg-gray-950'
+      : 'rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:h-140'"
+  >
 
     <!-- MapLibre container — ref is on THIS element so MapLibre reads its own clientHeight -->
     <div
       ref="container"
-      class="relative flex-1 min-h-80 sm:min-h-0 bg-gray-100 dark:bg-gray-800"
+      class="relative flex-1 bg-gray-100 dark:bg-gray-800"
+      :class="isFullscreen ? '' : 'min-h-100 sm:min-h-0'"
     >
       <div
         v-if="!mapReady && hasCoords"
@@ -36,6 +41,13 @@
           class="text-xs bg-white/90 dark:bg-gray-800/90 rounded-md px-2 py-1 shadow border border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           @click="exportKml"
         >⬇ KML</button>
+        <button
+          class="text-xs bg-white/90 dark:bg-gray-800/90 rounded-md px-2 py-1 shadow border border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          @click="toggleFullscreen"
+        >
+          <svg v-if="!isFullscreen" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+          <svg v-else class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 14h6v6m10-10h-6V4m0 6l7-7M3 21l7-7"/></svg>
+        </button>
       </div>
     </div>
 
@@ -371,9 +383,10 @@ const hasCoords = computed(() =>
 
 // ── Map state ─────────────────────────────────────────────────────────────────
 
-const container  = ref<HTMLDivElement>()
-const mapReady   = ref(false)
-const selectedId = ref<string | null>(null)
+const container    = ref<HTMLDivElement>()
+const mapReady     = ref(false)
+const selectedId   = ref<string | null>(null)
+const isFullscreen = ref(false)
 const basemap = ref<'street' | 'topo' | 'satellite'>('street')
 const BASEMAP_OPTIONS = [
   { value: 'street',    label: 'Street'    },
@@ -712,6 +725,24 @@ function setBasemap(value: 'street' | 'topo' | 'satellite') {
   map.setLayoutProperty('topo-tiles',   'visibility', value === 'topo'      ? 'visible' : 'none')
   map.setLayoutProperty('esri-tiles',   'visibility', value === 'satellite' ? 'visible' : 'none')
 }
+
+// ── Fullscreen ───────────────────────────────────────────────────────────────
+
+function toggleFullscreen() {
+  isFullscreen.value = !isFullscreen.value
+  if (isFullscreen.value) {
+    document.body.style.overflow = 'hidden'
+  } else {
+    document.body.style.overflow = ''
+  }
+  nextTick(() => map?.resize())
+}
+
+function onEscKey(e: KeyboardEvent) {
+  if (e.key === 'Escape' && isFullscreen.value) toggleFullscreen()
+}
+onMounted(() => document.addEventListener('keydown', onEscKey))
+onUnmounted(() => { document.removeEventListener('keydown', onEscKey); document.body.style.overflow = '' })
 
 // ── KML export ────────────────────────────────────────────────────────────────
 

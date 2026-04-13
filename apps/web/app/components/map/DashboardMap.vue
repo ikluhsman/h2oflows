@@ -63,6 +63,10 @@ const gaugeTooltip = new maplibregl.Popup({
   closeButton: false, closeOnClick: false, offset: [0, -28],
   className: 'dash-map-tooltip',
 })
+const reachTooltip = new maplibregl.Popup({
+  closeButton: false, closeOnClick: false, offset: [0, -8],
+  className: 'dash-map-tooltip',
+})
 
 // Colorado bbox — all current reaches are here
 const CO_BBOX = '-109.1,36.9,-102.0,41.1'
@@ -77,6 +81,12 @@ let fetchSeq       = 0   // incremented on each call; lets an in-flight fetch se
 function difficultyColorExpr(): any {
   return ['step', ['coalesce', ['get', 'class_max'], 0],
     '#16a34a', 3.0, '#3b82f6', 4.0, '#111827', 5.0, '#111827']
+}
+
+function classLabel(c: number): string {
+  const whole = Math.floor(c)
+  const roman: Record<number, string> = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V', 6: 'VI' }
+  return (roman[whole] ?? String(whole)) + (c % 1 >= 0.4 ? '+' : '')
 }
 
 // Build a MapLibre match expression that returns full opacity for dashboard
@@ -180,13 +190,13 @@ async function refreshData() {
 
     // Update opacity paint properties to highlight dashboard reaches
     if (m.getLayer('dash-glow')) {
-      m.setPaintProperty('dash-glow',  'line-opacity', dashOpacityExpr(dashSlugs, 0.12, 0.03))
-      m.setPaintProperty('dash-lines', 'line-opacity', dashOpacityExpr(dashSlugs, 0.9,  0.15))
+      m.setPaintProperty('dash-glow',  'line-opacity', dashOpacityExpr(dashSlugs, 0.15, 0.08))
+      m.setPaintProperty('dash-lines', 'line-opacity', dashOpacityExpr(dashSlugs, 0.95, 0.5))
       m.setPaintProperty('dash-lines', 'line-width',
         ['interpolate', ['linear'], ['zoom'], 6,
-          ['match', ['get', 'slug'], dashSlugs, 3.0, 1.0],
+          ['match', ['get', 'slug'], dashSlugs, 3.0, 1.5],
           12,
-          ['match', ['get', 'slug'], dashSlugs, 6.0, 2.0],
+          ['match', ['get', 'slug'], dashSlugs, 6.0, 3.0],
         ])
     }
 
@@ -347,8 +357,24 @@ onMounted(() => {
       const slug = e.features?.[0]?.properties?.slug
       if (slug) router.push(`/reaches/${slug}`)
     })
-    map!.on('mouseenter', 'dash-lines-hit', () => { map!.getCanvas().style.cursor = 'pointer' })
-    map!.on('mouseleave', 'dash-lines-hit', () => { map!.getCanvas().style.cursor = '' })
+    map!.on('mouseenter', 'dash-lines-hit', (e) => {
+      map!.getCanvas().style.cursor = 'pointer'
+      const props = e.features?.[0]?.properties
+      if (props?.name) {
+        const classMax = props.class_max as number | null
+        const label = classMax != null ? ` · Class ${classLabel(classMax)}` : ''
+        reachTooltip.setLngLat(e.lngLat).setHTML(
+          `<strong>${props.name}</strong>${label}`
+        ).addTo(map!)
+      }
+    })
+    map!.on('mousemove', 'dash-lines-hit', (e) => {
+      reachTooltip.setLngLat(e.lngLat)
+    })
+    map!.on('mouseleave', 'dash-lines-hit', () => {
+      map!.getCanvas().style.cursor = ''
+      reachTooltip.remove()
+    })
 
     mapReady.value = true
     refreshData()
