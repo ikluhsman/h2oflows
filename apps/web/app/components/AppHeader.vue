@@ -3,11 +3,41 @@
     <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center gap-2">
 
       <!-- Logo -->
-      <NuxtLink to="/" class="flex items-center gap-1.5 shrink-0 mr-1">
+      <NuxtLink to="/" class="flex items-center gap-1.5 shrink-0">
         <svg class="w-5 h-5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M2 12c2-4 4-6 6-6s4 6 6 6 4-6 6-6" stroke-linecap="round"/>
         </svg>
         <span class="text-sm font-bold tracking-tight hidden sm:inline">H2OFlows</span>
+      </NuxtLink>
+
+      <!-- Dashboard shortcut -->
+      <NuxtLink
+        to="/dashboard"
+        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md transition-colors"
+        :class="route.path === '/dashboard'
+          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
+          : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
+        title="Flow Dashboard"
+      >
+        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
+        </svg>
+        <span class="hidden sm:inline text-xs font-medium">Dashboard</span>
+      </NuxtLink>
+
+      <!-- Map shortcut -->
+      <NuxtLink
+        to="/map"
+        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md transition-colors"
+        :class="route.path === '/map'
+          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
+          : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
+        title="Interactive Map"
+      >
+        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+        </svg>
+        <span class="hidden sm:inline text-xs font-medium">Map</span>
       </NuxtLink>
 
       <!-- Breadcrumb / page-level content injected by each page -->
@@ -29,36 +59,6 @@
         </svg>
         <span class="text-xs">Ask anything…</span>
       </button>
-
-      <!-- Dashboard shortcut — always visible -->
-      <NuxtLink
-        to="/dashboard"
-        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md transition-colors"
-        :class="route.path === '/dashboard'
-          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
-          : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
-        title="Flow Dashboard"
-      >
-        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
-        </svg>
-        <span class="hidden sm:inline text-xs font-medium">Dashboard</span>
-      </NuxtLink>
-
-      <!-- Map shortcut — always visible -->
-      <NuxtLink
-        to="/map"
-        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md transition-colors"
-        :class="route.path === '/map'
-          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
-          : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
-        title="Interactive Map"
-      >
-        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
-        </svg>
-        <span class="hidden sm:inline text-xs font-medium">Map</span>
-      </NuxtLink>
 
       <!-- Hamburger — mobile only -->
       <button
