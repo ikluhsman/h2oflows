@@ -128,6 +128,11 @@ function locateMe() {
 
 let map: maplibregl.Map | null = null
 
+const reachTooltip = new maplibregl.Popup({
+  closeButton: false, closeOnClick: false, offset: [0, -8],
+  className: 'reach-map-tooltip',
+})
+
 // Initial viewport — western US (Colorado + surrounding states)
 const INITIAL_BBOX = { west: -116.0, south: 35.5, east: -101.5, north: 45.5 }
 
@@ -254,6 +259,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  reachTooltip.remove()
   map?.remove()
   map = null
 })
@@ -404,15 +410,26 @@ function updateLayers(features: ReachFeature[]) {
       if (slug) emit('reach-click', slug)
     })
 
-    // Hover → sync sidebar
+    // Hover → sync sidebar + tooltip
     map.on('mouseenter', 'reach-lines', e => {
       if (!map || !e.features?.length) return
       map.getCanvas().style.cursor = 'pointer'
-      const slug = (e.features[0].properties as any).slug as string
-      emit('hover-changed', slug)
+      const p = e.features[0].properties as any
+      emit('hover-changed', p.slug)
+      const commonName = p.common_name ?? p.name
+      const subtitle = p.common_name && p.common_name !== p.name
+        ? `<br><span style="opacity:0.6;font-size:0.7rem;font-weight:400">${p.name}</span>`
+        : ''
+      reachTooltip.setLngLat(e.lngLat).setHTML(
+        `<strong>${commonName}</strong>${subtitle}`
+      ).addTo(map!)
+    })
+    map.on('mousemove', 'reach-lines', e => {
+      reachTooltip.setLngLat(e.lngLat)
     })
     map.on('mouseleave', 'reach-lines', () => {
       if (map) map.getCanvas().style.cursor = ''
+      reachTooltip.remove()
       emit('hover-changed', null)
     })
   }
@@ -468,3 +485,18 @@ function difficultyColorExpr(): maplibregl.ExpressionSpecification {
   ] as any
 }
 </script>
+
+<style>
+.reach-map-tooltip .maplibregl-popup-content {
+  padding: 5px 10px !important;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: rgba(17, 24, 39, 0.92) !important;
+  color: #f9fafb !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+}
+.reach-map-tooltip .maplibregl-popup-tip {
+  border-top-color: rgba(17, 24, 39, 0.92) !important;
+}
+</style>

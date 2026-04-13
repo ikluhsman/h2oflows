@@ -30,44 +30,6 @@
         <span class="text-xs">Ask anything…</span>
       </button>
 
-      <!-- Auth — avatar dropdown on desktop -->
-      <ClientOnly>
-        <div class="hidden sm:block relative shrink-0" data-user-menu>
-          <button
-            class="flex items-center justify-center w-7 h-7 rounded-full transition-colors"
-            :class="isAuthenticated
-              ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'"
-            :title="isAuthenticated ? `Signed in as ${user?.email ?? user?.user_metadata?.user_name ?? 'you'}` : 'Sign in'"
-            @click="userMenuOpen = !userMenuOpen"
-          >
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/>
-            </svg>
-          </button>
-          <div
-            v-if="userMenuOpen"
-            class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-30"
-          >
-            <template v-if="isAuthenticated">
-              <p class="px-3 py-1.5 text-xs text-gray-400 truncate">{{ user?.email ?? user?.user_metadata?.user_name }}</p>
-              <div class="border-t border-gray-100 dark:border-gray-800" />
-              <button
-                class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                @click="userMenuOpen = false; handleSignOut()"
-              >Sign out</button>
-            </template>
-            <template v-else>
-              <NuxtLink
-                to="/login"
-                class="block px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                @click="userMenuOpen = false"
-              >Sign in</NuxtLink>
-            </template>
-          </div>
-        </div>
-      </ClientOnly>
-
       <!-- Dashboard shortcut — always visible -->
       <NuxtLink
         to="/dashboard"
@@ -98,8 +60,6 @@
         <span class="hidden sm:inline text-xs font-medium">Map</span>
       </NuxtLink>
 
-      <UColorModeButton size="sm" color="neutral" variant="ghost" class="shrink-0" />
-
       <!-- Hamburger — mobile only -->
       <button
         class="sm:hidden shrink-0 p-1.5 rounded-md text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -113,6 +73,55 @@
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
       </button>
+
+      <!-- User avatar — far right -->
+      <ClientOnly>
+        <div class="relative shrink-0" data-user-menu>
+          <button
+            class="flex items-center justify-center w-7 h-7 rounded-full transition-colors"
+            :class="isAuthenticated
+              ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'"
+            :title="isAuthenticated ? `Signed in as ${user?.email ?? user?.user_metadata?.user_name ?? 'you'}` : 'Sign in'"
+            @click="userMenuOpen = !userMenuOpen"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/>
+            </svg>
+          </button>
+          <div
+            v-if="userMenuOpen"
+            class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-30"
+          >
+            <template v-if="isAuthenticated">
+              <p class="px-3 py-1.5 text-xs text-gray-400 truncate">{{ user?.email ?? user?.user_metadata?.user_name }}</p>
+              <div class="border-t border-gray-100 dark:border-gray-800" />
+            </template>
+            <button
+              class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              @click="toggleColorMode"
+            >
+              <svg v-if="colorMode.value === 'dark'" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+              <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              {{ colorMode.value === 'dark' ? 'Light mode' : 'Dark mode' }}
+            </button>
+            <div class="border-t border-gray-100 dark:border-gray-800" />
+            <template v-if="isAuthenticated">
+              <button
+                class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                @click="userMenuOpen = false; handleSignOut()"
+              >Sign out</button>
+            </template>
+            <template v-else>
+              <NuxtLink
+                to="/login"
+                class="block px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                @click="userMenuOpen = false"
+              >Sign in</NuxtLink>
+            </template>
+          </div>
+        </div>
+      </ClientOnly>
     </div>
 
     <!-- Mobile menu dropdown -->
@@ -231,8 +240,13 @@ import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 const { user, isAuthenticated, signOut } = useAuth()
 const router = useRouter()
 const route = useRoute()
+const colorMode = useColorMode()
 const menuOpen = ref(false)
 const userMenuOpen = ref(false)
+
+function toggleColorMode() {
+  colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
+}
 
 const { apiBase } = useRuntimeConfig().public
 
