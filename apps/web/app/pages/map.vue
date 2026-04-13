@@ -25,7 +25,17 @@
         @click="showKmlGuide = !showKmlGuide"
       >KML Format Guide</button>
       <span v-if="importMsg" class="text-xs" :class="importError ? 'text-red-500' : 'text-green-600'">{{ importMsg }}</span>
+      <button
+        v-if="importLog.length > 0"
+        class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline transition-colors"
+        @click="showImportLog = !showImportLog"
+      >{{ showImportLog ? 'Hide log' : 'Show log' }}</button>
       <input ref="kmlInputRef" type="file" accept=".kmz,.kml" class="hidden" @change="onKmlSelected" />
+    </div>
+
+    <!-- Import log -->
+    <div v-if="showImportLog && importLog.length > 0" class="shrink-0 bg-gray-950 border-b border-gray-800 px-4 py-3 max-h-56 overflow-y-auto font-mono text-[11px] space-y-0.5">
+      <p v-for="(line, i) in importLog" :key="i" :class="line.startsWith('✗') || line.startsWith('⚠') ? 'text-red-400' : line.startsWith('+') ? 'text-emerald-400' : line.startsWith('✓') ? 'text-gray-300' : 'text-gray-500'">{{ line }}</p>
     </div>
 
     <!-- KML Format Guide -->
@@ -220,15 +230,19 @@ function classLabel(classMax: number | null): string {
 
 // ── Admin KML upload ──────────────────────────────────────────────────────────
 
-const kmlInputRef  = ref<HTMLInputElement | null>(null)
-const importing    = ref(false)
-const importMsg    = ref('')
-const importError  = ref(false)
-const showKmlGuide = ref(false)
+const kmlInputRef    = ref<HTMLInputElement | null>(null)
+const importing      = ref(false)
+const importMsg      = ref('')
+const importError    = ref(false)
+const showKmlGuide   = ref(false)
+const importLog      = ref<string[]>([])
+const showImportLog  = ref(false)
 
 function triggerKmlUpload() {
-  importMsg.value = ''
+  importMsg.value   = ''
   importError.value = false
+  importLog.value   = []
+  showImportLog.value = false
   kmlInputRef.value?.click()
 }
 
@@ -257,6 +271,8 @@ async function onKmlSelected(event: Event) {
     } else {
       const reachCount = Object.keys(json.reaches ?? {}).length
       importMsg.value = `Imported ${reachCount} reach${reachCount !== 1 ? 'es' : ''}`
+      importLog.value = json.log ?? []
+      if (importLog.value.length > 0) showImportLog.value = true
     }
   } catch (err: any) {
     importError.value = true

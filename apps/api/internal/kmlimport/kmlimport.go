@@ -119,9 +119,13 @@ func ParseKMLBytes(data []byte) (*KMLDoc, error) {
 		Description string    `xml:"description"`
 		Point       *xmlPoint `xml:"Point"`
 	}
+	// xmlFolder is declared as a named type so it can reference itself for
+	// nested sub-folders (Google My Maps sometimes wraps all reaches in one
+	// outer folder; we need to recurse into those).
 	type xmlFolder struct {
 		Name       string         `xml:"name"`
 		Placemarks []xmlPlacemark `xml:"Placemark"`
+		SubFolders []xmlFolder    `xml:"Folder"`
 	}
 	type xmlDocument struct {
 		Name    string      `xml:"name"`
@@ -136,21 +140,49 @@ func ParseKMLBytes(data []byte) (*KMLDoc, error) {
 		return nil, err
 	}
 
-	doc := &KMLDoc{Name: raw.Document.Name}
-	for _, xf := range raw.Document.Folders {
-		folder := KMLFolder{Name: xf.Name}
-		for _, xp := range xf.Placemarks {
-			pm := KMLPlacemark{
-				Name:        strings.TrimSpace(xp.Name),
-				Description: StripHTML(strings.TrimSpace(xp.Description)),
-			}
-			if xp.Point != nil {
-				pm.Point = &KMLPoint{Coordinates: strings.TrimSpace(xp.Point.Coordinates)}
-			}
-			folder.Placemarks = append(folder.Placemarks, pm)
+	// convertPM converts a raw xmlPlacemark to a KMLPlacemark.
+	convertPM := func(xp xmlPlacemark) KMLPlacemark {
+		pm := KMLPlacemark{
+			Name:        strings.TrimSpace(xp.Name),
+			Description: StripHTML(strings.TrimSpace(xp.Description)),
 		}
-		doc.Folders = append(doc.Folders, folder)
+		if xp.Point != nil {
+			pm.Point = &KMLPoint{Coordinates: strings.TrimSpace(xp.Point.Coordinates)}
+		}
+		return pm
 	}
+
+	// flattenFolders recursively collects reach folders.
+	// A folder that has sub-folders but no placemarks is treated as a wrapper
+	// and replaced by its children (one-level KML nesting is common in
+	// Google My Maps exports where the user organises reaches inside a layer).
+	// A folder that has placemarks (with or without sub-folders) is kept as-is;
+	// any sub-folders it also has are then flattened separately.
+	var flattenFolders func([]xmlFolder) []KMLFolder
+	flattenFolders = func(folders []xmlFolder) []KMLFolder {
+		var out []KMLFolder
+		for _, xf := range folders {
+			hasPins     := len(xf.Placemarks) > 0
+			hasSubs     := len(xf.SubFolders) > 0
+
+			if hasPins {
+				// This folder has placemarks — treat it as a reach folder.
+				kf := KMLFolder{Name: xf.Name}
+				for _, xp := range xf.Placemarks {
+					kf.Placemarks = append(kf.Placemarks, convertPM(xp))
+				}
+				out = append(out, kf)
+			}
+			if hasSubs {
+				// Recurse into sub-folders (whether or not this folder also had pins).
+				out = append(out, flattenFolders(xf.SubFolders)...)
+			}
+		}
+		return out
+	}
+
+	doc := &KMLDoc{Name: raw.Document.Name}
+	doc.Folders = flattenFolders(raw.Document.Folders)
 	return doc, nil
 }
 
