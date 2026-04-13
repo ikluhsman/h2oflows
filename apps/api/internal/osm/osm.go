@@ -87,6 +87,19 @@ func FetchReachLine(ctx context.Context, minLon, minLat, maxLon, maxLat, startLn
 	if len(chain) < 2 {
 		return "", nil
 	}
+
+	// If the chain's first point is more than ~200m from the put-in, the OSM
+	// data doesn't reach the put-in. Prepend the put-in coordinate so the
+	// line connects cleanly to the access point pin without a visible gap.
+	const putInGapThresh2 = 0.002 * 0.002 // ≈ 200m squared
+	if dist2(chain[0], startLng, startLat) > putInGapThresh2 {
+		chain = append([]coord{{startLng, startLat}}, chain...)
+	}
+	// Same for take-out.
+	if dist2(chain[len(chain)-1], endLng, endLat) > putInGapThresh2 {
+		chain = append(chain, coord{endLng, endLat})
+	}
+
 	return buildLineString(chain), nil
 }
 
