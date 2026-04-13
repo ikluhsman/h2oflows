@@ -715,6 +715,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			ctx_reach.common_name            AS context_reach_common_name,
 			ctx_reach.full_name              AS context_reach_full_name,
 			ctx_reach.river_name             AS context_reach_river_name,
+			ctx_reach.basin_group            AS context_reach_basin_group,
 			g.current_cfs,
 			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
 			fr_band.label                    AS flow_band_label
@@ -728,7 +729,8 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				CASE WHEN rctx.put_in_name IS NOT NULL AND rctx.take_out_name IS NOT NULL
 				     THEN rctx.put_in_name || ' to ' || rctx.take_out_name
 				     ELSE NULL END                     AS full_name,
-				rctx.river_name
+				rctx.river_name,
+				rctx.basin_group
 			FROM reaches rctx
 			WHERE rctx.primary_gauge_id = g.id
 			  AND rctx.slug = COALESCE(
@@ -791,9 +793,10 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			stateAbbr              *string
 			basinName              *string
 			watershedName          *string
-			contextReachCommonName *string
+			contextReachCommonName  *string
 			contextReachFullName   *string
 			contextReachRiverName  *string
+			contextReachBasinGroup *string
 			currentCFS             *float64
 			flowStatus             string
 			flowBandLabel          *string
@@ -804,7 +807,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			&reachNamesRaw, &reachSlugsRaw, &reachCommonNamesRaw,
 			&reachRelationship, &lastReadingAt,
 			&lng, &lat, &stateAbbr, &basinName, &watershedName,
-			&contextReachCommonName, &contextReachFullName, &contextReachRiverName,
+			&contextReachCommonName, &contextReachFullName, &contextReachRiverName, &contextReachBasinGroup,
 			&currentCFS, &flowStatus, &flowBandLabel,
 		); err != nil {
 			continue
@@ -839,6 +842,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				"context_reach_common_name":   contextReachCommonName,
 				"context_reach_full_name":     contextReachFullName,
 				"context_reach_river_name":    contextReachRiverName,
+				"context_reach_basin_group":   contextReachBasinGroup,
 				"current_cfs":                 currentCFS,
 				"flow_status":                 flowStatus,
 				"flow_band_label":             flowBandLabel,

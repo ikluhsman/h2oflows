@@ -55,6 +55,7 @@
         <UTooltip :text="displayName" :delay-duration="500">
           <span class="font-medium truncate block" :class="density === 'compact' ? 'text-xs' : 'text-sm'">{{ displayName }}</span>
         </UTooltip>
+        <span v-if="gauge.riverName" class="text-xs text-blue-400/70 truncate block">{{ gauge.riverName }}</span>
         <!-- Full: reach full name + gauge source/id as subtitle -->
         <p v-if="!hideReachSubtitle && density === 'full'" class="text-xs truncate mt-0.5">
           <span v-if="contextFullName" class="text-gray-400">{{ contextFullName }}</span>

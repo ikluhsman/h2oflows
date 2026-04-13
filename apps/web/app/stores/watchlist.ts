@@ -1,5 +1,14 @@
 import { defineStore } from 'pinia'
 
+function cleanBasinName(name: string | null): string | null {
+  if (!name) return null
+  const cleaned = name
+    .replace(/^(Upper|Middle|Lower)\s+/i, '')
+    .replace(/\s+(River|Rivers|Basin)s?$/i, '')
+    .trim()
+  return cleaned || null
+}
+
 // A gauge the user has saved to their dashboard.
 // A watchlist item is identified by (id, contextReachSlug) — the same gauge
 // can appear more than once when added in the context of different reaches
@@ -15,6 +24,7 @@ export interface WatchedGauge {
   contextReachCommonName: string | null  // e.g. "Foxton"
   contextReachFullName: string | null   // e.g. "Buffalo Creek to South Platte"
   contextReachRiverName: string | null  // e.g. "South Platte River"
+  contextReachBasinGroup: string | null // e.g. "Arkansas" — from KML metadata or auto-derived
   // All reaches associated with this gauge (for informational display)
   reachId: string | null
   reachName: string | null          // combined display string e.g. "Bailey / Foxton"
@@ -104,6 +114,21 @@ export const useWatchlistStore = defineStore('watchlist', {
       }, {} as Record<string, WatchedGauge[]>)
     },
 
+    byBasin(state): { basin: string; gauges: WatchedGauge[] }[] {
+      const map = new Map<string, WatchedGauge[]>()
+      for (const g of state.gauges) {
+        const key = g.contextReachBasinGroup
+          ?? cleanBasinName(g.watershedName)
+          ?? cleanBasinName(g.basinName)
+          ?? 'Other'
+        if (!map.has(key)) map.set(key, [])
+        map.get(key)!.push(g)
+      }
+      return [...map.entries()]
+        .map(([basin, gauges]) => ({ basin, gauges }))
+        .sort((a, b) => a.basin === 'Other' ? 1 : b.basin === 'Other' ? -1 : a.basin.localeCompare(b.basin))
+    },
+
     activeGauge(state): WatchedGauge | undefined {
       return state.gauges.find(g => g.watchState === 'active')
     },
@@ -189,6 +214,7 @@ export const useWatchlistStore = defineStore('watchlist', {
       gauge.contextReachCommonName = fresh.contextReachCommonName ?? null
       gauge.contextReachFullName  = fresh.contextReachFullName ?? null
       gauge.contextReachRiverName = fresh.contextReachRiverName ?? null
+      gauge.contextReachBasinGroup = fresh.contextReachBasinGroup ?? null
       gauge.reachId               = fresh.reachId
       gauge.reachName             = fresh.reachName
       gauge.reachNames            = fresh.reachNames

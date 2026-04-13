@@ -14,7 +14,7 @@
         <UButton color="primary" @click="searchOpen = true">Find a gauge</UButton>
       </div>
 
-      <!-- Gauges grouped by river -->
+      <!-- Gauges grouped by basin -->
       <template v-else>
         <div class="flex items-center justify-between mb-4">
           <!-- Density segmented control -->
@@ -33,33 +33,43 @@
             Add gauge
           </UButton>
         </div>
-        <section v-for="group in store.byRiver" :key="group.river ?? 'other'" class="mb-6">
-          <div class="flex items-center gap-2 mb-3">
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ group.river ?? 'Other Gauges' }}</h2>
+        <section v-for="group in store.byBasin" :key="group.basin" class="mb-6">
+          <button class="flex items-center gap-2 mb-3 w-full text-left" @click="toggleBasin(group.basin)">
+            <svg
+              class="w-3 h-3 text-gray-400 transition-transform duration-200"
+              :class="{ 'rotate-90': !collapsedBasins.has(group.basin) }"
+              viewBox="0 0 20 20" fill="currentColor"
+            >
+              <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+            </svg>
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ group.basin }}</h2>
+            <span class="text-xs text-gray-400">({{ group.gauges.length }})</span>
             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
-          </div>
+          </button>
 
-          <!-- List density: single column rows -->
-          <div v-if="density === 'list'" class="flex flex-col gap-1.5">
-            <GaugeCard
-              v-for="gauge in group.gauges"
-              :key="gauge.id"
-              :gauge="gauge"
-              density="list"
-              @open="openGauge(gauge)"
-            />
-          </div>
+          <template v-if="!collapsedBasins.has(group.basin)">
+            <!-- List density: single column rows -->
+            <div v-if="density === 'list'" class="flex flex-col gap-1.5">
+              <GaugeCard
+                v-for="gauge in group.gauges"
+                :key="gauge.id"
+                :gauge="gauge"
+                density="list"
+                @open="openGauge(gauge)"
+              />
+            </div>
 
-          <!-- Card densities: grid layout -->
-          <div v-else :class="gridClass">
-            <GaugeCard
-              v-for="gauge in group.gauges"
-              :key="gauge.id"
-              :gauge="gauge"
-              :density="density"
-              @open="openGauge(gauge)"
-            />
-          </div>
+            <!-- Card densities: grid layout -->
+            <div v-else :class="gridClass">
+              <GaugeCard
+                v-for="gauge in group.gauges"
+                :key="gauge.id"
+                :gauge="gauge"
+                :density="density"
+                @open="openGauge(gauge)"
+              />
+            </div>
+          </template>
         </section>
 
         <section v-if="aggregateGauges.length >= 2" class="border border-gray-300 dark:border-gray-700 rounded-xl p-4">
@@ -150,6 +160,22 @@ onMounted(() => {
   refreshTimer = setInterval(refresh, 60_000)
 })
 onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
+
+// ── Collapsible basin sections ────────────────────────────────────────────────
+const COLLAPSED_KEY = 'h2oflow_dashboard_collapsed'
+const collapsedBasins = ref<Set<string>>(new Set())
+onMounted(() => {
+  try {
+    const saved = localStorage.getItem(COLLAPSED_KEY)
+    if (saved) collapsedBasins.value = new Set(JSON.parse(saved))
+  } catch {}
+})
+function toggleBasin(basin: string) {
+  const s = new Set(collapsedBasins.value)
+  if (s.has(basin)) s.delete(basin); else s.add(basin)
+  collapsedBasins.value = s
+  localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...s]))
+}
 
 // ── UI state ─────────────────────────────────────────────────────────────────
 const searchOpen  = ref(false)

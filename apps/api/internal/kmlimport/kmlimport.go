@@ -314,6 +314,7 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				classMin   *float64
 				classMax   *float64
 				gaugeExtID string
+				basinGroup string
 			)
 			var folderFlowRanges []reachFlowRange
 			var folderPins []KMLPlacemark
@@ -335,6 +336,8 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 						}
 					case "gauge":
 						gaugeExtID = val
+					case "basin":
+						basinGroup = val
 					default:
 						if label, minCFS, maxCFS, ok := parseFlowRangePM(pm.Name, pm.Description); ok {
 							folderFlowRanges = append(folderFlowRanges, reachFlowRange{"", "", label, minCFS, maxCFS})
@@ -352,6 +355,12 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 			}
 			if created {
 				res.Log = append(res.Log, fmt.Sprintf("+ created reach %q (slug: %s)", folder.Name, rslug))
+			}
+
+			if basinGroup != "" {
+				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET basin_group = $1 WHERE id = $2`, basinGroup, rid); err != nil {
+					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] basin_group update failed: %v", rname, err))
+				}
 			}
 
 			for _, fr := range folderFlowRanges {
