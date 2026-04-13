@@ -164,23 +164,46 @@
             </p>
           </div>
 
-          <div class="flex items-center gap-2 shrink-0">
-            <span class="rounded-lg px-3 py-1.5 font-bold text-sm text-white" :style="{ backgroundColor: difficultyColor }">{{ classLabel }}</span>
-            <UBadge
-              v-if="allGauges.length > 0 && allGauges[0].flow_status && allGauges[0].flow_status !== 'unknown'"
-              :color="flowStatusColor(allGauges[0].flow_status)"
-              variant="subtle"
-              size="md"
-            >{{ flowStatusLabel(allGauges[0].flow_status) }}</UBadge>
-          </div>
         </div>
-        <!-- Inline current flow -->
-        <div v-if="allGauges.length > 0 && allGauges[0].current_cfs != null" class="flex items-baseline gap-1.5 mt-2">
-          <span class="text-2xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
-            {{ allGauges[0].current_cfs.toLocaleString() }}
-          </span>
-          <span class="text-sm text-gray-500">cfs</span>
-          <span v-if="allGauges[0].last_reading_at" class="text-xs text-gray-400">· {{ relativeTime(allGauges[0].last_reading_at) }}</span>
+      </section>
+
+      <!-- Quick stats — consolidated -->
+      <section>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
+          <div class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 flex-wrap gap-y-3">
+            <div class="pr-4">
+              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Difficulty</div>
+              <div class="flex items-center gap-1.5">
+                <span class="inline-block w-3 h-3 rounded-sm shrink-0" :style="{ backgroundColor: difficultyColor }" />
+                <span class="text-xl font-bold" :class="difficultyTextClass">{{ classLabel }}</span>
+              </div>
+            </div>
+            <div class="px-4">
+              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Length</div>
+              <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}</div>
+            </div>
+            <div class="px-4">
+              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Gradient</div>
+              <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.gradient_fpm != null ? `${reach.gradient_fpm} ft/mi` : '—' }}</div>
+            </div>
+            <div v-if="allGauges.length > 0" class="pl-4 flex-1 flex items-center justify-between gap-3">
+              <div>
+                <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Flow</div>
+                <div class="flex items-baseline gap-1.5 mb-1">
+                  <span class="text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
+                    {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
+                  </span>
+                  <span class="text-xs text-gray-500">cfs</span>
+                </div>
+                <UBadge :color="flowStatusColor(allGauges[0].flow_status)" variant="subtle" size="sm">
+                  {{ flowStatusLabel(allGauges[0].flow_status) }}
+                </UBadge>
+              </div>
+              <a href="#flow-gauge" class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors">
+                Graph ↓
+              </a>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -298,46 +321,6 @@
         </ClientOnly>
       </section>
 
-      <!-- Quick stats — consolidated -->
-      <section>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
-          <div class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 flex-wrap gap-y-3">
-            <div class="pr-4">
-              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Difficulty</div>
-              <div class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-3 rounded-sm shrink-0" :style="{ backgroundColor: difficultyColor }" />
-                <span class="text-xl font-bold" :class="difficultyTextClass">{{ classLabel }}</span>
-              </div>
-            </div>
-            <div class="px-4">
-              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Length</div>
-              <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}</div>
-            </div>
-            <div class="px-4">
-              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Gradient</div>
-              <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.gradient_fpm != null ? `${reach.gradient_fpm} ft/mi` : '—' }}</div>
-            </div>
-            <div v-if="allGauges.length > 0" class="pl-4 flex-1 flex items-center justify-between gap-3">
-              <div>
-                <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Flow</div>
-                <div class="flex items-baseline gap-1.5 mb-1">
-                  <span class="text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
-                    {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
-                  </span>
-                  <span class="text-xs text-gray-500">cfs</span>
-                </div>
-                <UBadge :color="flowStatusColor(allGauges[0].flow_status)" variant="subtle" size="sm">
-                  {{ flowStatusLabel(allGauges[0].flow_status) }}
-                </UBadge>
-              </div>
-              <a href="#flow-gauge" class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors">
-                Graph ↓
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- Reach Description -->
       <section v-if="reach.description">
         <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Reach Description</h2>
@@ -377,14 +360,32 @@
               <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
               Dashboard
             </button>
-            <button
-              v-else
-              class="shrink-0 flex items-center gap-1.5 text-xs rounded-lg border border-emerald-300 dark:border-emerald-700 px-2.5 py-1.5 text-emerald-600 dark:text-emerald-400 hover:border-red-300 hover:text-red-500 dark:hover:text-red-400 transition-colors"
-              @click="removeFromDashboard(g.id)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
-              On dashboard
-            </button>
+            <template v-else>
+              <!-- Confirming remove -->
+              <div v-if="confirmingRemove === g.id" class="shrink-0 flex items-center gap-1 text-xs">
+                <span class="text-gray-500 dark:text-gray-400">Remove?</span>
+                <button
+                  class="rounded px-2 py-1 bg-red-500 hover:bg-red-600 text-white font-medium transition-colors"
+                  @click="confirmRemoveDashboard(g.id)"
+                >Yes</button>
+                <button
+                  class="rounded px-2 py-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                  @click="confirmingRemove = null"
+                >Cancel</button>
+              </div>
+              <!-- Trash icon -->
+              <UTooltip v-else text="Remove from dashboard">
+                <button
+                  class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+                  aria-label="Remove from dashboard"
+                  @click="confirmingRemove = g.id"
+                >
+                  <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
+                  </svg>
+                </button>
+              </UTooltip>
+            </template>
           </div>
 
           <!-- Graph -->
@@ -406,7 +407,7 @@
               v-if="g.flow_status && g.flow_status !== 'unknown'"
               :color="flowStatusColor(g.flow_status)"
               variant="subtle"
-              size="xs"
+              size="md"
               class="mt-2"
             >{{ flowStatusLabel(g.flow_status) }}</UBadge>
           </div>
@@ -667,7 +668,11 @@ const allFeatures = computed<RiverFeature[]>(() => {
   }
 
   return items.sort((a, b) => {
-    // Prefer centerline position (river_order 0→1) — works for any flow direction.
+    // put_in always floats to top; take_out always sinks to bottom.
+    const typeRank = (t: string) => t === 'put_in' ? -1 : t === 'take_out' ? 1 : 0
+    const ra = typeRank(a.type), rb = typeRank(b.type)
+    if (ra !== rb) return ra - rb
+    // Within the middle group, prefer centerline position (river_order 0→1).
     if (a.river_order != null && b.river_order != null) return a.river_order - b.river_order
     if (a.river_order != null) return -1
     if (b.river_order != null) return 1
@@ -986,9 +991,16 @@ function gaugeRelLabel(rel: string | null | undefined): string {
   }
 }
 
+const confirmingRemove = ref<string | null>(null)
+
 function onDashboard(gaugeId: string): boolean {
   const reachSlug = (reach.value as any)?.slug ?? null
   return store.gauges.some(g => g.id === gaugeId && (g.contextReachSlug ?? null) === reachSlug)
+}
+
+function confirmRemoveDashboard(gaugeId: string) {
+  removeFromDashboard(gaugeId)
+  confirmingRemove.value = null
 }
 
 function addToDashboard(g: any) {
