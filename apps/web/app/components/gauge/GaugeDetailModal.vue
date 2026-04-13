@@ -46,8 +46,11 @@
             class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             @click="open = false"
           >
-            <span class="text-sm font-medium">{{ r.name }}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <div class="min-w-0">
+              <div class="text-sm font-medium truncate">{{ r.commonName ?? r.name }}</div>
+              <div v-if="r.commonName && r.commonName !== r.name" class="text-xs text-gray-400 truncate">{{ r.name }}</div>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 18l6-6-6-6"/>
             </svg>
           </NuxtLink>
@@ -74,13 +77,18 @@ const displayName = computed(() =>
 // Zip reachNames + reachSlugs into link objects. Falls back to the single
 // reachName/reachSlug fields for gauges loaded from an older persisted state.
 const reachLinks = computed(() => {
-  const names = props.gauge.reachNames ?? []
-  const slugs = props.gauge.reachSlugs ?? []
+  const names       = props.gauge.reachNames       ?? []
+  const slugs       = props.gauge.reachSlugs       ?? []
+  const commonNames = props.gauge.reachCommonNames  ?? []
   if (names.length > 0 && slugs.length > 0) {
-    return slugs.map((slug: string, i: number) => ({ slug, name: names[i] ?? slug }))
+    return slugs.map((slug: string, i: number) => ({
+      slug,
+      name:       names[i]       ?? slug,
+      commonName: commonNames[i] || null,
+    }))
   }
   if (props.gauge.reachSlug && props.gauge.reachName) {
-    return [{ slug: props.gauge.reachSlug, name: props.gauge.reachName }]
+    return [{ slug: props.gauge.reachSlug, name: props.gauge.reachName, commonName: props.gauge.contextReachCommonName ?? null }]
   }
   return []
 })

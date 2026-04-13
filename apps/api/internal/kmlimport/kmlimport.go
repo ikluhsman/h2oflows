@@ -804,7 +804,22 @@ func (imp *Importer) setReachGauge(ctx context.Context, reachID, externalID stri
 		`, bareID).Scan(&gaugeID)
 	}
 	if err != nil {
-		return fmt.Errorf("gauge %q not found: %w", externalID, err)
+		// If the caller specified an explicit source prefix (DWR- or USGS-),
+		// auto-create a stub gauge row so the link works immediately.
+		// The poller will populate name/lat/lng on its next cycle.
+		if source != "" {
+			createErr := imp.pool.QueryRow(ctx, `
+				INSERT INTO gauges (external_id, source, name)
+				VALUES ($1, $2, $1)
+				ON CONFLICT (external_id, source) DO UPDATE SET external_id = EXCLUDED.external_id
+				RETURNING id
+			`, bareID, source).Scan(&gaugeID)
+			if createErr != nil {
+				return fmt.Errorf("gauge %q not found and auto-create failed: %w", externalID, createErr)
+			}
+		} else {
+			return fmt.Errorf("gauge %q not found — use 'DWR-%s' or 'USGS-%s' prefix to auto-create", externalID, externalID, externalID)
+		}
 	}
 	_, err = imp.pool.Exec(ctx, `
 		UPDATE reaches SET primary_gauge_id = $1 WHERE id = $2

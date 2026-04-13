@@ -304,7 +304,10 @@
           <div class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 flex-wrap gap-y-2">
             <div class="pr-4">
               <div class="text-[10px] text-gray-400 uppercase tracking-wide">Difficulty</div>
-              <div class="text-sm font-bold" :style="{ color: difficultyColor }">{{ classLabel }}</div>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0" :style="{ backgroundColor: difficultyColor }" />
+                <span class="text-sm font-bold" :class="difficultyTextClass">{{ classLabel }}</span>
+              </div>
             </div>
             <div class="px-4">
               <div class="text-[10px] text-gray-400 uppercase tracking-wide">Length</div>
@@ -868,6 +871,17 @@ const difficultyColor = computed(() => {
   return '#dc2626'
 })
 
+// Dark-mode-safe text classes for difficulty — mirrors the badge color intent
+// but uses Tailwind responsive classes so near-black stays readable on dark bg.
+const difficultyTextClass = computed(() => {
+  const c = (reach.value as any)?.class_max
+  if (c == null) return 'text-gray-500 dark:text-gray-400'
+  if (c < 3.0)  return 'text-green-600 dark:text-green-400'
+  if (c < 4.0)  return 'text-blue-500 dark:text-blue-400'
+  if (c < 5.0)  return 'text-gray-700 dark:text-gray-200'   // near-black → visible in both modes
+  return 'text-red-600 dark:text-red-400'
+})
+
 const statusColor = computed(() => {
   switch (reach.value?.gauge.flow_status) {
     case 'runnable': return 'success'
@@ -1038,7 +1052,7 @@ function cfsColorClass(status: string): string {
     case 'caution':  return 'text-red-500'    // below_recommended = red
     case 'low':      return 'text-red-500'
     case 'flood':    return 'text-sky-500'    // above_recommended = blue
-    default:         return 'text-gray-300'
+    default:         return 'text-gray-700 dark:text-gray-200'
   }
 }
 

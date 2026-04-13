@@ -191,7 +191,7 @@ async function refreshData() {
     // Update opacity paint properties to highlight dashboard reaches
     if (m.getLayer('dash-glow')) {
       m.setPaintProperty('dash-glow',  'line-opacity', dashOpacityExpr(dashSlugs, 0.15, 0.08))
-      m.setPaintProperty('dash-lines', 'line-opacity', dashOpacityExpr(dashSlugs, 0.95, 0.5))
+      m.setPaintProperty('dash-lines', 'line-opacity', dashOpacityExpr(dashSlugs, 0.95, 0.65))
       m.setPaintProperty('dash-lines', 'line-width',
         ['interpolate', ['linear'], ['zoom'], 6,
           ['match', ['get', 'slug'], dashSlugs, 3.0, 1.5],

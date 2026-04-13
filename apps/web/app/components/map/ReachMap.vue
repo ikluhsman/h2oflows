@@ -511,17 +511,20 @@ function addLayers() {
     type: 'geojson',
     data: { type: 'FeatureCollection', features: [] },
   })
+  // Difficulty color expression — mirrors reachLineColor() and DashboardMap
+  const difficultyExpr = ['step', ['coalesce', ['get', 'class_max'], 0],
+    '#6b7280', 2.5, '#16a34a', 4.0, '#3b82f6', 5.0, '#475569', 6.0, '#dc2626']
   map.addLayer({
     id: 'other-reaches-glow',
     type: 'line',
     source: 'other-reaches',
-    paint: { 'line-color': ['get', 'flow_color'], 'line-width': 8, 'line-opacity': 0.15, 'line-blur': 4 },
+    paint: { 'line-color': difficultyExpr, 'line-width': 8, 'line-opacity': 0.15, 'line-blur': 4 },
   })
   map.addLayer({
     id: 'other-reaches-line',
     type: 'line',
     source: 'other-reaches',
-    paint: { 'line-color': ['get', 'flow_color'], 'line-width': 2.5, 'line-opacity': 0.55 },
+    paint: { 'line-color': difficultyExpr, 'line-width': 2.5, 'line-opacity': 0.55 },
   })
   // Hover highlight — filtered to only the hovered feature
   map.addLayer({
@@ -529,7 +532,7 @@ function addLayers() {
     type: 'line',
     source: 'other-reaches',
     filter: ['==', ['get', 'slug'], ''],
-    paint: { 'line-color': ['get', 'flow_color'], 'line-width': 5, 'line-opacity': 0.7 },
+    paint: { 'line-color': difficultyExpr, 'line-width': 5, 'line-opacity': 0.7 },
   })
   // Wider invisible hit area for click detection on thin lines
   map.addLayer({
