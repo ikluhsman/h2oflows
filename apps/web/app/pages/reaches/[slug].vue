@@ -301,31 +301,34 @@
       <!-- Quick stats — consolidated -->
       <section>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
-          <div class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 flex-wrap gap-y-2">
+          <div class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 flex-wrap gap-y-3">
             <div class="pr-4">
-              <div class="text-[10px] text-gray-400 uppercase tracking-wide">Difficulty</div>
-              <div class="flex items-center gap-1.5 mt-0.5">
-                <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0" :style="{ backgroundColor: difficultyColor }" />
-                <span class="text-sm font-bold" :class="difficultyTextClass">{{ classLabel }}</span>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Difficulty</div>
+              <div class="flex items-center gap-1.5">
+                <span class="inline-block w-3 h-3 rounded-sm shrink-0" :style="{ backgroundColor: difficultyColor }" />
+                <span class="text-xl font-bold" :class="difficultyTextClass">{{ classLabel }}</span>
               </div>
             </div>
             <div class="px-4">
-              <div class="text-[10px] text-gray-400 uppercase tracking-wide">Length</div>
-              <div class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Length</div>
+              <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}</div>
             </div>
             <div class="px-4">
-              <div class="text-[10px] text-gray-400 uppercase tracking-wide">Gradient</div>
-              <div class="text-sm font-bold text-gray-800 dark:text-gray-100">{{ reach.gradient_fpm != null ? `${reach.gradient_fpm} ft/mi` : '—' }}</div>
+              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Gradient</div>
+              <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.gradient_fpm != null ? `${reach.gradient_fpm} ft/mi` : '—' }}</div>
             </div>
             <div v-if="allGauges.length > 0" class="pl-4 flex-1 flex items-center justify-between gap-3">
               <div>
-                <div class="text-[10px] text-gray-400 uppercase tracking-wide">Flow</div>
-                <div class="flex items-baseline gap-1">
-                  <span class="text-sm font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
+                <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Flow</div>
+                <div class="flex items-baseline gap-1.5 mb-1">
+                  <span class="text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
                     {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
                   </span>
                   <span class="text-xs text-gray-500">cfs</span>
                 </div>
+                <UBadge :color="flowStatusColor(allGauges[0].flow_status)" variant="subtle" size="sm">
+                  {{ flowStatusLabel(allGauges[0].flow_status) }}
+                </UBadge>
               </div>
               <a href="#flow-gauge" class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors">
                 Graph ↓
