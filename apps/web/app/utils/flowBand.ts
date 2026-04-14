@@ -16,9 +16,9 @@ export type FlowStatus = 'runnable' | 'caution' | 'low' | 'flood' | 'unknown' | 
 
 const LABEL: Record<string, string> = {
   below_recommended: 'Too Low',
-  low_runnable:      'Running',
-  runnable:          'Fun',
-  med_runnable:      'Fun',
+  low_runnable:      'Low',
+  runnable:          'Running',
+  med_runnable:      'Running',
   high_runnable:     'High',
   above_recommended: 'Very High',
 }
@@ -26,7 +26,7 @@ const LABEL: Record<string, string> = {
 export function flowBandLabel(band?: string | null, status?: string | null): string {
   if (band && LABEL[band]) return LABEL[band]
   switch (status) {
-    case 'runnable': return 'Fun'
+    case 'runnable': return 'Running'
     case 'caution':  return 'Too Low'
     case 'low':      return 'Too Low'
     case 'flood':    return 'Very High'
