@@ -286,21 +286,12 @@
         </ClientOnly>
       </section>
 
-      <!-- Reach Description -->
-      <section v-if="reach.description">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Reach Description</h2>
-        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line">
-          {{ reach.description }}
-        </div>
-      </section>
-
       <!-- Gauge detail modal -->
       <GaugeDetailModal
         v-if="gaugeModalGauge"
         v-model:open="gaugeModalOpen"
         :gauge="gaugeModalGauge"
       />
-
 
       <!-- Features tabbed panel -->
       <section v-if="allFeatures.length > 0">
@@ -386,6 +377,14 @@
               No features in this category
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- Reach Description -->
+      <section v-if="reach.description">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Reach Description</h2>
+        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line">
+          {{ reach.description }}
         </div>
       </section>
 
