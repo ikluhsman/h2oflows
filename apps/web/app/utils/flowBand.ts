@@ -42,7 +42,7 @@ const BADGE: Record<string, string> = {
   runnable:          'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400',
   med_runnable:      'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400',
   high_runnable:     'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400',
-  above_recommended: 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400',
+  above_recommended: 'bg-sky-100 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400',
 }
 
 export function flowBandBadgeClass(band?: string | null, status?: string | null): string {
@@ -64,7 +64,7 @@ const CFS_TEXT: Record<string, string> = {
   runnable:          'text-emerald-500',
   med_runnable:      'text-emerald-500',
   high_runnable:     'text-blue-500',
-  above_recommended: 'text-amber-500',
+  above_recommended: 'text-sky-500',
 }
 
 export function flowBandCfsClass(band?: string | null, status?: string | null): string {
@@ -73,7 +73,7 @@ export function flowBandCfsClass(band?: string | null, status?: string | null): 
     case 'runnable': return 'text-emerald-500'
     case 'caution':  return 'text-red-500'
     case 'low':      return 'text-red-500'
-    case 'flood':    return 'text-amber-500'
+    case 'flood':    return 'text-sky-500'
     default:         return 'text-gray-400'
   }
 }
@@ -86,7 +86,7 @@ const SOLID: Record<string, string> = {
   runnable:          '#10b981', // emerald-500
   med_runnable:      '#10b981', // emerald-500
   high_runnable:     '#3b82f6', // blue-500
-  above_recommended: '#f59e0b', // amber-500
+  above_recommended: '#38bdf8', // sky-400
 }
 
 export function flowBandSolidColor(band?: string | null, status?: string | null): string {
@@ -95,7 +95,7 @@ export function flowBandSolidColor(band?: string | null, status?: string | null)
     case 'runnable': return '#10b981'
     case 'caution':  return '#ef4444'
     case 'low':      return '#ef4444'
-    case 'flood':    return '#f59e0b'
+    case 'flood':    return '#38bdf8'
     default:         return '#9ca3af' // gray-400
   }
 }
@@ -108,7 +108,7 @@ export const FLOW_BAND_FILL: Record<string, string> = {
   runnable:          'rgba(16,185,129,0.30)', // emerald
   med_runnable:      'rgba(16,185,129,0.28)', // emerald
   high_runnable:     'rgba(59,130,246,0.25)', // blue
-  above_recommended: 'rgba(245,158,11,0.25)', // amber
+  above_recommended: 'rgba(56,189,248,0.25)',  // sky-400
 }
 
 // Map the live band label to a coarse status bucket (used when the modal
