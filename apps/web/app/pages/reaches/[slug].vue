@@ -162,6 +162,23 @@
             <p class="text-gray-500 text-sm mt-0.5">
               {{ reach.region }}
             </p>
+            <!-- Permit / multi-day badges -->
+            <div v-if="(reach as any).permit_required || (reach as any).multi_day_days > 1" class="flex items-center gap-2 mt-2 flex-wrap">
+              <span
+                v-if="(reach as any).permit_required"
+                class="inline-flex items-center gap-1 rounded-md bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+              >
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 7V5a2 2 0 00-2-2H9a2 2 0 00-2 2v6"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>
+                Permit Required
+              </span>
+              <span
+                v-if="(reach as any).multi_day_days > 1"
+                class="inline-flex items-center gap-1 rounded-md bg-blue-100 dark:bg-blue-950/60 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400"
+              >
+                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                {{ (reach as any).multi_day_days }}-Day Trip
+              </span>
+            </div>
           </div>
 
         </div>
@@ -252,9 +269,10 @@
       </section>
 
       <!-- Reach map -->
-      <section>
+      <section data-reach-map>
         <ClientOnly>
           <ReachMap
+            ref="reachMapRef"
             :name="reach.name"
             :class-max="reach.class_max"
             :centerline="displayCenterline"
@@ -318,7 +336,11 @@
               <div
                 v-for="feat in filteredFeatures"
                 :key="feat.key"
-                class="px-4 py-3 flex items-start gap-3"
+                class="px-4 py-3 flex items-start gap-3 transition-colors"
+                :class="feat.lng != null && feat.lat != null
+                  ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                  : ''"
+                @click="onFeatureClick(feat)"
               >
                 <!-- Icon circle (matches map pin symbols) -->
                 <div
@@ -484,6 +506,7 @@ const { data: flowRanges } = await useAsyncData(
 
 interface RiverFeature {
   key:          string
+  id:           string          // raw UUID for map selectFeature calls
   type:         'rapid' | 'put_in' | 'take_out' | 'hazard' | 'access' | 'camp' | 'parking'
   name:         string
   description?: string | null
@@ -510,6 +533,7 @@ const allFeatures = computed<RiverFeature[]>(() => {
   for (const rap of r.rapids ?? []) {
     items.push({
       key:  `rapid-${rap.id}`,
+      id:   rap.id,
       type: rap.is_permanent_hazard ? 'hazard' : 'rapid',
       name: stripRapidClass(rap.name),
       description: rap.description,
@@ -521,6 +545,7 @@ const allFeatures = computed<RiverFeature[]>(() => {
       hazard_type: rap.hazard_type,
       river_order: rap.river_order,
       lng: rap.lng,
+      lat: rap.lat,
     })
   }
 
@@ -532,6 +557,7 @@ const allFeatures = computed<RiverFeature[]>(() => {
     else if (acc.access_type === 'parking' || acc.access_type === 'shuttle_drop') type = 'parking'
     items.push({
       key:  `access-${acc.id}`,
+      id:   acc.id,
       type,
       name: acc.name,
       description: acc.notes ?? acc.directions,
@@ -562,6 +588,14 @@ const allFeatures = computed<RiverFeature[]>(() => {
 
 const featuresTab = ref<string>('all')
 const featureListRef = ref<HTMLElement | null>(null)
+const reachMapRef    = ref<{ selectFeature: (id: string, lng: number, lat: number) => void } | null>(null)
+
+function onFeatureClick(feat: RiverFeature) {
+  if (feat.lng == null || feat.lat == null) return
+  reachMapRef.value?.selectFeature(feat.id, feat.lng, feat.lat)
+  const mapEl = document.querySelector('[data-reach-map]') as HTMLElement | null
+  mapEl?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 // Animate height when tab changes, then scroll up if container shrank past viewport bottom.
 watch(featuresTab, async () => {
@@ -901,6 +935,8 @@ function addToDashboard(g: any) {
     flowStatus:             g.flow_status ?? 'unknown',
     flowBandLabel:          null,
     lastReadingAt:          g.last_reading_at ?? null,
+    contextReachPermitRequired: r?.permit_required ?? false,
+    contextReachMultiDayDays:   r?.multi_day_days ?? 1,
   })
 }
 
@@ -945,7 +981,9 @@ function openGaugeModal(g: any) {
     flowStatus:             g.flow_status ?? 'unknown',
     flowBandLabel:          null,
     lastReadingAt:          g.last_reading_at ?? null,
-    contextReachBasinGroup: null,
+    contextReachBasinGroup:     null,
+    contextReachPermitRequired: r?.permit_required ?? false,
+    contextReachMultiDayDays:   r?.multi_day_days ?? 1,
   }
   gaugeModalOpen.value = true
 }

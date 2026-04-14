@@ -60,6 +60,15 @@
           <span class="font-medium truncate block" :class="density === 'compact' ? 'text-xs' : 'text-sm'">{{ displayName }}</span>
         </UTooltip>
         <span v-if="density === 'full' && (gauge.contextReachRiverName ?? gauge.riverName)" class="text-xs text-blue-400/70 truncate block">{{ gauge.contextReachRiverName ?? gauge.riverName }}</span>
+        <!-- Permit / multi-day micro-icons (full density only) -->
+        <span v-if="density === 'full' && (gauge.contextReachPermitRequired || gauge.contextReachMultiDayDays > 1)" class="inline-flex items-center gap-1.5 mt-0.5">
+          <UTooltip v-if="gauge.contextReachPermitRequired" text="Permit Required">
+            <svg class="w-3 h-3 text-amber-500 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 7V5a2 2 0 00-2-2H9a2 2 0 00-2 2v6"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>
+          </UTooltip>
+          <UTooltip v-if="gauge.contextReachMultiDayDays > 1" :text="`${gauge.contextReachMultiDayDays}-Day Trip`">
+            <svg class="w-3 h-3 text-blue-400 dark:text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </UTooltip>
+        </span>
         <!-- Full: reach full name + gauge source/id as subtitle -->
         <p v-if="!hideReachSubtitle && density === 'full'" class="text-xs truncate mt-0.5">
           <span v-if="contextFullName" class="text-gray-400">{{ contextFullName }}</span>

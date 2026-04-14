@@ -25,6 +25,8 @@ export interface WatchedGauge {
   contextReachFullName: string | null   // e.g. "Buffalo Creek to South Platte"
   contextReachRiverName: string | null  // e.g. "South Platte River"
   contextReachBasinGroup: string | null // e.g. "Arkansas" — from KML metadata or auto-derived
+  contextReachPermitRequired: boolean
+  contextReachMultiDayDays: number
   // All reaches associated with this gauge (for informational display)
   reachId: string | null
   reachName: string | null          // combined display string e.g. "Bailey / Foxton"
@@ -216,7 +218,9 @@ export const useWatchlistStore = defineStore('watchlist', {
       gauge.contextReachCommonName = fresh.contextReachCommonName ?? null
       gauge.contextReachFullName  = fresh.contextReachFullName ?? null
       gauge.contextReachRiverName = fresh.contextReachRiverName ?? null
-      gauge.contextReachBasinGroup = fresh.contextReachBasinGroup ?? null
+      gauge.contextReachBasinGroup     = fresh.contextReachBasinGroup ?? null
+      gauge.contextReachPermitRequired = fresh.contextReachPermitRequired ?? false
+      gauge.contextReachMultiDayDays   = fresh.contextReachMultiDayDays ?? 1
       gauge.reachId               = fresh.reachId
       gauge.reachName             = fresh.reachName
       gauge.reachNames            = fresh.reachNames

@@ -523,6 +523,8 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			r.description_verified,
 			r.aw_reach_id,
 			r.watershed_name,
+			r.permit_required,
+			r.multi_day_days,
 			r.river_name,
 			r.common_name,
 			r.put_in_name,
@@ -575,6 +577,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&reach.GradientFPM, &reach.Description, &reach.DescriptionSource,
 		&reach.DescriptionConfidence, &reach.DescriptionVerified,
 		&reach.AWReachID, &reach.WatershedName,
+		&reach.PermitRequired, &reach.MultiDayDays,
 		&reach.RiverName, &reach.CommonName, &reach.PutInName, &reach.TakeOutName,
 		&reach.Centerline,
 		&reach.Gauge.ID, &reach.Gauge.ExternalID, &reach.Gauge.Source,
@@ -840,6 +843,8 @@ type reachDetail struct {
 	DescriptionVerified     bool            `json:"description_verified"`
 	AWReachID               *string         `json:"aw_reach_id"`
 	WatershedName           *string         `json:"watershed_name"`
+	PermitRequired          bool            `json:"permit_required"`
+	MultiDayDays            int             `json:"multi_day_days"`
 	Centerline              rawGeometry     `json:"centerline"`
 	Gauge                   gaugeSnippet    `json:"gauge"`
 	Gauges                  []gaugeSnippet  `json:"gauges"`

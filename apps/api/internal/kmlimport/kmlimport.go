@@ -310,11 +310,13 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 			// Pre-scan metadata placemarks (no coordinates) to extract reach
 			// properties before calling matchOrCreateReach.
 			var (
-				commonName string
-				classMin   *float64
-				classMax   *float64
-				gaugeExtID string
-				basinGroup string
+				commonName     string
+				classMin       *float64
+				classMax       *float64
+				gaugeExtID     string
+				basinGroup     string
+				permitRequired *bool
+				multiDayDays   *int
 			)
 			var folderFlowRanges []reachFlowRange
 			var folderPins []KMLPlacemark
@@ -338,6 +340,13 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 						gaugeExtID = val
 					case "basin":
 						basinGroup = val
+					case "permit_required":
+						b := strings.ToLower(val) == "true"
+						permitRequired = &b
+					case "multi_day":
+						if v, err2 := strconv.Atoi(val); err2 == nil {
+							multiDayDays = &v
+						}
 					default:
 						if label, minCFS, maxCFS, ok := parseFlowRangePM(pm.Name, pm.Description); ok {
 							folderFlowRanges = append(folderFlowRanges, reachFlowRange{"", "", label, minCFS, maxCFS})
@@ -360,6 +369,16 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 			if basinGroup != "" {
 				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET basin_group = $1 WHERE id = $2`, basinGroup, rid); err != nil {
 					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] basin_group update failed: %v", rname, err))
+				}
+			}
+			if permitRequired != nil {
+				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET permit_required = $1 WHERE id = $2`, *permitRequired, rid); err != nil {
+					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] permit_required update failed: %v", rname, err))
+				}
+			}
+			if multiDayDays != nil {
+				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET multi_day_days = $1 WHERE id = $2`, *multiDayDays, rid); err != nil {
+					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] multi_day_days update failed: %v", rname, err))
 				}
 			}
 

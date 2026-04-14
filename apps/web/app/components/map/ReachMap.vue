@@ -1,16 +1,15 @@
 <template>
-  <!-- Map + feature list side-by-side on sm+, stacked on mobile -->
+  <!-- Map only — feature list lives in the reach page's features panel below -->
   <div
     :class="isFullscreen
-      ? 'fixed inset-0 z-50 flex flex-col sm:flex-row bg-white dark:bg-gray-950'
-      : 'rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row sm:h-140'"
+      ? 'fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-950'
+      : 'rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 h-100 sm:h-140'"
   >
 
     <!-- MapLibre container — ref is on THIS element so MapLibre reads its own clientHeight -->
     <div
       ref="container"
-      class="relative flex-1 bg-gray-100 dark:bg-gray-800"
-      :class="isFullscreen ? '' : 'min-h-100 sm:min-h-0'"
+      class="relative w-full h-full bg-gray-100 dark:bg-gray-800"
     >
       <div
         v-if="!mapReady && hasCoords"
@@ -51,125 +50,6 @@
       </div>
     </div>
 
-    <!-- Feature list sidebar -->
-    <div
-      v-if="allFeatures.length > 0"
-      class="sm:w-52 border-t sm:border-t-0 sm:border-l border-gray-100 dark:border-gray-800 overflow-y-auto h-44 sm:h-full"
-    >
-      <!-- Access group -->
-      <template v-if="accessFeatures.length > 0">
-        <p class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Access</p>
-        <div
-          v-for="a in accessFeatures"
-          :key="a.id"
-          class="flex items-center gap-1 pr-1.5"
-          :class="selectedId === a.id ? 'bg-gray-100 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'"
-        >
-          <button
-            class="flex-1 flex items-center gap-2 px-3 py-1.5 text-left transition-colors text-xs min-w-0"
-            @mousedown.prevent
-            @click="selectFeature(a.id, a.lng, a.lat)"
-          >
-            <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center p-0.75"
-              :style="{ background: accessColor(a.type) }"
-              v-html="accessFeatureIcon(a.type)"
-            />
-            <span class="truncate text-gray-700 dark:text-gray-300">{{ a.label }}</span>
-          </button>
-          <a
-            v-if="a.type === 'put_in' || a.type === 'take_out'"
-            :href="`https://www.google.com/maps/dir/?api=1&destination=${a.lat},${a.lng}`"
-            target="_blank"
-            rel="noopener"
-            class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/40 transition-colors"
-            title="Get directions"
-            @mousedown.prevent
-            @click.stop
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-          </a>
-        </div>
-      </template>
-
-      <!-- Rapids group -->
-      <template v-if="rapidFeatures.length > 0">
-        <p class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Rapids</p>
-        <button
-          v-for="r in rapidFeatures"
-          :key="r.id"
-          class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-xs"
-          :class="selectedId === r.id ? 'bg-gray-100 dark:bg-gray-800' : ''"
-          @mousedown.prevent
-          @click="selectFeature(r.id, r.lng, r.lat)"
-        >
-          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center p-0.75 bg-blue-500"
-            v-html="rapidFeatureIcon(r.isSurf)"
-          />
-          <span class="truncate text-gray-700 dark:text-gray-300">{{ r.label }}</span>
-          <span v-if="r.classLabel" class="shrink-0 text-[10px] text-gray-400 font-medium">{{ r.classLabel }}</span>
-        </button>
-      </template>
-
-      <!-- Hazards group -->
-      <template v-if="hazardFeatures.length > 0">
-        <p class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Hazards</p>
-        <button
-          v-for="h in hazardFeatures"
-          :key="h.id"
-          class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-xs"
-          :class="selectedId === h.id ? 'bg-gray-100 dark:bg-gray-800' : ''"
-          @mousedown.prevent
-          @click="selectFeature(h.id, h.lng, h.lat)"
-        >
-          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center bg-red-500" v-html="hazardCircleIcon()" />
-          <span class="truncate text-gray-700 dark:text-gray-300">{{ h.label }}</span>
-        </button>
-      </template>
-
-      <!-- Gauges group -->
-      <template v-if="allGauges.length > 0">
-        <p class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Gauges</p>
-        <div
-          v-for="g in allGauges"
-          :key="g.id"
-          class="flex items-center gap-1 pr-1.5"
-          :class="selectedId === g.id ? 'bg-gray-100 dark:bg-gray-800' : 'hover:bg-gray-50 dark:hover:bg-gray-800/60'"
-        >
-          <button
-            class="flex-1 flex items-center gap-2 px-3 py-1.5 text-left transition-colors text-xs min-w-0"
-            :class="g.lng == null || g.lat == null ? 'opacity-50 cursor-default' : ''"
-            @mousedown.prevent
-            @click="g.lng != null && g.lat != null && selectFeature(g.id, g.lng, g.lat)"
-          >
-            <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center p-0.75 bg-cyan-600"
-              v-html="gaugeFeatureIcon(g.reach_relationship)"
-            />
-            <span class="truncate text-gray-700 dark:text-gray-300">{{ g.name ?? g.external_id ?? gaugeRelLabel(g.reach_relationship) }}</span>
-          </button>
-          <!-- Add / remove dashboard -->
-          <button
-            v-if="!onDashboard(g.id)"
-            class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/40 transition-colors"
-            title="Add to dashboard"
-            @mousedown.prevent
-            @click.stop="emit('gauge-add', g.id)"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <button
-            v-else
-            class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-            title="Remove from dashboard"
-            @mousedown.prevent
-            @click.stop="removeFromDashboardSidebar(g.id)"
-          >
-            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
-            </svg>
-          </button>
-        </div>
-      </template>
-    </div>
   </div>
 
   <!-- Selected feature detail card -->
@@ -1086,6 +966,8 @@ function rebuildLayers() {
 watch(allFeatures, rebuildLayers, { deep: true })
 watch(() => props.centerline, rebuildLayers, { deep: true })
 watch(() => props.gauges, rebuildLayers, { deep: true })
+
+defineExpose({ selectFeature })
 </script>
 
 <style>
