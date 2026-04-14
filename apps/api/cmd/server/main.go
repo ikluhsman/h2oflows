@@ -104,10 +104,15 @@ func main() {
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
 	trips         := handlers.NewTripHandler(pool, describer)
 	contributions := handlers.NewContributionHandler(pool)
+	var importEmbedder *ai.Embedder
+	if cfg.VoyageAPIKey != "" {
+		importEmbedder = ai.NewEmbedder(cfg.VoyageAPIKey)
+	}
 	imports := &handlers.Import{
 		Pool:              pool,
 		CacheWarmer:       func() { reaches.WarmCache(context.Background()) },
 		CenterlineFetcher: reaches.BackgroundFetchCenterline,
+		Embedder:          importEmbedder,
 	}
 	r.Route("/api/v1", func(r chi.Router) {
 		// Optional: attaches user claims when a valid Bearer token is present,
