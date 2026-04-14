@@ -39,14 +39,137 @@
     </div>
 
     <!-- KML Format Guide -->
-    <div v-if="showKmlGuide" class="shrink-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-3 text-xs text-gray-600 dark:text-gray-400 space-y-1.5 max-h-48 overflow-y-auto">
-      <p class="font-semibold text-gray-700 dark:text-gray-300">Expected KMZ/KML format:</p>
-      <ul class="list-disc pl-4 space-y-0.5">
-        <li>One <strong>folder per reach</strong> — folder name = reach name (e.g. "Bailey")</li>
-        <li>First <strong>Placemark</strong> in folder with <code>description</code> = metadata (common_name, gauge, class, flow ranges)</li>
-        <li>LineString placemarks = reach centerline geometry</li>
-        <li>Point placemarks = river features (put_in, take_out, rapid, camp, etc.)</li>
-      </ul>
+    <div v-if="showKmlGuide" class="shrink-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-4 text-xs text-gray-600 dark:text-gray-400 max-h-[60vh] overflow-y-auto space-y-4">
+
+      <!-- Structure -->
+      <div>
+        <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">Document / folder structure</p>
+        <ul class="list-disc pl-4 space-y-0.5">
+          <li><strong>Document name</strong> → sets <code>river_name</code> on all reaches in the file</li>
+          <li><strong>One folder per reach</strong> — folder name becomes the reach display name (e.g. <code>Browns Canyon</code>)</li>
+          <li><strong>LineString placemark</strong> → reach centerline geometry</li>
+          <li><strong>Point placemarks with no prefix</strong> → ignored (use prefixes below)</li>
+        </ul>
+      </div>
+
+      <!-- Metadata placemarks -->
+      <div>
+        <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">Metadata placemarks <span class="font-normal text-gray-400">(no coordinates — add via folder data table)</span></p>
+        <p class="mb-1.5 text-gray-400">Each metadata entry is a coordinate-less placemark where <strong>Name</strong> = field key and <strong>Description</strong> = value.</p>
+        <table class="w-full border-collapse text-[11px]">
+          <thead>
+            <tr class="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-left">
+              <th class="px-2 py-1 font-medium border border-gray-200 dark:border-gray-700 w-28">Name (key)</th>
+              <th class="px-2 py-1 font-medium border border-gray-200 dark:border-gray-700 w-40">Example value</th>
+              <th class="px-2 py-1 font-medium border border-gray-200 dark:border-gray-700">Effect</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <tr class="bg-white dark:bg-gray-950">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">common_name</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Browns Canyon</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Short local name; used in the URL slug</td>
+            </tr>
+            <tr class="bg-gray-50 dark:bg-gray-900">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">min_class</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">3</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Minimum difficulty rating (numeric, e.g. 3.5)</td>
+            </tr>
+            <tr class="bg-white dark:bg-gray-950">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">max_class</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">4</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Maximum difficulty rating (numeric, e.g. 4.5)</td>
+            </tr>
+            <tr class="bg-gray-50 dark:bg-gray-900">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">gauge</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">09058000</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">USGS or DWR site number to link as primary gauge</td>
+            </tr>
+            <tr class="bg-white dark:bg-gray-950">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">basin</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Arkansas</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Basin group for dashboard grouping</td>
+            </tr>
+            <tr class="bg-gray-50 dark:bg-gray-900">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">permit_required</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">true</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Shows Permit Required badge on reach page and dashboard cards. Omit or <code>false</code> = no permit.</td>
+            </tr>
+            <tr class="bg-white dark:bg-gray-950">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">multi_day</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">3</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Approximate trip length in days. Omit or <code>1</code> = single day.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Flow range placemarks -->
+      <div>
+        <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">Flow range placemarks <span class="font-normal text-gray-400">(also coordinate-less, also in folder data table)</span></p>
+        <table class="w-full border-collapse text-[11px]">
+          <thead>
+            <tr class="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-left">
+              <th class="px-2 py-1 font-medium border border-gray-200 dark:border-gray-700 w-28">Name (key)</th>
+              <th class="px-2 py-1 font-medium border border-gray-200 dark:border-gray-700 w-40">Example value</th>
+              <th class="px-2 py-1 font-medium border border-gray-200 dark:border-gray-700">Band set</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <tr class="bg-white dark:bg-gray-950">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-red-500">below</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">200</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Too Low — upper CFS limit (single number)</td>
+            </tr>
+            <tr class="bg-gray-50 dark:bg-gray-900">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-green-600 dark:text-green-400">low</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">200,400</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Low — <code>min,max</code> CFS (optional; use for 5-tier)</td>
+            </tr>
+            <tr class="bg-white dark:bg-gray-950">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-emerald-600 dark:text-emerald-400">med</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">400,800</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Running — <code>min,max</code> CFS</td>
+            </tr>
+            <tr class="bg-gray-50 dark:bg-gray-900">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-500">high</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">800,1200</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">High — <code>min,max</code> CFS (optional; use for 5-tier)</td>
+            </tr>
+            <tr class="bg-white dark:bg-gray-950">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-sky-400">above</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">1200</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Very High — lower CFS limit (single number)</td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="mt-1 text-gray-400">3-tier (below / med / above only) is also accepted. <code>low</code> and <code>high</code> are optional.</p>
+      </div>
+
+      <!-- Pin prefixes -->
+      <div>
+        <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">Point placemark name prefixes</p>
+        <table class="w-full border-collapse text-[11px]">
+          <thead>
+            <tr class="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-left">
+              <th class="px-2 py-1 font-medium border border-gray-200 dark:border-gray-700 w-28">Prefix</th>
+              <th class="px-2 py-1 font-medium border border-gray-200 dark:border-gray-700 w-40">Example name</th>
+              <th class="px-2 py-1 font-medium border border-gray-200 dark:border-gray-700">Stored as</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <tr class="bg-white dark:bg-gray-950"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Rapid:</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Rapid: Zoom Flume</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Rapid</td></tr>
+            <tr class="bg-gray-50 dark:bg-gray-900"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Wave:</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Wave: The Hole</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Rapid (surf wave)</td></tr>
+            <tr class="bg-white dark:bg-gray-950"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Put-in:</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Put-in: Ruby Mtn</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Access point (put-in)</td></tr>
+            <tr class="bg-gray-50 dark:bg-gray-900"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Take-out:</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Take-out: Hecla Junction</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Access point (take-out)</td></tr>
+            <tr class="bg-white dark:bg-gray-950"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Parking:</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Parking: Hecla Lot</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Parking / shuttle drop</td></tr>
+            <tr class="bg-gray-50 dark:bg-gray-900"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Campsite:</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Campsite: Riverside</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Camp</td></tr>
+            <tr class="bg-white dark:bg-gray-950"><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Hazard:</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">Hazard: Low-head Dam</td><td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Permanent hazard (auto-classifies type from description)</td></tr>
+          </tbody>
+        </table>
+        <p class="mt-1 text-gray-400">Rapid descriptions may include a class number, e.g. <code>Class IV</code> or <code>(4)</code>, and it will be parsed automatically.</p>
+      </div>
+
       <button class="text-blue-500 hover:text-blue-400 font-medium" @click="showKmlGuide = false">Close</button>
     </div>
 
