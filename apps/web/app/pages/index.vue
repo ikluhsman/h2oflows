@@ -199,15 +199,8 @@ function focusAsk() {
 const { apiBase } = useRuntimeConfig().public
 const store = useWatchlistStore()
 const { addAndSync } = useWatchlistSync()
-const { isAuthenticated } = useAuth()
-
 const showDemoBanner = ref(false)
 onMounted(() => {
-  // Signed-in users (PWA return visits) go straight to the dashboard
-  if (isAuthenticated.value) {
-    navigateTo('/dashboard')
-    return
-  }
   showDemoBanner.value = localStorage.getItem('demo-banner-dismissed') !== 'true'
 })
 function dismissBanner() {
