@@ -108,6 +108,8 @@ const props = defineProps<{
   noRanges?: boolean
 }>()
 
+const emit = defineEmits<{ (e: 'latestCfs', cfs: number): void }>()
+
 // ---- State ------------------------------------------------------------------
 
 const container  = ref<HTMLElement | null>(null)
@@ -144,6 +146,10 @@ async function load() {
     }
   } finally {
     loading.value = false
+    // Emit the freshest reading so consumers (e.g. modal) can sync their displayed CFS
+    if (readings.value.length > 0) {
+      emit('latestCfs', readings.value[0].cfs)
+    }
     await nextTick()
     buildChart()
   }

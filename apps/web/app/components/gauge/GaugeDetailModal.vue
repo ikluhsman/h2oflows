@@ -42,10 +42,10 @@
         <!-- CFS + badge + trend arrow — left-aligned, prominent -->
         <div class="flex items-baseline gap-2 flex-wrap">
           <span class="text-3xl font-bold tabular-nums leading-none" :class="cfsClass">
-            {{ gauge.currentCfs != null ? gauge.currentCfs.toLocaleString() : '—' }}
+            {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
           </span>
           <span class="text-sm text-gray-500">cfs</span>
-          <TrendArrow v-if="gauge.currentCfs != null" :gauge-id="gauge.id" class="text-lg" />
+          <TrendArrow v-if="displayCfs != null" :gauge-id="gauge.id" class="text-lg" />
           <span
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
             :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', statusBadgeClass]"
@@ -62,11 +62,12 @@
           </span>
         </div>
 
-        <!-- 48-hour graph -->
+        <!-- 48-hour graph — emits the freshest reading so we can sync the displayed CFS -->
         <GaugeGraph
           :gauge-id="gauge.id"
-          :current-cfs="gauge.currentCfs"
+          :current-cfs="liveCfs ?? gauge.currentCfs"
           :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug"
+          @latest-cfs="liveCfs = $event"
         />
 
         <!-- Last updated -->
@@ -92,12 +93,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
 import { useDiurnalCache } from '~/composables/useDiurnalCache'
 
 const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ gauge: WatchedGauge }>()
+
+// liveCfs is set by GaugeGraph once it loads fresh readings from the API.
+// Supersedes the potentially-stale gauge.currentCfs from the watchlist store.
+const liveCfs = ref<number | null>(null)
+watch(open, (v) => { if (!v) liveCfs.value = null })
+
+const displayCfs = computed(() => liveCfs.value ?? props.gauge.currentCfs)
 
 const { pattern: diurnal } = useDiurnalCache(props.gauge.id)
 
