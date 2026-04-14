@@ -495,7 +495,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			`SELECT primary_gauge_id::text FROM reaches WHERE slug = $1`, slug,
 		).Scan(&primaryGaugeID)
 		if primaryGaugeID != nil && *primaryGaugeID != "" {
-			h.poller.FetchNowIfStale(r.Context(), *primaryGaugeID, time.Hour)
+			h.poller.FetchNowIfStale(r.Context(), *primaryGaugeID, 15*time.Minute)
 			go h.poller.TouchRequested(context.Background(), *primaryGaugeID)
 		}
 	}
