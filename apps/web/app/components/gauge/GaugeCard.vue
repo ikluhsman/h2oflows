@@ -15,6 +15,12 @@
           :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', statusBadgeClass]"
         >{{ statusLabel }}</span>
         <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" size="lg" class="shrink-0 hidden sm:block" />
+        <!-- Shared gauge indicator — list view inline -->
+        <UTooltip v-if="sharedWith?.length" :text="`Also: ${sharedWith.join(', ')}`" placement="bottom">
+          <span class="inline-flex items-center gap-0.5 shrink-0 text-slate-400 dark:text-slate-500">
+            <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+          </span>
+        </UTooltip>
       </div>
       <span v-if="gauge.riverName" class="text-xs text-blue-400 truncate block">{{ gauge.riverName }}</span>
     </div>
@@ -142,6 +148,18 @@
       {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
     </p>
     <p v-if="density === 'full' && lastUpdatedLabel" class="text-xs text-gray-400 mt-0.5">{{ lastUpdatedLabel }}</p>
+
+    <!-- Shared gauge indicator — card view (comfortable + full) -->
+    <UTooltip
+      v-if="sharedWith?.length && density !== 'compact'"
+      :text="`Also: ${sharedWith.join(', ')}`"
+      placement="bottom"
+    >
+      <div class="flex items-center gap-1 mt-2 pt-1.5 border-t border-gray-100 dark:border-gray-800 text-slate-400 dark:text-slate-500">
+        <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+        <span class="text-[10px] font-medium">Shared gauge</span>
+      </div>
+    </UTooltip>
   </div>
 </template>
 
@@ -154,6 +172,7 @@ const props = defineProps<{
   gauge: WatchedGauge
   hideReachSubtitle?: boolean
   density?: 'compact' | 'comfortable' | 'full' | 'list'
+  sharedWith?: string[]  // other reach names on the dashboard using the same gauge station
 }>()
 const emit = defineEmits<{ (e: 'open'): void }>()
 

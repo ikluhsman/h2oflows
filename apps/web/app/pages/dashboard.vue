@@ -55,6 +55,7 @@
                 :key="gauge.id"
                 :gauge="gauge"
                 density="list"
+                :shared-with="sharedGaugeMap.get(`${gauge.id}:${gauge.contextReachSlug ?? ''}`)"
                 @open="openGauge(gauge)"
               />
             </div>
@@ -66,6 +67,7 @@
                 :key="gauge.id"
                 :gauge="gauge"
                 :density="density"
+                :shared-with="sharedGaugeMap.get(`${gauge.id}:${gauge.contextReachSlug ?? ''}`)"
                 @open="openGauge(gauge)"
               />
             </div>
@@ -160,6 +162,26 @@ onMounted(() => {
   refreshTimer = setInterval(refresh, 60_000)
 })
 onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
+
+// ── Shared gauge detection ────────────────────────────────────────────────────
+// Maps each (gaugeId:contextReachSlug) key → array of other reach names on the
+// dashboard that use the same physical gauge station.
+const sharedGaugeMap = computed(() => {
+  const idCount = new Map<string, number>()
+  for (const g of store.gauges) idCount.set(g.id, (idCount.get(g.id) ?? 0) + 1)
+
+  const result = new Map<string, string[]>()
+  for (const g of store.gauges) {
+    if ((idCount.get(g.id) ?? 0) <= 1) continue
+    const key = `${g.id}:${g.contextReachSlug ?? ''}`
+    const others = store.gauges
+      .filter(x => x.id === g.id && (x.contextReachSlug ?? '') !== (g.contextReachSlug ?? ''))
+      .map(x => x.contextReachCommonName ?? x.name ?? x.externalId ?? '')
+      .filter(Boolean)
+    result.set(key, others)
+  }
+  return result
+})
 
 // ── Collapsible basin sections ────────────────────────────────────────────────
 const COLLAPSED_KEY = 'h2oflow_dashboard_collapsed'
