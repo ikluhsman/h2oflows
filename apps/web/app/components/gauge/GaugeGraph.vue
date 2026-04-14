@@ -108,7 +108,10 @@ const props = defineProps<{
   noRanges?: boolean
 }>()
 
-const emit = defineEmits<{ (e: 'latestCfs', cfs: number): void }>()
+const emit = defineEmits<{
+  (e: 'latestCfs', cfs: number): void
+  (e: 'liveFlowBand', band: { flowBandLabel: string | null; flowStatus: string }): void
+}>()
 
 // ---- State ------------------------------------------------------------------
 
@@ -148,7 +151,20 @@ async function load() {
     loading.value = false
     // Emit the freshest reading so consumers (e.g. modal) can sync their displayed CFS
     if (readings.value.length > 0) {
-      emit('latestCfs', readings.value[0].cfs)
+      const latestCfs = readings.value[0].cfs
+      emit('latestCfs', latestCfs)
+      // Also emit the live flow band so the modal can correct its color
+      const matchedRange = flowRanges.value.find(fr =>
+        (fr.min_cfs == null || latestCfs >= fr.min_cfs) &&
+        (fr.max_cfs == null || latestCfs < fr.max_cfs)
+      )
+      const liveLabel = matchedRange?.label ?? null
+      const liveStatus = liveLabel == null ? 'unknown'
+        : ['runnable','low_runnable','med_runnable','high_runnable'].includes(liveLabel) ? 'runnable'
+        : liveLabel === 'below_recommended' ? 'caution'
+        : liveLabel === 'above_recommended' ? 'flood'
+        : 'unknown'
+      emit('liveFlowBand', { flowBandLabel: liveLabel, flowStatus: liveStatus })
     }
     await nextTick()
     buildChart()

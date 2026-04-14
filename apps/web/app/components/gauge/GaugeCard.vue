@@ -22,7 +22,7 @@
     <!-- Sparkline + CFS -->
     <div class="flex items-center gap-2 shrink-0">
       <div class="w-32 shrink-0 hidden sm:block">
-        <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact />
+        <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact @latest-cfs="liveCfs = $event" />
       </div>
       <span class="text-base font-bold tabular-nums min-w-14 text-right" :class="cfsClass">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
@@ -50,7 +50,7 @@
   >
     <!-- Compact: background sparkline along the bottom edge -->
     <div v-if="density === 'compact'" class="absolute bottom-0 left-0 right-0 h-10 pointer-events-none opacity-35">
-      <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact class="h-full w-full" />
+      <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact class="h-full w-full" @latest-cfs="liveCfs = $event" />
     </div>
 
     <!-- Gauge name + reach subtitle -->
@@ -112,8 +112,8 @@
     </div>
 
     <!-- Sparkline — comfortable gets compact sparkline; full gets full sparkline -->
-    <GaugeSparkline v-if="density === 'comfortable'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact class="mb-1" />
-    <GaugeSparkline v-else-if="density === 'full'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" class="mb-2" />
+    <GaugeSparkline v-if="density === 'comfortable'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact class="mb-1" @latest-cfs="liveCfs = $event" />
+    <GaugeSparkline v-else-if="density === 'full'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" class="mb-2" @latest-cfs="liveCfs = $event" />
 
     <!-- Diurnal forecast — compact/comfortable: one-liner; full: richer summary -->
     <p v-if="diurnal.detected && diurnal.forecast && density !== 'full'" class="relative text-[10px] text-indigo-500 dark:text-indigo-400 truncate">
@@ -137,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
 import { useDiurnalCache } from '~/composables/useDiurnalCache'
 
@@ -163,7 +163,9 @@ const diurnalPhaseLabel = computed(() => {
   }
 })
 
-const currentCfs = computed(() => props.gauge.currentCfs)
+// liveCfs is set by GaugeSparkline once it loads fresh readings — supersedes stale store value
+const liveCfs   = ref<number | null>(null)
+const currentCfs = computed(() => liveCfs.value ?? props.gauge.currentCfs)
 
 // --- Display name -----------------------------------------------------------
 // Prefer the context reach's common name (e.g. "Foxton") over the raw gauge name.

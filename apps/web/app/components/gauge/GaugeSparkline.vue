@@ -49,6 +49,8 @@ const props = defineProps<{
   compact?: boolean
 }>()
 
+const emit = defineEmits<{ (e: 'latestCfs', cfs: number): void }>()
+
 const { apiBase } = useRuntimeConfig().public
 const PREF_KEY = 'h2oflow_sparkline_hours'
 
@@ -61,7 +63,13 @@ async function fetchReadings() {
   try {
     const since = new Date(Date.now() - hours.value * 3_600_000).toISOString()
     const res = await fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/readings?since=${since}&limit=500`)
-    if (res.ok) readings.value = ([...(await res.json())]).reverse()
+    if (res.ok) {
+      readings.value = ([...(await res.json())]).reverse()
+      // Newest is last after reverse; emit so parent can sync displayed CFS
+      if (readings.value.length > 0) {
+        emit('latestCfs', readings.value[readings.value.length - 1].cfs)
+      }
+    }
   } catch { /* fall through */ } finally {
     loading.value = false
   }

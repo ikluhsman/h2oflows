@@ -13,7 +13,7 @@
       <!-- Dashboard shortcut -->
       <NuxtLink
         to="/dashboard"
-        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md transition-colors"
+        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md transition-colors"
         :class="route.path === '/dashboard'
           ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
           : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
@@ -28,7 +28,7 @@
       <!-- Map shortcut -->
       <NuxtLink
         to="/map"
-        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md transition-colors"
+        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md transition-colors"
         :class="route.path === '/map'
           ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
           : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"

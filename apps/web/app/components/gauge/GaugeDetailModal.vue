@@ -62,12 +62,13 @@
           </span>
         </div>
 
-        <!-- 48-hour graph — emits the freshest reading so we can sync the displayed CFS -->
+        <!-- 48-hour graph — emits live CFS + band so we can sync display -->
         <GaugeGraph
           :gauge-id="gauge.id"
-          :current-cfs="liveCfs ?? gauge.currentCfs"
+          :current-cfs="displayCfs"
           :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug"
           @latest-cfs="liveCfs = $event"
+          @live-flow-band="liveFlowBand = $event"
         />
 
         <!-- Last updated -->
@@ -100,12 +101,15 @@ import { useDiurnalCache } from '~/composables/useDiurnalCache'
 const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ gauge: WatchedGauge }>()
 
-// liveCfs is set by GaugeGraph once it loads fresh readings from the API.
-// Supersedes the potentially-stale gauge.currentCfs from the watchlist store.
-const liveCfs = ref<number | null>(null)
-watch(open, (v) => { if (!v) liveCfs.value = null })
+// liveCfs / liveFlowBand are set by GaugeGraph once it loads fresh readings.
+// These supersede the potentially-stale values from the watchlist store.
+const liveCfs      = ref<number | null>(null)
+const liveFlowBand = ref<{ flowBandLabel: string | null; flowStatus: string } | null>(null)
+watch(open, (v) => { if (!v) { liveCfs.value = null; liveFlowBand.value = null } })
 
-const displayCfs = computed(() => liveCfs.value ?? props.gauge.currentCfs)
+const displayCfs        = computed(() => liveCfs.value ?? props.gauge.currentCfs)
+const displayFlowBand   = computed(() => liveFlowBand.value?.flowBandLabel ?? props.gauge.flowBandLabel)
+const displayFlowStatus = computed(() => liveFlowBand.value?.flowStatus   ?? props.gauge.flowStatus)
 
 const { pattern: diurnal } = useDiurnalCache(props.gauge.id)
 
@@ -140,14 +144,14 @@ const sourceUrl = computed(() => {
 })
 
 const statusBadgeClass = computed(() => {
-  const band = props.gauge.flowBandLabel
+  const band = displayFlowBand.value
   if (band === 'below_recommended') return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
   if (band === 'low_runnable')      return 'bg-lime-100 dark:bg-lime-950/50 text-lime-700 dark:text-lime-400'
   if (band === 'runnable')          return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
   if (band === 'med_runnable')      return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
   if (band === 'high_runnable')     return 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-500'
   if (band === 'above_recommended') return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
-  switch (props.gauge.flowStatus) {
+  switch (displayFlowStatus.value) {
     case 'runnable': return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
     case 'caution':  return 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400'
     case 'low':      return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
@@ -157,13 +161,13 @@ const statusBadgeClass = computed(() => {
 })
 
 const statusLabel = computed(() => {
-  if (props.gauge.flowBandLabel) {
-    return props.gauge.flowBandLabel
+  if (displayFlowBand.value) {
+    return displayFlowBand.value
       .split('_')
       .map(w => w.charAt(0).toUpperCase() + w.slice(1))
       .join(' ')
   }
-  switch (props.gauge.flowStatus) {
+  switch (displayFlowStatus.value) {
     case 'runnable': return 'Runnable'
     case 'caution':  return 'Minimum'
     case 'low':      return 'Too Low'
@@ -173,16 +177,16 @@ const statusLabel = computed(() => {
 })
 
 const cfsClass = computed(() => {
-  const band = props.gauge.flowBandLabel
+  const band = displayFlowBand.value
   if (band === 'low_runnable')  return 'text-lime-500'
   if (band === 'med_runnable')  return 'text-emerald-500'
   if (band === 'high_runnable') return 'text-green-600 dark:text-green-500'
   return {
-    'text-emerald-400 dark:text-emerald-500': props.gauge.flowStatus === 'runnable',
-    'text-amber-400':                         props.gauge.flowStatus === 'caution',
-    'text-red-400':                           props.gauge.flowStatus === 'low',
-    'text-blue-400 dark:text-blue-500':       props.gauge.flowStatus === 'flood',
-    'text-gray-400':                          !props.gauge.flowStatus || props.gauge.flowStatus === 'unknown',
+    'text-emerald-400 dark:text-emerald-500': displayFlowStatus.value === 'runnable',
+    'text-amber-400':                         displayFlowStatus.value === 'caution',
+    'text-red-400':                           displayFlowStatus.value === 'low',
+    'text-blue-400 dark:text-blue-500':       displayFlowStatus.value === 'flood',
+    'text-gray-400':                          !displayFlowStatus.value || displayFlowStatus.value === 'unknown',
   }
 })
 
