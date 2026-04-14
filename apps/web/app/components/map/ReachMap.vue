@@ -130,7 +130,7 @@
             />
             <span class="truncate text-gray-700 dark:text-gray-300">{{ g.name ?? g.external_id ?? gaugeRelLabel(g.reach_relationship) }}</span>
           </button>
-          <!-- Add to dashboard -->
+          <!-- Add / remove dashboard -->
           <button
             v-if="!onDashboard(g.id)"
             class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-cyan-600 hover:bg-cyan-50 dark:hover:bg-cyan-900/40 transition-colors"
@@ -140,13 +140,17 @@
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
           </button>
-          <span
+          <button
             v-else
-            class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-emerald-500"
-            title="On dashboard"
+            class="shrink-0 w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
+            title="Remove from dashboard"
+            @mousedown.prevent
+            @click.stop="removeFromDashboardSidebar(g.id)"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-          </span>
+            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
+            </svg>
+          </button>
         </div>
       </template>
     </div>
@@ -194,10 +198,16 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
             Add to dashboard
           </button>
-          <span v-else class="flex items-center gap-1 text-xs text-emerald-500 font-medium">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
-            On dashboard
-          </span>
+          <button
+            v-else
+            class="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 font-medium transition-colors"
+            @click="removeFromDashboardSidebar(selectedFeature.gaugeId)"
+          >
+            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
+            </svg>
+            Remove
+          </button>
           <a
             v-if="selectedFeature.sourceUrl"
             :href="selectedFeature.sourceUrl"
@@ -280,7 +290,13 @@ const emit = defineEmits<{
 }>()
 
 const watchlist = useWatchlistStore()
+const { removeAndSync } = useWatchlistSync()
 const onDashboard = (id: string) => watchlist.gauges.some(g => g.id === id)
+
+function removeFromDashboardSidebar(gaugeId: string) {
+  // Remove by gauge id — no reach slug context available in the map sidebar
+  removeAndSync(gaugeId, null)
+}
 
 const router = useRouter()
 const config = useRuntimeConfig()
@@ -314,7 +330,7 @@ const rapidFeatures = computed(() =>
     .filter(r => r.lng != null && r.lat != null)
     .map(r => ({
       id:         r.id,
-      label:      r.name,
+      label:      stripRapidClass(r.name),
       desc:       r.description ?? '',
       isSurf:     r.is_surf_wave,
       classLabel: r.class_rating != null ? `${formatClass(r.class_rating)}` : null,
@@ -322,6 +338,10 @@ const rapidFeatures = computed(() =>
       lat:        r.lat!,
     }))
 )
+
+function stripRapidClass(name: string): string {
+  return name.replace(/\s*\((?:class\s+)?[IVX]+[+]?\)\s*$/i, '').trim() || name
+}
 
 const allFeatures = computed(() => [...accessFeatures.value, ...rapidFeatures.value])
 
@@ -537,7 +557,7 @@ function addLayers() {
     type: 'line',
     source: 'other-reaches',
     filter: ['==', ['get', 'slug'], ''],
-    paint: { 'line-color': difficultyExpr, 'line-width': 5, 'line-opacity': 0.7 },
+    paint: { 'line-color': difficultyExpr, 'line-width': 7, 'line-opacity': 0.92 },
   })
   // Wider invisible hit area for click detection on thin lines
   map.addLayer({

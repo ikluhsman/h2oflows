@@ -189,119 +189,66 @@
             <div v-if="allGauges.length > 0" class="pl-4 flex-1 flex items-center justify-between gap-3">
               <div>
                 <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Flow</div>
-                <div class="flex items-baseline gap-1.5 mb-1">
+                <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
                     {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
                   </span>
                   <span class="text-xs text-gray-500">cfs</span>
+                  <UBadge :color="flowStatusColor(allGauges[0].flow_status)" variant="subtle" size="sm" class="hidden sm:inline-flex">
+                    {{ flowStatusLabel(allGauges[0].flow_status) }}
+                  </UBadge>
                 </div>
-                <UBadge :color="flowStatusColor(allGauges[0].flow_status)" variant="subtle" size="sm">
+                <UBadge :color="flowStatusColor(allGauges[0].flow_status)" variant="subtle" size="sm" class="sm:hidden mt-1">
                   {{ flowStatusLabel(allGauges[0].flow_status) }}
                 </UBadge>
               </div>
-              <a href="#flow-gauge" class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors">
-                Graph ↓
-              </a>
+              <button
+                class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+                @click="openGaugeModal(allGauges[0])"
+              >
+                View flow →
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- River assistant — Ask about this reach -->
-      <section class="border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
-        <button
-          class="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          @click="showChat = !showChat"
-        >
-          <div class="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <!-- River assistant — inline search box -->
+      <section>
+        <form class="flex gap-2" @submit.prevent="sendQuestion(chatInput)">
+          <div class="relative flex-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sky-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
-            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Ask about this reach</span>
-            <span class="text-xs text-gray-400 hidden sm:inline">· AI answers based on reach data</span>
-          </div>
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': showChat }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M6 9l6 6 6-6"/>
-          </svg>
-        </button>
-
-        <div v-if="showChat" class="p-4 space-y-4">
-          <!-- Message thread -->
-          <div v-if="chatMessages.length" class="space-y-3 max-h-96 overflow-y-auto pr-1">
-            <div
-              v-for="(msg, i) in chatMessages"
-              :key="i"
-              class="flex gap-2.5"
-              :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
-            >
-              <!-- Assistant avatar -->
-              <div v-if="msg.role === 'assistant'" class="w-6 h-6 rounded-full bg-sky-100 dark:bg-sky-900 flex items-center justify-center shrink-0 mt-0.5">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-              </div>
-
-              <div
-                class="rounded-xl px-3 py-2 text-sm max-w-prose"
-                :class="msg.role === 'user'
-                  ? 'bg-sky-500 text-white rounded-br-sm'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-sm'"
-              >
-                <div class="whitespace-pre-wrap">{{ msg.content }}</div>
-              </div>
-            </div>
-
-            <!-- Typing indicator -->
-            <div v-if="chatLoading" class="flex gap-2.5 justify-start">
-              <div class="w-6 h-6 rounded-full bg-sky-100 dark:bg-sky-900 flex items-center justify-center shrink-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-sky-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                </svg>
-              </div>
-              <div class="rounded-xl rounded-bl-sm bg-gray-100 dark:bg-gray-800 px-3 py-2">
-                <span class="flex gap-1 items-center h-5">
-                  <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0ms"/>
-                  <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 150ms"/>
-                  <span class="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 300ms"/>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Suggested questions (only before first message) -->
-          <div v-if="!chatMessages.length" class="flex flex-wrap gap-2">
-            <button
-              v-for="q in suggestedQuestions"
-              :key="q"
-              class="text-xs rounded-full border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-gray-600 dark:text-gray-400 hover:border-sky-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
-              @click="sendQuestion(q)"
-            >
-              {{ q }}
-            </button>
-          </div>
-
-          <!-- Input -->
-          <form class="flex gap-2" @submit.prevent="sendQuestion(chatInput)">
             <input
               v-model="chatInput"
               type="text"
               placeholder="Ask anything about this reach…"
               :disabled="chatLoading"
-              class="flex-1 text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50"
+              class="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 pl-9 pr-3 py-2 text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50"
             />
-            <button
-              type="submit"
-              :disabled="chatLoading || !chatInput.trim()"
-              class="rounded-lg bg-sky-500 hover:bg-sky-600 disabled:opacity-40 px-3 py-2 text-white transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
-            </button>
-          </form>
+          </div>
+          <button
+            type="submit"
+            :disabled="chatLoading || !chatInput.trim()"
+            class="shrink-0 rounded-lg bg-sky-500 hover:bg-sky-600 disabled:opacity-40 px-3 py-2 text-white transition-colors"
+          >
+            <svg v-if="!chatLoading" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+            <span v-else class="flex gap-1 items-center">
+              <span class="w-1.5 h-1.5 rounded-full bg-white/80 animate-bounce" style="animation-delay:0ms"/>
+              <span class="w-1.5 h-1.5 rounded-full bg-white/80 animate-bounce" style="animation-delay:150ms"/>
+              <span class="w-1.5 h-1.5 rounded-full bg-white/80 animate-bounce" style="animation-delay:300ms"/>
+            </span>
+          </button>
+        </form>
 
-          <p v-if="chatError" class="text-xs text-red-500">{{ chatError }}</p>
+        <!-- Last assistant response -->
+        <div v-if="lastAssistantMessage" class="mt-3 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+          {{ lastAssistantMessage }}
         </div>
+        <p v-if="chatError" class="mt-2 text-xs text-red-500">{{ chatError }}</p>
       </section>
 
       <!-- Reach map -->
@@ -329,90 +276,12 @@
         </div>
       </section>
 
-      <!-- Flow / Gauge section -->
-      <section v-if="allGauges.length > 0" id="flow-gauge" class="space-y-4">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Flow</h2>
-        <div
-          v-for="g in allGauges"
-          :key="g.id"
-          class="border border-gray-200 dark:border-gray-700 rounded-xl p-4"
-        >
-          <!-- Gauge header: name + relationship label + dashboard button -->
-          <div class="flex items-start justify-between gap-3 mb-3">
-            <div class="min-w-0">
-              <div class="text-xs text-gray-400 uppercase tracking-wide mb-0.5">
-                {{ gaugeRelLabel(g.reach_relationship) }}
-              </div>
-              <div class="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">
-                {{ g.name ?? g.external_id }}
-              </div>
-              <div class="text-xs text-gray-400 mt-0.5">
-                {{ g.source?.toUpperCase() }} · {{ g.external_id }}
-              </div>
-            </div>
-
-            <!-- Add / remove dashboard button -->
-            <button
-              v-if="!onDashboard(g.id)"
-              class="shrink-0 flex items-center gap-1.5 text-xs rounded-lg bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 text-white font-medium transition-colors"
-              @click="addToDashboard(g)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-              Dashboard
-            </button>
-            <template v-else>
-              <!-- Confirming remove -->
-              <div v-if="confirmingRemove === g.id" class="shrink-0 flex items-center gap-1 text-xs">
-                <span class="text-gray-500 dark:text-gray-400">Remove?</span>
-                <button
-                  class="rounded px-2 py-1 bg-red-500 hover:bg-red-600 text-white font-medium transition-colors"
-                  @click="confirmRemoveDashboard(g.id)"
-                >Yes</button>
-                <button
-                  class="rounded px-2 py-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-                  @click="confirmingRemove = null"
-                >Cancel</button>
-              </div>
-              <!-- Trash icon -->
-              <UTooltip v-else text="Remove from dashboard">
-                <button
-                  class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
-                  aria-label="Remove from dashboard"
-                  @click="confirmingRemove = g.id"
-                >
-                  <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
-                  </svg>
-                </button>
-              </UTooltip>
-            </template>
-          </div>
-
-          <!-- Graph -->
-          <GaugeGraph :gauge-id="g.id" :reach-slug="(reach as any)?.slug ?? null" :current-cfs="g.current_cfs" />
-
-          <!-- CFS + flow badge below graph -->
-          <div class="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3">
-            <div v-if="g.current_cfs != null" class="flex items-end gap-2">
-              <span class="text-3xl font-bold tabular-nums" :class="cfsColorClass(g.flow_status)">
-                {{ g.current_cfs.toLocaleString() }}
-              </span>
-              <span class="text-gray-500 mb-0.5">cfs</span>
-              <span v-if="g.last_reading_at" class="text-xs text-gray-400 mb-1">
-                · {{ relativeTime(g.last_reading_at) }}
-              </span>
-            </div>
-            <div v-else class="text-gray-400 text-sm">No recent reading</div>
-            <UBadge
-              v-if="g.flow_status && g.flow_status !== 'unknown'"
-              :color="flowStatusColor(g.flow_status)"
-              variant="subtle"
-              size="md"
-              class="mt-2"
-            >{{ flowStatusLabel(g.flow_status) }}</UBadge>
-          </div>
-        </div>
-      </section>
+      <!-- Gauge detail modal -->
+      <GaugeDetailModal
+        v-if="gaugeModalGauge"
+        v-model:open="gaugeModalOpen"
+        :gauge="gaugeModalGauge"
+      />
 
 
       <!-- Features tabbed panel -->
@@ -637,7 +506,7 @@ const allFeatures = computed<RiverFeature[]>(() => {
     items.push({
       key:  `rapid-${rap.id}`,
       type: rap.is_permanent_hazard ? 'hazard' : 'rapid',
-      name: rap.name,
+      name: stripRapidClass(rap.name),
       description: rap.description,
       class_rating: rap.class_rating,
       class_at_high: rap.class_at_high,
@@ -1041,6 +910,55 @@ function removeFromDashboard(gaugeId: string) {
   removeAndSync(gaugeId, reachSlug)
 }
 
+// ---- Gauge flow modal -------------------------------------------------------
+
+import type { WatchedGauge } from '~/stores/watchlist'
+const gaugeModalOpen  = ref(false)
+const gaugeModalGauge = ref<WatchedGauge | null>(null)
+
+function openGaugeModal(g: any) {
+  const r = reach.value as any
+  const putIn   = r?.put_in_name  ?? null
+  const takeOut = r?.take_out_name ?? null
+  gaugeModalGauge.value = {
+    id:                     g.id,
+    externalId:             g.external_id,
+    source:                 g.source ?? '',
+    name:                   g.name ?? null,
+    contextReachSlug:       r?.slug ?? null,
+    contextReachCommonName: r?.common_name ?? r?.name ?? null,
+    contextReachFullName:   putIn && takeOut ? `${putIn} to ${takeOut}` : null,
+    contextReachRiverName:  r?.river_name ?? null,
+    reachId:                r?.id ?? null,
+    reachName:              r?.common_name ?? r?.name ?? null,
+    reachNames:             [],
+    reachSlug:              r?.slug ?? null,
+    reachSlugs:             [],
+    reachCommonNames:       [],
+    reachRelationship:      g.reach_relationship ?? 'primary',
+    watershedName:          r?.watershed_name ?? null,
+    basinName:              null,
+    riverName:              r?.river_name ?? null,
+    stateAbbr:              null,
+    lat:                    g.lat ?? null,
+    lng:                    g.lng ?? null,
+    currentCfs:             g.current_cfs ?? null,
+    flowStatus:             g.flow_status ?? 'unknown',
+    flowBandLabel:          null,
+    lastReadingAt:          g.last_reading_at ?? null,
+    contextReachBasinGroup: null,
+  }
+  gaugeModalOpen.value = true
+}
+
+// ---- Rapid name helpers ----------------------------------------------------
+
+/** Strip trailing class notation from rapid names: "Gorilla (Class V)" → "Gorilla" */
+function stripRapidClass(name: string | null): string | null {
+  if (!name) return name
+  return name.replace(/\s*\((?:class\s+)?[IVX]+[+]?\)\s*$/i, '').trim() || name
+}
+
 function flowStatusColor(status: string): string {
   switch (status) {
     case 'runnable': return 'success'
@@ -1129,22 +1047,14 @@ async function fetchCenterline() {
 
 // ---- River assistant chat ---------------------------------------------------
 
-const showChat      = ref(true)
 const chatMessages  = ref<{ role: 'user' | 'assistant'; content: string }[]>([])
 const chatInput     = ref('')
 const chatLoading   = ref(false)
 const chatError     = ref<string | null>(null)
 
-const suggestedQuestions = computed(() => {
-  const r = reach.value as any
-  if (!r) return []
-  const base = [
-    'What flows are best?',
-    'What should I scout?',
-    'How do I get to the put-in?',
-  ]
-  if ((r.class_max ?? 0) >= 4) base.push('How committing is this run?')
-  return base
+const lastAssistantMessage = computed(() => {
+  const msgs = chatMessages.value.filter(m => m.role === 'assistant')
+  return msgs.length ? msgs[msgs.length - 1].content : null
 })
 
 async function sendQuestion(question: string) {

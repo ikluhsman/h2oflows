@@ -384,22 +384,14 @@ function updateLayers(features: ReachFeature[]) {
       },
     })
 
-    // Hover / selected highlight layer
+    // Hover / selected highlight layer — uses the reach's own difficulty color at higher opacity/width
     map.addLayer({
       id: 'reach-highlight', type: 'line', source: 'reaches',
       filter: ['==', ['get', 'slug'], ''],
       paint: {
-        // V-class reaches highlight red; others highlight yellow
-        'line-color': ['case',
-          ['>=', ['coalesce', ['get', 'class_max'], 0], 5.0], '#ef4444',
-          '#facc15',
-        ],
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 5, 12, 10],
-        'line-opacity': 0.95,
-        'line-blur': ['case',
-          ['>=', ['coalesce', ['get', 'class_max'], 0], 5.0], 3,
-          0,
-        ],
+        'line-color': difficultyColorExpr(),
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 5, 12, 8],
+        'line-opacity': 1.0,
       },
     })
 

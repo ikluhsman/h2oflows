@@ -2,29 +2,34 @@
   <!-- ─── LIST row ─────────────────────────────────────────────────────── -->
   <div
     v-if="density === 'list'"
-    class="flex items-center gap-3 px-3 py-2 rounded-lg border transition-all duration-200 cursor-pointer"
+    class="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border transition-all duration-200 cursor-pointer"
     :class="cardClass"
     @click="emit('open')"
   >
-    <div class="min-w-0 flex-1">
-      <span class="text-sm font-medium truncate block">{{ displayName }}</span>
-      <span v-if="gauge.riverName" class="text-xs text-blue-400 truncate block">{{ gauge.riverName }}</span>
-    </div>
-
-    <div class="w-40 shrink-0 hidden sm:block">
-      <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact />
-    </div>
-
-    <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" size="lg" class="shrink-0 hidden sm:block" />
-
+    <!-- Badge — far left -->
     <UBadge v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" :color="statusColor" variant="subtle" size="sm" class="shrink-0 hidden sm:flex">
       {{ statusLabel }}
     </UBadge>
 
-    <span class="text-base font-bold tabular-nums shrink-0 min-w-16 text-right" :class="cfsClass">
-      {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
-      <span class="text-xs font-normal text-gray-400 dark:text-gray-500">cfs</span>
-    </span>
+    <!-- Name + trend arrow -->
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-1.5 min-w-0">
+        <span class="text-sm font-medium truncate">{{ displayName }}</span>
+        <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" size="lg" class="shrink-0 hidden sm:block" />
+      </div>
+      <span v-if="gauge.riverName" class="text-xs text-blue-400 truncate block">{{ gauge.riverName }}</span>
+    </div>
+
+    <!-- Sparkline + CFS -->
+    <div class="flex items-center gap-2 shrink-0">
+      <div class="w-32 shrink-0 hidden sm:block">
+        <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact />
+      </div>
+      <span class="text-base font-bold tabular-nums min-w-14 text-right" :class="cfsClass">
+        {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
+        <span class="text-xs font-normal text-gray-400 dark:text-gray-500">cfs</span>
+      </span>
+    </div>
 
     <button
       class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"
@@ -113,10 +118,10 @@
     <GaugeSparkline v-else-if="density === 'full'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" class="mb-2" />
 
     <!-- Diurnal forecast — compact/comfortable: one-liner; full: richer summary -->
-    <p v-if="diurnal.detected && diurnal.forecast && density !== 'full'" class="relative text-[10px] text-gray-400 dark:text-gray-500 truncate">
+    <p v-if="diurnal.detected && diurnal.forecast && density !== 'full'" class="relative text-[10px] text-indigo-500 dark:text-indigo-400 truncate">
       {{ diurnal.forecast.label }}
     </p>
-    <div v-if="diurnal.detected && density === 'full'" class="flex items-center gap-2 text-[11px] text-gray-400 dark:text-gray-500 mt-0.5 mb-1">
+    <div v-if="diurnal.detected && density === 'full'" class="flex items-center gap-2 text-[11px] text-indigo-500 dark:text-indigo-400 mt-0.5 mb-1">
       <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       <span class="truncate">
         {{ diurnalPhaseLabel }}
