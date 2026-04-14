@@ -5,5 +5,6 @@
     </Head>
     <NuxtPage />
     <ClientOnly><SiteDisclaimerBanner /></ClientOnly>
+    <MobileTabBar />
   </UApp>
 </template>

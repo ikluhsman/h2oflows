@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
     <AppHeader />
 
-    <main class="max-w-5xl mx-auto px-4 py-6 space-y-8">
+    <main class="max-w-5xl mx-auto px-4 py-6 pb-20 sm:pb-6 space-y-8">
 
       <!-- Empty state -->
       <div v-if="store.gauges.length === 0" class="mt-20 flex flex-col items-center gap-4 text-center">

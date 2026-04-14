@@ -110,6 +110,22 @@
         </button>
       </template>
 
+      <!-- Hazards group -->
+      <template v-if="hazardFeatures.length > 0">
+        <p class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Hazards</p>
+        <button
+          v-for="h in hazardFeatures"
+          :key="h.id"
+          class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors text-xs"
+          :class="selectedId === h.id ? 'bg-gray-100 dark:bg-gray-800' : ''"
+          @mousedown.prevent
+          @click="selectFeature(h.id, h.lng, h.lat)"
+        >
+          <span class="shrink-0 w-5 h-5 rounded-full flex items-center justify-center bg-red-500" v-html="hazardCircleIcon()" />
+          <span class="truncate text-gray-700 dark:text-gray-300">{{ h.label }}</span>
+        </button>
+      </template>
+
       <!-- Gauges group -->
       <template v-if="allGauges.length > 0">
         <p class="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Gauges</p>
@@ -245,6 +261,8 @@ interface RapidFeature {
   class_rating: number | null
   description: string | null
   is_surf_wave: boolean
+  is_permanent_hazard?: boolean
+  hazard_type?: string | null
   lng: number | null
   lat: number | null
 }
@@ -327,7 +345,7 @@ const accessFeatures = computed(() =>
 
 const rapidFeatures = computed(() =>
   props.rapids
-    .filter(r => r.lng != null && r.lat != null)
+    .filter(r => r.lng != null && r.lat != null && !r.is_permanent_hazard)
     .map(r => ({
       id:         r.id,
       label:      stripRapidClass(r.name),
@@ -339,11 +357,24 @@ const rapidFeatures = computed(() =>
     }))
 )
 
+const hazardFeatures = computed(() =>
+  props.rapids
+    .filter(r => r.lng != null && r.lat != null && r.is_permanent_hazard)
+    .map(r => ({
+      id:          r.id,
+      label:       r.name,
+      desc:        r.description ?? '',
+      hazardType:  r.hazard_type ?? null,
+      lng:         r.lng!,
+      lat:         r.lat!,
+    }))
+)
+
 function stripRapidClass(name: string): string {
   return name.replace(/\s*\((?:class\s+)?[IVX]+[+]?\)\s*$/i, '').trim() || name
 }
 
-const allFeatures = computed(() => [...accessFeatures.value, ...rapidFeatures.value])
+const allFeatures = computed(() => [...accessFeatures.value, ...rapidFeatures.value, ...hazardFeatures.value])
 
 const selectedFeature = computed(() => {
   if (!selectedId.value) return null
@@ -367,6 +398,15 @@ const selectedFeature = computed(() => {
     directionsUrl: (access.type === 'put_in' || access.type === 'take_out')
       ? `https://www.google.com/maps/dir/?api=1&destination=${access.lat},${access.lng}`
       : null,
+  }
+  const hazard = hazardFeatures.value.find(h => h.id === selectedId.value)
+  if (hazard) return {
+    title:       hazard.label,
+    classLabel:  null as string | null,
+    subtitle:    hazard.hazardType ? hazardTypeLabel(hazard.hazardType) : 'Permanent hazard',
+    desc:        hazard.desc || null,
+    pinColor:    '#dc2626',
+    circleIcon:  hazardCircleIcon(),
   }
   const gauge = gaugeFeatures.value.find(g => g.id === selectedId.value)
   if (gauge) return {
@@ -677,6 +717,29 @@ function addLayers() {
     allMarkers.push(marker)
     markerEls.set(r.id, el)
   }
+
+  // Hazard pins — red warning triangle
+  for (const h of hazardFeatures.value) {
+    const tooltipText = h.hazardType ? `⚠ ${hazardTypeLabel(h.hazardType)}` : `⚠ ${h.label}`
+    const el = makeHazardPinEl(h.id)
+    el.title = tooltipText
+    el.addEventListener('mouseenter', () => showTooltip(el, tooltipText, [h.lng, h.lat]))
+    el.addEventListener('mouseleave', () => tooltip.remove())
+    el.addEventListener('click', (e) => {
+      e.stopPropagation()
+      clickPopup?.remove()
+      clickPopup = new maplibregl.Popup({ offset: [0, -36] })
+        .setLngLat([h.lng, h.lat])
+        .setHTML(`<div class="map-popup"><p class="map-popup-title">⚠ ${h.label}</p>${h.desc ? `<p class="map-popup-desc">${h.desc}</p>` : ''}</div>`)
+        .addTo(map!)
+      setSelectedMarker(h.id)
+    })
+    const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
+      .setLngLat([h.lng, h.lat])
+      .addTo(map!)
+    allMarkers.push(marker)
+    markerEls.set(h.id, el)
+  }
 }
 
 const tooltip = new maplibregl.Popup({
@@ -729,6 +792,40 @@ function makePinSvg(color: string, label: string): string {
 
 // Kept for API compatibility — no longer used (inline SVG replaces KMZ images)
 function accessIconUrl(_type: string): string | null { return null }
+
+function makeHazardPinEl(id: string): HTMLElement {
+  const el = document.createElement('div')
+  el.dataset.markerId = id
+  el.dataset.pinColor = '#dc2626'
+  el.tabIndex = -1
+  el.addEventListener('mousedown', e => e.preventDefault())
+  el.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));transition:filter 0.12s'
+  // Warning triangle with exclamation mark
+  el.innerHTML = `<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16 3 L30 28 L2 28 Z" fill="#dc2626" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+    <text x="16" y="24" text-anchor="middle" font-size="14" font-weight="900" font-family="system-ui,sans-serif" fill="white">!</text>
+  </svg>`
+  return el
+}
+
+function hazardCircleIcon(): string {
+  return `<svg viewBox="0 0 20 20" fill="white" xmlns="http://www.w3.org/2000/svg" style="width:12px;height:12px">
+    <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+  </svg>`
+}
+
+function hazardTypeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    waterfall:         'Waterfall',
+    low_head_dam:      'Low-head dam',
+    strainer:          'Strainer',
+    undercut:          'Undercut',
+    siphon:            'Siphon',
+    flood_debris:      'Flood debris',
+    other:             'Permanent hazard',
+  }
+  return labels[type] ?? 'Permanent hazard'
+}
 
 function setSelectedMarker(id: string) {
   selectedId.value = id

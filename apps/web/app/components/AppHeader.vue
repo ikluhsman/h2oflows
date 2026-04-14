@@ -126,9 +126,37 @@
 
     <!-- Mobile menu dropdown -->
     <div v-if="menuOpen" class="sm:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 px-4 py-3 flex flex-col gap-1">
+      <!-- Dashboard + Map — mobile -->
+      <NuxtLink
+        to="/dashboard"
+        class="text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors"
+        :class="route.path === '/dashboard'
+          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
+          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'"
+        @click="menuOpen = false"
+      >
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
+        </svg>
+        Dashboard
+      </NuxtLink>
+      <NuxtLink
+        to="/map"
+        class="text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors"
+        :class="route.path === '/map'
+          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
+          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'"
+        @click="menuOpen = false"
+      >
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+        </svg>
+        Map
+      </NuxtLink>
+      <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2">
       <!-- Ask — mobile -->
       <button
-        class="text-left px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center gap-2"
+        class="w-full text-left px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center gap-2"
         @click="menuOpen = false; askOpen = true"
       >
         <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -136,6 +164,7 @@
         </svg>
         Ask anything
       </button>
+      </div>
       <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2">
         <ClientOnly>
           <button

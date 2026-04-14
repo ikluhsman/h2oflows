@@ -39,16 +39,16 @@
 
         <!-- Headline -->
         <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white leading-tight mb-3 text-center">
-          A better streamflow<br>dashboard.
+          Know before<br>you go.
         </h1>
 
-        <!-- Feature pills — linked -->
-        <div class="flex items-center gap-2 sm:gap-3 mb-6 text-sm font-medium">
-          <NuxtLink to="/dashboard" class="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Real-time Gauges</NuxtLink>
+        <!-- Feature pills — plain text -->
+        <div class="flex items-center gap-2 sm:gap-3 mb-6 text-sm font-medium text-gray-500 dark:text-gray-400">
+          <span>Real-time Gauges</span>
           <span class="text-gray-300 dark:text-gray-700">·</span>
-          <NuxtLink to="/map" class="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Smart Sharing</NuxtLink>
+          <span>Smart Sharing</span>
           <span class="text-gray-300 dark:text-gray-700">·</span>
-          <button type="button" class="text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" @click="focusAsk">AI Intel</button>
+          <span>AI Intel</span>
         </div>
 
         <!-- Primary nav buttons -->
@@ -199,9 +199,15 @@ function focusAsk() {
 const { apiBase } = useRuntimeConfig().public
 const store = useWatchlistStore()
 const { addAndSync } = useWatchlistSync()
+const { isAuthenticated } = useAuth()
 
 const showDemoBanner = ref(false)
 onMounted(() => {
+  // Signed-in users (PWA return visits) go straight to the dashboard
+  if (isAuthenticated.value) {
+    navigateTo('/dashboard')
+    return
+  }
   showDemoBanner.value = localStorage.getItem('demo-banner-dismissed') !== 'true'
 })
 function dismissBanner() {
@@ -267,10 +273,9 @@ const searchResult     = ref<AskResult | null>(null)
 const searchController = ref<AbortController | null>(null)
 
 const LOADING_VERBS = [
-  'Thinking', 'Pondering', 'Perusing', 'Flibbertigibbeting',
   'Eddying', 'Stoking', 'Paddling', 'Navigating', 'Formulating',
   'Hydrating', 'Pumping', 'Rolling', 'Ferrying', 'Scouting',
-  'Reading the water', 'Catching an eddy', 'Running the rapid',
+  'Rowing', 'Boofing', 'Peeling Out', 'Portaging', 'Bracing', 'Surfing',
 ]
 const loadingVerb = ref(LOADING_VERBS[0])
 let verbInterval: ReturnType<typeof setInterval> | null = null

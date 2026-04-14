@@ -145,7 +145,7 @@
       Reach not found.
     </div>
 
-    <main v-else class="max-w-5xl mx-auto px-3 py-6 space-y-8">
+    <main v-else class="max-w-5xl mx-auto px-3 py-6 pb-20 sm:pb-6 space-y-8">
 
       <!-- Hero -->
       <section>

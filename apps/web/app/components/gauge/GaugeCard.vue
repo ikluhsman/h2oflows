@@ -6,15 +6,14 @@
     :class="cardClass"
     @click="emit('open')"
   >
-    <!-- Badge — far left -->
-    <UBadge v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel" :color="statusColor" variant="subtle" size="sm" class="shrink-0 hidden sm:flex">
-      {{ statusLabel }}
-    </UBadge>
-
-    <!-- Name + trend arrow -->
+    <!-- Name + badge + trend arrow -->
     <div class="min-w-0 flex-1">
       <div class="flex items-center gap-1.5 min-w-0">
         <span class="text-sm font-medium truncate">{{ displayName }}</span>
+        <span
+          v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
+          :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', statusBadgeClass]"
+        >{{ statusLabel }}</span>
         <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" size="lg" class="shrink-0 hidden sm:block" />
       </div>
       <span v-if="gauge.riverName" class="text-xs text-blue-400 truncate block">{{ gauge.riverName }}</span>
@@ -93,11 +92,10 @@
       <!-- Trending arrow — shown in comfortable + full -->
       <TrendArrow v-if="currentCfs != null && density !== 'compact'" :gauge-id="gauge.id" class="text-lg" />
       <!-- Badge inline with CFS on sm+ for comfortable mode only -->
-      <UBadge
+      <span
         v-if="density === 'comfortable' && (gauge.flowStatus !== 'unknown' || gauge.flowBandLabel)"
-        :color="statusColor" variant="subtle" size="sm"
-        class="hidden sm:inline-flex"
-      >{{ statusLabel }}</UBadge>
+        :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', statusBadgeClass]"
+      >{{ statusLabel }}</span>
     </div>
 
     <!-- Flow status badge — full: always shown; comfortable: mobile only -->
@@ -106,7 +104,7 @@
       class="flex items-center gap-2 mb-2"
       :class="density === 'full' ? '' : 'sm:hidden'"
     >
-      <UBadge :color="statusColor" variant="subtle" :size="density === 'full' ? 'md' : 'sm'">{{ statusLabel }}</UBadge>
+      <span :class="['inline-flex items-center rounded-md font-medium', density === 'full' ? 'px-2 py-0.5 text-sm' : 'px-1.5 py-0.5 text-xs', statusBadgeClass]">{{ statusLabel }}</span>
       <span v-if="gauge.flowStatus === 'flood'" class="relative flex h-2 w-2">
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
         <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-400" />
@@ -180,20 +178,20 @@ const contextFullName = computed(() => props.gauge.contextReachFullName ?? null)
 
 // --- Flow status ------------------------------------------------------------
 
-const statusColor = computed(() => {
+const statusBadgeClass = computed(() => {
   const band = props.gauge.flowBandLabel
-  if (band === 'below_recommended') return 'error'
-  if (band === 'low_runnable')      return 'lime'
-  if (band === 'runnable')          return 'emerald'
-  if (band === 'med_runnable')      return 'emerald'
-  if (band === 'high_runnable')     return 'green'
-  if (band === 'above_recommended') return 'info'
+  if (band === 'below_recommended') return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
+  if (band === 'low_runnable')      return 'bg-lime-100 dark:bg-lime-950/50 text-lime-700 dark:text-lime-400'
+  if (band === 'runnable')          return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+  if (band === 'med_runnable')      return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+  if (band === 'high_runnable')     return 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-500'
+  if (band === 'above_recommended') return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
   switch (props.gauge.flowStatus) {
-    case 'runnable': return 'emerald'
-    case 'caution':  return 'warning'
-    case 'low':      return 'error'
-    case 'flood':    return 'info'
-    default:         return 'neutral'
+    case 'runnable': return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+    case 'caution':  return 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400'
+    case 'low':      return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
+    case 'flood':    return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
+    default:         return 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
   }
 })
 const statusLabel = computed(() => {
