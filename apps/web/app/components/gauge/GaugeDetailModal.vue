@@ -47,7 +47,7 @@
           <span class="text-sm text-gray-500">cfs</span>
           <TrendArrow v-if="displayCfs != null" :gauge-id="gauge.id" class="text-lg" />
           <span
-            v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
+            v-if="displayFlowStatus !== 'unknown' || displayFlowBand"
             :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', statusBadgeClass]"
           >{{ statusLabel }}</span>
         </div>
@@ -143,52 +143,9 @@ const sourceUrl = computed(() => {
   }
 })
 
-const statusBadgeClass = computed(() => {
-  const band = displayFlowBand.value
-  if (band === 'below_recommended') return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
-  if (band === 'low_runnable')      return 'bg-lime-100 dark:bg-lime-950/50 text-lime-700 dark:text-lime-400'
-  if (band === 'runnable')          return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-  if (band === 'med_runnable')      return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-  if (band === 'high_runnable')     return 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-500'
-  if (band === 'above_recommended') return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
-  switch (displayFlowStatus.value) {
-    case 'runnable': return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-    case 'caution':  return 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400'
-    case 'low':      return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
-    case 'flood':    return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
-    default:         return 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-  }
-})
-
-const statusLabel = computed(() => {
-  if (displayFlowBand.value) {
-    return displayFlowBand.value
-      .split('_')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ')
-  }
-  switch (displayFlowStatus.value) {
-    case 'runnable': return 'Runnable'
-    case 'caution':  return 'Minimum'
-    case 'low':      return 'Too Low'
-    case 'flood':    return 'Flood Stage'
-    default:         return 'Unknown'
-  }
-})
-
-const cfsClass = computed(() => {
-  const band = displayFlowBand.value
-  if (band === 'low_runnable')  return 'text-lime-500'
-  if (band === 'med_runnable')  return 'text-emerald-500'
-  if (band === 'high_runnable') return 'text-green-600 dark:text-green-500'
-  return {
-    'text-emerald-400 dark:text-emerald-500': displayFlowStatus.value === 'runnable',
-    'text-amber-400':                         displayFlowStatus.value === 'caution',
-    'text-red-400':                           displayFlowStatus.value === 'low',
-    'text-blue-400 dark:text-blue-500':       displayFlowStatus.value === 'flood',
-    'text-gray-400':                          !displayFlowStatus.value || displayFlowStatus.value === 'unknown',
-  }
-})
+const statusBadgeClass = computed(() => flowBandBadgeClass(displayFlowBand.value, displayFlowStatus.value))
+const statusLabel      = computed(() => flowBandLabel(displayFlowBand.value, displayFlowStatus.value))
+const cfsClass         = computed(() => flowBandCfsClass(displayFlowBand.value, displayFlowStatus.value))
 
 const lastReadingRelative = computed(() => {
   if (!props.gauge.lastReadingAt) return ''

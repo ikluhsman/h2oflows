@@ -11,7 +11,7 @@
       <div class="flex items-center gap-1.5 min-w-0">
         <span class="text-sm font-medium truncate">{{ displayName }}</span>
         <span
-          v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
+          v-if="displayFlowStatus !== 'unknown' || displayFlowBand"
           :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', statusBadgeClass]"
         >{{ statusLabel }}</span>
         <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" size="lg" class="shrink-0 hidden sm:block" />
@@ -22,7 +22,7 @@
     <!-- Sparkline + CFS -->
     <div class="flex items-center gap-2 shrink-0">
       <div class="w-32 shrink-0 hidden sm:block">
-        <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact @latest-cfs="liveCfs = $event" />
+        <GaugeSparkline :gauge-id="gauge.id" :flow-status="displayFlowStatus" :flow-band-label="displayFlowBand" :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug" compact @latest-cfs="liveCfs = $event" @live-flow-band="liveFlowBand = $event" />
       </div>
       <span class="text-base font-bold tabular-nums min-w-14 text-right" :class="cfsClass">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
@@ -50,7 +50,7 @@
   >
     <!-- Compact: background sparkline along the bottom edge -->
     <div v-if="density === 'compact'" class="absolute bottom-0 left-0 right-0 h-10 pointer-events-none opacity-35">
-      <GaugeSparkline :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact class="h-full w-full" @latest-cfs="liveCfs = $event" />
+      <GaugeSparkline :gauge-id="gauge.id" :flow-status="displayFlowStatus" :flow-band-label="displayFlowBand" :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug" compact class="h-full w-full" @latest-cfs="liveCfs = $event" @live-flow-band="liveFlowBand = $event" />
     </div>
 
     <!-- Gauge name + reach subtitle -->
@@ -93,27 +93,27 @@
       <TrendArrow v-if="currentCfs != null && density !== 'compact'" :gauge-id="gauge.id" class="text-lg" />
       <!-- Badge inline with CFS on sm+ for comfortable mode only -->
       <span
-        v-if="density === 'comfortable' && (gauge.flowStatus !== 'unknown' || gauge.flowBandLabel)"
+        v-if="density === 'comfortable' && (displayFlowStatus !== 'unknown' || displayFlowBand)"
         :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', statusBadgeClass]"
       >{{ statusLabel }}</span>
     </div>
 
     <!-- Flow status badge — full: always shown; comfortable: mobile only -->
     <div
-      v-if="(gauge.flowStatus !== 'unknown' || gauge.flowBandLabel) && density !== 'compact'"
+      v-if="(displayFlowStatus !== 'unknown' || displayFlowBand) && density !== 'compact'"
       class="flex items-center gap-2 mb-2"
       :class="density === 'full' ? '' : 'sm:hidden'"
     >
       <span :class="['inline-flex items-center rounded-md font-medium', density === 'full' ? 'px-2 py-0.5 text-sm' : 'px-1.5 py-0.5 text-xs', statusBadgeClass]">{{ statusLabel }}</span>
-      <span v-if="gauge.flowStatus === 'flood'" class="relative flex h-2 w-2">
-        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-        <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-400" />
+      <span v-if="displayFlowBand === 'above_recommended'" class="relative flex h-2 w-2">
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
       </span>
     </div>
 
     <!-- Sparkline — comfortable gets compact sparkline; full gets full sparkline -->
-    <GaugeSparkline v-if="density === 'comfortable'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" compact class="mb-1" @latest-cfs="liveCfs = $event" />
-    <GaugeSparkline v-else-if="density === 'full'" :gauge-id="gauge.id" :flow-status="gauge.flowStatus" :flow-band-label="gauge.flowBandLabel" class="mb-2" @latest-cfs="liveCfs = $event" />
+    <GaugeSparkline v-if="density === 'comfortable'" :gauge-id="gauge.id" :flow-status="displayFlowStatus" :flow-band-label="displayFlowBand" :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug" compact class="mb-1" @latest-cfs="liveCfs = $event" @live-flow-band="liveFlowBand = $event" />
+    <GaugeSparkline v-else-if="density === 'full'" :gauge-id="gauge.id" :flow-status="displayFlowStatus" :flow-band-label="displayFlowBand" :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug" class="mb-2" @latest-cfs="liveCfs = $event" @live-flow-band="liveFlowBand = $event" />
 
     <!-- Diurnal forecast — compact/comfortable: one-liner; full: richer summary -->
     <p v-if="diurnal.detected && diurnal.forecast && density !== 'full'" class="relative text-[10px] text-indigo-500 dark:text-indigo-400 truncate">
@@ -163,9 +163,13 @@ const diurnalPhaseLabel = computed(() => {
   }
 })
 
-// liveCfs is set by GaugeSparkline once it loads fresh readings — supersedes stale store value
-const liveCfs   = ref<number | null>(null)
-const currentCfs = computed(() => liveCfs.value ?? props.gauge.currentCfs)
+// liveCfs / liveFlowBand are set by GaugeSparkline once it loads fresh readings
+// and flow ranges — both supersede the (potentially-stale) watchlist store values.
+const liveCfs       = ref<number | null>(null)
+const liveFlowBand  = ref<{ flowBandLabel: string | null; flowStatus: string } | null>(null)
+const currentCfs        = computed(() => liveCfs.value ?? props.gauge.currentCfs)
+const displayFlowBand   = computed(() => liveFlowBand.value?.flowBandLabel ?? props.gauge.flowBandLabel)
+const displayFlowStatus = computed(() => liveFlowBand.value?.flowStatus   ?? props.gauge.flowStatus)
 
 // --- Display name -----------------------------------------------------------
 // Prefer the context reach's common name (e.g. "Foxton") over the raw gauge name.
@@ -180,50 +184,9 @@ const contextFullName = computed(() => props.gauge.contextReachFullName ?? null)
 
 // --- Flow status ------------------------------------------------------------
 
-const statusBadgeClass = computed(() => {
-  const band = props.gauge.flowBandLabel
-  if (band === 'below_recommended') return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
-  if (band === 'low_runnable')      return 'bg-lime-100 dark:bg-lime-950/50 text-lime-700 dark:text-lime-400'
-  if (band === 'runnable')          return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-  if (band === 'med_runnable')      return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-  if (band === 'high_runnable')     return 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-500'
-  if (band === 'above_recommended') return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
-  switch (props.gauge.flowStatus) {
-    case 'runnable': return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-    case 'caution':  return 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400'
-    case 'low':      return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
-    case 'flood':    return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
-    default:         return 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-  }
-})
-const statusLabel = computed(() => {
-  if (props.gauge.flowBandLabel) {
-    return props.gauge.flowBandLabel
-      .split('_')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ')
-  }
-  switch (props.gauge.flowStatus) {
-    case 'runnable': return 'Runnable'
-    case 'caution':  return 'Minimum'
-    case 'low':      return 'Too Low'
-    case 'flood':    return 'Flood Stage'
-    default:         return 'Unknown'
-  }
-})
-const cfsClass = computed(() => {
-  const band = props.gauge.flowBandLabel
-  if (band === 'low_runnable')  return 'text-lime-500'
-  if (band === 'med_runnable')  return 'text-emerald-500'
-  if (band === 'high_runnable') return 'text-green-600 dark:text-green-500'
-  return {
-    'text-emerald-400 dark:text-emerald-500': props.gauge.flowStatus === 'runnable',
-    'text-amber-400':                         props.gauge.flowStatus === 'caution',
-    'text-red-400':                           props.gauge.flowStatus === 'low',
-    'text-blue-400 dark:text-blue-500':       props.gauge.flowStatus === 'flood',
-    'text-gray-400':                          !props.gauge.flowStatus || props.gauge.flowStatus === 'unknown',
-  }
-})
+const statusBadgeClass = computed(() => flowBandBadgeClass(displayFlowBand.value, displayFlowStatus.value))
+const statusLabel      = computed(() => flowBandLabel(displayFlowBand.value, displayFlowStatus.value))
+const cfsClass         = computed(() => flowBandCfsClass(displayFlowBand.value, displayFlowStatus.value))
 
 // --- Card chrome ------------------------------------------------------------
 

@@ -159,12 +159,7 @@ async function load() {
         (fr.max_cfs == null || latestCfs < fr.max_cfs)
       )
       const liveLabel = matchedRange?.label ?? null
-      const liveStatus = liveLabel == null ? 'unknown'
-        : ['runnable','low_runnable','med_runnable','high_runnable'].includes(liveLabel) ? 'runnable'
-        : liveLabel === 'below_recommended' ? 'caution'
-        : liveLabel === 'above_recommended' ? 'flood'
-        : 'unknown'
-      emit('liveFlowBand', { flowBandLabel: liveLabel, flowStatus: liveStatus })
+      emit('liveFlowBand', { flowBandLabel: liveLabel, flowStatus: flowStatusForBand(liveLabel) })
     }
     await nextTick()
     buildChart()
@@ -244,32 +239,14 @@ function buildChart() {
 
 // ---- Canvas drawing helpers -------------------------------------------------
 
-const BAND_COLORS: Record<string, string> = {
-  below_recommended: 'rgba(239,68,68,0.22)',
-  low_runnable:      'rgba(132,204,22,0.25)',
-  runnable:          'rgba(34,197,94,0.30)',
-  med_runnable:      'rgba(16,185,129,0.28)',
-  high_runnable:     'rgba(22,163,74,0.25)',
-  above_recommended: 'rgba(59,130,246,0.25)',
-}
-
 // bandColor returns the translucent fill used on the chart bands.
 function bandColor(label: string): string {
-  return BAND_COLORS[label] ?? 'rgba(156,163,175,0.10)'
-}
-
-const BAND_COLORS_SOLID: Record<string, string> = {
-  below_recommended: '#ef4444',
-  low_runnable:      '#84cc16',
-  runnable:          '#22c55e',
-  med_runnable:      '#10b981',
-  high_runnable:     '#16a34a',
-  above_recommended: '#3b82f6',
+  return FLOW_BAND_FILL[label] ?? 'rgba(156,163,175,0.10)'
 }
 
 // bandColorSolid returns a fully opaque swatch color for the legend.
 function bandColorSolid(label: string): string {
-  return BAND_COLORS_SOLID[label] ?? '#9ca3af'
+  return flowBandSolidColor(label)
 }
 
 function drawBands(u: uPlot, ranges: FlowRange[]) {
@@ -284,7 +261,7 @@ function drawBands(u: uPlot, ranges: FlowRange[]) {
   ctx.clip()
 
   for (const fr of ranges) {
-    const color = BAND_COLORS[fr.label]
+    const color = FLOW_BAND_FILL[fr.label]
     if (!color) continue
 
     // Convert CFS values to canvas Y coordinates.
@@ -334,20 +311,12 @@ function lineColor(ranges: FlowRange[], cfs: number | null): string {
     (fr.min_cfs == null || cfs >= fr.min_cfs) &&
     (fr.max_cfs == null || cfs <  fr.max_cfs)
   )
-  if (match) {
-    switch (match.label) {
-      case 'runnable':          return '#22c55e'
-      case 'above_recommended': return '#3b82f6'
-      case 'below_recommended': return '#ef4444'
-      default:                  return '#6b7280'
-    }
-  }
+  if (match) return flowBandSolidColor(match.label)
   // No exact match — infer from position relative to known ranges.
-  // This handles gauges that only have a 'runnable' band without flanking bands.
   const mins = ranges.filter(r => r.min_cfs != null).map(r => r.min_cfs!)
   const maxs = ranges.filter(r => r.max_cfs != null).map(r => r.max_cfs!)
-  if (mins.length > 0 && cfs < Math.min(...mins)) return '#ef4444'  // below all ranges → red
-  if (maxs.length > 0 && cfs >= Math.max(...maxs)) return '#3b82f6' // above all ranges → blue
+  if (mins.length > 0 && cfs < Math.min(...mins)) return flowBandSolidColor('below_recommended')
+  if (maxs.length > 0 && cfs >= Math.max(...maxs)) return flowBandSolidColor('above_recommended')
   return '#6b7280'
 }
 
@@ -373,17 +342,8 @@ function formatHour(h: number): string {
 
 // ---- Flow range legend helpers ----------------------------------------------
 
-const LABEL_DISPLAY: Record<string, string> = {
-  below_recommended: 'Below Recommended',
-  low_runnable:      'Low Runnable',
-  runnable:          'Runnable',
-  med_runnable:      'Mid Runnable',
-  high_runnable:     'High Runnable',
-  above_recommended: 'Above Recommended',
-}
-
 function labelDisplay(label: string): string {
-  return LABEL_DISPLAY[label] ?? label
+  return flowBandLabel(label)
 }
 
 // ---- Lifecycle --------------------------------------------------------------

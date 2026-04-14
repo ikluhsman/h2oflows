@@ -418,6 +418,11 @@ import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { gsap } from 'gsap'
 import { featurePanelIcon } from '~/utils/featureIcons'
+import {
+  flowBandLabel as flowBandLabelFn,
+  flowBandBadgeClass,
+  flowBandCfsClass,
+} from '~/utils/flowBand'
 
 const route  = useRoute()
 const config = useRuntimeConfig()
@@ -784,13 +789,7 @@ const activeBand = computed(() => {
 
 const statusLabel = computed(() => {
   if (activeBand.value) return bandDisplayLabel(activeBand.value)
-  switch (reach.value?.gauge.flow_status) {
-    case 'runnable': return 'Runnable'
-    case 'caution':  return 'Caution'
-    case 'low':      return 'Too Low'
-    case 'flood':    return 'Flood Stage'
-    default:         return 'Unknown'
-  }
+  return flowBandLabelFn(null, reach.value?.gauge.flow_status)
 })
 
 // ---- SEO --------------------------------------------------------------------
@@ -960,48 +959,15 @@ function stripRapidClass(name: string | null): string | null {
 }
 
 function flowBadgeClass(status: string, band?: string | null): string {
-  if (band === 'below_recommended') return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
-  if (band === 'low_runnable')      return 'bg-lime-100 dark:bg-lime-950/50 text-lime-700 dark:text-lime-400'
-  if (band === 'runnable')          return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-  if (band === 'med_runnable')      return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-  if (band === 'high_runnable')     return 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-500'
-  if (band === 'above_recommended') return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
-  switch (status) {
-    case 'runnable': return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
-    case 'caution':  return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
-    case 'low':      return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
-    case 'flood':    return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
-    default:         return 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-  }
+  return flowBandBadgeClass(band, status)
 }
 
 function flowBandLabel(status: string, band?: string | null): string {
-  if (band) {
-    return band.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-  }
-  switch (status) {
-    case 'runnable': return 'Runnable'
-    case 'caution':  return 'Below Recommended'
-    case 'low':      return 'Too Low'
-    case 'flood':    return 'Above Recommended'
-    default:         return 'Unknown'
-  }
+  return flowBandLabelFn(band, status)
 }
 
 function cfsColorClass(status: string, band?: string | null): string {
-  if (band === 'low_runnable')  return 'text-lime-500'
-  if (band === 'med_runnable')  return 'text-emerald-500'
-  if (band === 'high_runnable') return 'text-green-600 dark:text-green-500'
-  if (band === 'runnable')      return 'text-emerald-500'
-  if (band === 'below_recommended') return 'text-red-500'
-  if (band === 'above_recommended') return 'text-blue-500'
-  switch (status) {
-    case 'runnable': return 'text-emerald-500'
-    case 'caution':  return 'text-red-500'
-    case 'low':      return 'text-red-500'
-    case 'flood':    return 'text-blue-500'
-    default:         return 'text-gray-700 dark:text-gray-200'
-  }
+  return flowBandCfsClass(band, status)
 }
 
 function relativeTime(t: string | null): string {
@@ -1016,7 +982,7 @@ function relativeTime(t: string | null): string {
 // ---- Flow band helpers -------------------------------------------------------
 
 function bandDisplayLabel(label: string): string {
-  return label.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  return flowBandLabelFn(label)
 }
 
 // ---- OSM centerline fetch ---------------------------------------------------

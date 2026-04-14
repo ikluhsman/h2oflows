@@ -46,10 +46,14 @@ const props = defineProps<{
   gaugeId: string
   flowStatus: WatchedGauge['flowStatus']
   flowBandLabel?: string | null
+  reachSlug?: string | null
   compact?: boolean
 }>()
 
-const emit = defineEmits<{ (e: 'latestCfs', cfs: number): void }>()
+const emit = defineEmits<{
+  (e: 'latestCfs', cfs: number): void
+  (e: 'liveFlowBand', band: { flowBandLabel: string | null; flowStatus: string }): void
+}>()
 
 const { apiBase } = useRuntimeConfig().public
 const PREF_KEY = 'h2oflow_sparkline_hours'
@@ -57,17 +61,41 @@ const PREF_KEY = 'h2oflow_sparkline_hours'
 const hours   = ref<12 | 24>(12)
 const loading = ref(true)
 const readings = ref<{ cfs: number; timestamp: string }[]>([])
+// Flow ranges are fetched once per mount so we can compute the live band
+// from the freshest reading and emit it upward, overriding the (potentially
+// stale) flowBandLabel coming from the watchlist store.
+const flowRanges = ref<{ label: string; min_cfs: number | null; max_cfs: number | null }[]>([])
+let rangesLoaded = false
+
+async function loadFlowRanges() {
+  if (rangesLoaded) return
+  try {
+    const url = props.reachSlug
+      ? `${apiBase}/api/v1/reaches/${props.reachSlug}/flow-ranges`
+      : `${apiBase}/api/v1/gauges/${props.gaugeId}/flow-ranges`
+    const res = await fetch(url)
+    if (res.ok) flowRanges.value = await res.json()
+    rangesLoaded = true
+  } catch { /* fall through */ }
+}
 
 async function fetchReadings() {
   loading.value = true
   try {
+    await loadFlowRanges()
     const since = new Date(Date.now() - hours.value * 3_600_000).toISOString()
     const res = await fetch(`${apiBase}/api/v1/gauges/${props.gaugeId}/readings?since=${since}&limit=500`)
     if (res.ok) {
       readings.value = ([...(await res.json())]).reverse()
-      // Newest is last after reverse; emit so parent can sync displayed CFS
       if (readings.value.length > 0) {
-        emit('latestCfs', readings.value[readings.value.length - 1].cfs)
+        const latestCfs = readings.value[readings.value.length - 1].cfs
+        emit('latestCfs', latestCfs)
+        const matched = flowRanges.value.find(fr =>
+          (fr.min_cfs == null || latestCfs >= fr.min_cfs) &&
+          (fr.max_cfs == null || latestCfs <  fr.max_cfs)
+        )
+        const liveLabel = matched?.label ?? null
+        emit('liveFlowBand', { flowBandLabel: liveLabel, flowStatus: flowStatusForBand(liveLabel) })
       }
     }
   } catch { /* fall through */ } finally {
@@ -124,21 +152,5 @@ const areaPath = computed(() => {
   return `${toPath(pts)} L${last.x.toFixed(1)},40 L0,40 Z`
 })
 
-const strokeColor = computed(() => {
-  const band = props.flowBandLabel
-  if (band === 'low_runnable')       return '#84cc16'
-  if (band === 'med_runnable')       return '#34d399'
-  if (band === 'high_runnable')      return '#22c55e'
-  if (band === 'below_recommended')  return '#f87171'
-  if (band === 'above_recommended')  return '#60a5fa'
-  if (band === 'runnable')           return '#34d399'
-
-  return {
-    runnable: '#34d399',
-    caution:  '#fbbf24',
-    low:      '#f87171',
-    flood:    '#60a5fa',
-    unknown:  '#9ca3af',
-  }[props.flowStatus] ?? '#9ca3af'
-})
+const strokeColor = computed(() => flowBandSolidColor(props.flowBandLabel, props.flowStatus))
 </script>
