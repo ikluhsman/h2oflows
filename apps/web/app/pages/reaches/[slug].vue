@@ -190,17 +190,17 @@
               <div>
                 <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Flow</div>
                 <div class="flex items-center gap-2 flex-wrap">
-                  <span class="text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status)">
+                  <span class="text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status, allGauges[0].flow_band_label)">
                     {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
                   </span>
                   <span class="text-xs text-gray-500">cfs</span>
-                  <UBadge :color="flowStatusColor(allGauges[0].flow_status)" variant="subtle" size="sm" class="hidden sm:inline-flex">
-                    {{ flowStatusLabel(allGauges[0].flow_status) }}
-                  </UBadge>
+                  <span :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', flowBadgeClass(allGauges[0].flow_status, allGauges[0].flow_band_label)]">
+                    {{ flowBandLabel(allGauges[0].flow_status, allGauges[0].flow_band_label) }}
+                  </span>
                 </div>
-                <UBadge :color="flowStatusColor(allGauges[0].flow_status)" variant="subtle" size="sm" class="sm:hidden mt-1">
-                  {{ flowStatusLabel(allGauges[0].flow_status) }}
-                </UBadge>
+                <span :class="['inline-flex sm:hidden items-center rounded-md px-1.5 py-0.5 text-xs font-medium mt-1', flowBadgeClass(allGauges[0].flow_status, allGauges[0].flow_band_label)]">
+                  {{ flowBandLabel(allGauges[0].flow_status, allGauges[0].flow_band_label) }}
+                </span>
               </div>
               <button
                 class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
@@ -959,17 +959,26 @@ function stripRapidClass(name: string | null): string | null {
   return name.replace(/\s*\((?:class\s+)?[IVX]+[+]?\)\s*$/i, '').trim() || name
 }
 
-function flowStatusColor(status: string): string {
+function flowBadgeClass(status: string, band?: string | null): string {
+  if (band === 'below_recommended') return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
+  if (band === 'low_runnable')      return 'bg-lime-100 dark:bg-lime-950/50 text-lime-700 dark:text-lime-400'
+  if (band === 'runnable')          return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+  if (band === 'med_runnable')      return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+  if (band === 'high_runnable')     return 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-500'
+  if (band === 'above_recommended') return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
   switch (status) {
-    case 'runnable': return 'success'
-    case 'caution':  return 'error'    // below_recommended = red (matches graph)
-    case 'low':      return 'error'
-    case 'flood':    return 'info'     // above_recommended = blue (matches graph)
-    default:         return 'neutral'
+    case 'runnable': return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+    case 'caution':  return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
+    case 'low':      return 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400'
+    case 'flood':    return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
+    default:         return 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
   }
 }
 
-function flowStatusLabel(status: string): string {
+function flowBandLabel(status: string, band?: string | null): string {
+  if (band) {
+    return band.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  }
   switch (status) {
     case 'runnable': return 'Runnable'
     case 'caution':  return 'Below Recommended'
@@ -979,12 +988,18 @@ function flowStatusLabel(status: string): string {
   }
 }
 
-function cfsColorClass(status: string): string {
+function cfsColorClass(status: string, band?: string | null): string {
+  if (band === 'low_runnable')  return 'text-lime-500'
+  if (band === 'med_runnable')  return 'text-emerald-500'
+  if (band === 'high_runnable') return 'text-green-600 dark:text-green-500'
+  if (band === 'runnable')      return 'text-emerald-500'
+  if (band === 'below_recommended') return 'text-red-500'
+  if (band === 'above_recommended') return 'text-blue-500'
   switch (status) {
     case 'runnable': return 'text-emerald-500'
-    case 'caution':  return 'text-red-500'    // below_recommended = red
+    case 'caution':  return 'text-red-500'
     case 'low':      return 'text-red-500'
-    case 'flood':    return 'text-sky-500'    // above_recommended = blue
+    case 'flood':    return 'text-blue-500'
     default:         return 'text-gray-700 dark:text-gray-200'
   }
 }

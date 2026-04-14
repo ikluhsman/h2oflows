@@ -540,7 +540,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			COALESCE(ST_Y(g.location::geometry), NULL) AS gauge_lat,
 			CASE
 				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
-				WHEN fr.label = 'runnable'                 THEN 'runnable'
+				WHEN fr.label IN ('runnable','low_runnable','med_runnable','high_runnable') THEN 'runnable'
 				WHEN fr.label = 'below_recommended'        THEN 'caution'
 				WHEN fr.label = 'above_recommended'        THEN 'flood'
 				-- legacy fallbacks (pre-migration 034)
@@ -549,7 +549,8 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 				WHEN fr.label = 'too_low'                  THEN 'low'
 				WHEN fr.label IN ('high','flood')          THEN 'flood'
 				ELSE 'unknown'
-			END AS flow_status
+			END AS flow_status,
+			fr.label AS flow_band_label
 		FROM reaches r
 		LEFT JOIN gauges g ON g.id = r.primary_gauge_id
 		LEFT JOIN LATERAL (
@@ -580,7 +581,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&reach.Gauge.Name, &reach.Gauge.Featured,
 		&reach.Gauge.CurrentCFS, &reach.Gauge.LastReadingAt,
 		&reach.Gauge.Lng, &reach.Gauge.Lat,
-		&reach.Gauge.FlowStatus,
+		&reach.Gauge.FlowStatus, &reach.Gauge.FlowBandLabel,
 	)
 	if err != nil {
 		errorResponse(w, http.StatusNotFound, "reach not found")
@@ -602,10 +603,38 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		SELECT
 			g.id, g.external_id, g.source, g.name, g.featured,
 			g.reach_relationship,
-			g.current_cfs, g.flow_status, g.last_reading_at,
+			lr.value AS current_cfs,
+			CASE
+				WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
+				WHEN fr.label IN ('runnable','low_runnable','med_runnable','high_runnable') THEN 'runnable'
+				WHEN fr.label = 'below_recommended'        THEN 'caution'
+				WHEN fr.label = 'above_recommended'        THEN 'flood'
+				WHEN fr.label IN ('fun','optimal')         THEN 'runnable'
+				WHEN fr.label IN ('minimum','pushy')       THEN 'caution'
+				WHEN fr.label = 'too_low'                  THEN 'low'
+				WHEN fr.label IN ('high','flood')          THEN 'flood'
+				ELSE 'unknown'
+			END AS flow_status,
+			fr.label AS flow_band_label,
+			lr.timestamp AS last_reading_at,
 			ST_X(g.location::geometry) AS lng,
 			ST_Y(g.location::geometry) AS lat
 		FROM gauges g
+		LEFT JOIN LATERAL (
+			SELECT value, timestamp FROM gauge_readings
+			WHERE gauge_id = g.id
+			  AND timestamp > NOW() - INTERVAL '48 hours'
+			ORDER BY timestamp DESC LIMIT 1
+		) lr ON TRUE
+		LEFT JOIN LATERAL (
+			SELECT label FROM flow_ranges
+			WHERE reach_id = g.reach_id
+			  AND craft_type = 'general'
+			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
+			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
+			ORDER BY min_cfs ASC NULLS FIRST
+			LIMIT 1
+		) fr ON TRUE
 		WHERE g.reach_id = $1
 		  AND ($2::uuid IS NULL OR g.id != $2::uuid)
 		  AND g.status = 'active'
@@ -623,7 +652,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			if err := secRows.Scan(
 				&sg.ID, &sg.ExternalID, &sg.Source, &sg.Name, &sg.Featured,
 				&sg.Relationship,
-				&sg.CurrentCFS, &sg.FlowStatus, &sg.LastReadingAt,
+				&sg.CurrentCFS, &sg.FlowStatus, &sg.FlowBandLabel, &sg.LastReadingAt,
 				&sg.Lng, &sg.Lat,
 			); err != nil {
 				continue
@@ -829,6 +858,7 @@ type gaugeSnippet struct {
 	CurrentCFS    *float64   `json:"current_cfs"`
 	LastReadingAt *time.Time `json:"last_reading_at"`
 	FlowStatus    string     `json:"flow_status"`
+	FlowBandLabel *string    `json:"flow_band_label"`
 	Lng           *float64   `json:"lng"`
 	Lat           *float64   `json:"lat"`
 }

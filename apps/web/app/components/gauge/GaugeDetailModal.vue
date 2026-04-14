@@ -73,6 +73,19 @@
         <p v-if="gauge.lastReadingAt" class="text-xs text-gray-500">
           Last reading {{ lastReadingRelative }}
         </p>
+
+        <!-- View reach link -->
+        <NuxtLink
+          v-if="primaryReachSlug"
+          :to="`/reaches/${primaryReachSlug}`"
+          class="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+          @click="open = false"
+        >
+          View this Reach
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </NuxtLink>
       </div>
     </template>
   </UModal>
