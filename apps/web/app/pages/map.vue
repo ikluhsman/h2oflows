@@ -71,6 +71,11 @@
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Short local name; used in the URL slug</td>
             </tr>
             <tr class="bg-gray-50 dark:bg-gray-900">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">description</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-xs">Multi-line text…</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Sets/updates the reach description shown on the detail page. Also used for AI embeddings.</td>
+            </tr>
+            <tr class="bg-white dark:bg-gray-950">
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">min_class</td>
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">3</td>
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Minimum difficulty rating (numeric, e.g. 3.5)</td>
@@ -99,6 +104,11 @@
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400">multi_day</td>
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">3</td>
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Approximate trip length in days. Omit or <code>1</code> = single day.</td>
+            </tr>
+            <tr class="bg-gray-50 dark:bg-gray-900">
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-600 dark:text-blue-400 italic">LineString</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-xs">(drawn line)</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">A drawn line in the folder is used as the reach centerline. Exactly one allowed per folder. The admin "Re-fetch" button can still override it later.</td>
             </tr>
           </tbody>
         </table>

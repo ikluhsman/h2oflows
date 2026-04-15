@@ -52,91 +52,6 @@
       </div>
     </div>
 
-    <!-- Admin bar — only visible to users with app_metadata.role === "admin" -->
-    <!-- ClientOnly prevents SSR hydration mismatch (session only available client-side) -->
-    <ClientOnly>
-    <div v-if="reach && isAdmin" class="shrink-0 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/60">
-      <div class="max-w-5xl mx-auto px-3 py-2 flex items-center gap-4 flex-wrap">
-        <!-- Fetch river line -->
-        <div class="flex items-center gap-2">
-          <div v-if="needsCoordsInput" class="flex items-center gap-1.5">
-            <input
-              v-model="manualLat"
-              type="text"
-              placeholder="lat"
-              class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-24 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
-            />
-            <input
-              v-model="manualLng"
-              type="text"
-              placeholder="lng"
-              class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-28 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
-            />
-          </div>
-          <button
-            class="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1 disabled:opacity-50"
-            :disabled="fetchingCenterline || (needsCoordsInput && (!manualLat || !manualLng))"
-            @click="fetchCenterline"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-            <span v-if="fetchingCenterline">Fetching…</span>
-            <span v-else-if="displayCenterline">Re-fetch river line</span>
-            <span v-else>Fetch river line</span>
-          </button>
-          <span v-if="centerlineError" class="text-xs text-red-500">{{ centerlineError }}</span>
-        </div>
-
-        <span class="text-gray-200 dark:text-gray-700">|</span>
-
-        <!-- Import KMZ -->
-        <div class="flex items-center gap-2">
-          <button
-            class="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1"
-            @click="showImport = !showImport"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-            Import KMZ
-          </button>
-          <template v-if="showImport">
-            <input
-              ref="kmzInput"
-              type="file"
-              accept=".kml,.kmz"
-              class="text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-100 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 dark:hover:file:bg-gray-700 cursor-pointer"
-              @change="onKmzSelect"
-            />
-            <UButton v-if="kmzFile" size="xs" color="primary" :loading="importing" @click="runImport">
-              Import
-            </UButton>
-          </template>
-        </div>
-
-        <!-- Import result inline -->
-        <div v-if="importResult" class="text-xs text-gray-500 flex items-center gap-2">
-          <span class="text-emerald-500 font-medium">✓ Imported</span>
-          <template v-for="(r, slug) in importResult.reaches" :key="slug">
-            rapids: {{ r.rapids }}, put-ins: {{ r.put_ins }}, take-outs: {{ r.take_outs }}, parking: {{ r.parking }}
-            <span v-if="r.errors?.length" class="text-red-500"> · {{ r.errors.length }} error(s)</span>
-          </template>
-        </div>
-        <p v-if="importError" class="text-xs text-red-500">{{ importError }}</p>
-
-        <span class="text-gray-200 dark:text-gray-700">|</span>
-
-        <!-- Delete reach -->
-        <button
-          class="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 flex items-center gap-1 disabled:opacity-50"
-          :disabled="deleting"
-          @click="deleteReach"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-          <span v-if="deleting">Deleting…</span>
-          <span v-else>Delete reach</span>
-        </button>
-      </div>
-    </div>
-    </ClientOnly>
-
     <div v-if="pending" class="max-w-5xl mx-auto px-3 py-12 text-center text-gray-400">
       Loading…
     </div>
@@ -417,6 +332,94 @@
         </div>
       </section>
 
+      <!-- Admin controls — collapsible, bottom of page -->
+      <ClientOnly>
+        <details v-if="reach && isAdmin" class="group rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+          <summary class="flex items-center gap-2 px-4 py-2.5 cursor-pointer text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 select-none list-none">
+            <svg class="w-3.5 h-3.5 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            Admin controls
+          </summary>
+          <div class="px-4 pb-3 pt-1 flex items-center gap-4 flex-wrap border-t border-dashed border-gray-200 dark:border-gray-700">
+            <!-- Fetch river line -->
+            <div class="flex items-center gap-2">
+              <div v-if="needsCoordsInput" class="flex items-center gap-1.5">
+                <input
+                  v-model="manualLat"
+                  type="text"
+                  placeholder="lat"
+                  class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-24 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
+                />
+                <input
+                  v-model="manualLng"
+                  type="text"
+                  placeholder="lng"
+                  class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-28 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
+                />
+              </div>
+              <button
+                class="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1 disabled:opacity-50"
+                :disabled="fetchingCenterline || (needsCoordsInput && (!manualLat || !manualLng))"
+                @click="fetchCenterline"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                <span v-if="fetchingCenterline">Fetching…</span>
+                <span v-else-if="(reach as any).centerline_source === 'kml'">Re-fetch (overrides KML)</span>
+                <span v-else-if="displayCenterline">Re-fetch river line</span>
+                <span v-else>Fetch river line</span>
+              </button>
+              <span v-if="centerlineError" class="text-xs text-red-500">{{ centerlineError }}</span>
+            </div>
+
+            <span class="text-gray-200 dark:text-gray-700">|</span>
+
+            <!-- Import KMZ -->
+            <div class="flex items-center gap-2">
+              <button
+                class="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1"
+                @click="showImport = !showImport"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                Import KMZ
+              </button>
+              <template v-if="showImport">
+                <input
+                  ref="kmzInput"
+                  type="file"
+                  accept=".kml,.kmz"
+                  class="text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-100 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 dark:hover:file:bg-gray-700 cursor-pointer"
+                  @change="onKmzSelect"
+                />
+                <UButton v-if="kmzFile" size="xs" color="primary" :loading="importing" @click="runImport">
+                  Import
+                </UButton>
+              </template>
+            </div>
+
+            <!-- Import result inline -->
+            <div v-if="importResult" class="text-xs text-gray-500 flex items-center gap-2">
+              <span class="text-emerald-500 font-medium">✓ Imported</span>
+              <template v-for="(r, slug) in importResult.reaches" :key="slug">
+                rapids: {{ r.rapids }}, put-ins: {{ r.put_ins }}, take-outs: {{ r.take_outs }}, parking: {{ r.parking }}
+                <span v-if="r.errors?.length" class="text-red-500"> · {{ r.errors.length }} error(s)</span>
+              </template>
+            </div>
+            <p v-if="importError" class="text-xs text-red-500">{{ importError }}</p>
+
+            <span class="text-gray-200 dark:text-gray-700">|</span>
+
+            <!-- Delete reach -->
+            <button
+              class="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 flex items-center gap-1 disabled:opacity-50"
+              :disabled="deleting"
+              @click="deleteReach"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              <span v-if="deleting">Deleting…</span>
+              <span v-else>Delete reach</span>
+            </button>
+          </div>
+        </details>
+      </ClientOnly>
 
     </main>
 

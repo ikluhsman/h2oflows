@@ -17,13 +17,43 @@ var httpClient = &http.Client{Timeout: 30 * time.Second}
 // coord is a [longitude, latitude] pair.
 type coord [2]float64
 
-// FetchReachLine fetches all river/stream ways within the given bounding box,
-// then chains them into a single connected LineString starting from the end
-// nearest (startLng, startLat) — typically the put-in centroid.
+// ── Centerline algorithm overview ─────────────────────────────────────────────
 //
-// The caller should pass a bbox that covers all access points for the reach
-// so the full river section is captured. Returns ("", nil) if no waterways found.
-func FetchReachLine(ctx context.Context, minLon, minLat, maxLon, maxLat, startLng, startLat, endLng, endLat float64) (string, error) {
+// FetchReachLine fetches all river/stream waterways in the reach bbox from
+// Overpass, selects the correct waterway, stitches its ways into one line, and
+// clips it to the put-in → take-out span. The following cases are handled:
+//
+//   Main-stem reach
+//     A single named river spans the bbox. filterByBestEndpointScore picks it
+//     because both access points are close to it.
+//
+//   Tributary / small creek
+//     A small creek (waterway=stream) enters a larger river near the take-out.
+//     The creek's combined endpoint score is lower than the main river's because
+//     both put-in AND take-out are on the creek, even though the take-out is
+//     near the confluence. Old behaviour (filterByType→river only) would drop
+//     the creek entirely; the new approach considers streams alongside rivers.
+//
+//   Preferred-name hint (river_name from DB)
+//     If a non-empty preferredName is passed, any ways whose OSM name contains
+//     that string (case-insensitive) are promoted: their combined score is halved
+//     so they win ties against equally-close unnamed or differently-named ways.
+//
+//   Multi-channel braid
+//     Multiple ways share the same name. filterByBestEndpointScore picks the
+//     winning name; stitchWays and chainWays then join all its segments.
+//
+//   Canyon / wilderness gap
+//     OSM coverage may not be complete inside a canyon. stitchWays joins
+//     exactly-connected segments; chainWays then bridges any remaining gap
+//     (up to ~5 km) by greedy nearest-endpoint chaining.
+//
+//   Confluence take-out
+//     Take-out is near the mouth of a tributary. The creek still wins on
+//     combined endpoint scoring because the put-in is far from the main river.
+//
+// Returns ("", nil) if no waterways are found.
+func FetchReachLine(ctx context.Context, minLon, minLat, maxLon, maxLat, startLng, startLat, endLng, endLat float64, preferredName string) (string, error) {
 	const pad = 0.01 // small extra padding around the access-point bbox
 
 	// Always expand the bbox to include the explicit put-in and take-out so
@@ -42,17 +72,16 @@ func FetchReachLine(ctx context.Context, minLon, minLat, maxLon, maxLat, startLn
 		return "", nil
 	}
 
-	// Filter to just the target river. Multiple named rivers may exist in the
-	// bbox (e.g. Chalk Creek alongside the Arkansas). Find the river that
-	// passes closest to the put-in and keep only ways with that name.
-	// Fall back to all river-tagged ways, then all ways if no rivers exist.
+	// Select the target waterway. Multiple named rivers/streams may exist in the
+	// bbox (e.g. Chalk Creek alongside the Arkansas, or a small creek joining the
+	// Colorado). Score each named waterway by combined closest-approach distance
+	// from both put-in and take-out — this correctly handles tributaries where the
+	// creek (stream-type) would be dropped by a river-only filter.
+	// A preferredName hint (from the DB river_name) halves a matching waterway's
+	// score so it wins ties against equally-close unnamed ways.
 	ways := extractCoords(tagged)
-	if rivers := filterByType(tagged, "river"); len(rivers) > 0 {
-		if named := filterByNearestName(rivers, startLng, startLat); len(named) > 0 {
-			ways = extractCoords(named)
-		} else {
-			ways = extractCoords(rivers)
-		}
+	if named := filterByBestEndpointScore(tagged, startLng, startLat, endLng, endLat, preferredName); len(named) > 0 {
+		ways = extractCoords(named)
 	}
 
 	// Stitch all same-name ways into one continuous line, then clip to the
@@ -126,6 +155,69 @@ func filterByType(tagged []taggedWay, wtype string) []taggedWay {
 	var out []taggedWay
 	for _, t := range tagged {
 		if t.wtype == wtype {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// filterByBestEndpointScore returns all ways sharing the name whose waterways
+// pass closest to BOTH put-in and take-out combined. This handles tributary
+// reaches where a small creek (waterway=stream) joins a larger river near the
+// take-out: the creek wins because both endpoints are close to it, even if the
+// main river happens to be closer to one endpoint in isolation.
+//
+// preferredName (from DB river_name) halves the combined score of any waterway
+// whose OSM name contains the hint (case-insensitive), so it wins ties.
+// If no named ways exist, returns nil (caller falls back to all ways).
+func filterByBestEndpointScore(tagged []taggedWay, putLng, putLat, takeLng, takeLat float64, preferredName string) []taggedWay {
+	type nameScore struct {
+		putDist  float64
+		takeDist float64
+	}
+	scores := make(map[string]*nameScore)
+	for _, t := range tagged {
+		if t.name == "" {
+			continue
+		}
+		s, ok := scores[t.name]
+		if !ok {
+			s = &nameScore{putDist: math.MaxFloat64, takeDist: math.MaxFloat64}
+			scores[t.name] = s
+		}
+		for i := 0; i < len(t.coords)-1; i++ {
+			if _, d := closestPointOnSegment(putLng, putLat, t.coords[i], t.coords[i+1]); d < s.putDist {
+				s.putDist = d
+			}
+			if _, d := closestPointOnSegment(takeLng, takeLat, t.coords[i], t.coords[i+1]); d < s.takeDist {
+				s.takeDist = d
+			}
+		}
+	}
+	if len(scores) == 0 {
+		return nil
+	}
+
+	hint := strings.ToLower(preferredName)
+	bestName := ""
+	bestScore := math.MaxFloat64
+	for name, s := range scores {
+		combined := s.putDist + s.takeDist
+		// Preferred-name hint: halve the score so it wins over equally-close ways.
+		if hint != "" && strings.Contains(strings.ToLower(name), hint) {
+			combined *= 0.5
+		}
+		if combined < bestScore {
+			bestScore = combined
+			bestName = name
+		}
+	}
+	if bestName == "" {
+		return nil
+	}
+	var out []taggedWay
+	for _, t := range tagged {
+		if t.name == bestName {
 			out = append(out, t)
 		}
 	}

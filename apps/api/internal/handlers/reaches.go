@@ -530,6 +530,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			r.put_in_name,
 			r.take_out_name,
 			ST_AsGeoJSON(r.centerline::geometry) AS centerline,
+			r.centerline_source,
 			-- Primary gauge fields (all nullable — reach may not have a gauge yet)
 			g.id                AS gauge_id,
 			g.external_id       AS gauge_external_id,
@@ -580,6 +581,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&reach.PermitRequired, &reach.MultiDayDays,
 		&reach.RiverName, &reach.CommonName, &reach.PutInName, &reach.TakeOutName,
 		&reach.Centerline,
+		&reach.CenterlineSource,
 		&reach.Gauge.ID, &reach.Gauge.ExternalID, &reach.Gauge.Source,
 		&reach.Gauge.Name, &reach.Gauge.Featured,
 		&reach.Gauge.CurrentCFS, &reach.Gauge.LastReadingAt,
@@ -846,6 +848,7 @@ type reachDetail struct {
 	PermitRequired          bool            `json:"permit_required"`
 	MultiDayDays            int             `json:"multi_day_days"`
 	Centerline              rawGeometry     `json:"centerline"`
+	CenterlineSource        string          `json:"centerline_source"`
 	Gauge                   gaugeSnippet    `json:"gauge"`
 	Gauges                  []gaugeSnippet  `json:"gauges"`
 	Rapids                  []rapidRow      `json:"rapids"`
@@ -1204,12 +1207,13 @@ func (e *fetchCenterlineError) Error() string { return e.msg }
 // Returns the stored GeoJSON line string and the reach's internal ID on success.
 func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, explicitLng, explicitLat *float64) (lineJSON, reachID string, ferr *fetchCenterlineError) {
 	var (
-		putInLng   *float64
-		putInLat   *float64
-		takeOutLng *float64
-		takeOutLat *float64
-		gaugeLng   *float64
-		gaugeLat   *float64
+		putInLng     *float64
+		putInLat     *float64
+		takeOutLng   *float64
+		takeOutLat   *float64
+		gaugeLng     *float64
+		gaugeLat     *float64
+		riverName    *string
 	)
 	err := h.db.QueryRow(ctx, `
 		SELECT r.id,
@@ -1218,7 +1222,8 @@ func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, exp
 		       ST_X(r.take_out::geometry)    AS take_out_lng,
 		       ST_Y(r.take_out::geometry)    AS take_out_lat,
 		       ST_X(g.location::geometry)    AS gauge_lng,
-		       ST_Y(g.location::geometry)    AS gauge_lat
+		       ST_Y(g.location::geometry)    AS gauge_lat,
+		       r.river_name
 		FROM reaches r
 		LEFT JOIN gauges g ON g.id = r.primary_gauge_id
 		WHERE r.slug = $1
@@ -1227,6 +1232,7 @@ func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, exp
 		&putInLng, &putInLat,
 		&takeOutLng, &takeOutLat,
 		&gaugeLng, &gaugeLat,
+		&riverName,
 	)
 	if err != nil {
 		return "", "", &fetchCenterlineError{fetchErrNotFound, "reach not found"}
@@ -1302,6 +1308,10 @@ func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, exp
 			"no location available — pass ?lat=&lng= with the reach's approximate centre"}
 	}
 
+	hint := ""
+	if riverName != nil {
+		hint = *riverName
+	}
 	if accessMinLng != nil && putInLng != nil && takeOutLng != nil && explicitLng == nil {
 		lineJSON, err = osm.FetchReachLine(
 			ctx,
@@ -1309,6 +1319,7 @@ func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, exp
 			*accessMaxLng, *accessMaxLat,
 			*putInLng, *putInLat,
 			*takeOutLng, *takeOutLat,
+			hint,
 		)
 	} else {
 		const pad = 0.05
@@ -1328,8 +1339,9 @@ func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, exp
 
 	_, err = h.db.Exec(ctx, `
 		UPDATE reaches
-		SET    centerline = ST_GeomFromGeoJSON($1)::geography,
-		       length_mi  = ROUND((ST_Length(ST_GeomFromGeoJSON($1)::geography) / 1609.344)::numeric, 2)
+		SET    centerline        = ST_GeomFromGeoJSON($1)::geography,
+		       centerline_source = 'osm',
+		       length_mi         = ROUND((ST_Length(ST_GeomFromGeoJSON($1)::geography) / 1609.344)::numeric, 2)
 		WHERE  id = $2
 	`, lineJSON, reachID)
 	if err != nil {

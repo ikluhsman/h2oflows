@@ -77,11 +77,17 @@ type KMLFolder struct {
 type KMLPlacemark struct {
 	Name        string
 	Description string
-	Point       *KMLPoint // nil for LineStrings/Polygons
+	Point       *KMLPoint      // nil for LineStrings/Polygons
+	LineString  *KMLLineString // non-nil when placemark is a LineString
 }
 
 // KMLPoint holds the parsed coordinate string.
 type KMLPoint struct {
+	Coordinates string
+}
+
+// KMLLineString holds raw KML coordinates for a LineString placemark.
+type KMLLineString struct {
 	Coordinates string
 }
 
@@ -114,10 +120,14 @@ func ParseKMLBytes(data []byte) (*KMLDoc, error) {
 	type xmlPoint struct {
 		Coordinates string `xml:"coordinates"`
 	}
+	type xmlLineString struct {
+		Coordinates string `xml:"coordinates"`
+	}
 	type xmlPlacemark struct {
-		Name        string    `xml:"name"`
-		Description string    `xml:"description"`
-		Point       *xmlPoint `xml:"Point"`
+		Name        string         `xml:"name"`
+		Description string         `xml:"description"`
+		Point       *xmlPoint      `xml:"Point"`
+		LineString  *xmlLineString `xml:"LineString"`
 	}
 	// xmlFolder is declared as a named type so it can reference itself for
 	// nested sub-folders (Google My Maps sometimes wraps all reaches in one
@@ -148,6 +158,9 @@ func ParseKMLBytes(data []byte) (*KMLDoc, error) {
 		}
 		if xp.Point != nil {
 			pm.Point = &KMLPoint{Coordinates: strings.TrimSpace(xp.Point.Coordinates)}
+		}
+		if xp.LineString != nil {
+			pm.LineString = &KMLLineString{Coordinates: strings.TrimSpace(xp.LineString.Coordinates)}
 		}
 		return pm
 	}
@@ -189,6 +202,38 @@ func ParseKMLBytes(data []byte) (*KMLDoc, error) {
 // isZIP checks the ZIP magic bytes.
 func isZIP(data []byte) bool {
 	return len(data) >= 4 && data[0] == 'P' && data[1] == 'K' && data[2] == 0x03 && data[3] == 0x04
+}
+
+// kmlCoordsToLineStringGeoJSON converts a KML coordinate string (space/newline-
+// separated "lng,lat,ele" triples) to a GeoJSON LineString JSON string.
+func kmlCoordsToLineStringGeoJSON(raw string) (string, error) {
+	var coords [][2]float64
+	for _, token := range strings.Fields(raw) {
+		parts := strings.Split(token, ",")
+		if len(parts) < 2 {
+			continue
+		}
+		lng, err1 := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+		lat, err2 := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		coords = append(coords, [2]float64{lng, lat})
+	}
+	if len(coords) < 2 {
+		return "", fmt.Errorf("LineString has fewer than 2 valid coordinates")
+	}
+	// Build GeoJSON manually to avoid importing encoding/json at the top level.
+	var sb strings.Builder
+	sb.WriteString(`{"type":"LineString","coordinates":[`)
+	for i, c := range coords {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		sb.WriteString(fmt.Sprintf("[%g,%g]", c[0], c[1]))
+	}
+	sb.WriteString(`]}`)
+	return sb.String(), nil
 }
 
 // ── Importer ──────────────────────────────────────────────────────────────────
@@ -311,23 +356,32 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 			// properties before calling matchOrCreateReach.
 			var (
 				commonName     string
+				reachDesc      string
 				classMin       *float64
 				classMax       *float64
 				gaugeExtID     string
 				basinGroup     string
 				permitRequired *bool
 				multiDayDays   *int
+				lineStrings    []KMLPlacemark // LineString placemarks found in this folder
 			)
 			var folderFlowRanges []reachFlowRange
 			var folderPins []KMLPlacemark
 
 			for _, pm := range folder.Placemarks {
+				// Collect LineString placemarks for potential centerline use.
+				if pm.LineString != nil {
+					lineStrings = append(lineStrings, pm)
+					continue
+				}
 				if pm.Point == nil {
 					key := strings.ToLower(strings.TrimSpace(pm.Name))
 					val := strings.TrimSpace(pm.Description)
 					switch key {
 					case "common_name":
 						commonName = val
+					case "description":
+						reachDesc = val
 					case "min_class":
 						if v, err2 := strconv.ParseFloat(val, 64); err2 == nil {
 							classMin = &v
@@ -366,6 +420,31 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				res.Log = append(res.Log, fmt.Sprintf("+ created reach %q (slug: %s)", folder.Name, rslug))
 			}
 
+			if reachDesc != "" {
+				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET description = $1 WHERE id = $2`, reachDesc, rid); err != nil {
+					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] description update failed: %v", rname, err))
+				} else {
+					res.Log = append(res.Log, fmt.Sprintf("~ [%s] description updated", rname))
+				}
+			}
+			// LineString → centerline. Exactly one required; reject if multiple.
+			if len(lineStrings) > 1 {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] %d LineStrings found — expected at most 1; skipping centerline import", rname, len(lineStrings)))
+			} else if len(lineStrings) == 1 {
+				geoJSON, err := kmlCoordsToLineStringGeoJSON(lineStrings[0].LineString.Coordinates)
+				if err != nil {
+					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] centerline parse failed: %v", rname, err))
+				} else {
+					if _, err := imp.pool.Exec(ctx,
+						`UPDATE reaches SET centerline = ST_GeomFromGeoJSON($1)::geography, centerline_source = 'kml' WHERE id = $2`,
+						geoJSON, rid,
+					); err != nil {
+						res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] centerline update failed: %v", rname, err))
+					} else {
+						res.Log = append(res.Log, fmt.Sprintf("~ [%s] centerline imported from KML (%d points)", rname, strings.Count(geoJSON, "[")-1))
+					}
+				}
+			}
 			if basinGroup != "" {
 				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET basin_group = $1 WHERE id = $2`, basinGroup, rid); err != nil {
 					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] basin_group update failed: %v", rname, err))

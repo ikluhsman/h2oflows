@@ -62,6 +62,34 @@
           </span>
         </div>
 
+        <!-- Add / remove from dashboard -->
+        <div class="flex items-center gap-2">
+          <button
+            v-if="isOnDashboard"
+            class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors group"
+            @click="toggleDashboard"
+          >
+            <svg class="w-4 h-4 group-hover:hidden" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd"/>
+            </svg>
+            <svg class="w-4 h-4 hidden group-hover:block" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+            </svg>
+            <span class="group-hover:hidden">On Dashboard</span>
+            <span class="hidden group-hover:inline">Remove</span>
+          </button>
+          <button
+            v-else
+            class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            @click="toggleDashboard"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z"/>
+            </svg>
+            Add to Dashboard
+          </button>
+        </div>
+
         <!-- 48-hour graph — emits live CFS + band so we can sync display -->
         <GaugeGraph
           :gauge-id="gauge.id"
@@ -96,6 +124,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
+import { useWatchlistStore } from '~/stores/watchlist'
 import { useDiurnalCache } from '~/composables/useDiurnalCache'
 
 const open = defineModel<boolean>('open', { default: false })
@@ -134,6 +163,27 @@ const displayName = computed(() =>
 const primaryReachSlug = computed(() =>
   props.gauge.contextReachSlug ?? props.gauge.reachSlug ?? props.gauge.reachSlugs?.[0] ?? null
 )
+
+// ── Dashboard add/remove ──────────────────────────────────────────────────
+const watchlistStore = useWatchlistStore()
+const { addAndSync, removeAndSync } = useWatchlistSync()
+
+const isOnDashboard = computed(() =>
+  watchlistStore.gauges.some(
+    g => g.id === props.gauge.id &&
+         (g.contextReachSlug ?? null) === (props.gauge.contextReachSlug ?? null)
+  )
+)
+
+function toggleDashboard() {
+  if (isOnDashboard.value) {
+    removeAndSync(props.gauge.id, props.gauge.contextReachSlug)
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { watchState: _ws, activeSince: _as, ...gaugeData } = props.gauge
+    addAndSync(gaugeData)
+  }
+}
 
 const sourceUrl = computed(() => {
   switch (props.gauge.source) {

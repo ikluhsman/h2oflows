@@ -40,6 +40,18 @@
         <span class="hidden sm:inline text-xs font-medium">Map</span>
       </NuxtLink>
 
+      <!-- AI Ask button — left side -->
+      <button
+        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+        title="Ask AI anything"
+        @click="askOpen = true"
+      >
+        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+        </svg>
+        <span class="text-xs font-medium">Ask</span>
+      </button>
+
       <!-- Breadcrumb / page-level content injected by each page -->
       <div class="flex items-center gap-2 min-w-0 flex-1">
         <slot />
@@ -48,16 +60,17 @@
       <!-- Page-level action buttons -->
       <slot name="actions" />
 
-      <!-- Global Ask button -->
+      <!-- Find a gauge button — right side -->
       <button
         class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-        title="Ask anything"
-        @click="askOpen = true"
+        title="Find a gauge"
+        @click="gaugeSearchOpen = true"
       >
-        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          <path d="M11 8v6M8 11h6"/>
         </svg>
-        <span class="text-xs font-medium">Ask</span>
+        <span class="text-xs font-medium">Gauge</span>
       </button>
 
       <!-- Hamburger — mobile only -->
@@ -153,17 +166,27 @@
         </svg>
         Map
       </NuxtLink>
-      <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2">
-      <!-- Ask — mobile -->
-      <button
-        class="w-full text-left px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center gap-2"
-        @click="menuOpen = false; askOpen = true"
-      >
-        <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
-        Ask anything
-      </button>
+      <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2 flex flex-col gap-1">
+        <!-- Ask — mobile -->
+        <button
+          class="w-full text-left px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center gap-2"
+          @click="menuOpen = false; askOpen = true"
+        >
+          <svg class="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+          </svg>
+          Ask AI
+        </button>
+        <!-- Find a gauge — mobile -->
+        <button
+          class="w-full text-left px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center gap-2"
+          @click="menuOpen = false; gaugeSearchOpen = true"
+        >
+          <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/>
+          </svg>
+          Find a gauge
+        </button>
       </div>
       <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2">
         <ClientOnly>
@@ -183,6 +206,9 @@
     </div>
   </header>
 
+  <!-- Global gauge search modal -->
+  <GaugeSearchModal v-model:open="gaugeSearchOpen" @add="handleGaugeAdd" />
+
   <!-- Global Ask modal (Teleport so it's above everything) -->
   <Teleport to="body">
     <Transition
@@ -200,8 +226,8 @@
       >
         <div class="w-full max-w-xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
           <form class="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800" @submit.prevent="askQuestion">
-            <svg class="w-4 h-4 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            <svg class="w-4 h-4 text-purple-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
             </svg>
             <input
               ref="askInputRef"
@@ -265,6 +291,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import type { WatchedGauge } from '~/stores/watchlist'
 
 const { user, isAuthenticated, signOut } = useAuth()
 const router = useRouter()
@@ -294,6 +321,13 @@ async function handleSignOut() {
   menuOpen.value = false
   await signOut()
   router.push('/')
+}
+
+// ── Find a gauge ─────────────────────────────────────────────────────────────
+const { addAndSync } = useWatchlistSync()
+const gaugeSearchOpen = ref(false)
+function handleGaugeAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
+  addAndSync(gauge)
 }
 
 // ── Global Ask ────────────────────────────────────────────────────────────────

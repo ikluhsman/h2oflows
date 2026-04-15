@@ -33,42 +33,42 @@
             Add gauge
           </UButton>
         </div>
-        <section v-for="group in store.byBasin" :key="group.basin" class="mb-6">
-          <button class="flex items-center gap-2 mb-3 w-full text-left" @click="toggleBasin(group.basin)">
+        <section v-for="{ basin, groups } in byBasinGrouped" :key="basin" class="mb-6">
+          <button class="flex items-center gap-2 mb-3 w-full text-left" @click="toggleBasin(basin)">
             <svg
               class="w-3 h-3 text-gray-400 transition-transform duration-200"
-              :class="{ 'rotate-90': !collapsedBasins.has(group.basin) }"
+              :class="{ 'rotate-90': !collapsedBasins.has(basin) }"
               viewBox="0 0 20 20" fill="currentColor"
             >
               <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
             </svg>
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ group.basin }}</h2>
-            <span class="text-xs text-gray-400">({{ group.gauges.length }})</span>
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ basin }}</h2>
+            <span class="text-xs text-gray-400">({{ groups.length }})</span>
             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
           </button>
 
-          <template v-if="!collapsedBasins.has(group.basin)">
-            <!-- List density: single column rows -->
-            <div v-if="density === 'list'" class="flex flex-col gap-1.5">
-              <GaugeCard
-                v-for="gauge in group.gauges"
-                :key="gauge.id"
-                :gauge="gauge"
+          <template v-if="!collapsedBasins.has(basin)">
+            <!-- List density: single column -->
+            <div v-if="density === 'list'" class="flex flex-col gap-2">
+              <GaugeReachGroup
+                v-for="group in groups"
+                :key="group.lead.id"
+                :lead-gauge="group.lead"
+                :reach-items="group.reachItems"
                 density="list"
-                :shared-with="sharedGaugeMap.get(`${gauge.id}:${gauge.contextReachSlug ?? ''}`)"
-                @open="openGauge(gauge)"
+                @open="openGauge"
               />
             </div>
 
             <!-- Card densities: grid layout -->
             <div v-else :class="gridClass">
-              <GaugeCard
-                v-for="gauge in group.gauges"
-                :key="gauge.id"
-                :gauge="gauge"
+              <GaugeReachGroup
+                v-for="group in groups"
+                :key="group.lead.id"
+                :lead-gauge="group.lead"
+                :reach-items="group.reachItems"
                 :density="density"
-                :shared-with="sharedGaugeMap.get(`${gauge.id}:${gauge.contextReachSlug ?? ''}`)"
-                @open="openGauge(gauge)"
+                @open="openGauge"
               />
             </div>
           </template>
@@ -142,6 +142,7 @@ const gridClass = computed(() => ({
   'compact':     'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2',
   'comfortable': 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3',
   'full':        'grid grid-cols-1 sm:grid-cols-2 gap-4',
+  'list':        'flex flex-col gap-2',
 }[density.value] ?? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'))
 
 // ── Server sync ───────────────────────────────────────────────────────────────
@@ -163,25 +164,31 @@ onMounted(() => {
 })
 onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 
-// ── Shared gauge detection ────────────────────────────────────────────────────
-// Maps each (gaugeId:contextReachSlug) key → array of other reach names on the
-// dashboard that use the same physical gauge station.
-const sharedGaugeMap = computed(() => {
-  const idCount = new Map<string, number>()
-  for (const g of store.gauges) idCount.set(g.id, (idCount.get(g.id) ?? 0) + 1)
+// ── Gauge grouping (gauge-as-primary-unit) ────────────────────────────────────
+// Regroups store.byBasin so each basin shows unique gauge stations, each with
+// their associated reaches listed as sub-items.
+interface GaugeGroup {
+  lead: WatchedGauge
+  reachItems: WatchedGauge[]
+}
 
-  const result = new Map<string, string[]>()
-  for (const g of store.gauges) {
-    if ((idCount.get(g.id) ?? 0) <= 1) continue
-    const key = `${g.id}:${g.contextReachSlug ?? ''}`
-    const others = store.gauges
-      .filter(x => x.id === g.id && (x.contextReachSlug ?? '') !== (g.contextReachSlug ?? ''))
-      .map(x => x.contextReachCommonName ?? x.name ?? x.externalId ?? '')
-      .filter(Boolean)
-    result.set(key, others)
-  }
-  return result
-})
+const byBasinGrouped = computed(() =>
+  store.byBasin.map(({ basin, gauges }) => {
+    const gaugeMap = new Map<string, GaugeGroup>()
+    for (const g of gauges) {
+      const existing = gaugeMap.get(g.id)
+      if (!existing) {
+        gaugeMap.set(g.id, {
+          lead: g,
+          reachItems: g.contextReachSlug ? [g] : [],
+        })
+      } else {
+        if (g.contextReachSlug) existing.reachItems.push(g)
+      }
+    }
+    return { basin, groups: [...gaugeMap.values()] }
+  })
+)
 
 // ── Collapsible basin sections ────────────────────────────────────────────────
 const COLLAPSED_KEY = 'h2oflow_dashboard_collapsed'

@@ -22,7 +22,6 @@
           </span>
         </UTooltip>
       </div>
-      <span v-if="gauge.riverName" class="text-xs text-blue-400 truncate block">{{ gauge.riverName }}</span>
     </div>
 
     <!-- Sparkline + CFS -->
