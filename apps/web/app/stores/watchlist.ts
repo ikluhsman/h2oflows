@@ -46,7 +46,7 @@ export interface WatchedGauge {
   currentCfs: number | null
   // Flow status resolved against the context reach's flow ranges.
   // For standalone gauges (no contextReachSlug), uses the alphabetically-first reach.
-  flowStatus: 'runnable' | 'caution' | 'low' | 'flood' | 'unknown'
+  flowStatus: 'runnable' | 'caution' | 'flood' | 'unknown'
   // Named flow band from flow_ranges (e.g. "optimal", "fun") — null if no ranges seeded
   flowBandLabel: string | null
   lastReadingAt: string | null

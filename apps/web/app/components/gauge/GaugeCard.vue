@@ -119,7 +119,7 @@
       :class="density === 'full' ? '' : 'sm:hidden'"
     >
       <span :class="['inline-flex items-center rounded-md font-medium', density === 'full' ? 'px-2 py-0.5 text-sm' : 'px-1.5 py-0.5 text-xs', statusBadgeClass]">{{ statusLabel }}</span>
-      <span v-if="displayFlowBand === 'above_recommended'" class="relative flex h-2 w-2">
+      <span v-if="displayFlowBand === 'very_high'" class="relative flex h-2 w-2">
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
         <span class="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />
       </span>

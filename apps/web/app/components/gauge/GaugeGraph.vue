@@ -265,8 +265,8 @@ function drawBands(u: uPlot, ranges: FlowRange[]) {
     if (!color) continue
 
     // Convert CFS values to canvas Y coordinates.
-    // min_cfs null means the band extends to the bottom (below_recommended).
-    // max_cfs null means it extends to the top (above_recommended).
+    // min_cfs null means the band extends to the bottom (too_low).
+    // max_cfs null means it extends to the top (very_high).
     const yMin = fr.max_cfs != null
       ? u.valToPos(fr.max_cfs, 'y', true) * dpr
       : bbox.top
@@ -315,8 +315,8 @@ function lineColor(ranges: FlowRange[], cfs: number | null): string {
   // No exact match — infer from position relative to known ranges.
   const mins = ranges.filter(r => r.min_cfs != null).map(r => r.min_cfs!)
   const maxs = ranges.filter(r => r.max_cfs != null).map(r => r.max_cfs!)
-  if (mins.length > 0 && cfs < Math.min(...mins)) return flowBandSolidColor('below_recommended')
-  if (maxs.length > 0 && cfs >= Math.max(...maxs)) return flowBandSolidColor('above_recommended')
+  if (mins.length > 0 && cfs < Math.min(...mins)) return flowBandSolidColor('too_low')
+  if (maxs.length > 0 && cfs >= Math.max(...maxs)) return flowBandSolidColor('very_high')
   return '#6b7280'
 }
 

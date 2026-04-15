@@ -9,7 +9,12 @@
       class="flex items-center gap-2 sm:gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
       @click="$emit('open', leadGauge)"
     >
-      <div class="min-w-0 flex-1">
+      <div class="min-w-0 flex-1 flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
+          <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
+          <path d="M12 12 16 8"/>
+          <path d="M3 12a9 9 0 0 1 18 0"/>
+        </svg>
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate block">{{ gaugeName }}</span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -38,8 +43,9 @@
         :key="item.contextReachSlug!"
         class="flex items-center gap-2 pl-5 pr-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0"
       >
-        <svg class="w-3 h-3 text-gray-300 dark:text-gray-700 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 18l6-6-6-6"/>
+        <svg class="w-3.5 h-3.5 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-label="Reach">
+          <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
         </svg>
         <NuxtLink
           :to="`/reaches/${item.contextReachSlug}`"
@@ -48,7 +54,7 @@
         >{{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}</NuxtLink>
         <span
           v-if="item.flowStatus !== 'unknown' || item.flowBandLabel"
-          :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
+          :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
         >{{ flowBandLabel(item.flowBandLabel, item.flowStatus) }}</span>
         <button
           class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors shrink-0"
@@ -75,7 +81,12 @@
     <!-- Gauge header section -->
     <div :class="density === 'compact' ? 'p-2.5' : density === 'comfortable' ? 'p-3' : 'p-4'">
       <!-- Gauge name -->
-      <div class="flex items-start gap-2" :class="density === 'compact' ? 'mb-0.5' : 'mb-1'">
+      <div class="flex items-center gap-1.5" :class="density === 'compact' ? 'mb-0.5' : 'mb-1'">
+        <svg class="text-gray-400 dark:text-gray-500 shrink-0" :class="density === 'compact' ? 'w-3 h-3' : 'w-3.5 h-3.5'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
+          <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
+          <path d="M12 12 16 8"/>
+          <path d="M3 12a9 9 0 0 1 18 0"/>
+        </svg>
         <span
           class="font-medium text-gray-500 dark:text-gray-400 truncate block leading-tight"
           :class="density === 'compact' ? 'text-[11px]' : 'text-xs'"
@@ -129,6 +140,10 @@
         class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0"
         @click.stop
       >
+        <svg class="w-3.5 h-3.5 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-label="Reach">
+          <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
+        </svg>
         <NuxtLink
           :to="`/reaches/${item.contextReachSlug}`"
           class="flex-1 min-w-0 text-sm text-gray-700 dark:text-gray-300 truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"

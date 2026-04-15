@@ -159,13 +159,9 @@ const mapBaseSQL = `
 		g.info_links,
 		CASE
 			WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
-			WHEN fr.label = 'runnable'                 THEN 'runnable'
-			WHEN fr.label = 'below_recommended'        THEN 'caution'
-			WHEN fr.label = 'above_recommended'        THEN 'flood'
-			WHEN fr.label IN ('fun', 'optimal')        THEN 'runnable'
-			WHEN fr.label IN ('minimum', 'pushy')      THEN 'caution'
-			WHEN fr.label = 'too_low'                  THEN 'low'
-			WHEN fr.label IN ('high', 'flood')         THEN 'flood'
+			WHEN fr.label IN ('running', 'high')       THEN 'runnable'
+			WHEN fr.label = 'too_low'                  THEN 'caution'
+			WHEN fr.label = 'very_high'                THEN 'flood'
 			ELSE                                            'unknown'
 		END AS flow_status
 	FROM reaches r
@@ -378,13 +374,9 @@ func (h *ReachHandler) queryAllFeatures(ctx context.Context) ([]Feature, error) 
 			g.info_links,
 			CASE
 				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
-				WHEN fr.label = 'runnable'                 THEN 'runnable'
-				WHEN fr.label = 'below_recommended'        THEN 'caution'
-				WHEN fr.label = 'above_recommended'        THEN 'flood'
-				WHEN fr.label IN ('fun', 'optimal')        THEN 'runnable'
-				WHEN fr.label IN ('minimum', 'pushy')      THEN 'caution'
-				WHEN fr.label = 'too_low'                  THEN 'low'
-				WHEN fr.label IN ('high', 'flood')         THEN 'flood'
+				WHEN fr.label IN ('running', 'high')       THEN 'runnable'
+				WHEN fr.label = 'too_low'                  THEN 'caution'
+				WHEN fr.label = 'very_high'                THEN 'flood'
 				ELSE                                            'unknown'
 			END AS flow_status
 		FROM reaches r
@@ -543,14 +535,9 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			COALESCE(ST_Y(g.location::geometry), NULL) AS gauge_lat,
 			CASE
 				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
-				WHEN fr.label IN ('runnable','low_runnable','med_runnable','high_runnable') THEN 'runnable'
-				WHEN fr.label = 'below_recommended'        THEN 'caution'
-				WHEN fr.label = 'above_recommended'        THEN 'flood'
-				-- legacy fallbacks (pre-migration 034)
-				WHEN fr.label IN ('fun','optimal')         THEN 'runnable'
-				WHEN fr.label IN ('minimum','pushy')       THEN 'caution'
-				WHEN fr.label = 'too_low'                  THEN 'low'
-				WHEN fr.label IN ('high','flood')          THEN 'flood'
+				WHEN fr.label IN ('running','high')        THEN 'runnable'
+				WHEN fr.label = 'too_low'                  THEN 'caution'
+				WHEN fr.label = 'very_high'                THEN 'flood'
 				ELSE 'unknown'
 			END AS flow_status,
 			fr.label AS flow_band_label
@@ -611,13 +598,9 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			lr.value AS current_cfs,
 			CASE
 				WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
-				WHEN fr.label IN ('runnable','low_runnable','med_runnable','high_runnable') THEN 'runnable'
-				WHEN fr.label = 'below_recommended'        THEN 'caution'
-				WHEN fr.label = 'above_recommended'        THEN 'flood'
-				WHEN fr.label IN ('fun','optimal')         THEN 'runnable'
-				WHEN fr.label IN ('minimum','pushy')       THEN 'caution'
-				WHEN fr.label = 'too_low'                  THEN 'low'
-				WHEN fr.label IN ('high','flood')          THEN 'flood'
+				WHEN fr.label IN ('running','high')       THEN 'runnable'
+				WHEN fr.label = 'too_low'                 THEN 'caution'
+				WHEN fr.label = 'very_high'               THEN 'flood'
 				ELSE 'unknown'
 			END AS flow_status,
 			fr.label AS flow_band_label,
@@ -1020,14 +1003,15 @@ func (h *ReachHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 
 // SetFlowRanges handles PUT /api/v1/reaches/{slug}/flow-ranges
 //
-// Upserts the three canonical bands for a reach+craft combination.
+// Upserts the four canonical bands for a reach+craft combination.
 // Missing bands are deleted.  Body example:
 //
 //	{
 //	  "craft": "general",
-//	  "below_recommended": { "max_cfs": 170 },
-//	  "runnable":          { "min_cfs": 170, "max_cfs": 430 },
-//	  "above_recommended": { "min_cfs": 430 }
+//	  "too_low":   { "max_cfs": 170 },
+//	  "running":   { "min_cfs": 170, "max_cfs": 400 },
+//	  "high":      { "min_cfs": 400, "max_cfs": 600 },
+//	  "very_high": { "min_cfs": 600 }
 //	}
 func (h *ReachHandler) SetFlowRanges(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
@@ -1037,10 +1021,11 @@ func (h *ReachHandler) SetFlowRanges(w http.ResponseWriter, r *http.Request) {
 		MaxCFS *float64 `json:"max_cfs"`
 	}
 	var body struct {
-		Craft             string     `json:"craft"`
-		BelowRecommended  *bandInput `json:"below_recommended"`
-		Runnable          *bandInput `json:"runnable"`
-		AboveRecommended  *bandInput `json:"above_recommended"`
+		Craft    string     `json:"craft"`
+		TooLow   *bandInput `json:"too_low"`
+		Running  *bandInput `json:"running"`
+		High     *bandInput `json:"high"`
+		VeryHigh *bandInput `json:"very_high"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		errorResponse(w, http.StatusBadRequest, "invalid JSON")
@@ -1071,9 +1056,10 @@ func (h *ReachHandler) SetFlowRanges(w http.ResponseWriter, r *http.Request) {
 		input  *bandInput
 	}
 	bands := []band{
-		{"below_recommended", body.BelowRecommended},
-		{"runnable", body.Runnable},
-		{"above_recommended", body.AboveRecommended},
+		{"too_low", body.TooLow},
+		{"running", body.Running},
+		{"high", body.High},
+		{"very_high", body.VeryHigh},
 	}
 
 	for _, b := range bands {

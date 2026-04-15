@@ -218,13 +218,11 @@ func loadEmbedReach(ctx context.Context, pool *pgxpool.Pool, id string) (embedRe
 		JOIN reaches rc ON rc.primary_gauge_id = fr.gauge_id
 		WHERE rc.id = $1 AND fr.craft_type = 'general'
 		ORDER BY CASE fr.label
-			WHEN 'below_recommended' THEN 1
-			WHEN 'low_runnable'      THEN 2
-			WHEN 'runnable'          THEN 3
-			WHEN 'med_runnable'      THEN 4
-			WHEN 'high_runnable'     THEN 5
-			WHEN 'above_recommended' THEN 6
-			ELSE 7
+			WHEN 'too_low'   THEN 1
+			WHEN 'running'   THEN 2
+			WHEN 'high'      THEN 3
+			WHEN 'very_high' THEN 4
+			ELSE 5
 		END
 	`, id)
 	if err != nil {

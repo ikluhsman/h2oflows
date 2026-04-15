@@ -807,20 +807,24 @@ func (imp *Importer) inferReachFromText(ctx context.Context, text string) (id, s
 // ── Flow range parsing ────────────────────────────────────────────────────────
 
 // flowRangeKeywords maps KML placemark names to flow_ranges label values.
+// Accepts both the legacy 5-tier keywords and the new 4-band names as aliases.
 var flowRangeKeywords = map[string]string{
-	"below": "below_recommended",
-	"low":   "low_runnable",
-	"med":   "runnable",
-	"high":  "high_runnable",
-	"above": "above_recommended",
+	"below":     "too_low",
+	"too_low":   "too_low",
+	"low":       "running", // legacy alias
+	"running":   "running",
+	"med":       "running", // legacy alias (was the middle tier)
+	"high":      "high",
+	"above":     "very_high",
+	"very_high": "very_high",
 }
 
 // parseFlowRangePM detects a flow-range metadata placemark and returns the
 // DB label, min/max CFS, and true when the placemark name is a known keyword.
 //
 // Description format:
-//   - "below" / "above": single CFS value — max_cfs or min_cfs respectively
-//   - "low" / "med" / "high": "min,max" pair (or single value treated as min)
+//   - "below"/"too_low" / "above"/"very_high": single CFS value — max_cfs or min_cfs respectively
+//   - "running" / "high": "min,max" pair (or single value treated as min)
 func parseFlowRangePM(name, desc string) (label string, minCFS, maxCFS *float64, ok bool) {
 	label, ok = flowRangeKeywords[strings.ToLower(strings.TrimSpace(name))]
 	if !ok {
@@ -838,10 +842,10 @@ func parseFlowRangePM(name, desc string) (label string, minCFS, maxCFS *float64,
 		return nil
 	}
 	switch label {
-	case "below_recommended":
+	case "too_low":
 		// single value = upper bound (< this)
 		maxCFS = parseVal(parts[0])
-	case "above_recommended":
+	case "very_high":
 		// single value = lower bound (> this)
 		minCFS = parseVal(parts[0])
 	default:

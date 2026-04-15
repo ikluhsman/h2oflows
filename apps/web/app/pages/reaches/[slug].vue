@@ -804,7 +804,6 @@ const statusColor = computed(() => {
   switch (reach.value?.gauge.flow_status) {
     case 'runnable': return 'success'
     case 'caution':  return 'error'
-    case 'low':      return 'error'
     case 'flood':    return 'info'
     default:         return 'neutral'
   }
@@ -857,7 +856,7 @@ useSeoMeta({
 
 const cfsClass = computed(() => ({
   'text-emerald-500': reach.value?.gauge.flow_status === 'runnable',
-  'text-red-500':     ['caution','low'].includes(reach.value?.gauge.flow_status ?? ''),
+  'text-red-500':     reach.value?.gauge.flow_status === 'caution',
   'text-sky-500':     reach.value?.gauge.flow_status === 'flood',
   'text-gray-300':    reach.value?.gauge.flow_status === 'unknown',
 }))

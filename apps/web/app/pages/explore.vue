@@ -268,6 +268,6 @@ async function addGaugeById(gaugeId: string) {
 }
 
 function flowDotColor(status: string): string {
-  return ({ runnable: '#16a34a', caution: '#d97706', low: '#9ca3af', flood: '#dc2626' } as Record<string, string>)[status] ?? '#9ca3af'
+  return ({ runnable: '#16a34a', caution: '#ef4444', flood: '#38bdf8' } as Record<string, string>)[status] ?? '#9ca3af'
 }
 </script>

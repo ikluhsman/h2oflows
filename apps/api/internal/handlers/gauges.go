@@ -573,13 +573,9 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 		LEFT JOIN LATERAL (
 			SELECT fr.label,
 			       CASE
-			           WHEN fr.label = 'runnable'          THEN 'runnable'
-			           WHEN fr.label = 'below_recommended' THEN 'low'
-			           WHEN fr.label = 'above_recommended' THEN 'flood'
-			           WHEN fr.label IN ('fun', 'optimal')   THEN 'runnable'
-			           WHEN fr.label IN ('minimum', 'pushy') THEN 'caution'
-			           WHEN fr.label = 'too_low'             THEN 'low'
-			           WHEN fr.label IN ('high', 'flood')    THEN 'flood'
+			           WHEN fr.label IN ('running', 'high') THEN 'runnable'
+			           WHEN fr.label = 'too_low'            THEN 'caution'
+			           WHEN fr.label = 'very_high'          THEN 'flood'
 			           ELSE 'unknown'
 			       END AS flow_status
 			FROM flow_ranges fr
@@ -751,13 +747,9 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN LATERAL (
 			SELECT fr.label,
 			       CASE
-			           WHEN fr.label IN ('fun', 'optimal')   THEN 'runnable'
-			           WHEN fr.label IN ('minimum', 'pushy') THEN 'caution'
-			           WHEN fr.label = 'too_low'             THEN 'low'
-			           WHEN fr.label IN ('high', 'flood')    THEN 'flood'
-			           WHEN fr.label = 'runnable'            THEN 'runnable'
-			           WHEN fr.label = 'below_recommended'   THEN 'low'
-			           WHEN fr.label = 'above_recommended'   THEN 'flood'
+			           WHEN fr.label IN ('running', 'high') THEN 'runnable'
+			           WHEN fr.label = 'too_low'            THEN 'caution'
+			           WHEN fr.label = 'very_high'          THEN 'flood'
 			           ELSE 'unknown'
 			       END AS flow_status
 			FROM flow_ranges fr

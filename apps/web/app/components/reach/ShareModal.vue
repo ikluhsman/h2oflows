@@ -337,10 +337,9 @@ function resetForm() {
 
 function flowStatusLabel(status: string): string {
   switch (status) {
-    case 'runnable': return 'Runnable'
-    case 'caution':  return 'Below Recommended'
-    case 'low':      return 'Too Low'
-    case 'flood':    return 'Above Recommended'
+    case 'runnable': return 'Running'
+    case 'caution':  return 'Too Low'
+    case 'flood':    return 'Very High'
     default:         return status
   }
 }

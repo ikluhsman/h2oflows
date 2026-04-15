@@ -129,31 +129,26 @@
             <tr class="bg-white dark:bg-gray-950">
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-red-500">below</td>
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">200</td>
-              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Too Low — upper CFS limit (single number)</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700"><span class="text-red-500 font-medium">Too Low</span> — upper CFS limit (single number)</td>
             </tr>
             <tr class="bg-gray-50 dark:bg-gray-900">
-              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-green-600 dark:text-green-400">low</td>
-              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">200,400</td>
-              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Low — <code>min,max</code> CFS (optional; use for 5-tier)</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-emerald-600 dark:text-emerald-400">running</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">200,800</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700"><span class="text-emerald-600 dark:text-emerald-400 font-medium">Running</span> — <code>min,max</code> CFS</td>
             </tr>
             <tr class="bg-white dark:bg-gray-950">
-              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-emerald-600 dark:text-emerald-400">med</td>
-              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">400,800</td>
-              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Running — <code>min,max</code> CFS</td>
-            </tr>
-            <tr class="bg-gray-50 dark:bg-gray-900">
-              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-blue-500">high</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-green-700 dark:text-green-400">high</td>
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">800,1200</td>
-              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">High — <code>min,max</code> CFS (optional; use for 5-tier)</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700"><span class="text-green-700 dark:text-green-400 font-medium">High</span> — <code>min,max</code> CFS (optional)</td>
             </tr>
-            <tr class="bg-white dark:bg-gray-950">
+            <tr class="bg-gray-50 dark:bg-gray-900">
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono text-sky-400">above</td>
               <td class="px-2 py-1 border border-gray-200 dark:border-gray-700 font-mono">1200</td>
-              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700">Very High — lower CFS limit (single number)</td>
+              <td class="px-2 py-1 border border-gray-200 dark:border-gray-700"><span class="text-sky-400 font-medium">Very High</span> — lower CFS limit (single number)</td>
             </tr>
           </tbody>
         </table>
-        <p class="mt-1 text-gray-400">3-tier (below / med / above only) is also accepted. <code>low</code> and <code>high</code> are optional.</p>
+        <p class="mt-1 text-gray-400">Minimum: <code>below</code> / <code>running</code> / <code>above</code>. Add <code>high</code> when there's a distinct pushy window above normal. Aliases: <code>below</code> = <code>too_low</code>, <code>running</code> = <code>low</code> = <code>med</code>, <code>above</code> = <code>very_high</code>.</p>
       </div>
 
       <!-- Pin prefixes -->
@@ -348,10 +343,9 @@ function onReachClick(slug: string) {
 // Flow status colors — aligned with GaugeGraph band colors
 function flowStatusColor(status: string): string {
   const map: Record<string, string> = {
-    runnable: '#22c55e',   // green  — runnable band
-    caution:  '#ef4444',   // red    — below_recommended band
-    low:      '#ef4444',   // red
-    flood:    '#3b82f6',   // blue   — above_recommended band
+    runnable: '#22c55e',   // green  — running / high bands
+    caution:  '#ef4444',   // red    — too_low band
+    flood:    '#38bdf8',   // sky    — very_high band
   }
   return map[status] ?? '#9ca3af'
 }
