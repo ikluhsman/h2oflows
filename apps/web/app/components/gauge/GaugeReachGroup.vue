@@ -13,7 +13,7 @@
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate block">{{ gaugeName }}</span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <div class="w-28 shrink-0 hidden sm:block">
+        <div class="w-28 shrink-0 hidden sm:block opacity-50">
           <GaugeSparkline
             :gauge-id="leadGauge.id"
             :flow-status="displayFlowStatus"
@@ -24,7 +24,7 @@
             @live-flow-band="liveFlowBand = $event"
           />
         </div>
-        <span class="text-base font-bold tabular-nums min-w-[3.5rem] text-right" :class="cfsClass">
+        <span class="text-base font-bold tabular-nums min-w-[3.5rem] text-right text-gray-900 dark:text-white">
           {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
           <span class="text-xs font-normal text-gray-400 dark:text-gray-500">cfs</span>
         </span>
@@ -82,59 +82,43 @@
         >{{ gaugeName }}</span>
       </div>
 
-      <!-- CFS + trend + badge -->
+      <!-- CFS + trend -->
       <div
         class="flex items-baseline gap-2 flex-wrap"
         :class="density === 'compact' ? 'mb-2' : 'mb-1.5'"
       >
         <span
-          class="font-bold tabular-nums leading-none"
-          :class="[cfsClass, density === 'compact' ? 'text-xl' : density === 'comfortable' ? 'text-2xl' : 'text-3xl']"
+          class="font-bold tabular-nums leading-none text-gray-900 dark:text-white"
+          :class="density === 'compact' ? 'text-xl' : density === 'comfortable' ? 'text-2xl' : 'text-3xl'"
         >
           {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
         </span>
         <span class="text-xs text-gray-500">cfs</span>
         <TrendArrow v-if="currentCfs != null && density !== 'compact'" :gauge-id="leadGauge.id" class="text-lg" />
-        <!-- Badge inline for comfortable on sm+ -->
-        <span
-          v-if="density === 'comfortable' && (displayFlowStatus !== 'unknown' || displayFlowBand)"
-          :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', statusBadgeClass]"
-        >{{ statusLabel }}</span>
       </div>
 
-      <!-- Flow badge — full: always shown; comfortable: mobile only -->
-      <div
-        v-if="(displayFlowStatus !== 'unknown' || displayFlowBand) && density !== 'compact'"
-        class="flex items-center gap-2 mb-1.5"
-        :class="density === 'full' ? '' : 'sm:hidden'"
-      >
-        <span
-          :class="['inline-flex items-center rounded-md font-medium', density === 'full' ? 'px-2 py-0.5 text-sm' : 'px-1.5 py-0.5 text-xs', statusBadgeClass]"
-        >{{ statusLabel }}</span>
+      <!-- Sparkline — comfortable: compact; full: full (muted) -->
+      <div v-if="density === 'comfortable'" class="opacity-50 mb-1">
+        <GaugeSparkline
+          :gauge-id="leadGauge.id"
+          :flow-status="displayFlowStatus"
+          :flow-band-label="displayFlowBand"
+          :reach-slug="leadGauge.contextReachSlug ?? leadGauge.reachSlug"
+          compact
+          @latest-cfs="liveCfs = $event"
+          @live-flow-band="liveFlowBand = $event"
+        />
       </div>
-
-      <!-- Sparkline — comfortable: compact; full: full -->
-      <GaugeSparkline
-        v-if="density === 'comfortable'"
-        :gauge-id="leadGauge.id"
-        :flow-status="displayFlowStatus"
-        :flow-band-label="displayFlowBand"
-        :reach-slug="leadGauge.contextReachSlug ?? leadGauge.reachSlug"
-        compact
-        class="mb-1"
-        @latest-cfs="liveCfs = $event"
-        @live-flow-band="liveFlowBand = $event"
-      />
-      <GaugeSparkline
-        v-else-if="density === 'full'"
-        :gauge-id="leadGauge.id"
-        :flow-status="displayFlowStatus"
-        :flow-band-label="displayFlowBand"
-        :reach-slug="leadGauge.contextReachSlug ?? leadGauge.reachSlug"
-        class="mb-1.5"
-        @latest-cfs="liveCfs = $event"
-        @live-flow-band="liveFlowBand = $event"
-      />
+      <div v-else-if="density === 'full'" class="opacity-50 mb-1.5">
+        <GaugeSparkline
+          :gauge-id="leadGauge.id"
+          :flow-status="displayFlowStatus"
+          :flow-band-label="displayFlowBand"
+          :reach-slug="leadGauge.contextReachSlug ?? leadGauge.reachSlug"
+          @latest-cfs="liveCfs = $event"
+          @live-flow-band="liveFlowBand = $event"
+        />
+      </div>
     </div>
 
     <!-- Reach sub-list -->
@@ -194,8 +178,4 @@ const displayFlowStatus = computed(() => liveFlowBand.value?.flowStatus    ?? pr
 const gaugeName = computed(() =>
   props.leadGauge.name ?? `${props.leadGauge.source.toUpperCase()} ${props.leadGauge.externalId}`
 )
-
-const statusBadgeClass = computed(() => flowBandBadgeClass(displayFlowBand.value, displayFlowStatus.value))
-const statusLabel      = computed(() => flowBandLabel(displayFlowBand.value, displayFlowStatus.value))
-const cfsClass         = computed(() => flowBandCfsClass(displayFlowBand.value, displayFlowStatus.value))
 </script>
