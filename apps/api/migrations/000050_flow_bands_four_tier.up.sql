@@ -15,7 +15,7 @@ ALTER TABLE flow_ranges DROP CONSTRAINT flow_ranges_label_check;
 WITH merged AS (
   SELECT
     reach_id,
-    MIN(gauge_id)  AS gauge_id,
+    (array_agg(gauge_id))[1] AS gauge_id,
     craft_type,
     MIN(min_cfs)   AS min_cfs,
     MAX(max_cfs)   AS max_cfs
