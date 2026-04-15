@@ -16,3 +16,10 @@
 
 [context.branch-deploy.environment]
   NUXT_PUBLIC_API_BASE = "https://api.h2oflows.org"
+
+# SPA fallback — any path without a matching static file (e.g. /dashboard, /trips,
+# /confirm) gets served the Nuxt-generated 200.html so client-side routing takes over.
+[[redirects]]
+  from   = "/*"
+  to     = "/200.html"
+  status = 200
