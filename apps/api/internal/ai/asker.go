@@ -103,47 +103,50 @@ func (a *ReachAsker) IdentifyReach(ctx context.Context, question string, slugs [
 	return &result, nil
 }
 
-// Answer embeds the question, retrieves the top-8 relevant reach chunks,
-// and returns Claude's answer grounded in that context.
+// Answer loads the reach's full structured data (description, rapids, access,
+// flow ranges) directly from the DB, then supplements with embedding-based
+// semantic chunks. This ensures all reach data is available to the AI even
+// if embeddings haven't been generated yet.
 func (a *ReachAsker) Answer(ctx context.Context, reachID, reachName, question string) (string, error) {
-	// 1. Embed the question using the same model as the stored chunks.
-	vecs, err := a.embedder.Embed(ctx, []string{question})
+	// 1. Load live structured data directly from DB — always available.
+	r, err := loadEmbedReach(ctx, a.db, reachID)
 	if err != nil {
-		return "", fmt.Errorf("embed question: %w", err)
+		return "", fmt.Errorf("load reach data: %w", err)
 	}
-	if len(vecs) == 0 || vecs[0] == nil {
-		return "", fmt.Errorf("embed question: empty response from Voyage")
-	}
-	queryVec := vecs[0]
-
-	// 2. Retrieve the 8 most semantically similar chunks for this reach.
-	rows, err := a.db.Query(ctx, `
-		SELECT chunk_type, content
-		FROM reach_embeddings
-		WHERE reach_id = $1
-		ORDER BY embedding <=> $2::vector
-		LIMIT 8
-	`, reachID, FormatVector(queryVec))
-	if err != nil {
-		return "", fmt.Errorf("retrieve chunks: %w", err)
-	}
-	defer rows.Close()
+	liveChunks := buildEmbedChunks(r)
 
 	var chunks []string
-	for rows.Next() {
-		var chunkType, content string
-		if err := rows.Scan(&chunkType, &content); err != nil {
-			return "", err
-		}
-		_ = chunkType // available for logging/debugging if needed
-		chunks = append(chunks, content)
+	for _, c := range liveChunks {
+		chunks = append(chunks, c.text)
 	}
-	if err := rows.Err(); err != nil {
-		return "", err
+
+	// 2. Supplement with embedding-based semantic search if available.
+	vecs, embedErr := a.embedder.Embed(ctx, []string{question})
+	if embedErr == nil && len(vecs) > 0 && vecs[0] != nil {
+		rows, queryErr := a.db.Query(ctx, `
+			SELECT chunk_type, content
+			FROM reach_embeddings
+			WHERE reach_id = $1
+			ORDER BY embedding <=> $2::vector
+			LIMIT 6
+		`, reachID, FormatVector(vecs[0]))
+		if queryErr == nil {
+			defer rows.Close()
+			seen := make(map[string]bool)
+			for _, c := range chunks {
+				seen[c] = true
+			}
+			for rows.Next() {
+				var chunkType, content string
+				if err := rows.Scan(&chunkType, &content); err == nil && !seen[content] {
+					chunks = append(chunks, content)
+				}
+			}
+		}
 	}
 
 	if len(chunks) == 0 {
-		return "I don't have enough data about this reach yet to answer that question.", nil
+		return "I don't have any data about this reach yet.", nil
 	}
 
 	// 3. Build the grounded prompt and call Claude.

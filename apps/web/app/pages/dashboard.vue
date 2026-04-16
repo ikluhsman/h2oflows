@@ -21,12 +21,13 @@
           <div class="inline-flex items-center rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 p-0.5">
             <button
               v-for="d in DENSITIES" :key="d.value"
-              class="px-2.5 py-1 rounded-md text-xs font-medium transition-all duration-150"
+              class="p-1.5 rounded-md transition-all duration-150"
               :class="density === d.value
                 ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+                : 'text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200'"
+              :title="d.title"
               @click="density = d.value"
-            >{{ d.label }}</button>
+            ><svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="d.icon"/></svg></button>
           </div>
 
           <UButton size="xs" color="neutral" variant="outline" icon="i-heroicons-plus" @click="searchOpen = true">
@@ -124,17 +125,20 @@ const { addAndSync, removeAndSync, loadFromServer, pushLocalToServer } = useWatc
 type Density = 'compact' | 'comfortable' | 'full' | 'list'
 const DENSITY_KEY = 'h2oflow_dashboard_density'
 
-const DENSITIES = [
-  { value: 'compact'     as Density, label: 'Compact'     },
-  { value: 'comfortable' as Density, label: 'Comfortable' },
-  { value: 'full'        as Density, label: 'Full'        },
-  { value: 'list'        as Density, label: 'List'        },
+const DENSITIES: { value: Density; title: string; icon: string }[] = [
+  { value: 'list',        title: 'List',        icon: 'M4 6h16M4 12h16M4 18h16' },
+  { value: 'compact',     title: 'Grid',        icon: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z' },
+  { value: 'comfortable', title: 'Comfortable', icon: 'M3 3h8v8H3zM13 3h8v8h-8zM3 13h8v8H3zM13 13h8v8h-8z' },
+  { value: 'full',        title: 'Full',        icon: 'M3 3h18v8H3zM3 13h18v8H3z' },
 ]
 
+const isMobile = ref(false)
 const density = ref<Density>('comfortable')
 onMounted(() => {
+  isMobile.value = window.innerWidth < 640
   const saved = localStorage.getItem(DENSITY_KEY) as Density | null
   if (saved && DENSITIES.some(d => d.value === saved)) density.value = saved
+  else if (isMobile.value) density.value = 'list'
 })
 watch(density, val => localStorage.setItem(DENSITY_KEY, val))
 
