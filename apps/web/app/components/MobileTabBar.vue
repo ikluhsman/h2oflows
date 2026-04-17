@@ -24,6 +24,18 @@
       </svg>
       Map
     </NuxtLink>
+    <NuxtLink
+      to="/rivers"
+      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors"
+      :class="route.path === '/rivers'
+        ? 'text-blue-600 dark:text-blue-400'
+        : 'text-gray-500 dark:text-gray-400'"
+    >
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9"/>
+      </svg>
+      Rivers
+    </NuxtLink>
   </nav>
 </template>
 

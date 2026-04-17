@@ -18,24 +18,22 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// reachMapCache holds a pre-warmed snapshot of all reach features for the
-// /reaches/map/all endpoint. This lets the frontend load the full dataset
-// in one request at startup and filter client-side on every viewport change,
-// eliminating per-pan/zoom round-trips to the database.
-type reachMapCache struct {
+// jsonCache holds a pre-warmed snapshot of marshalled JSON.
+// Used for both /reaches/map/all (GeoJSON) and /reaches (list JSON).
+type jsonCache struct {
 	mu       sync.RWMutex
-	payload  []byte    // marshalled GeoJSON FeatureCollection
+	payload  []byte    // marshalled JSON
 	warmedAt time.Time
 }
 
-func (c *reachMapCache) set(payload []byte) {
+func (c *jsonCache) set(payload []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.payload = payload
 	c.warmedAt = time.Now()
 }
 
-func (c *reachMapCache) get() ([]byte, bool) {
+func (c *jsonCache) get() ([]byte, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if len(c.payload) == 0 {
@@ -54,14 +52,15 @@ type gaugeFetcher interface {
 
 // ReachHandler handles reach-related HTTP routes.
 type ReachHandler struct {
-	db     *pgxpool.Pool
-	asker  *ai.ReachAsker
-	cache  *reachMapCache
-	poller gaugeFetcher // nil = on-demand fetching disabled
+	db        *pgxpool.Pool
+	asker     *ai.ReachAsker
+	cache     *jsonCache // /reaches/map/all GeoJSON
+	listCache *jsonCache // /reaches lightweight JSON
+	poller    gaugeFetcher // nil = on-demand fetching disabled
 }
 
 func NewReachHandler(db *pgxpool.Pool, asker *ai.ReachAsker) *ReachHandler {
-	return &ReachHandler{db: db, asker: asker, cache: &reachMapCache{}}
+	return &ReachHandler{db: db, asker: asker, cache: &jsonCache{}, listCache: &jsonCache{}}
 }
 
 // WithPoller wires a poller for on-demand gauge fetching. Optional — without
@@ -74,6 +73,7 @@ func (h *ReachHandler) WithPoller(p gaugeFetcher) *ReachHandler {
 
 // WarmCache fetches all reach features (no bbox filter) and stores the result
 // in the in-memory cache. Call once at server startup, then every poll cycle.
+// Also warms the lightweight list cache used by GET /reaches.
 func (h *ReachHandler) WarmCache(ctx context.Context) {
 	features, err := h.queryAllFeatures(ctx)
 	if err != nil {
@@ -87,6 +87,20 @@ func (h *ReachHandler) WarmCache(ctx context.Context) {
 	}
 	h.cache.set(payload)
 	log.Printf("reach cache: warmed %d features", len(features))
+
+	// Warm lightweight list cache (no geometry).
+	items, err := h.queryAllListItems(ctx)
+	if err != nil {
+		log.Printf("reach list cache: warm failed: %v", err)
+		return
+	}
+	listPayload, err := json.Marshal(items)
+	if err != nil {
+		log.Printf("reach list cache: marshal failed: %v", err)
+		return
+	}
+	h.listCache.set(listPayload)
+	log.Printf("reach list cache: warmed %d items", len(items))
 }
 
 // StartCacheRefresh launches a background goroutine that re-warms the cache
@@ -461,9 +475,118 @@ func (h *ReachHandler) queryAllFeatures(ctx context.Context) ([]Feature, error) 
 }
 
 // List handles GET /api/v1/reaches
-// TODO: implement
+//
+// Returns a lightweight JSON array of all reaches with current flow data,
+// grouped by the frontend into basin → river → reach. No geometry is included.
+// Served from an in-memory cache warmed at startup and refreshed every poll cycle.
 func (h *ReachHandler) List(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
+	if payload, ok := h.listCache.get(); ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "public, max-age=60")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(payload)
+		return
+	}
+	// Cache cold — query directly.
+	items, err := h.queryAllListItems(r.Context())
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "query failed")
+		return
+	}
+	jsonResponse(w, http.StatusOK, items)
+}
+
+// reachListItem is the lightweight struct returned by GET /reaches.
+type reachListItem struct {
+	Slug            string   `json:"slug"`
+	RiverName       *string  `json:"river_name"`
+	CommonName      *string  `json:"common_name"`
+	PutInName       *string  `json:"put_in_name"`
+	TakeOutName     *string  `json:"take_out_name"`
+	BasinGroup      *string  `json:"basin_group"`
+	ClassMin        *float64 `json:"class_min"`
+	ClassMax        *float64 `json:"class_max"`
+	CurrentCFS      *float64 `json:"current_cfs"`
+	FlowLabel       *string  `json:"flow_label"`
+	FlowStatus      string   `json:"flow_status"`
+	GaugeID         *string  `json:"gauge_id"`
+	GaugeExternalID *string  `json:"gauge_external_id"`
+	GaugeSource     *string  `json:"gauge_source"`
+	GaugeName       *string  `json:"gauge_name"`
+}
+
+// queryAllListItems returns a lightweight slice of all reaches with current
+// flow data. No geometry, no gauge notes/links — just what the browse page needs.
+func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, error) {
+	rows, err := h.db.Query(ctx, `
+		WITH latest_reading AS (
+			SELECT DISTINCT ON (gauge_id)
+				gauge_id, value
+			FROM gauge_readings
+			WHERE timestamp > NOW() - INTERVAL '48 hours'
+			ORDER BY gauge_id, timestamp DESC
+		)
+		SELECT
+			r.slug,
+			r.river_name,
+			r.common_name,
+			r.put_in_name,
+			r.take_out_name,
+			r.basin_group,
+			r.class_min,
+			COALESCE(
+				(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL),
+				r.class_max
+			) AS class_max,
+			lr.value       AS current_cfs,
+			fr.label       AS flow_label,
+			g.id           AS gauge_id,
+			g.external_id  AS gauge_external_id,
+			g.source       AS gauge_source,
+			g.name         AS gauge_name,
+			CASE
+				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
+				WHEN fr.label IN ('running', 'high')       THEN 'runnable'
+				WHEN fr.label = 'too_low'                  THEN 'caution'
+				WHEN fr.label = 'very_high'                THEN 'flood'
+				ELSE                                            'unknown'
+			END AS flow_status
+		FROM reaches r
+		LEFT JOIN gauges g ON g.id = r.primary_gauge_id
+		LEFT JOIN latest_reading lr ON lr.gauge_id = g.id
+		LEFT JOIN LATERAL (
+			SELECT label FROM flow_ranges
+			WHERE reach_id = r.id
+			  AND craft_type = 'general'
+			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
+			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
+			ORDER BY min_cfs ASC NULLS FIRST
+			LIMIT 1
+		) fr ON TRUE
+		ORDER BY r.basin_group NULLS LAST, r.river_name NULLS LAST, r.common_name NULLS LAST
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := make([]reachListItem, 0)
+	for rows.Next() {
+		var item reachListItem
+		if err := rows.Scan(
+			&item.Slug,
+			&item.RiverName, &item.CommonName, &item.PutInName, &item.TakeOutName,
+			&item.BasinGroup,
+			&item.ClassMin, &item.ClassMax,
+			&item.CurrentCFS, &item.FlowLabel, &item.GaugeID,
+			&item.GaugeExternalID, &item.GaugeSource, &item.GaugeName,
+			&item.FlowStatus,
+		); err != nil {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }
 
 // Get handles GET /api/v1/reaches/{slug}
