@@ -13,28 +13,6 @@
       </div>
     </div>
 
-    <!-- Seasonal context banner -->
-    <GaugeSeasonalBanner :gauge-id="gaugeId" :current-cfs="currentCfs" />
-
-    <!-- Diurnal cycle banner -->
-    <div
-      v-if="diurnal.detected"
-      class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300"
-    >
-      <span class="text-base">🌡</span>
-      <span>
-        <strong>Diurnal cycle</strong> —
-        {{ diurnalPhaseLabel }}
-        <template v-if="diurnal.estimatedPeakHour != null">
-          · Est. peak {{ formatHour(diurnal.estimatedPeakHour) }}
-          (~{{ diurnal.peakCfs?.toLocaleString() }} cfs)
-        </template>
-        <template v-if="diurnal.swingPct != null">
-          · {{ diurnal.swingPct }}% daily swing
-        </template>
-      </span>
-    </div>
-
     <!-- Chart container — always mounted so the ref is never torn down mid-update.
          Overlay states sit on top without removing the canvas from the DOM. -->
     <div class="relative w-full" style="height:200px">
@@ -55,7 +33,7 @@
       >No readings in this window</div>
     </div>
 
-    <!-- Flow range legend + provenance -->
+    <!-- Flow range legend -->
     <div v-if="flowRanges.length > 0" class="space-y-1">
       <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-700 dark:text-gray-300">
         <span
@@ -70,6 +48,26 @@
           </span>
         </span>
       </div>
+    </div>
+
+    <!-- Seasonal context + diurnal cycle — below the chart -->
+    <GaugeSeasonalBanner :gauge-id="gaugeId" :current-cfs="currentCfs" />
+    <div
+      v-if="diurnal.detected"
+      class="flex items-center gap-2 rounded-lg px-3 py-2 text-xs bg-sky-50 dark:bg-sky-950 text-sky-700 dark:text-sky-300"
+    >
+      <span class="text-base">🌡</span>
+      <span>
+        <strong>Diurnal cycle</strong> —
+        {{ diurnalPhaseLabel }}
+        <template v-if="diurnal.estimatedPeakHour != null">
+          · Est. peak {{ formatHour(diurnal.estimatedPeakHour) }}
+          (~{{ diurnal.peakCfs?.toLocaleString() }} cfs)
+        </template>
+        <template v-if="diurnal.swingPct != null">
+          · {{ diurnal.swingPct }}% daily swing
+        </template>
+      </span>
     </div>
   </div>
 </template>
@@ -106,6 +104,7 @@ const props = defineProps<{
   reachSlug?: string | null
   currentCfs?: number | null
   noRanges?: boolean
+  color?: string   // override line color (e.g. '#3b82f6' for neutral blue in gauge-only mode)
 }>()
 
 const emit = defineEmits<{
@@ -305,7 +304,9 @@ function drawCurrentMarker(u: uPlot, cfs: number | null) {
 }
 
 // Determine the line color from current CFS and flow ranges.
+// When props.color is set (e.g. gauge-only mode), always use that override.
 function lineColor(ranges: FlowRange[], cfs: number | null): string {
+  if (props.color) return props.color
   if (cfs == null || ranges.length === 0) return '#6b7280'
   const match = ranges.find(fr =>
     (fr.min_cfs == null || cfs >= fr.min_cfs) &&

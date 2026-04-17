@@ -210,11 +210,12 @@
         </ClientOnly>
       </section>
 
-      <!-- Gauge detail modal -->
+      <!-- Gauge detail modal — always reach mode on the reach page -->
       <GaugeDetailModal
         v-if="gaugeModalGauge"
         v-model:open="gaugeModalOpen"
         :gauge="gaugeModalGauge"
+        mode="reach"
       />
 
       <!-- Features tabbed panel -->

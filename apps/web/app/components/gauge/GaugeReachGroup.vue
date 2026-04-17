@@ -18,10 +18,11 @@
         <span class="text-sm font-medium text-gray-600 dark:text-gray-400 truncate block">{{ gaugeName }}</span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <div class="w-28 shrink-0 hidden sm:block opacity-50">
+        <div class="w-28 shrink-0 hidden sm:block opacity-60">
           <GaugeSparkline
             :gauge-id="leadGauge.id"
             flow-status="unknown"
+            color="#3b82f6"
             compact
             @latest-cfs="liveCfs = $event"
           />
@@ -116,19 +117,21 @@
         <TrendArrow v-if="currentCfs != null && density !== 'compact'" :gauge-id="leadGauge.id" class="text-lg" />
       </div>
 
-      <!-- Sparkline — comfortable: compact; full: full (muted) -->
-      <div v-if="density === 'comfortable'" class="opacity-50 mb-1">
+      <!-- Sparkline — comfortable: compact; full: full -->
+      <div v-if="density === 'comfortable'" class="opacity-60 mb-1">
         <GaugeSparkline
           :gauge-id="leadGauge.id"
           flow-status="unknown"
+          color="#3b82f6"
           compact
           @latest-cfs="liveCfs = $event"
         />
       </div>
-      <div v-else-if="density === 'full'" class="opacity-50 mb-1.5">
+      <div v-else-if="density === 'full'" class="opacity-60 mb-1.5">
         <GaugeSparkline
           :gauge-id="leadGauge.id"
           flow-status="unknown"
+          color="#3b82f6"
           @latest-cfs="liveCfs = $event"
         />
       </div>

@@ -3,9 +3,15 @@
     <template #header>
       <div class="flex items-start justify-between gap-3 w-full">
         <div class="min-w-0 flex-1">
-          <!-- Reach mode: reach name as title, gauge info as subtitle -->
+          <!-- Reach mode: reach name links to reach page; gauge info as subtitle -->
           <template v-if="mode === 'reach' && reachTitle">
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ reachTitle }}</h2>
+            <NuxtLink
+              v-if="reachSlugForLink"
+              :to="`/reaches/${reachSlugForLink}`"
+              class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight hover:text-blue-600 dark:hover:text-blue-400 transition-colors block"
+              @click="open = false"
+            >{{ reachTitle }}</NuxtLink>
+            <h2 v-else class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ reachTitle }}</h2>
             <p class="text-xs text-gray-400 truncate mt-0.5">
               {{ gaugeName }} ·
               <a :href="sourceUrl" target="_blank" rel="noopener" class="hover:text-blue-400 underline underline-offset-2">
@@ -13,7 +19,7 @@
               </a>
             </p>
           </template>
-          <!-- Gauge mode (default): gauge name as title -->
+          <!-- Gauge mode (default): gauge name as title, no reach context -->
           <template v-else>
             <h2 class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ gaugeName }}</h2>
             <p class="text-xs text-gray-400 truncate mt-0.5">
@@ -46,21 +52,11 @@
           </span>
           <span class="text-sm text-gray-500">cfs</span>
           <TrendArrow v-if="displayCfs != null" :gauge-id="gauge.id" class="text-lg" />
-          <!-- Flow band badge — only in reach mode -->
+          <!-- Flow band badge — reach mode only -->
           <span
             v-if="mode === 'reach' && (gauge.flowStatus !== 'unknown' || gauge.flowBandLabel)"
             :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
-        </div>
-
-        <!-- Diurnal context -->
-        <div v-if="diurnal.detected" class="flex items-center gap-1.5 text-xs text-indigo-500 dark:text-indigo-400">
-          <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-          <span class="truncate">
-            {{ diurnalPhaseLabel }}
-            <template v-if="diurnal.forecast"> · {{ diurnal.forecast.label }}</template>
-            <template v-if="diurnal.swingPct != null"> · {{ diurnal.swingPct }}% swing</template>
-          </span>
         </div>
 
         <!-- Add / remove from dashboard -->
@@ -91,11 +87,15 @@
           </button>
         </div>
 
-        <!-- 48-hour graph — reach mode: colored with flow bands; gauge mode: neutral blue -->
+        <!-- Graph:
+             reach mode — colored line + flow band fills + legend (below chart)
+             gauge mode — neutral blue, no ranges, no legend -->
         <GaugeGraph
           :gauge-id="gauge.id"
           :current-cfs="displayCfs"
           :reach-slug="graphReachSlug"
+          :no-ranges="mode !== 'reach'"
+          :color="mode !== 'reach' ? '#3b82f6' : undefined"
           @latest-cfs="liveCfs = $event"
         />
 
@@ -103,6 +103,20 @@
         <p v-if="gauge.lastReadingAt" class="text-xs text-gray-500">
           Last reading {{ lastReadingRelative }}
         </p>
+
+        <!-- View this reach — reach mode only -->
+        <div v-if="mode === 'reach' && reachSlugForLink" class="pt-1 border-t border-gray-100 dark:border-gray-800">
+          <NuxtLink
+            :to="`/reaches/${reachSlugForLink}`"
+            class="inline-flex items-center gap-1 text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+            @click="open = false"
+          >
+            View {{ reachTitle ?? 'reach' }} details
+            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 10h10M11 6l4 4-4 4"/>
+            </svg>
+          </NuxtLink>
+        </div>
 
       </div>
     </template>
@@ -113,13 +127,12 @@
 import { ref, computed, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
 import { useWatchlistStore } from '~/stores/watchlist'
-import { useDiurnalCache } from '~/composables/useDiurnalCache'
 import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
 
 const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{
   gauge: WatchedGauge
-  mode?: 'gauge' | 'reach'  // 'gauge' = neutral graph; 'reach' = colored + reach name + flow band
+  mode?: 'gauge' | 'reach'  // 'gauge' = neutral blue, no bands; 'reach' = colored + reach name + bands
 }>()
 
 const liveCfs = ref<number | null>(null)
@@ -127,32 +140,27 @@ watch(open, (v) => { if (!v) liveCfs.value = null })
 
 const displayCfs = computed(() => liveCfs.value ?? props.gauge.currentCfs)
 
-const { pattern: diurnal } = useDiurnalCache(props.gauge.id)
-
-const diurnalPhaseLabel = computed(() => {
-  switch (diurnal.value.phase) {
-    case 'rising':      return 'Rising'
-    case 'falling':     return 'Falling'
-    case 'near_peak':   return 'Near peak'
-    case 'near_trough': return 'Near trough'
-    case 'stable':      return 'Stable'
-    default:            return ''
-  }
-})
-
 const gaugeName = computed(() =>
   props.gauge.name ?? `${props.gauge.source.toUpperCase()} ${props.gauge.externalId}`
 )
 
-// In reach mode, the header title is the reach name.
+// Reach title (reach mode header) — prefer common name, fall back to put-in→take-out
 const reachTitle = computed(() =>
   props.gauge.contextReachCommonName
     ?? props.gauge.contextReachFullName
     ?? null
 )
 
-// The reach slug to pass to GaugeGraph for colored/banded display.
-// Only active in 'reach' mode — null in gauge mode gives neutral blue graph.
+// Slug used for "View this reach" link and the header NuxtLink
+const reachSlugForLink = computed(() =>
+  props.gauge.contextReachSlug
+    ?? props.gauge.reachSlug
+    ?? props.gauge.reachSlugs?.[0]
+    ?? null
+)
+
+// Reach slug passed to GaugeGraph only in reach mode — drives flow band coloring + legend.
+// null in gauge mode forces neutral blue graph with no bands.
 const graphReachSlug = computed(() =>
   props.mode === 'reach'
     ? (props.gauge.contextReachSlug ?? props.gauge.reachSlug ?? null)
