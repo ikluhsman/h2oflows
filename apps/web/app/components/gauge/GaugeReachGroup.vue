@@ -9,24 +9,21 @@
       class="flex items-center gap-2 sm:gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
       @click="$emit('open', leadGauge)"
     >
-      <div class="min-w-0 flex-1 flex items-center gap-1">
-        <svg class="w-3 h-3 text-gray-300 dark:text-gray-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
+      <div class="min-w-0 flex-1 flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
           <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
           <path d="M12 12 16 8"/>
           <path d="M3 12a9 9 0 0 1 18 0"/>
         </svg>
-        <span class="text-[10px] uppercase tracking-wider font-medium text-gray-400 dark:text-gray-500 truncate block">{{ gaugeName }}</span>
+        <span class="text-sm font-medium text-gray-600 dark:text-gray-400 truncate block">{{ gaugeName }}</span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <div class="w-28 shrink-0 hidden sm:block opacity-50">
           <GaugeSparkline
             :gauge-id="leadGauge.id"
-            :flow-status="displayFlowStatus"
-            :flow-band-label="displayFlowBand"
-            :reach-slug="leadGauge.contextReachSlug ?? leadGauge.reachSlug"
+            flow-status="unknown"
             compact
             @latest-cfs="liveCfs = $event"
-            @live-flow-band="liveFlowBand = $event"
           />
         </div>
         <span class="text-base font-bold tabular-nums min-w-[3.5rem] text-right text-gray-900 dark:text-white">
@@ -81,15 +78,15 @@
     <!-- Gauge header section -->
     <div :class="density === 'compact' ? 'p-2.5' : density === 'comfortable' ? 'p-3' : 'p-4'">
       <!-- Gauge name -->
-      <div class="flex items-center gap-1" :class="density === 'compact' ? 'mb-0.5' : 'mb-1'">
-        <svg class="text-gray-300 dark:text-gray-600 shrink-0" :class="density === 'compact' ? 'w-2.5 h-2.5' : 'w-3 h-3'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
+      <div class="flex items-center gap-1.5" :class="density === 'compact' ? 'mb-0.5' : 'mb-1'">
+        <svg class="text-gray-400 dark:text-gray-500 shrink-0" :class="density === 'compact' ? 'w-3.5 h-3.5' : 'w-4 h-4'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
           <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
           <path d="M12 12 16 8"/>
           <path d="M3 12a9 9 0 0 1 18 0"/>
         </svg>
         <span
-          class="uppercase tracking-wider font-medium text-gray-400 dark:text-gray-500 truncate block leading-tight"
-          :class="density === 'compact' ? 'text-[9px]' : 'text-[10px]'"
+          class="font-medium text-gray-600 dark:text-gray-400 truncate block leading-tight"
+          :class="density === 'compact' ? 'text-xs' : 'text-sm'"
         >{{ gaugeName }}</span>
       </div>
 
@@ -112,22 +109,16 @@
       <div v-if="density === 'comfortable'" class="opacity-50 mb-1">
         <GaugeSparkline
           :gauge-id="leadGauge.id"
-          :flow-status="displayFlowStatus"
-          :flow-band-label="displayFlowBand"
-          :reach-slug="leadGauge.contextReachSlug ?? leadGauge.reachSlug"
+          flow-status="unknown"
           compact
           @latest-cfs="liveCfs = $event"
-          @live-flow-band="liveFlowBand = $event"
         />
       </div>
       <div v-else-if="density === 'full'" class="opacity-50 mb-1.5">
         <GaugeSparkline
           :gauge-id="leadGauge.id"
-          :flow-status="displayFlowStatus"
-          :flow-band-label="displayFlowBand"
-          :reach-slug="leadGauge.contextReachSlug ?? leadGauge.reachSlug"
+          flow-status="unknown"
           @latest-cfs="liveCfs = $event"
-          @live-flow-band="liveFlowBand = $event"
         />
       </div>
     </div>
@@ -183,12 +174,9 @@ const emit = defineEmits<{ (e: 'open', gauge: WatchedGauge): void }>()
 
 const { removeAndSync } = useWatchlistSync()
 
-const liveCfs      = ref<number | null>(null)
-const liveFlowBand = ref<{ flowBandLabel: string | null; flowStatus: string } | null>(null)
+const liveCfs = ref<number | null>(null)
 
-const currentCfs        = computed(() => liveCfs.value ?? props.leadGauge.currentCfs)
-const displayFlowBand   = computed(() => liveFlowBand.value?.flowBandLabel ?? props.leadGauge.flowBandLabel)
-const displayFlowStatus = computed(() => liveFlowBand.value?.flowStatus    ?? props.leadGauge.flowStatus)
+const currentCfs = computed(() => liveCfs.value ?? props.leadGauge.currentCfs)
 
 const gaugeName = computed(() =>
   props.leadGauge.name ?? `${props.leadGauge.source.toUpperCase()} ${props.leadGauge.externalId}`

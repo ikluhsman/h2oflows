@@ -259,6 +259,7 @@
                 <!-- Content -->
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-[10px] uppercase tracking-wider font-semibold text-gray-400 dark:text-gray-500">{{ featureTypeLabel(feat) }}</span>
                     <span class="text-sm font-medium text-gray-800 dark:text-gray-100">{{ feat.name }}</span>
                     <span
                       v-if="(feat.type === 'rapid' || feat.type === 'hazard') && feat.class_rating"

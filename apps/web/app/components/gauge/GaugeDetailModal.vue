@@ -3,20 +3,7 @@
     <template #header>
       <div class="flex items-start justify-between gap-3 w-full">
         <div class="min-w-0 flex-1">
-          <!-- Common name — large, clickable to reach page -->
-          <NuxtLink
-            v-if="primaryReachSlug"
-            :to="`/reaches/${primaryReachSlug}`"
-            class="flex items-center gap-1.5 group"
-            @click="open = false"
-          >
-            <span class="text-lg font-bold text-gray-900 dark:text-white truncate group-hover:text-blue-500 transition-colors leading-tight">{{ displayName }}</span>
-            <svg class="w-3.5 h-3.5 shrink-0 text-gray-400 group-hover:text-blue-500 transition-colors mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>
-          </NuxtLink>
-          <h2 v-else class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ displayName }}</h2>
-          <!-- Gauge source/id as muted subtext -->
+          <h2 class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ gaugeName }}</h2>
           <p class="text-xs text-gray-400 truncate mt-0.5">
             <a :href="sourceUrl" target="_blank" rel="noopener" class="hover:text-blue-400 underline underline-offset-2">
               {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
@@ -39,17 +26,13 @@
 
     <template #body>
       <div class="space-y-3">
-        <!-- CFS + badge + trend arrow — left-aligned, prominent -->
+        <!-- CFS + trend arrow — left-aligned, prominent -->
         <div class="flex items-baseline gap-2 flex-wrap">
-          <span class="text-3xl font-bold tabular-nums leading-none" :class="cfsClass">
+          <span class="text-3xl font-bold tabular-nums leading-none text-gray-900 dark:text-white">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
           </span>
           <span class="text-sm text-gray-500">cfs</span>
           <TrendArrow v-if="displayCfs != null" :gauge-id="gauge.id" class="text-lg" />
-          <span
-            v-if="displayFlowStatus !== 'unknown' || displayFlowBand"
-            :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', statusBadgeClass]"
-          >{{ statusLabel }}</span>
         </div>
 
         <!-- Diurnal context -->
@@ -96,7 +79,6 @@
           :current-cfs="displayCfs"
           :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug"
           @latest-cfs="liveCfs = $event"
-          @live-flow-band="liveFlowBand = $event"
         />
 
         <!-- Last updated -->
@@ -104,18 +86,6 @@
           Last reading {{ lastReadingRelative }}
         </p>
 
-        <!-- View reach link -->
-        <NuxtLink
-          v-if="primaryReachSlug"
-          :to="`/reaches/${primaryReachSlug}`"
-          class="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-          @click="open = false"
-        >
-          View this Reach
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M5 12h14M12 5l7 7-7 7"/>
-          </svg>
-        </NuxtLink>
       </div>
     </template>
   </UModal>
@@ -130,15 +100,10 @@ import { useDiurnalCache } from '~/composables/useDiurnalCache'
 const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{ gauge: WatchedGauge }>()
 
-// liveCfs / liveFlowBand are set by GaugeGraph once it loads fresh readings.
-// These supersede the potentially-stale values from the watchlist store.
-const liveCfs      = ref<number | null>(null)
-const liveFlowBand = ref<{ flowBandLabel: string | null; flowStatus: string } | null>(null)
-watch(open, (v) => { if (!v) { liveCfs.value = null; liveFlowBand.value = null } })
+const liveCfs = ref<number | null>(null)
+watch(open, (v) => { if (!v) liveCfs.value = null })
 
-const displayCfs        = computed(() => liveCfs.value ?? props.gauge.currentCfs)
-const displayFlowBand   = computed(() => liveFlowBand.value?.flowBandLabel ?? props.gauge.flowBandLabel)
-const displayFlowStatus = computed(() => liveFlowBand.value?.flowStatus   ?? props.gauge.flowStatus)
+const displayCfs = computed(() => liveCfs.value ?? props.gauge.currentCfs)
 
 const { pattern: diurnal } = useDiurnalCache(props.gauge.id)
 
@@ -153,15 +118,8 @@ const diurnalPhaseLabel = computed(() => {
   }
 })
 
-const displayName = computed(() =>
-  props.gauge.contextReachCommonName
-  ?? props.gauge.reachName
-  ?? props.gauge.name
-  ?? props.gauge.externalId
-)
-
-const primaryReachSlug = computed(() =>
-  props.gauge.contextReachSlug ?? props.gauge.reachSlug ?? props.gauge.reachSlugs?.[0] ?? null
+const gaugeName = computed(() =>
+  props.gauge.name ?? `${props.gauge.source.toUpperCase()} ${props.gauge.externalId}`
 )
 
 // ── Dashboard add/remove ──────────────────────────────────────────────────
@@ -193,9 +151,6 @@ const sourceUrl = computed(() => {
   }
 })
 
-const statusBadgeClass = computed(() => flowBandBadgeClass(displayFlowBand.value, displayFlowStatus.value))
-const statusLabel      = computed(() => flowBandLabel(displayFlowBand.value, displayFlowStatus.value))
-const cfsClass         = computed(() => flowBandCfsClass(displayFlowBand.value, displayFlowStatus.value))
 
 const lastReadingRelative = computed(() => {
   if (!props.gauge.lastReadingAt) return ''

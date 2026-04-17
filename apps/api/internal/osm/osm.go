@@ -14,8 +14,11 @@ import (
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
-// coord is a [longitude, latitude] pair.
-type coord [2]float64
+// Coord is a [longitude, latitude] pair (exported for callers that pass
+// intermediate waypoints to FetchReachLine).
+type Coord [2]float64
+
+type coord = Coord
 
 // ── Centerline algorithm overview ─────────────────────────────────────────────
 //
@@ -53,7 +56,7 @@ type coord [2]float64
 //     combined endpoint scoring because the put-in is far from the main river.
 //
 // Returns ("", nil) if no waterways are found.
-func FetchReachLine(ctx context.Context, minLon, minLat, maxLon, maxLat, startLng, startLat, endLng, endLat float64, preferredName string) (string, error) {
+func FetchReachLine(ctx context.Context, minLon, minLat, maxLon, maxLat, startLng, startLat, endLng, endLat float64, preferredName string, intermediatePoints []coord) (string, error) {
 	const pad = 0.01 // small extra padding around the access-point bbox
 
 	// Always expand the bbox to include the explicit put-in and take-out so
@@ -80,7 +83,7 @@ func FetchReachLine(ctx context.Context, minLon, minLat, maxLon, maxLat, startLn
 	// A preferredName hint (from the DB river_name) halves a matching waterway's
 	// score so it wins ties against equally-close unnamed ways.
 	ways := extractCoords(tagged)
-	if named := filterByBestEndpointScore(tagged, startLng, startLat, endLng, endLat, preferredName); len(named) > 0 {
+	if named := filterByBestEndpointScore(tagged, startLng, startLat, endLng, endLat, preferredName, intermediatePoints); len(named) > 0 {
 		ways = extractCoords(named)
 	}
 
@@ -170,10 +173,11 @@ func filterByType(tagged []taggedWay, wtype string) []taggedWay {
 // preferredName (from DB river_name) halves the combined score of any waterway
 // whose OSM name contains the hint (case-insensitive), so it wins ties.
 // If no named ways exist, returns nil (caller falls back to all ways).
-func filterByBestEndpointScore(tagged []taggedWay, putLng, putLat, takeLng, takeLat float64, preferredName string) []taggedWay {
+func filterByBestEndpointScore(tagged []taggedWay, putLng, putLat, takeLng, takeLat float64, preferredName string, intermediatePoints []coord) []taggedWay {
 	type nameScore struct {
 		putDist  float64
 		takeDist float64
+		midDist  float64 // sum of min distances to each intermediate point
 	}
 	scores := make(map[string]*nameScore)
 	for _, t := range tagged {
@@ -198,12 +202,35 @@ func filterByBestEndpointScore(tagged []taggedWay, putLng, putLat, takeLng, take
 		return nil
 	}
 
+	// Score each intermediate point (rapids, mid-reach access) against each
+	// named waterway. For each point, find the min distance across all ways
+	// sharing that name, then sum across all intermediate points.
+	if len(intermediatePoints) > 0 {
+		for name, s := range scores {
+			var total float64
+			for _, pt := range intermediatePoints {
+				minD := math.MaxFloat64
+				for _, t := range tagged {
+					if t.name != name {
+						continue
+					}
+					for i := 0; i < len(t.coords)-1; i++ {
+						if _, d := closestPointOnSegment(pt[0], pt[1], t.coords[i], t.coords[i+1]); d < minD {
+							minD = d
+						}
+					}
+				}
+				total += minD
+			}
+			s.midDist = total
+		}
+	}
+
 	hint := strings.ToLower(preferredName)
 	bestName := ""
 	bestScore := math.MaxFloat64
 	for name, s := range scores {
-		combined := s.putDist + s.takeDist
-		// Preferred-name hint: halve the score so it wins over equally-close ways.
+		combined := s.putDist + s.takeDist + s.midDist
 		if hint != "" && strings.Contains(strings.ToLower(name), hint) {
 			combined *= 0.5
 		}

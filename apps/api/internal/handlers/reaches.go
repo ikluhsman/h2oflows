@@ -1298,6 +1298,25 @@ func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, exp
 	if riverName != nil {
 		hint = *riverName
 	}
+
+	// Load rapids + mid-reach access points as intermediate waypoints to
+	// disambiguate at confluences (e.g. La Poudre Pass Creek vs Corral Creek).
+	var midpoints []osm.Coord
+	rows, _ := h.db.Query(ctx, `
+		SELECT ST_X(location::geometry), ST_Y(location::geometry)
+		FROM rapids
+		WHERE reach_id = $1 AND location IS NOT NULL
+	`, reachID)
+	if rows != nil {
+		for rows.Next() {
+			var lng, lat float64
+			if rows.Scan(&lng, &lat) == nil {
+				midpoints = append(midpoints, osm.Coord{lng, lat})
+			}
+		}
+		rows.Close()
+	}
+
 	if accessMinLng != nil && putInLng != nil && takeOutLng != nil && explicitLng == nil {
 		lineJSON, err = osm.FetchReachLine(
 			ctx,
@@ -1306,6 +1325,7 @@ func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, exp
 			*putInLng, *putInLat,
 			*takeOutLng, *takeOutLat,
 			hint,
+			midpoints,
 		)
 	} else {
 		const pad = 0.05
