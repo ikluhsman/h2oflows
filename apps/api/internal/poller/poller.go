@@ -489,7 +489,7 @@ func (p *Poller) syncSourceMetadata(ctx context.Context, sourceType string, disc
 		FROM   gauges
 		WHERE  source = $1
 		  AND  status != 'retired'
-		  AND  (location IS NULL OR huc8 IS NULL OR basin_name IS NULL OR state_abbr IS NULL OR state_abbr = '')
+		  AND  (location IS NULL OR huc8 IS NULL OR basin_name IS NULL OR state_abbr IS NULL OR state_abbr = '' OR elevation_ft IS NULL)
 		LIMIT  500
 	`, sourceType)
 	if err != nil {
@@ -570,15 +570,16 @@ func (p *Poller) applyMetadata(ctx context.Context, gaugeID string, site *gauge.
 			site.StateCode,
 			basinName,
 			watershedName,
+			site.ElevationFt, // nullable
 		}
 	} else {
-		locExpr = ""
 		args = []any{
 			gaugeID,
 			site.HUCCode,
 			site.StateCode,
 			basinName,
 			watershedName,
+			site.ElevationFt, // nullable
 		}
 	}
 
@@ -590,7 +591,8 @@ func (p *Poller) applyMetadata(ctx context.Context, gaugeID string, site *gauge.
 				huc8           = $4,
 				state_abbr     = $5,
 				basin_name     = $6,
-				watershed_name = COALESCE(watershed_name, $7)
+				watershed_name = COALESCE(watershed_name, $7),
+				elevation_ft   = COALESCE(elevation_ft, $8)
 			WHERE id = $1
 		`
 	} else {
@@ -599,7 +601,8 @@ func (p *Poller) applyMetadata(ctx context.Context, gaugeID string, site *gauge.
 				huc8           = $2,
 				state_abbr     = $3,
 				basin_name     = $4,
-				watershed_name = COALESCE(watershed_name, $5)
+				watershed_name = COALESCE(watershed_name, $5),
+				elevation_ft   = COALESCE(elevation_ft, $6)
 			WHERE id = $1
 		`
 	}

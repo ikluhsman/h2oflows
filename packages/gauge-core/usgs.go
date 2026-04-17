@@ -396,6 +396,13 @@ func parseNWISSiteRDB(r io.Reader) ([]*SiteMetadata, error) {
 		lng, _ := strconv.ParseFloat(get(fields, "dec_long_va"), 64)
 		drainArea, _ := strconv.ParseFloat(get(fields, "drain_area_va"), 64)
 
+		var elevationFt *float64
+		if altStr := get(fields, "alt_va"); altStr != "" {
+			if v, err := strconv.ParseFloat(altStr, 64); err == nil {
+				elevationFt = &v
+			}
+		}
+
 		beginDate := parseNWISDate(get(fields, "begin_date"))
 		endDate := parseNWISDatePtr(get(fields, "end_date"))
 
@@ -410,6 +417,7 @@ func parseNWISSiteRDB(r io.Reader) ([]*SiteMetadata, error) {
 			BeginDate:        beginDate,
 			EndDate:          endDate,
 			DrainageAreaSqMi: drainArea,
+			ElevationFt:      elevationFt,
 			SourceType:       SourceUSGS,
 		}
 

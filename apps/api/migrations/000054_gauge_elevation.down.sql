@@ -1,0 +1,1 @@
+ALTER TABLE gauges DROP COLUMN IF EXISTS elevation_ft;

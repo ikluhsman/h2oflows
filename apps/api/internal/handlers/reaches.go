@@ -563,7 +563,10 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 			ORDER BY min_cfs ASC NULLS FIRST
 			LIMIT 1
 		) fr ON TRUE
-		ORDER BY r.basin_group NULLS LAST, r.river_name NULLS LAST, r.common_name NULLS LAST
+		ORDER BY r.basin_group NULLS LAST,
+		         r.river_name NULLS LAST,
+		         g.elevation_ft DESC NULLS LAST,
+		         ST_X(r.put_in::geometry) ASC NULLS LAST
 	`)
 	if err != nil {
 		return nil, err

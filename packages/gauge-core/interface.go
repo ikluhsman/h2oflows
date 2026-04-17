@@ -93,6 +93,7 @@ type SiteMetadata struct {
 	BeginDate        time.Time
 	EndDate          *time.Time // nil = still active; non-nil = retired upstream
 	DrainageAreaSqMi float64
+	ElevationFt      *float64 // altitude of gauge datum in feet (USGS alt_va); nil if unavailable
 	SourceType       SourceType
 }
 
