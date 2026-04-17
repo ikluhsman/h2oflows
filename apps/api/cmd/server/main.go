@@ -99,6 +99,7 @@ func main() {
 	gauges    := handlers.NewGaugeHandler(pool, enricher, p)
 	reaches   := handlers.NewReachHandler(pool, asker).WithPoller(p)
 	watchlist := handlers.NewWatchlistHandler(pool)
+	admin     := handlers.NewAdminHandler(pool)
 	// Warm the reach map cache immediately, then refresh every poll cycle.
 	reaches.WarmCache(context.Background())
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
@@ -114,10 +115,31 @@ func main() {
 		CenterlineFetcher: reaches.BackgroundFetchCenterline,
 		Embedder:          importEmbedder,
 	}
+	// LoadAppRoles queries user_roles for the authenticated user on each request.
+	// Runs after Optional/Required so the user ID is already in context.
+	loadAppRoles := auth.LoadAppRoles(func(r *http.Request, userID string) ([]string, error) {
+		rows, err := pool.Query(r.Context(),
+			`SELECT role FROM user_roles WHERE user_id = $1`, userID)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		var roles []string
+		for rows.Next() {
+			var role string
+			if rows.Scan(&role) == nil {
+				roles = append(roles, role)
+			}
+		}
+		return roles, nil
+	})
+
 	r.Route("/api/v1", func(r chi.Router) {
 		// Optional: attaches user claims when a valid Bearer token is present,
 		// but anonymous (device_id) requests still flow through.
 		r.Use(auth.Optional(verifier))
+		// LoadAppRoles enriches context with DB roles for authenticated users.
+		r.Use(loadAppRoles)
 		r.Get("/gauges/search", gauges.Search)
 		r.Get("/gauges/batch", gauges.BatchGet)
 		r.Get("/gauges/{id}/readings", gauges.GetReadings)
@@ -142,14 +164,33 @@ func main() {
 			r.Delete("/watchlist/{gaugeId}", watchlist.Remove)
 		})
 
-		// Admin-only write routes — require authenticated user with role "admin".
+		// Data admin routes — require data_admin or site_admin role.
 		r.Group(func(r chi.Router) {
-			r.Use(auth.RequireAdmin)
+			r.Use(auth.RequireDataAdmin)
 			r.Put("/reaches/{slug}/flow-ranges", reaches.SetFlowRanges)
 			r.Delete("/reaches/{slug}", reaches.Delete)
 			r.Post("/reaches/{slug}/fetch-centerline", reaches.FetchCenterline)
 			r.Delete("/reaches/{slug}/centerline", reaches.ClearCenterline)
 			r.Post("/import/kmz", imports.ImportKMZ)
+			r.Put("/admin/reaches/{slug}/river", admin.AssignReachToRiver)
+			r.Get("/admin/rivers", admin.ListRivers)
+			r.Get("/admin/rivers/{riverSlug}", admin.GetRiver)
+			r.Post("/admin/rivers", admin.CreateRiver)
+			r.Put("/admin/rivers/{riverSlug}", admin.UpdateRiver)
+		})
+
+		// Site admin only — role management.
+		r.Group(func(r chi.Router) {
+			r.Use(auth.RequireAdmin)
+			r.Get("/admin/users/roles", admin.ListUserRoles)
+			r.Post("/admin/users/roles", admin.AssignRole)
+			r.Delete("/admin/users/roles/{roleId}", admin.RevokeRole)
+		})
+
+		// Authenticated user — own role info.
+		r.Group(func(r chi.Router) {
+			r.Use(auth.Required(verifier))
+			r.Get("/admin/me/roles", admin.GetMyRoles)
 		})
 
 		r.Post("/reaches/{slug}/contributions", contributions.CreateContribution)

@@ -74,6 +74,39 @@ func RequireAdmin(next http.Handler) http.Handler {
 	})
 }
 
+// LoadAppRoles returns middleware that loads the authenticated user's application
+// roles from the DB (via querier) and stores them in context. Must run after
+// Optional or Required. The querier receives the user ID and returns role strings.
+// Failures are non-fatal — the request proceeds with no app roles.
+func LoadAppRoles(querier func(r *http.Request, userID string) ([]string, error)) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if userID, ok := UserIDFromContext(r.Context()); ok {
+				if roles, err := querier(r, userID); err == nil {
+					r = r.WithContext(WithAppRoles(r.Context(), roles))
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// RequireDataAdmin rejects requests from users without at least data_admin rights.
+// Returns 401 for unauthenticated requests and 403 for authenticated non-admin users.
+func RequireDataAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := UserIDFromContext(r.Context()); !ok {
+			writeJSONError(w, http.StatusUnauthorized, "authentication required")
+			return
+		}
+		if !IsDataAdminFromContext(r.Context()) {
+			writeJSONError(w, http.StatusForbidden, "data admin role required")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // bearerToken extracts the token from the Authorization header, if present.
 // Returns an empty string when no Bearer token is attached.
 func bearerToken(r *http.Request) string {
