@@ -445,9 +445,24 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 					}
 				}
 			}
-			if basinGroup != "" {
-				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET basin_group = $1 WHERE id = $2`, basinGroup, rid); err != nil {
-					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] basin_group update failed: %v", rname, err))
+			// Upsert river and link the reach to it.
+			// Basin belongs on the river, not the reach.
+			if doc.Name != "" {
+				riverSlug := slugify(doc.Name)
+				var riverID string
+				err := imp.pool.QueryRow(ctx, `
+					INSERT INTO rivers (slug, name, basin)
+					VALUES ($1, $2, NULLIF($3, ''))
+					ON CONFLICT (slug) DO UPDATE
+						SET basin = COALESCE(NULLIF(EXCLUDED.basin, ''), rivers.basin)
+					RETURNING id
+				`, riverSlug, doc.Name, basinGroup).Scan(&riverID)
+				if err != nil {
+					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] river upsert failed: %v", rname, err))
+				} else {
+					if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET river_id = $1 WHERE id = $2`, riverID, rid); err != nil {
+						res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] river_id link failed: %v", rname, err))
+					}
 				}
 			}
 			if permitRequired != nil {

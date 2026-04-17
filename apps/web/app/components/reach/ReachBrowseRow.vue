@@ -64,7 +64,7 @@ export interface ReachListItem {
   common_name: string | null
   put_in_name: string | null
   take_out_name: string | null
-  basin_group: string | null
+  basin: string | null
   class_min: number | null
   class_max: number | null
   current_cfs: number | null

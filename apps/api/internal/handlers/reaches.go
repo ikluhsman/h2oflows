@@ -503,7 +503,7 @@ type reachListItem struct {
 	CommonName      *string  `json:"common_name"`
 	PutInName       *string  `json:"put_in_name"`
 	TakeOutName     *string  `json:"take_out_name"`
-	BasinGroup      *string  `json:"basin_group"`
+	Basin           *string  `json:"basin"`
 	ClassMin        *float64 `json:"class_min"`
 	ClassMax        *float64 `json:"class_max"`
 	CurrentCFS      *float64 `json:"current_cfs"`
@@ -532,7 +532,7 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 			r.common_name,
 			r.put_in_name,
 			r.take_out_name,
-			r.basin_group,
+			rv.basin,
 			r.class_min,
 			COALESCE(
 				(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL),
@@ -552,6 +552,7 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 				ELSE                                            'unknown'
 			END AS flow_status
 		FROM reaches r
+		LEFT JOIN rivers rv ON rv.id = r.river_id
 		LEFT JOIN gauges g ON g.id = r.primary_gauge_id
 		LEFT JOIN latest_reading lr ON lr.gauge_id = g.id
 		LEFT JOIN LATERAL (
@@ -563,7 +564,7 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 			ORDER BY min_cfs ASC NULLS FIRST
 			LIMIT 1
 		) fr ON TRUE
-		ORDER BY r.basin_group NULLS LAST,
+		ORDER BY rv.basin NULLS LAST,
 		         r.river_name NULLS LAST,
 		         g.elevation_ft DESC NULLS LAST,
 		         ST_X(r.put_in::geometry) ASC NULLS LAST
@@ -579,7 +580,7 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 		if err := rows.Scan(
 			&item.Slug,
 			&item.RiverName, &item.CommonName, &item.PutInName, &item.TakeOutName,
-			&item.BasinGroup,
+			&item.Basin,
 			&item.ClassMin, &item.ClassMax,
 			&item.CurrentCFS, &item.FlowLabel, &item.GaugeID,
 			&item.GaugeExternalID, &item.GaugeSource, &item.GaugeName,

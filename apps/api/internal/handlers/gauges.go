@@ -735,8 +735,9 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				     THEN rctx.put_in_name || ' to ' || rctx.take_out_name
 				     ELSE NULL END                     AS full_name,
 				rctx.river_name,
-				rctx.basin_group
+				rctx_rv.basin AS basin_group
 			FROM reaches rctx
+			LEFT JOIN rivers rctx_rv ON rctx_rv.id = rctx.river_id
 			WHERE rctx.primary_gauge_id = g.id
 			  AND rctx.slug = COALESCE(
 			      ctx.reach_slug,

@@ -148,7 +148,7 @@ function buildTree(items: ReachListItem[]): BasinGroup[] {
   const basinMap = new Map<string, Map<string, ReachListItem[]>>()
 
   for (const r of items) {
-    const basin = r.basin_group ?? 'Other'
+    const basin = r.basin ?? 'Other'
     const river = r.river_name ?? 'Unknown River'
     if (!basinMap.has(basin)) basinMap.set(basin, new Map())
     const riverMap = basinMap.get(basin)!
@@ -179,7 +179,7 @@ const filteredBasins = computed(() => {
     (r.put_in_name?.toLowerCase().includes(q)) ||
     (r.take_out_name?.toLowerCase().includes(q)) ||
     (r.river_name?.toLowerCase().includes(q)) ||
-    (r.basin_group?.toLowerCase().includes(q)) ||
+    (r.basin?.toLowerCase().includes(q)) ||
     (r.slug.toLowerCase().includes(q))
   )
   return buildTree(filtered)
@@ -225,7 +225,7 @@ function openGaugeModal(reach: ReachListItem) {
       ? `${reach.put_in_name} to ${reach.take_out_name}`
       : null,
     contextReachRiverName: reach.river_name ?? null,
-    contextReachBasinGroup: reach.basin_group ?? null,
+    contextReachBasinGroup: reach.basin ?? null,
     contextReachPermitRequired: false,
     contextReachMultiDayDays: 0,
     reachId: null,
@@ -236,7 +236,7 @@ function openGaugeModal(reach: ReachListItem) {
     reachCommonNames: reach.common_name ? [reach.common_name] : [],
     reachRelationship: 'primary',
     watershedName: null,
-    basinName: reach.basin_group ?? null,
+    basinName: reach.basin ?? null,
     riverName: reach.river_name ?? null,
     stateAbbr: null,
     lat: null,
