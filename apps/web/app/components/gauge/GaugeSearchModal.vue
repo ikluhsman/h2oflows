@@ -1,63 +1,120 @@
 <template>
-  <UModal v-model:open="open" title="Add a reach or gauge" :ui="{ width: 'max-w-lg' }">
+  <UModal v-model:open="open" title="Add a reach or gauge" :ui="{ width: 'max-w-2xl' }">
     <template #body>
       <div class="space-y-4">
         <UInput
           v-model="query"
           placeholder="Search by river, section, or gauge ID…"
           icon="i-heroicons-magnifying-glass"
+          size="lg"
           autofocus
           @input="onInput"
         />
 
-        <!-- Results -->
-        <div v-if="loading" class="text-center py-6 text-gray-400 text-sm">Searching…</div>
-
-        <div v-else-if="results.length === 0 && query.length >= 2" class="text-center py-6 text-gray-400 text-sm">
-          No gauges found for "{{ query }}"
-        </div>
-
-        <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800 max-h-[60vh] overflow-y-auto">
-          <template v-for="g in results" :key="g.id">
-            <!-- Gauge has reaches: one flat row per reach -->
-            <template v-if="g.reachSlugs.length">
-              <li
-                v-for="(slug, i) in g.reachSlugs"
-                :key="slug"
-                class="flex items-center justify-between gap-2 py-2.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-900 rounded"
-              >
-                <div class="min-w-0 flex-1">
-                  <p class="text-sm font-medium truncate">{{ g.reachCommonNames[i] ?? g.reachNames[i] ?? slug }}</p>
-                  <p class="text-xs text-gray-400 truncate">
-                    {{ g.source.toUpperCase() }} · {{ g.externalId }}<template v-if="g.stateAbbr">, {{ g.stateAbbr }}</template>
-                    <template v-if="g.reachRelationship && g.reachRelationship !== 'primary' && i === 0">
-                      · {{ relationshipLabel(g.reachRelationship) }}
-                    </template>
-                  </p>
+        <div class="flex gap-4">
+          <!-- Results list -->
+          <div class="flex-1 min-w-0">
+            <!-- Skeleton loader -->
+            <div v-if="loading" class="space-y-2 py-2">
+              <div v-for="i in 4" :key="i" class="flex items-center gap-3 px-2 py-2.5">
+                <div class="flex-1 space-y-2">
+                  <div class="h-4 w-3/4 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                  <div class="h-3 w-1/2 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
                 </div>
-                <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
-                  @click="selectWithContext(g, slug, g.reachCommonNames[i] ?? g.reachNames[i] ?? null)"
-                >Add</UButton>
-              </li>
-            </template>
-
-            <!-- Gauge has no reaches: standalone row -->
-            <li
-              v-else
-              class="flex items-center justify-between gap-2 py-2.5 px-1 hover:bg-gray-50 dark:hover:bg-gray-900 rounded"
-            >
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium truncate">{{ g.name ?? g.externalId }}</p>
-                <p class="text-xs text-gray-400 truncate">
-                  {{ g.source.toUpperCase() }} · {{ g.externalId }}<template v-if="g.stateAbbr">, {{ g.stateAbbr }}</template>
-                </p>
+                <div class="h-7 w-14 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
               </div>
-              <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
-                @click="selectWithContext(g, null, null)"
-              >Add</UButton>
-            </li>
-          </template>
-        </ul>
+            </div>
+
+            <!-- Empty state -->
+            <div v-else-if="results.length === 0 && query.length >= 2" class="text-center py-10 text-gray-400 text-sm">
+              No gauges found for "{{ query }}"
+            </div>
+
+            <!-- Idle state -->
+            <div v-else-if="results.length === 0" class="text-center py-10 text-gray-400 text-sm">
+              Type to search rivers, sections, or gauge IDs
+            </div>
+
+            <!-- Results -->
+            <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800 max-h-[60vh] overflow-y-auto">
+              <template v-for="g in results" :key="g.id">
+                <!-- Gauge has reaches: one row per reach -->
+                <template v-if="g.reachSlugs.length">
+                  <li
+                    v-for="(slug, i) in g.reachSlugs"
+                    :key="slug"
+                    class="flex items-center justify-between gap-3 py-2.5 px-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors cursor-pointer"
+                    @mouseenter="hoverGauge = g"
+                    @mouseleave="hoverGauge = null"
+                    @click="selectWithContext(g, slug, g.reachCommonNames[i] ?? g.reachNames[i] ?? null)"
+                  >
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ g.reachCommonNames[i] ?? g.reachNames[i] ?? slug }}</p>
+                      <div class="flex items-center gap-1.5 mt-0.5">
+                        <span v-if="g.riverName" class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ g.riverName }}</span>
+                        <span v-if="g.riverName" class="text-gray-300 dark:text-gray-600 text-xs">·</span>
+                        <span class="text-xs text-gray-400 truncate">
+                          {{ g.source.toUpperCase() }} {{ g.externalId }}<template v-if="g.stateAbbr">, {{ g.stateAbbr }}</template>
+                        </span>
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <span v-if="g.currentCfs != null" class="text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
+                        {{ g.currentCfs.toLocaleString() }}
+                        <span class="text-xs font-normal text-gray-400">cfs</span>
+                      </span>
+                      <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
+                        @click.stop="selectWithContext(g, slug, g.reachCommonNames[i] ?? g.reachNames[i] ?? null)"
+                      >Add</UButton>
+                    </div>
+                  </li>
+                </template>
+
+                <!-- Standalone gauge (no reaches) -->
+                <li
+                  v-else
+                  class="flex items-center justify-between gap-3 py-2.5 px-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors cursor-pointer"
+                  @mouseenter="hoverGauge = g"
+                  @mouseleave="hoverGauge = null"
+                  @click="selectWithContext(g, null, null)"
+                >
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ g.name ?? g.externalId }}</p>
+                    <div class="flex items-center gap-1.5 mt-0.5">
+                      <span v-if="g.riverName" class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ g.riverName }}</span>
+                      <span v-if="g.riverName" class="text-gray-300 dark:text-gray-600 text-xs">·</span>
+                      <span class="text-xs text-gray-400 truncate">
+                        {{ g.source.toUpperCase() }} {{ g.externalId }}<template v-if="g.stateAbbr">, {{ g.stateAbbr }}</template>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <span v-if="g.currentCfs != null" class="text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
+                      {{ g.currentCfs.toLocaleString() }}
+                      <span class="text-xs font-normal text-gray-400">cfs</span>
+                    </span>
+                    <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
+                      @click.stop="selectWithContext(g, null, null)"
+                    >Add</UButton>
+                  </div>
+                </li>
+              </template>
+            </ul>
+          </div>
+
+          <!-- Mini-map preview — only visible when results exist, hidden on small screens -->
+          <div
+            v-if="results.length > 0"
+            class="hidden sm:block w-48 shrink-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 self-start sticky top-0"
+          >
+            <ClientOnly>
+              <GaugeSearchMiniMap
+                :gauges="results"
+                :highlight-id="hoverGauge?.id ?? null"
+              />
+            </ClientOnly>
+          </div>
+        </div>
       </div>
     </template>
     <template #footer>
@@ -79,6 +136,7 @@ const emit = defineEmits<{ (e: 'add', gauge: Omit<WatchedGauge, 'watchState' | '
 const query = ref('')
 const loading = ref(false)
 const results = ref<Omit<WatchedGauge, 'watchState' | 'activeSince'>[]>([])
+const hoverGauge = ref<Omit<WatchedGauge, 'watchState' | 'activeSince'> | null>(null)
 
 const { apiBase } = useRuntimeConfig().public
 
@@ -116,14 +174,12 @@ function selectWithContext(
   reachSlug: string | null,
   reachCommonName: string | null,
 ) {
-  // Build the watchlist item with the chosen reach context.
-  // For a specific reach, look up full name and river name from the gauge's reach data.
   const idx = reachSlug ? gauge.reachSlugs.indexOf(reachSlug) : -1
   const enriched: Omit<WatchedGauge, 'watchState' | 'activeSince'> = {
     ...gauge,
     contextReachSlug:       reachSlug,
     contextReachCommonName: reachCommonName,
-    contextReachFullName:   null,  // populated on next batch refresh from API
+    contextReachFullName:   null,
     contextReachRiverName:  idx >= 0 ? (gauge.riverName ?? null) : null,
   }
   emit('add', enriched)
