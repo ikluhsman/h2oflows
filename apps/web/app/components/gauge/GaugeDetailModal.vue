@@ -3,13 +3,26 @@
     <template #header>
       <div class="flex items-start justify-between gap-3 w-full">
         <div class="min-w-0 flex-1">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ gaugeName }}</h2>
-          <p class="text-xs text-gray-400 truncate mt-0.5">
-            <a :href="sourceUrl" target="_blank" rel="noopener" class="hover:text-blue-400 underline underline-offset-2">
-              {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
-            </a>
-            <span v-if="gauge.watershedName"> · {{ gauge.watershedName }}</span>
-          </p>
+          <!-- Reach mode: reach name as title, gauge info as subtitle -->
+          <template v-if="mode === 'reach' && reachTitle">
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ reachTitle }}</h2>
+            <p class="text-xs text-gray-400 truncate mt-0.5">
+              {{ gaugeName }} ·
+              <a :href="sourceUrl" target="_blank" rel="noopener" class="hover:text-blue-400 underline underline-offset-2">
+                {{ gauge.source.toUpperCase() }} {{ gauge.externalId }}
+              </a>
+            </p>
+          </template>
+          <!-- Gauge mode (default): gauge name as title -->
+          <template v-else>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ gaugeName }}</h2>
+            <p class="text-xs text-gray-400 truncate mt-0.5">
+              <a :href="sourceUrl" target="_blank" rel="noopener" class="hover:text-blue-400 underline underline-offset-2">
+                {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
+              </a>
+              <span v-if="gauge.watershedName"> · {{ gauge.watershedName }}</span>
+            </p>
+          </template>
         </div>
         <!-- Close button only in header -->
         <button
@@ -33,6 +46,11 @@
           </span>
           <span class="text-sm text-gray-500">cfs</span>
           <TrendArrow v-if="displayCfs != null" :gauge-id="gauge.id" class="text-lg" />
+          <!-- Flow band badge — only in reach mode -->
+          <span
+            v-if="mode === 'reach' && (gauge.flowStatus !== 'unknown' || gauge.flowBandLabel)"
+            :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+          >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
         </div>
 
         <!-- Diurnal context -->
@@ -73,11 +91,11 @@
           </button>
         </div>
 
-        <!-- 48-hour graph — emits live CFS + band so we can sync display -->
+        <!-- 48-hour graph — reach mode: colored with flow bands; gauge mode: neutral blue -->
         <GaugeGraph
           :gauge-id="gauge.id"
           :current-cfs="displayCfs"
-          :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug"
+          :reach-slug="graphReachSlug"
           @latest-cfs="liveCfs = $event"
         />
 
@@ -96,9 +114,13 @@ import { ref, computed, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { useDiurnalCache } from '~/composables/useDiurnalCache'
+import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
 
 const open = defineModel<boolean>('open', { default: false })
-const props = defineProps<{ gauge: WatchedGauge }>()
+const props = defineProps<{
+  gauge: WatchedGauge
+  mode?: 'gauge' | 'reach'  // 'gauge' = neutral graph; 'reach' = colored + reach name + flow band
+}>()
 
 const liveCfs = ref<number | null>(null)
 watch(open, (v) => { if (!v) liveCfs.value = null })
@@ -120,6 +142,21 @@ const diurnalPhaseLabel = computed(() => {
 
 const gaugeName = computed(() =>
   props.gauge.name ?? `${props.gauge.source.toUpperCase()} ${props.gauge.externalId}`
+)
+
+// In reach mode, the header title is the reach name.
+const reachTitle = computed(() =>
+  props.gauge.contextReachCommonName
+    ?? props.gauge.contextReachFullName
+    ?? null
+)
+
+// The reach slug to pass to GaugeGraph for colored/banded display.
+// Only active in 'reach' mode — null in gauge mode gives neutral blue graph.
+const graphReachSlug = computed(() =>
+  props.mode === 'reach'
+    ? (props.gauge.contextReachSlug ?? props.gauge.reachSlug ?? null)
+    : null
 )
 
 // ── Dashboard add/remove ──────────────────────────────────────────────────

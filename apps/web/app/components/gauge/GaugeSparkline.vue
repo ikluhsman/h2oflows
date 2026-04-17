@@ -48,6 +48,7 @@ const props = defineProps<{
   flowBandLabel?: string | null
   reachSlug?: string | null
   compact?: boolean
+  color?: string  // override stroke color (e.g. '#3b82f6' for neutral blue)
 }>()
 
 const emit = defineEmits<{
@@ -152,5 +153,5 @@ const areaPath = computed(() => {
   return `${toPath(pts)} L${last.x.toFixed(1)},40 L0,40 Z`
 })
 
-const strokeColor = computed(() => flowBandSolidColor(props.flowBandLabel, props.flowStatus))
+const strokeColor = computed(() => props.color ?? flowBandSolidColor(props.flowBandLabel, props.flowStatus))
 </script>

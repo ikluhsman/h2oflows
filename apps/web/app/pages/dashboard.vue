@@ -43,7 +43,7 @@
             >
               <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
             </svg>
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ basin }}</h2>
+            <h2 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">{{ basin }}</h2>
             <span class="text-xs text-gray-400">({{ groups.length }})</span>
             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
           </button>
@@ -97,7 +97,7 @@
             <DashboardMap
               :gauges="store.gauges"
               @remove-gauge="removeAndSync($event)"
-              @open-gauge="(id) => { const g = store.gauges.find(x => x.id === id); if (g) openGauge(g) }"
+              @open-gauge="(id) => { const g = store.gauges.find(x => x.id === id); if (g) openGauge(g, 'gauge') }"
             />
           </ClientOnly>
         </section>
@@ -105,7 +105,7 @@
     </main>
 
     <GaugeSearchModal v-model:open="searchOpen" @add="handleAdd" />
-    <GaugeDetailModal v-if="detailGauge" v-model:open="detailOpen" :gauge="detailGauge" />
+    <GaugeDetailModal v-if="detailGauge" v-model:open="detailOpen" :gauge="detailGauge" :mode="detailMode" />
   </div>
 </template>
 
@@ -190,7 +190,13 @@ const byBasinGrouped = computed(() =>
         if (g.contextReachSlug) existing.reachItems.push(g)
       }
     }
-    return { basin, groups: [...gaugeMap.values()] }
+    const groups = [...gaugeMap.values()].sort((a, b) => {
+      const ar = (a.lead.contextReachRiverName ?? a.lead.riverName ?? '').toLowerCase()
+      const br = (b.lead.contextReachRiverName ?? b.lead.riverName ?? '').toLowerCase()
+      if (ar !== br) return ar.localeCompare(br)
+      return (a.lead.name ?? '').toLowerCase().localeCompare((b.lead.name ?? '').toLowerCase())
+    })
+    return { basin, groups }
   })
 )
 
@@ -226,7 +232,12 @@ function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
 
 const detailOpen  = ref(false)
 const detailGauge = ref<WatchedGauge | null>(null)
-function openGauge(gauge: WatchedGauge) { detailGauge.value = gauge; detailOpen.value = true }
+const detailMode  = ref<'gauge' | 'reach'>('gauge')
+function openGauge(gauge: WatchedGauge, mode: 'gauge' | 'reach' = 'gauge') {
+  detailGauge.value = gauge
+  detailMode.value = mode
+  detailOpen.value = true
+}
 
 const aggregateLabel  = ref('')
 const aggregateGauges = ref<WatchedGauge[]>([])

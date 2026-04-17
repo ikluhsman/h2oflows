@@ -7,7 +7,7 @@
     <!-- Gauge station header row -->
     <div
       class="flex items-center gap-2 sm:gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
-      @click="$emit('open', leadGauge)"
+      @click="$emit('open', leadGauge, 'gauge')"
     >
       <div class="min-w-0 flex-1 flex items-center gap-1.5">
         <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
@@ -38,21 +38,32 @@
       <div
         v-for="item in reachItems"
         :key="item.contextReachSlug!"
-        class="flex items-center gap-2 pl-5 pr-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0"
+        class="flex items-center gap-2 pl-5 pr-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0 cursor-pointer"
+        @click.stop="$emit('open', item, 'reach')"
       >
         <svg class="w-3.5 h-3.5 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-label="Reach">
           <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
           <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
         </svg>
-        <NuxtLink
-          :to="`/reaches/${item.contextReachSlug}`"
-          class="flex-1 min-w-0 text-sm text-blue-600 dark:text-blue-400 truncate hover:underline"
-          @click.stop
-        >{{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}</NuxtLink>
+        <span class="flex-1 min-w-0 text-sm text-blue-600 dark:text-blue-400 truncate">
+          {{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}
+        </span>
         <span
           v-if="item.flowStatus !== 'unknown' || item.flowBandLabel"
           :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
         >{{ flowBandLabel(item.flowBandLabel, item.flowStatus) }}</span>
+        <!-- Link to reach page -->
+        <NuxtLink
+          :to="`/reaches/${item.contextReachSlug}`"
+          class="shrink-0 p-1 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+          aria-label="View reach page"
+          title="View reach page"
+          @click.stop
+        >
+          <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </NuxtLink>
         <button
           class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors shrink-0"
           aria-label="Remove"
@@ -73,7 +84,7 @@
   <div
     v-else
     class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden cursor-pointer transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-600"
-    @click="$emit('open', leadGauge)"
+    @click="$emit('open', leadGauge, 'gauge')"
   >
     <!-- Gauge header section -->
     <div :class="density === 'compact' ? 'p-2.5' : density === 'comfortable' ? 'p-3' : 'p-4'">
@@ -128,21 +139,32 @@
       <div
         v-for="item in reachItems"
         :key="item.contextReachSlug!"
-        class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0"
-        @click.stop
+        class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0 cursor-pointer"
+        @click.stop="$emit('open', item, 'reach')"
       >
         <svg class="w-3.5 h-3.5 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-label="Reach">
           <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
           <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
         </svg>
-        <NuxtLink
-          :to="`/reaches/${item.contextReachSlug}`"
-          class="flex-1 min-w-0 text-sm text-gray-700 dark:text-gray-300 truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-        >{{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}</NuxtLink>
+        <span class="flex-1 min-w-0 text-sm text-gray-700 dark:text-gray-300 truncate">
+          {{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}
+        </span>
         <span
           v-if="item.flowStatus !== 'unknown' || item.flowBandLabel"
           :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
         >{{ flowBandLabel(item.flowBandLabel, item.flowStatus) }}</span>
+        <!-- Link to reach page -->
+        <NuxtLink
+          :to="`/reaches/${item.contextReachSlug}`"
+          class="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-all"
+          aria-label="View reach page"
+          title="View reach page"
+          @click.stop
+        >
+          <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </NuxtLink>
         <button
           class="opacity-0 group-hover:opacity-100 rounded p-0.5 text-gray-400 hover:text-red-400 transition-all shrink-0"
           aria-label="Remove"
@@ -170,7 +192,7 @@ const props = defineProps<{
   density?: 'compact' | 'comfortable' | 'full' | 'list'
 }>()
 
-const emit = defineEmits<{ (e: 'open', gauge: WatchedGauge): void }>()
+const emit = defineEmits<{ (e: 'open', gauge: WatchedGauge, mode: 'gauge' | 'reach'): void }>()
 
 const { removeAndSync } = useWatchlistSync()
 

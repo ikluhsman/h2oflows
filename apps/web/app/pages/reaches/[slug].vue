@@ -106,7 +106,7 @@
             <div class="pr-4">
               <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Difficulty</div>
               <div class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-3 rounded-sm shrink-0" :style="{ backgroundColor: difficultyColor }" />
+                <span class="inline-block w-3 h-3 rounded-sm shrink-0" :class="difficultySwatchClass" :style="{ backgroundColor: difficultyColor }" />
                 <span class="text-xl font-bold" :class="difficultyTextClass">{{ classLabel }}</span>
               </div>
             </div>
@@ -118,8 +118,8 @@
               <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Gradient</div>
               <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.gradient_fpm != null ? `${reach.gradient_fpm} ft/mi` : '—' }}</div>
             </div>
-            <div v-if="allGauges.length > 0" class="pl-4 flex-1 flex items-center justify-between gap-3">
-              <div>
+            <div v-if="allGauges.length > 0" class="pl-4 flex-1 flex items-center gap-3 min-w-0">
+              <div class="min-w-0 flex-1">
                 <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Flow</div>
                 <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status, allGauges[0].flow_band_label)">
@@ -133,6 +133,15 @@
                 <span :class="['inline-flex sm:hidden items-center rounded-md px-1.5 py-0.5 text-xs font-medium mt-1', flowBadgeClass(allGauges[0].flow_status, allGauges[0].flow_band_label)]">
                   {{ flowBandLabel(allGauges[0].flow_status, allGauges[0].flow_band_label) }}
                 </span>
+              </div>
+              <!-- Trend sparkline — neutral blue, compact -->
+              <div class="w-20 shrink-0 hidden sm:block">
+                <GaugeSparkline
+                  :gauge-id="allGauges[0].id"
+                  flow-status="unknown"
+                  color="#3b82f6"
+                  compact
+                />
               </div>
               <button
                 class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
@@ -797,8 +806,15 @@ const difficultyTextClass = computed(() => {
   if (c == null) return 'text-gray-500 dark:text-gray-400'
   if (c < 3.0)  return 'text-green-600 dark:text-green-400'
   if (c < 4.0)  return 'text-blue-500 dark:text-blue-400'
-  if (c < 5.0)  return 'text-gray-700 dark:text-gray-200'   // near-black → visible in both modes
+  if (c < 5.0)  return 'text-gray-900 dark:text-white'   // near-black swatch → white text
   return 'text-red-600 dark:text-red-400'
+})
+
+// Near-black (class IV) swatch gets a subtle ring so it's visible on white card bg
+const difficultySwatchClass = computed(() => {
+  const c = (reach.value as any)?.class_max
+  if (c != null && c >= 4.0 && c < 5.0) return 'ring-1 ring-gray-300 dark:ring-gray-600'
+  return ''
 })
 
 const statusColor = computed(() => {
