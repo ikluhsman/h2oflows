@@ -23,22 +23,15 @@
             <button
               v-for="m in VIEW_MODES" :key="m.key"
               class="p-1.5 rounded-md transition-colors"
-              :class="[
-                viewMode === m.key
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300',
-                m.key === 'comfortable' ? 'hidden sm:block' : '',
-              ]"
+              :class="viewMode === m.key
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
               :title="m.label"
               @click="setViewMode(m.key)"
             >
               <!-- List icon -->
               <svg v-if="m.key === 'list'" class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
                 <line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/>
-              </svg>
-              <!-- Compact icon: 2 full-width stacked cards -->
-              <svg v-else-if="m.key === 'compact'" class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="2" width="12" height="5" rx="1"/><rect x="2" y="9" width="12" height="5" rx="1"/>
               </svg>
               <!-- Comfortable icon: 2x2 grid -->
               <svg v-else-if="m.key === 'comfortable'" class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -383,16 +376,18 @@ function toggleAllSections() {
 const VIEW_MODE_KEY = 'h2oflow_dashboard_view_mode'
 const VIEW_MODES = [
   { key: 'list',        label: 'List'        },
-  { key: 'compact',     label: 'Compact'     },
   { key: 'comfortable', label: 'Comfortable' },
   { key: 'full',        label: 'Full'        },
 ] as const
-type ViewMode = 'list' | 'compact' | 'comfortable' | 'full'
-const viewMode = ref<ViewMode>('compact')
+type ViewMode = 'list' | 'comfortable' | 'full'
+const viewMode = ref<ViewMode>('comfortable')
 onMounted(() => {
   const saved = localStorage.getItem(VIEW_MODE_KEY)
-  if (saved === 'list' || saved === 'compact' || saved === 'comfortable' || saved === 'full') {
+  if (saved === 'list' || saved === 'comfortable' || saved === 'full') {
     viewMode.value = saved
+  } else if (saved === 'compact') {
+    viewMode.value = 'comfortable' // migrate old compact saves
+    localStorage.setItem(VIEW_MODE_KEY, 'comfortable')
   }
 })
 function setViewMode(m: ViewMode) {
@@ -404,7 +399,7 @@ function setViewMode(m: ViewMode) {
 const rowView = computed<'list' | 'compact' | 'full'>(() => {
   if (viewMode.value === 'full') return 'full'
   if (viewMode.value === 'list') return 'list'
-  return 'compact' // 'compact' and 'comfortable' both use compact cards
+  return 'compact' // comfortable uses the compact card layout
 })
 
 // ── Group by gauge ────────────────────────────────────────────────────────────
