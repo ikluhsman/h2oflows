@@ -887,6 +887,8 @@ function selectFeature(id: string, lng: number, lat: number) {
 
 function fitBounds() {
   if (!map) return
+  // Only include reach features (rapids, access, centerline) — exclude gauge
+  // locations which can be far upstream/downstream and zoom the map out too far.
   const coords: [number, number][] = []
   rapidFeatures.value.forEach(r => coords.push([r.lng, r.lat]))
   accessFeatures.value.forEach(a => coords.push([a.lng, a.lat]))
@@ -894,7 +896,10 @@ function fitBounds() {
     const line = props.centerline.coordinates as [number, number][]
     if (line.length > 0) coords.push(line[0] as [number, number], line[line.length - 1] as [number, number])
   }
-  gaugeFeatures.value.forEach(g => coords.push([g.lng!, g.lat!]))
+  // Fallback: if no reach features, use gauge locations so the map isn't empty
+  if (coords.length === 0) {
+    gaugeFeatures.value.forEach(g => { if (g.lng != null && g.lat != null) coords.push([g.lng, g.lat]) })
+  }
   if (coords.length === 0) return
   if (coords.length === 1) { map.setCenter(coords[0] as [number, number]); map.setZoom(14); return }
   const lngs = coords.map(c => c[0])

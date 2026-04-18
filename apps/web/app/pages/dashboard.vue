@@ -17,14 +17,18 @@
       <!-- Reaches grouped by basin → river -->
       <template v-else>
         <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
           <!-- View mode toggle -->
           <div class="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
             <button
               v-for="m in VIEW_MODES" :key="m.key"
               class="p-1.5 rounded-md transition-colors"
-              :class="viewMode === m.key
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+              :class="[
+                viewMode === m.key
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300',
+                m.key === 'comfortable' ? 'hidden sm:block' : '',
+              ]"
               :title="m.label"
               @click="setViewMode(m.key)"
             >
@@ -46,6 +50,12 @@
                 <rect x="2" y="2" width="12" height="4" rx="1"/><rect x="2" y="7" width="12" height="3" rx="1"/><rect x="2" y="11" width="12" height="3" rx="1"/>
               </svg>
             </button>
+          </div>
+          <!-- Expand / Collapse all -->
+          <button
+            class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-medium transition-colors whitespace-nowrap"
+            @click="toggleAllSections"
+          >{{ allExpanded ? 'Collapse all' : 'Expand all' }}</button>
           </div>
           <UButton size="xs" color="neutral" variant="outline" icon="i-heroicons-plus" @click="searchOpen = true">
             Add gauge
@@ -137,15 +147,6 @@
                       {{ g.currentCfs != null ? g.currentCfs.toLocaleString() : '—' }}
                     </span>
                     <span class="text-xs text-gray-400">cfs</span>
-                    <button
-                      class="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors shrink-0"
-                      aria-label="Remove"
-                      @click.stop="removeAndSync(g.id, g.contextReachSlug)"
-                    >
-                      <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
-                      </svg>
-                    </button>
                   </div>
                 </div>
               </div>
@@ -313,6 +314,29 @@ function toggleRiver(basin: string, river: string) {
   if (s.has(key)) s.delete(key); else s.add(key)
   collapsedRivers.value = s
   localStorage.setItem(COLLAPSED_RIVERS_KEY, JSON.stringify([...s]))
+}
+
+// ── Expand / collapse all ────────────────────────────────────────────────────
+const allExpanded = computed(() => collapsedBasins.value.size === 0 && collapsedRivers.value.size === 0)
+
+function toggleAllSections() {
+  if (allExpanded.value) {
+    // Collapse everything
+    const basins = new Set(byBasinTree.value.map(b => b.name))
+    const rivers = new Set(
+      byBasinTree.value.flatMap(b => b.rivers.map(r => `${b.name}::${r.name}`))
+    )
+    collapsedBasins.value = basins
+    collapsedRivers.value = rivers
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...basins]))
+    localStorage.setItem(COLLAPSED_RIVERS_KEY, JSON.stringify([...rivers]))
+  } else {
+    // Expand everything
+    collapsedBasins.value = new Set()
+    collapsedRivers.value = new Set()
+    localStorage.setItem(COLLAPSED_KEY, '[]')
+    localStorage.setItem(COLLAPSED_RIVERS_KEY, '[]')
+  }
 }
 
 // ── View mode ────────────────────────────────────────────────────────────────

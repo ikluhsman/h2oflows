@@ -32,13 +32,14 @@
           />
           <!-- Back to map (mobile only, shown when list is visible) -->
           <button
-            class="sm:hidden shrink-0 p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            class="sm:hidden shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
             aria-label="Show map"
             @click="listVisible = false"
           >
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M1 6l7-4 8 4 7-4v16l-7 4-8-4-7 4V6z"/><path d="M8 2v16M16 6v16"/>
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 5l-5 5 5 5"/>
             </svg>
+            Map
           </button>
         </div>
 
@@ -280,9 +281,17 @@ function buildTree(items: ReachListItem[]): BasinGroup[] {
 
 const allBasins = computed(() => buildTree(reaches.value))
 
+// Viewport-filtered tree: only reaches currently visible on the map
+const viewportBasins = computed(() => {
+  if (mapReaches.value.length === 0) return allBasins.value
+  const visibleSlugs = new Set(mapReaches.value.map(r => r.slug))
+  return buildTree(reaches.value.filter(r => visibleSlugs.has(r.slug)))
+})
+
 const filteredBasins = computed(() => {
   const q = query.value.trim().toLowerCase()
-  if (q.length < 2) return allBasins.value
+  if (q.length < 2) return viewportBasins.value
+  // Search spans ALL reaches, not just viewport
   const filtered = reaches.value.filter(r =>
     (r.common_name?.toLowerCase().includes(q)) ||
     (r.put_in_name?.toLowerCase().includes(q)) ||

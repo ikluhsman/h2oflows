@@ -126,54 +126,44 @@
 
       <!-- Quick stats — consolidated -->
       <section>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 overflow-x-auto">
-          <div class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 min-w-0">
-            <div class="pr-4">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
+          <div class="grid grid-cols-3 gap-3" :class="allGauges.length > 0 ? 'sm:grid-cols-4' : ''">
+            <div>
               <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Difficulty</div>
               <div class="flex items-center gap-1.5">
                 <span class="inline-block w-3 h-3 rounded-sm shrink-0" :class="difficultySwatchClass" :style="{ backgroundColor: difficultyColor }" />
-                <span class="text-xl font-bold" :class="difficultyTextClass">{{ classLabel }}</span>
+                <span class="text-lg sm:text-xl font-bold" :class="difficultyTextClass">{{ classLabel }}</span>
               </div>
             </div>
-            <div class="px-4">
+            <div>
               <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Length</div>
-              <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}</div>
+              <div class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}</div>
             </div>
-            <div class="px-4">
+            <div>
               <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Gradient</div>
-              <div class="text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.gradient_fpm != null ? `${reach.gradient_fpm} ft/mi` : '—' }}</div>
+              <div class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.gradient_fpm != null ? `${reach.gradient_fpm} ft/mi` : '—' }}</div>
             </div>
-            <div v-if="allGauges.length > 0" class="pl-4 flex-1 flex items-center gap-3 min-w-0">
-              <div class="min-w-0 flex-1">
-                <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Flow</div>
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status, allGauges[0].flow_band_label)">
-                    {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
-                  </span>
-                  <span class="text-xs text-gray-500">cfs</span>
-                  <span :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', flowBadgeClass(allGauges[0].flow_status, allGauges[0].flow_band_label)]">
-                    {{ flowBandLabel(allGauges[0].flow_status, allGauges[0].flow_band_label) }}
-                  </span>
+            <div v-if="allGauges.length > 0" class="col-span-3 sm:col-span-1 border-t sm:border-t-0 sm:border-l border-gray-200 dark:border-gray-700 pt-2 sm:pt-0 sm:pl-4">
+              <div class="flex items-center gap-3">
+                <div class="min-w-0">
+                  <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Flow</div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-lg sm:text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status, allGauges[0].flow_band_label)">
+                      {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
+                    </span>
+                    <span class="text-xs text-gray-500">cfs</span>
+                    <span :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', flowBadgeClass(allGauges[0].flow_status, allGauges[0].flow_band_label)]">
+                      {{ flowBandLabel(allGauges[0].flow_status, allGauges[0].flow_band_label) }}
+                    </span>
+                  </div>
                 </div>
-                <span :class="['inline-flex sm:hidden items-center rounded-md px-1.5 py-0.5 text-xs font-medium mt-1', flowBadgeClass(allGauges[0].flow_status, allGauges[0].flow_band_label)]">
-                  {{ flowBandLabel(allGauges[0].flow_status, allGauges[0].flow_band_label) }}
-                </span>
+                <button
+                  class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors ml-auto"
+                  @click="openGaugeModal(allGauges[0])"
+                >
+                  View flow →
+                </button>
               </div>
-              <!-- Trend sparkline — neutral blue, compact -->
-              <div class="w-20 shrink-0 hidden sm:block">
-                <GaugeSparkline
-                  :gauge-id="allGauges[0].id"
-                  flow-status="unknown"
-                  color="#3b82f6"
-                  compact
-                />
-              </div>
-              <button
-                class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
-                @click="openGaugeModal(allGauges[0])"
-              >
-                View flow →
-              </button>
             </div>
           </div>
         </div>
