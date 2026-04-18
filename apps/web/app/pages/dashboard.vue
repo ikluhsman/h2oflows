@@ -38,10 +38,12 @@
           </button>
 
           <template v-if="!collapsedBasins.has(basin.name)">
-            <!-- River groups within basin -->
+            <!-- River groups within basin.
+                 Only show river sub-header when there are multiple rivers (or standalones). -->
             <div v-for="river in basin.rivers" :key="river.name" class="ml-2 mb-1">
-              <!-- River header -->
+              <!-- River header — hidden when this basin has only one river and no standalones -->
               <button
+                v-if="basin.rivers.length > 1 || basin.standaloneGauges.length > 0"
                 class="flex items-center gap-2 py-1 w-full text-left"
                 @click="toggleRiver(basin.name, river.name)"
               >
@@ -56,16 +58,16 @@
                 <span class="text-xs text-gray-400">({{ river.reaches.length }})</span>
               </button>
 
-              <!-- Reach rows -->
+              <!-- Reach rows — always visible when only one river (no header to collapse) -->
               <div
-                v-if="!collapsedRivers.has(`${basin.name}::${river.name}`)"
+                v-if="basin.rivers.length === 1 && basin.standaloneGauges.length === 0 || !collapsedRivers.has(`${basin.name}::${river.name}`)"
                 class="ml-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden divide-y divide-gray-100 dark:divide-gray-800"
               >
                 <DashboardReachRow
                   v-for="reach in river.reaches"
                   :key="`${reach.id}::${reach.contextReachSlug}`"
                   :gauge="reach"
-                  @open-gauge="openGauge($event, 'gauge')"
+                  @open-gauge="openGauge($event, 'reach')"
                 />
               </div>
             </div>
@@ -230,7 +232,18 @@ const byBasinTree = computed<BasinGroup[]>(() => {
     .map(([name, { rivers, standalone }]) => {
       const riverGroups = [...rivers.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([rName, reaches]) => ({ name: rName, reaches }))
+        .map(([rName, reaches]) => ({
+          name: rName,
+          // Sort upstream→downstream: gauge lng ascending (west = upstream for CO rivers).
+          // Nulls go last.
+          reaches: [...reaches].sort((a, b) => {
+            const al = a.lng, bl = b.lng
+            if (al == null && bl == null) return 0
+            if (al == null) return 1
+            if (bl == null) return -1
+            return al - bl
+          }),
+        }))
       const reachCount = riverGroups.reduce((s, r) => s + r.reaches.length, 0) + standalone.length
       return { name, reachCount, rivers: riverGroups, standaloneGauges: standalone }
     })
