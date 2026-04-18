@@ -13,28 +13,16 @@
       Dashboard
     </NuxtLink>
     <NuxtLink
-      to="/map"
+      to="/explore"
       class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors"
-      :class="route.path === '/map'
-        ? 'text-blue-600 dark:text-blue-400'
-        : 'text-gray-500 dark:text-gray-400'"
-    >
-      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
-      </svg>
-      Map
-    </NuxtLink>
-    <NuxtLink
-      to="/rivers"
-      class="flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-xs font-medium transition-colors"
-      :class="route.path === '/rivers'
+      :class="route.path === '/explore'
         ? 'text-blue-600 dark:text-blue-400'
         : 'text-gray-500 dark:text-gray-400'"
     >
       <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9"/>
       </svg>
-      Rivers
+      Explore
     </NuxtLink>
   </nav>
 </template>
