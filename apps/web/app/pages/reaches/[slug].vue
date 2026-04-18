@@ -437,7 +437,7 @@
     <!-- Scroll-to-top button -->
     <button
       ref="scrollTopBtn"
-      class="fixed bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg flex items-center justify-center text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors opacity-0 pointer-events-none"
+      class="fixed bottom-20 sm:bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg flex items-center justify-center text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors opacity-0 pointer-events-none"
       aria-label="Scroll to top"
       @click="scrollToTop"
     >

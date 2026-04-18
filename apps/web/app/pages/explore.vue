@@ -12,51 +12,6 @@
 
     <AppHeader class="shrink-0" />
 
-    <!-- Admin bar -->
-    <div v-if="isAdmin" class="shrink-0 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-2 flex items-center gap-3 text-sm">
-      <span class="text-xs font-bold text-gray-400 uppercase tracking-wide">Admin</span>
-      <button
-        class="px-3 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors disabled:opacity-50"
-        :disabled="importing"
-        @click="triggerKmlUpload"
-      >{{ importing ? 'Importing…' : 'Import KMZ' }}</button>
-      <button
-        class="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-700 text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-        @click="showKmlGuide = !showKmlGuide"
-      >KML Format Guide</button>
-      <span v-if="importMsg" class="text-xs" :class="importError ? 'text-red-500' : 'text-green-600'">{{ importMsg }}</span>
-      <button
-        v-if="importLog.length > 0"
-        class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 underline transition-colors"
-        @click="showImportLog = !showImportLog"
-      >{{ showImportLog ? 'Hide log' : 'Show log' }}</button>
-      <input ref="kmlInputRef" type="file" accept=".kmz,.kml" class="hidden" @change="onKmlSelected" />
-    </div>
-
-    <!-- Import log -->
-    <div v-if="showImportLog && importLog.length > 0" class="shrink-0 bg-gray-950 border-b border-gray-800 px-4 py-3 max-h-56 overflow-y-auto font-mono text-[11px] space-y-0.5">
-      <p v-for="(line, i) in importLog" :key="i" :class="line.startsWith('✗') || line.startsWith('⚠') ? 'text-red-400' : line.startsWith('+') ? 'text-emerald-400' : line.startsWith('✓') ? 'text-gray-300' : 'text-gray-500'">{{ line }}</p>
-    </div>
-
-    <!-- KML Format Guide -->
-    <div v-if="showKmlGuide" class="shrink-0 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 py-4 text-xs text-gray-600 dark:text-gray-400 max-h-[40vh] overflow-y-auto space-y-4">
-      <div>
-        <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">Document / folder structure</p>
-        <ul class="list-disc pl-4 space-y-0.5">
-          <li><strong>Document name</strong> → sets <code>river_name</code> on all reaches in the file</li>
-          <li><strong>One folder per reach</strong> — folder name becomes the reach display name</li>
-          <li><strong>LineString placemark</strong> → reach centerline geometry</li>
-        </ul>
-      </div>
-      <div>
-        <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">Metadata placemarks (coordinate-less)</p>
-        <p class="text-gray-400">Keys: <code>common_name</code>, <code>description</code>, <code>min_class</code>, <code>max_class</code>, <code>gauge</code>, <code>basin</code>, <code>permit_required</code>, <code>multi_day</code></p>
-        <p class="mt-1 text-gray-400">Flow bands: <code>below</code> (upper Too Low CFS), <code>running</code> (min,max), <code>high</code> (min,max), <code>above</code> (lower Very High CFS)</p>
-        <p class="mt-1 text-gray-400">Pin prefixes: <code>Rapid:</code>, <code>Wave:</code>, <code>Put-in:</code>, <code>Take-out:</code>, <code>Parking:</code>, <code>Campsite:</code>, <code>Hazard:</code></p>
-      </div>
-      <button class="text-blue-500 hover:text-blue-400 font-medium" @click="showKmlGuide = false">Close</button>
-    </div>
-
     <!-- Split-pane body -->
     <div class="flex-1 overflow-hidden flex relative">
 
@@ -64,17 +19,27 @@
       <aside
         class="shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col overflow-hidden transition-all"
         :class="listVisible
-          ? 'absolute sm:relative inset-0 sm:inset-auto z-10 sm:z-auto w-full sm:w-80'
+          ? 'absolute sm:relative inset-0 sm:inset-auto z-30 sm:z-auto w-full sm:w-80'
           : 'hidden sm:flex sm:w-80'"
       >
-        <!-- Search -->
-        <div class="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 shrink-0">
+        <!-- Search + mobile map toggle -->
+        <div class="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 shrink-0 flex items-center gap-2">
           <input
             v-model="query"
             type="search"
             placeholder="Search reaches, rivers, basins…"
-            class="w-full text-sm bg-gray-100 dark:bg-gray-900 rounded-md px-3 py-1.5 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            class="flex-1 text-sm bg-gray-100 dark:bg-gray-900 rounded-md px-3 py-1.5 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
+          <!-- Back to map (mobile only, shown when list is visible) -->
+          <button
+            class="sm:hidden shrink-0 p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            aria-label="Show map"
+            @click="listVisible = false"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 6l7-4 8 4 7-4v16l-7 4-8-4-7 4V6z"/><path d="M8 2v16M16 6v16"/>
+            </svg>
+          </button>
         </div>
 
         <!-- Loading / error / empty states -->
@@ -183,15 +148,16 @@
           />
         </ClientOnly>
 
-        <!-- Mobile: toggle list/map -->
+        <!-- Mobile: open list (only shown when map is visible) -->
         <button
+          v-if="!listVisible"
           class="sm:hidden absolute top-2 left-2 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium shadow-md bg-white/95 dark:bg-gray-900/95 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200"
-          @click="listVisible = !listVisible"
+          @click="listVisible = true"
         >
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
           </svg>
-          {{ listVisible ? 'Show Map' : `${mapReaches.length} reaches` }}
+          {{ mapReaches.length }} reaches
         </button>
       </div>
     </div>
@@ -214,7 +180,7 @@ import type { WatchedGauge } from '~/stores/watchlist'
 
 definePageMeta({ ssr: false })
 
-const { isAdmin, getToken } = useAuth()
+
 const { apiBase } = useRuntimeConfig().public
 
 // ── Demo banner ───────────────────────────────────────────────────────────────
@@ -388,54 +354,4 @@ function openGaugeModal(reach: ReachListItem) {
   detailOpen.value = true
 }
 
-// ── Admin KML upload ──────────────────────────────────────────────────────────
-const kmlInputRef   = ref<HTMLInputElement | null>(null)
-const importing     = ref(false)
-const importMsg     = ref('')
-const importError   = ref(false)
-const showKmlGuide  = ref(false)
-const importLog     = ref<string[]>([])
-const showImportLog = ref(false)
-
-function triggerKmlUpload() {
-  importMsg.value = ''
-  importError.value = false
-  importLog.value = []
-  showImportLog.value = false
-  kmlInputRef.value?.click()
-}
-
-async function onKmlSelected(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  if (!file) return
-  ;(event.target as HTMLInputElement).value = ''
-  importing.value = true
-  importMsg.value = ''
-  importError.value = false
-  try {
-    const token = await getToken()
-    const form = new FormData()
-    form.append('file', file)
-    const res = await fetch(`${apiBase}/api/v1/import/kmz`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form,
-    })
-    const json = await res.json()
-    if (!res.ok) {
-      importError.value = true
-      importMsg.value = json.error ?? `Error ${res.status}`
-    } else {
-      const reachCount = Object.keys(json.reaches ?? {}).length
-      importMsg.value = `Imported ${reachCount} reach${reachCount !== 1 ? 'es' : ''}`
-      importLog.value = json.log ?? []
-      if (importLog.value.length > 0) showImportLog.value = true
-    }
-  } catch (err: any) {
-    importError.value = true
-    importMsg.value = err?.message ?? 'Upload failed'
-  } finally {
-    importing.value = false
-  }
-}
 </script>

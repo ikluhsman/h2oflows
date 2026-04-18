@@ -6,7 +6,7 @@
       Loading map…
     </div>
 
-    <div v-if="mapReady" class="absolute bottom-8 left-2 z-10 flex items-center gap-1.5">
+    <div v-if="mapReady" class="absolute bottom-20 sm:bottom-8 left-2 z-10 flex items-center gap-1.5">
       <div class="flex rounded-md shadow overflow-hidden border border-gray-200 dark:border-gray-600 text-xs font-medium">
         <button
           v-for="opt in BASEMAP_OPTIONS" :key="opt.value"
@@ -34,7 +34,7 @@
     </div>
 
     <!-- Difficulty legend -->
-    <div v-if="mapReady" class="absolute bottom-8 right-2 z-10 bg-white/90 dark:bg-gray-900/90 backdrop-blur rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs space-y-1.5 shadow">
+    <div v-if="mapReady" class="absolute bottom-20 sm:bottom-8 right-2 z-10 bg-white/90 dark:bg-gray-900/90 backdrop-blur rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs space-y-1.5 shadow">
       <p class="font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide text-[10px] mb-1">Difficulty</p>
       <div v-for="d in DIFFICULTY_LEGEND" :key="d.label" class="flex items-center gap-2">
         <span class="shrink-0" v-html="d.symbol" />

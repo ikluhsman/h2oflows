@@ -40,7 +40,7 @@
           <template v-if="!collapsedBasins.has(basin.name)">
             <!-- River groups within basin.
                  Only show river sub-header when there are multiple rivers (or standalones). -->
-            <div v-for="river in basin.rivers" :key="river.name" class="ml-2 mb-1">
+            <div v-for="river in basin.rivers" :key="river.name" class="mb-2">
               <!-- River header — hidden when this basin has only one river and no standalones -->
               <button
                 v-if="basin.rivers.length > 1 || basin.standaloneGauges.length > 0"
@@ -58,10 +58,10 @@
                 <span class="text-xs text-gray-400">({{ river.reaches.length }})</span>
               </button>
 
-              <!-- Reach rows — always visible when only one river (no header to collapse) -->
+              <!-- Reach cards — always visible when only one river (no header to collapse) -->
               <div
                 v-if="basin.rivers.length === 1 && basin.standaloneGauges.length === 0 || !collapsedRivers.has(`${basin.name}::${river.name}`)"
-                class="ml-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden divide-y divide-gray-100 dark:divide-gray-800"
+                class="space-y-2 mt-1"
               >
                 <DashboardReachRow
                   v-for="reach in river.reaches"
@@ -73,7 +73,7 @@
             </div>
 
             <!-- Standalone gauges (no reach context) -->
-            <div v-if="basin.standaloneGauges.length > 0" class="ml-2 mb-1">
+            <div v-if="basin.standaloneGauges.length > 0" class="mb-2 mt-1">
               <div class="flex items-center gap-2 py-1">
                 <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
@@ -82,11 +82,11 @@
                 </svg>
                 <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">Standalone Gauges</span>
               </div>
-              <div class="ml-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden divide-y divide-gray-100 dark:divide-gray-800">
+              <div class="space-y-2 mt-1">
                 <div
                   v-for="g in basin.standaloneGauges"
                   :key="g.id"
-                  class="flex items-center gap-2 sm:gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group cursor-pointer"
+                  class="rounded-2xl border border-gray-200 dark:border-gray-700/60 bg-white dark:bg-gray-900 shadow-sm px-4 py-3 flex items-center gap-3 cursor-pointer active:opacity-80 transition-opacity"
                   @click="openGauge(g, 'gauge')"
                 >
                   <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -94,22 +94,22 @@
                     <path d="M12 12 16 8"/>
                     <path d="M3 12a9 9 0 0 1 18 0"/>
                   </svg>
-                  <span class="flex-1 min-w-0 text-sm font-medium text-gray-600 dark:text-gray-400 truncate">
+                  <span class="flex-1 min-w-0 text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
                     {{ g.name ?? `${g.source.toUpperCase()} ${g.externalId}` }}
                   </span>
-                  <div class="w-20 shrink-0 hidden sm:block opacity-60">
+                  <div class="w-20 shrink-0 hidden sm:block opacity-50">
                     <GaugeSparkline :gauge-id="g.id" flow-status="unknown" color="#3b82f6" compact />
                   </div>
-                  <span class="text-sm font-bold tabular-nums text-gray-900 dark:text-white">
+                  <span class="text-[22px] font-bold tabular-nums text-gray-900 dark:text-white leading-none">
                     {{ g.currentCfs != null ? g.currentCfs.toLocaleString() : '—' }}
-                    <span class="text-xs font-normal text-gray-400">cfs</span>
                   </span>
+                  <span class="text-xs text-gray-400">cfs</span>
                   <button
-                    class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                    class="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors shrink-0"
                     aria-label="Remove"
                     @click.stop="removeAndSync(g.id, g.contextReachSlug)"
                   >
-                    <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                    <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
                     </svg>
                   </button>
