@@ -104,7 +104,7 @@
           </button>
           <div
             v-if="userMenuOpen"
-            class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-30"
+            class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-40"
           >
             <template v-if="isAuthenticated">
               <p class="px-3 py-1.5 text-xs text-gray-400 truncate">{{ user?.email ?? user?.user_metadata?.user_name }}</p>

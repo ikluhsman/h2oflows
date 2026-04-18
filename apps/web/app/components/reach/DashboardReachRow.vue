@@ -104,6 +104,15 @@
               <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11"/>
             </svg>
           </NuxtLink>
+          <button
+            class="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-colors shrink-0"
+            aria-label="Remove from dashboard"
+            @click.stop="$emit('removeGauge', gauge)"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/>
+            </svg>
+          </button>
         </div>
         <div class="flex items-center gap-3 mt-1">
           <a
@@ -116,7 +125,7 @@
           <span v-if="lastReadingRelative" class="text-[10px] text-gray-400 truncate">{{ lastReadingRelative }}</span>
         </div>
       </div>
-      <div class="px-4 pb-3 pointer-events-none opacity-50 h-12">
+      <div class="px-4 pb-4 pointer-events-none opacity-50 h-20">
         <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" :color="sparklineColor" @latest-cfs="liveCfs = $event" />
       </div>
     </template>
@@ -133,7 +142,10 @@ const props = defineProps<{
   view?: 'list' | 'compact' | 'full'
 }>()
 
-defineEmits<{ (e: 'openGauge', gauge: WatchedGauge): void }>()
+defineEmits<{
+  (e: 'openGauge', gauge: WatchedGauge): void
+  (e: 'removeGauge', gauge: WatchedGauge): void
+}>()
 
 const liveCfs = ref<number | null>(null)
 const displayCfs = computed(() => liveCfs.value ?? props.gauge.currentCfs)

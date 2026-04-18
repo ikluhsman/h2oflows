@@ -44,8 +44,6 @@
                     v-for="(slug, i) in g.reachSlugs"
                     :key="slug"
                     class="flex items-center justify-between gap-3 py-2.5 px-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors cursor-pointer"
-                    @mouseenter="hoverGauge = g"
-                    @mouseleave="hoverGauge = null"
                     @click="selectWithContext(g, slug, g.reachCommonNames[i] ?? g.reachNames[i] ?? null)"
                   >
                     <div class="min-w-0 flex-1">
@@ -74,8 +72,6 @@
                 <li
                   v-else
                   class="flex items-center justify-between gap-3 py-2.5 px-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors cursor-pointer"
-                  @mouseenter="hoverGauge = g"
-                  @mouseleave="hoverGauge = null"
                   @click="selectWithContext(g, null, null)"
                 >
                   <div class="min-w-0 flex-1">
@@ -102,18 +98,6 @@
             </ul>
           </div>
 
-          <!-- Mini-map preview — only visible when results exist, hidden on small screens -->
-          <div
-            v-if="results.length > 0"
-            class="hidden sm:block w-48 shrink-0 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 self-start sticky top-0"
-          >
-            <ClientOnly>
-              <GaugeSearchMiniMap
-                :gauges="results"
-                :highlight-id="hoverGauge?.id ?? null"
-              />
-            </ClientOnly>
-          </div>
         </div>
       </div>
     </template>
@@ -136,7 +120,6 @@ const emit = defineEmits<{ (e: 'add', gauge: Omit<WatchedGauge, 'watchState' | '
 const query = ref('')
 const loading = ref(false)
 const results = ref<Omit<WatchedGauge, 'watchState' | 'activeSince'>[]>([])
-const hoverGauge = ref<Omit<WatchedGauge, 'watchState' | 'activeSince'> | null>(null)
 
 const { apiBase } = useRuntimeConfig().public
 
@@ -188,12 +171,4 @@ function selectWithContext(
   results.value = []
 }
 
-function relationshipLabel(rel: string | null): string {
-  switch (rel) {
-    case 'upstream_indicator':   return '↑ upstream'
-    case 'downstream_indicator': return '↓ downstream'
-    case 'tributary':            return '⤷ tributary'
-    default:                     return ''
-  }
-}
 </script>

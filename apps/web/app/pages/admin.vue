@@ -93,6 +93,7 @@
                 <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">Document / folder structure</p>
                 <ul class="list-disc pl-4 space-y-0.5">
                   <li><strong>Document name</strong> → sets <code>river_name</code> on all reaches in the file</li>
+                  <li><strong>Document description</strong> → optional <code>Basin: South Platte</code> line sets the basin for all reaches (overridable per-folder via metadata placemark)</li>
                   <li><strong>One folder per reach</strong> — folder name becomes the reach display name</li>
                   <li><strong>LineString placemark</strong> → reach centerline geometry</li>
                 </ul>

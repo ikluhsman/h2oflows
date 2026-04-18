@@ -109,6 +109,7 @@
                   :gauge="reach"
                   :view="rowView"
                   @open-gauge="openGauge($event, 'reach')"
+                  @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
                 />
               </div>
             </div>

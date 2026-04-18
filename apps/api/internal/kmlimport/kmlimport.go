@@ -63,8 +63,9 @@ type ReachResult struct {
 
 // KMLDoc is the parsed representation of a KML/KMZ file.
 type KMLDoc struct {
-	Name    string
-	Folders []KMLFolder
+	Name        string
+	Description string // optional — may contain "Basin: South Platte" etc.
+	Folders     []KMLFolder
 }
 
 // KMLFolder is a single layer/folder in the KML.
@@ -138,8 +139,9 @@ func ParseKMLBytes(data []byte) (*KMLDoc, error) {
 		SubFolders []xmlFolder    `xml:"Folder"`
 	}
 	type xmlDocument struct {
-		Name    string      `xml:"name"`
-		Folders []xmlFolder `xml:"Folder"`
+		Name        string      `xml:"name"`
+		Description string      `xml:"description"`
+		Folders     []xmlFolder `xml:"Folder"`
 	}
 	type xmlKML struct {
 		Document xmlDocument `xml:"Document"`
@@ -194,7 +196,10 @@ func ParseKMLBytes(data []byte) (*KMLDoc, error) {
 		return out
 	}
 
-	doc := &KMLDoc{Name: raw.Document.Name}
+	doc := &KMLDoc{
+		Name:        raw.Document.Name,
+		Description: StripHTML(strings.TrimSpace(raw.Document.Description)),
+	}
 	doc.Folders = flattenFolders(raw.Document.Folders)
 	return doc, nil
 }
@@ -351,6 +356,20 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		var flowRanges []reachFlowRange
 		var gaugeAssocs []gaugeAssoc
 
+		// Extract document-level basin from description (e.g. "Basin: South Platte").
+		// Per-folder metadata placemarks take precedence; this is just the default.
+		var docBasin string
+		for _, line := range strings.Split(doc.Description, "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(strings.ToLower(line), "basin:") {
+				docBasin = strings.TrimSpace(line[len("basin:"):])
+				break
+			}
+		}
+		if docBasin != "" {
+			res.Log = append(res.Log, fmt.Sprintf("~ document basin: %q", docBasin))
+		}
+
 		for _, folder := range doc.Folders {
 			// Pre-scan metadata placemarks (no coordinates) to extract reach
 			// properties before calling matchOrCreateReach.
@@ -360,7 +379,7 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				classMin       *float64
 				classMax       *float64
 				gaugeExtID     string
-				basinGroup     string
+				basinGroup     = docBasin // inherit document-level basin; folder metadata can override
 				permitRequired *bool
 				multiDayDays   *int
 				lineStrings    []KMLPlacemark // LineString placemarks found in this folder
