@@ -203,7 +203,14 @@ const liveCfs = ref<number | null>(null)
 
 const currentCfs = computed(() => liveCfs.value ?? props.leadGauge.currentCfs)
 
+const gaugeShortLabel = computed(() =>
+  `${props.leadGauge.source.toUpperCase()}-${props.leadGauge.externalId}`
+)
+
+// Full card: show the human-readable gauge name. All other densities: show the short ID label.
 const gaugeName = computed(() =>
-  props.leadGauge.name ?? `${props.leadGauge.source.toUpperCase()} ${props.leadGauge.externalId}`
+  props.density === 'full'
+    ? (props.leadGauge.name ?? gaugeShortLabel.value)
+    : gaugeShortLabel.value
 )
 </script>

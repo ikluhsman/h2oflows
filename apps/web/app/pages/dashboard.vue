@@ -51,6 +51,23 @@
               </svg>
             </button>
           </div>
+          <!-- Group by gauge toggle — only shown when shared gauges exist -->
+          <button
+            v-if="hasSharedGauges"
+            class="p-1.5 rounded-md transition-colors"
+            :class="groupByGauge
+              ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+              : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+            title="Group by gauge"
+            @click="groupByGauge = !groupByGauge"
+          >
+            <!-- Link/merge icon: two cards linked into one -->
+            <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="5" width="5" height="6" rx="1"/>
+              <rect x="10" y="5" width="5" height="6" rx="1"/>
+              <line x1="6" y1="8" x2="10" y2="8"/>
+            </svg>
+          </button>
           <!-- Expand / Collapse all -->
           <button
             class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-medium transition-colors whitespace-nowrap"
@@ -103,14 +120,36 @@
                 v-if="basin.rivers.length === 1 && basin.standaloneGauges.length === 0 || !collapsedRivers.has(`${basin.name}::${river.name}`)"
                 :class="reachContainerClass"
               >
-                <DashboardReachRow
-                  v-for="reach in river.reaches"
-                  :key="`${reach.id}::${reach.contextReachSlug}`"
-                  :gauge="reach"
-                  :view="rowView"
-                  @open-gauge="openGauge($event, 'reach')"
-                  @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
-                />
+                <!-- Grouped mode: merge reaches sharing the same gauge into one card -->
+                <template v-if="groupByGauge">
+                  <template v-for="group in groupReaches(river.reaches)" :key="group.lead.id">
+                    <GaugeReachGroup
+                      v-if="group.all.length > 1"
+                      :lead-gauge="group.lead"
+                      :reach-items="group.all"
+                      :density="viewMode"
+                      @open="(g, mode) => openGauge(g, mode)"
+                    />
+                    <DashboardReachRow
+                      v-else
+                      :gauge="group.lead"
+                      :view="rowView"
+                      @open-gauge="openGauge($event, 'reach')"
+                      @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
+                    />
+                  </template>
+                </template>
+                <!-- Normal mode: one card per reach -->
+                <template v-else>
+                  <DashboardReachRow
+                    v-for="reach in river.reaches"
+                    :key="`${reach.id}::${reach.contextReachSlug}`"
+                    :gauge="reach"
+                    :view="rowView"
+                    @open-gauge="openGauge($event, 'reach')"
+                    @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
+                  />
+                </template>
               </div>
             </div>
 
@@ -367,6 +406,32 @@ const rowView = computed<'list' | 'compact' | 'full'>(() => {
   if (viewMode.value === 'list') return 'list'
   return 'compact' // 'compact' and 'comfortable' both use compact cards
 })
+
+// ── Group by gauge ────────────────────────────────────────────────────────────
+const GROUP_KEY = 'h2oflow_dashboard_group_by_gauge'
+const groupByGauge = ref(false)
+onMounted(() => {
+  const saved = localStorage.getItem(GROUP_KEY)
+  if (saved !== null) groupByGauge.value = saved === 'true'
+})
+watch(groupByGauge, val => localStorage.setItem(GROUP_KEY, String(val)))
+
+// True when at least one gauge ID appears on multiple reaches (toggle is meaningful).
+const hasSharedGauges = computed(() => {
+  const counts = new Map<string, number>()
+  for (const g of store.gauges) counts.set(g.id, (counts.get(g.id) ?? 0) + 1)
+  return [...counts.values()].some(c => c > 1)
+})
+
+interface GaugeGroup { lead: WatchedGauge; all: WatchedGauge[] }
+function groupReaches(reaches: WatchedGauge[]): GaugeGroup[] {
+  const map = new Map<string, WatchedGauge[]>()
+  for (const r of reaches) {
+    if (!map.has(r.id)) map.set(r.id, [])
+    map.get(r.id)!.push(r)
+  }
+  return [...map.values()].map(all => ({ lead: all[0]!, all }))
+}
 
 // Container class: 2-col grid for comfortable + full
 const reachContainerClass = computed(() =>
