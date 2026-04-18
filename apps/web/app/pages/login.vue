@@ -81,10 +81,10 @@
         </p>
       </div>
 
-      <!-- Back to map -->
+      <!-- Back to explore -->
       <div class="mt-6 text-center">
-        <NuxtLink to="/map" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-          ← Back to map
+        <NuxtLink to="/explore" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+          ← Back to explore
         </NuxtLink>
       </div>
     </div>

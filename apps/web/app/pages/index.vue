@@ -61,11 +61,11 @@
             Dashboard
           </NuxtLink>
           <NuxtLink
-            to="/map"
+            to="/explore"
             class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-semibold transition-colors shadow-sm"
           >
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-            Map
+            Explore
           </NuxtLink>
         </div>
 
@@ -121,6 +121,7 @@
         <div class="relative w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm" style="height: 420px;">
           <ClientOnly>
             <ReachesMap
+              embedded
               :hovered-slug="heroHoveredSlug"
               @reaches-updated="onReachesUpdated"
               @bounds-updated="onBoundsUpdated"
@@ -130,7 +131,7 @@
             />
           </ClientOnly>
           <NuxtLink
-            to="/map"
+            to="/explore"
             class="absolute top-3 right-12 z-10 inline-flex items-center justify-center w-9 h-9 rounded-md bg-white/95 dark:bg-gray-900/95 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-900 hover:text-blue-600 dark:hover:text-blue-400 shadow-sm transition-colors"
             title="Open full screen map"
             aria-label="Open full screen map"

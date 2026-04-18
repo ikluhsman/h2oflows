@@ -40,16 +40,16 @@
         <span class="hidden sm:inline text-xs font-medium">Explore</span>
       </NuxtLink>
 
-      <!-- AI Ask button — left side -->
+      <!-- AI Ask button — left side (icon always visible, text desktop only) -->
       <button
-        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
         title="Ask AI anything"
         @click="askOpen = true"
       >
         <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
         </svg>
-        <span class="text-xs font-medium">Ask</span>
+        <span class="hidden sm:inline text-xs font-medium">Ask</span>
       </button>
 
       <!-- Breadcrumb / page-level content injected by each page -->

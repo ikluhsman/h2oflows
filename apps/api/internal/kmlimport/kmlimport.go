@@ -447,8 +447,13 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 			}
 			// Upsert river and link the reach to it.
 			// Basin belongs on the river, not the reach.
+			// Include basin in the slug so same-named rivers in different basins
+			// (e.g. "Clear Creek" South Platte vs Arkansas) stay as distinct rows.
 			if doc.Name != "" {
 				riverSlug := slugify(doc.Name)
+				if basinGroup != "" {
+					riverSlug = riverSlug + "-" + slugify(basinGroup)
+				}
 				var riverID string
 				err := imp.pool.QueryRow(ctx, `
 					INSERT INTO rivers (slug, name, basin)
@@ -462,6 +467,15 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				} else {
 					if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET river_id = $1 WHERE id = $2`, riverID, rid); err != nil {
 						res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] river_id link failed: %v", rname, err))
+					}
+					// Propagate basin to reach watershed_name for basin-grouping UI.
+					if basinGroup != "" {
+						if _, err := imp.pool.Exec(ctx,
+							`UPDATE reaches SET watershed_name = $1 WHERE id = $2 AND watershed_name IS NULL`,
+							basinGroup, rid,
+						); err != nil {
+							res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] watershed_name update failed: %v", rname, err))
+						}
 					}
 				}
 			}
@@ -956,7 +970,19 @@ func (imp *Importer) setReachGauge(ctx context.Context, reachID, externalID stri
 	_, err = imp.pool.Exec(ctx, `
 		UPDATE gauges SET reach_id = $1 WHERE id = $2
 	`, reachID, gaugeID)
-	return err
+	if err != nil {
+		return err
+	}
+	// Best-effort: backfill reach watershed_name from the gauge's HUC-derived
+	// watershed when the reach doesn't already have one. USGS gauges carry a
+	// precise huc8 → CanonicalBasin value; this catches the common case where
+	// a KML is imported without a `basin` metadata field.
+	_, _ = imp.pool.Exec(ctx, `
+		UPDATE reaches
+		SET watershed_name = (SELECT watershed_name FROM gauges WHERE id = $1)
+		WHERE id = $2 AND watershed_name IS NULL
+	`, gaugeID, reachID)
+	return nil
 }
 
 // ── DB upserts ────────────────────────────────────────────────────────────────

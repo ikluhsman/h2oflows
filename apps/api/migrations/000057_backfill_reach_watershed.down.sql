@@ -1,0 +1,2 @@
+-- No reliable rollback: watershed_name was NULL before; we cannot distinguish
+-- backfilled values from values set by other means.
