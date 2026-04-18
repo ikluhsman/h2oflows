@@ -164,9 +164,14 @@
             <h2 class="text-lg font-bold">{{ selectedRiver.name }}</h2>
             <p class="text-xs text-gray-400 mt-0.5">{{ selectedRiver.basin }} · {{ selectedRiver.slug }}</p>
           </div>
-          <button class="p-1 rounded text-gray-400 hover:text-gray-600" @click="riverDetailOpen = false">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-          </button>
+          <div class="flex items-center gap-2">
+            <UButton size="xs" variant="outline" color="error" @click="deleteRiver(selectedRiver.slug, selectedRiver.name)">
+              Delete river
+            </UButton>
+            <button class="p-1 rounded text-gray-400 hover:text-gray-600" @click="riverDetailOpen = false">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
         </div>
       </template>
       <template #body>
@@ -181,15 +186,17 @@
                 <p class="text-sm font-medium truncate">{{ reach.common_name ?? reach.name }}</p>
                 <p class="text-xs text-gray-400 truncate">{{ reach.slug }}</p>
               </div>
-              <div class="flex items-center gap-2 shrink-0">
+              <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                 <span
                   class="text-xs px-1.5 py-0.5 rounded"
                   :class="reach.has_centerline
                     ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
                 >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
+                <span v-if="centerlineErrors.get(reach.slug)" class="text-xs text-red-400">{{ centerlineErrors.get(reach.slug) }}</span>
                 <UButton
                   size="xs" variant="outline" color="neutral"
+                  :loading="fetchingCenterlines.has(reach.slug)"
                   @click="fetchCenterline(reach.slug)"
                 >Fetch line</UButton>
                 <UButton
@@ -301,6 +308,7 @@ const riversLoading = ref(false)
 
 async function loadRivers() {
   riversLoading.value = true
+  rivers.value = []
   const token = await getToken()
   try {
     const res = await fetch(`${apiBase}/api/v1/admin/rivers`, {
@@ -326,14 +334,30 @@ async function openRiver(river: River) {
   }
 }
 
+const fetchingCenterlines = ref<Set<string>>(new Set())
+const centerlineErrors = ref<Map<string, string>>(new Map())
+
 async function fetchCenterline(reachSlug: string) {
-  const token = await getToken()
-  await fetch(`${apiBase}/api/v1/reaches/${reachSlug}/fetch-centerline`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  // Refresh river detail to update has_centerline
-  if (selectedRiver.value) openRiver(selectedRiver.value)
+  fetchingCenterlines.value = new Set([...fetchingCenterlines.value, reachSlug])
+  centerlineErrors.value = new Map([...centerlineErrors.value].filter(([k]) => k !== reachSlug))
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/reaches/${reachSlug}/fetch-centerline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) {
+      centerlineErrors.value = new Map([...centerlineErrors.value, [reachSlug, `Error ${res.status}`]])
+    } else if (selectedRiver.value) {
+      openRiver(selectedRiver.value)
+    }
+  } catch (err: any) {
+    centerlineErrors.value = new Map([...centerlineErrors.value, [reachSlug, err?.message ?? 'Failed']])
+  } finally {
+    const s = new Set(fetchingCenterlines.value)
+    s.delete(reachSlug)
+    fetchingCenterlines.value = s
+  }
 }
 
 async function deleteReach(reachSlug: string, displayName: string) {
@@ -347,8 +371,24 @@ async function deleteReach(reachSlug: string, displayName: string) {
     alert(`Delete failed: ${res.status}`)
     return
   }
-  // Refresh river detail
   if (selectedRiver.value) openRiver(selectedRiver.value)
+  loadRivers()
+}
+
+async function deleteRiver(riverSlug: string, riverName: string) {
+  if (!confirm(`Permanently delete "${riverName}"?\n\nAll reaches will be unlinked but not deleted.`)) return
+  const token = await getToken()
+  const res = await fetch(`${apiBase}/api/v1/admin/rivers/${riverSlug}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    alert(`Delete failed: ${res.status}`)
+    return
+  }
+  riverDetailOpen.value = false
+  selectedRiver.value = null
+  loadRivers()
 }
 
 // Create river

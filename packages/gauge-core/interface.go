@@ -87,7 +87,7 @@ type SiteMetadata struct {
 	Location         *LatLng
 	StateCode        string   // two-letter, e.g. "CO"
 	CountyCode       string
-	HUCCode          string   // 8-digit hydrologic unit code (watershed)
+	HUCCode          string   // 8-digit hydrologic unit code (watershed); empty for DWR
 	Parameters       []string // available parameter codes, e.g. ["00060", "00065"]
 	Active           bool
 	BeginDate        time.Time
@@ -95,6 +95,11 @@ type SiteMetadata struct {
 	DrainageAreaSqMi float64
 	ElevationFt      *float64 // altitude of gauge datum in feet (USGS alt_va); nil if unavailable
 	SourceType       SourceType
+	// CanonicalBasin is the app's standard basin label ("South Platte", "Arkansas",
+	// "Colorado", etc.). Set by each adapter so grouping is source-agnostic.
+	// USGS derives this from HUCCode via CanonicalBasin(); DWR from division number
+	// via CanonicalBasinFromDWRDivision(). Empty string means unknown.
+	CanonicalBasin string
 }
 
 // GaugeSource is the core interface every adapter must implement.

@@ -555,8 +555,11 @@ func (p *Poller) syncSourceMetadata(ctx context.Context, sourceType string, disc
 }
 
 // applyMetadata writes discovered site metadata to the gauges table.
+// watershed_name is always set to the canonical basin label (e.g. "South Platte",
+// "Arkansas", "Colorado") which is source-agnostic and used by the UI for grouping.
+// basin_name retains the raw HUC2-derived name from USGS where available.
 func (p *Poller) applyMetadata(ctx context.Context, gaugeID string, site *gauge.SiteMetadata) {
-	basinName, watershedName := gauge.HUCNames(site.HUCCode)
+	basinName, _ := gauge.HUCNames(site.HUCCode) // HUC2 name for basin_name column only
 
 	var locExpr string
 	var args []any
@@ -569,7 +572,7 @@ func (p *Poller) applyMetadata(ctx context.Context, gaugeID string, site *gauge.
 			site.HUCCode,
 			site.StateCode,
 			basinName,
-			watershedName,
+			site.CanonicalBasin,
 			site.ElevationFt, // nullable
 		}
 	} else {
@@ -578,7 +581,7 @@ func (p *Poller) applyMetadata(ctx context.Context, gaugeID string, site *gauge.
 			site.HUCCode,
 			site.StateCode,
 			basinName,
-			watershedName,
+			site.CanonicalBasin,
 			site.ElevationFt, // nullable
 		}
 	}
@@ -590,8 +593,8 @@ func (p *Poller) applyMetadata(ctx context.Context, gaugeID string, site *gauge.
 				` + locExpr + `
 				huc8           = $4,
 				state_abbr     = $5,
-				basin_name     = $6,
-				watershed_name = COALESCE(watershed_name, $7),
+				basin_name     = COALESCE(NULLIF($6, ''), basin_name),
+				watershed_name = NULLIF($7, ''),
 				elevation_ft   = COALESCE(elevation_ft, $8)
 			WHERE id = $1
 		`
@@ -600,8 +603,8 @@ func (p *Poller) applyMetadata(ctx context.Context, gaugeID string, site *gauge.
 			UPDATE gauges SET
 				huc8           = $2,
 				state_abbr     = $3,
-				basin_name     = $4,
-				watershed_name = COALESCE(watershed_name, $5),
+				basin_name     = COALESCE(NULLIF($4, ''), basin_name),
+				watershed_name = NULLIF($5, ''),
 				elevation_ft   = COALESCE(elevation_ft, $6)
 			WHERE id = $1
 		`

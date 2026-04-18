@@ -144,6 +144,33 @@ func (h *AdminHandler) CreateRiver(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusCreated, map[string]string{"id": id})
 }
 
+// DeleteRiver permanently deletes a river and unlinks its reaches.
+// Reaches are NOT deleted — they remain but lose their river association.
+// DELETE /api/v1/admin/rivers/{riverSlug}
+func (h *AdminHandler) DeleteRiver(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "riverSlug")
+
+	// Unlink reaches first so the FK constraint doesn't block deletion.
+	if _, err := h.db.Exec(r.Context(),
+		`UPDATE reaches SET river_id = NULL WHERE river_id = (SELECT id FROM rivers WHERE slug = $1)`,
+		slug,
+	); err != nil {
+		errorResponse(w, http.StatusInternalServerError, "unlink reaches failed")
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(), `DELETE FROM rivers WHERE slug = $1`, slug)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "delete failed")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		errorResponse(w, http.StatusNotFound, "river not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // UpdateRiver updates a river's metadata.
 // PUT /api/v1/admin/rivers/{riverSlug}
 func (h *AdminHandler) UpdateRiver(w http.ResponseWriter, r *http.Request) {

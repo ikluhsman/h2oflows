@@ -11,9 +11,9 @@
           <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
         </svg>
         <span class="flex-1 min-w-0 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ reachName }}</span>
-        <!-- Sparkline: fixed width, desktop only -->
-        <div class="w-24 shrink-0 hidden sm:block h-5 opacity-50">
-          <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" color="#3b82f6" compact @latest-cfs="liveCfs = $event" />
+        <!-- Sparkline: fixed width, desktop only, pointer-events-none so card click passes through -->
+        <div class="w-24 shrink-0 hidden sm:block h-5 opacity-50 pointer-events-none">
+          <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" :color="sparklineColor" compact @latest-cfs="liveCfs = $event" />
         </div>
         <span
           v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
@@ -45,8 +45,8 @@
       </div>
     </template>
 
-    <!-- ── COMFORTABLE mode: two-row card ─────────────────────────────────── -->
-    <template v-else-if="view === 'comfortable'">
+    <!-- ── COMPACT mode: two-row card, sparkline right-side ───────────────── -->
+    <template v-else-if="view === 'compact'">
       <div class="flex items-center gap-3 px-4 pt-3.5 pb-1.5">
         <svg class="w-4 h-4 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
           <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
@@ -62,8 +62,10 @@
       </div>
       <div class="flex items-center gap-2 px-4 pb-3">
         <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider shrink-0 max-w-24 truncate">{{ gaugeName }}</span>
-        <div class="flex-1 h-6 min-w-0 opacity-50">
-          <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" color="#3b82f6" compact @latest-cfs="liveCfs = $event" />
+        <div class="flex-1 min-w-0" />
+        <!-- Sparkline: fixed width right side, pointer-events-none -->
+        <div class="w-24 shrink-0 h-5 opacity-50 pointer-events-none">
+          <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" :color="sparklineColor" compact @latest-cfs="liveCfs = $event" />
         </div>
         <span
           v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
@@ -91,7 +93,7 @@
       </div>
     </template>
 
-    <!-- ── FULL mode: two-row card + extras ───────────────────────────────── -->
+    <!-- ── FULL mode: two-row card + taller sparkline ─────────────────────── -->
     <template v-else>
       <div class="flex items-center gap-3 px-4 pt-3.5 pb-1.5">
         <svg class="w-4 h-4 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
@@ -111,10 +113,10 @@
           <span class="text-xs text-gray-400 ml-0.5">cfs</span>
         </div>
       </div>
-      <!-- Taller sparkline row -->
-      <div class="px-4 pb-1.5">
+      <!-- Taller sparkline row, pointer-events-none -->
+      <div class="px-4 pb-1.5 pointer-events-none">
         <div class="h-10 opacity-50">
-          <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" color="#3b82f6" @latest-cfs="liveCfs = $event" />
+          <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" :color="sparklineColor" @latest-cfs="liveCfs = $event" />
         </div>
       </div>
       <div class="flex items-center gap-2 px-4 pb-3">
@@ -156,7 +158,7 @@ import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
 
 const props = defineProps<{
   gauge: WatchedGauge
-  view?: 'list' | 'comfortable' | 'full'
+  view?: 'list' | 'compact' | 'full'
 }>()
 
 defineEmits<{ (e: 'openGauge', gauge: WatchedGauge): void }>()
@@ -185,6 +187,15 @@ const cfsColorClass = computed(() => {
   if (s === 'very_high' || s === 'flood') return 'text-red-600 dark:text-red-400'
   if (s === 'low')                        return 'text-amber-500 dark:text-amber-400'
   return 'text-gray-900 dark:text-white'
+})
+
+const sparklineColor = computed(() => {
+  const s = props.gauge.flowStatus
+  if (s === 'running')                    return '#22c55e'
+  if (s === 'high')                       return '#f97316'
+  if (s === 'very_high' || s === 'flood') return '#ef4444'
+  if (s === 'low')                        return '#f59e0b'
+  return '#3b82f6'
 })
 
 const lastReadingRelative = computed(() => {

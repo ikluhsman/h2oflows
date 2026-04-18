@@ -123,6 +123,31 @@
             </div>
           </div>
 
+          <!-- Add to dashboard — prominent in body -->
+          <ClientOnly>
+            <div v-if="allGauges.length > 0" class="shrink-0">
+              <button
+                v-if="!onDashboard(allGauges[0].id)"
+                class="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                @click="addToDashboard(allGauges[0])"
+              >
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
+                </svg>
+                Add to dashboard
+              </button>
+              <button
+                v-else
+                class="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-950/50 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950 transition-colors"
+                @click="confirmRemoveDashboard(allGauges[0].id)"
+              >
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
+                </svg>
+                On dashboard
+              </button>
+            </div>
+          </ClientOnly>
         </div>
       </section>
 

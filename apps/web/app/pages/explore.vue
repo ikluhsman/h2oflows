@@ -71,20 +71,32 @@
             <template v-if="!collapsed.basins.has(basin.name)">
               <div v-for="river in basin.rivers" :key="river.name">
                 <!-- River header -->
-                <button
-                  class="w-full flex items-center gap-2 pl-6 pr-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
-                  @click="toggleRiver(basin.name, river.name)"
-                >
-                  <svg
-                    class="w-2.5 h-2.5 text-gray-400 shrink-0 transition-transform duration-150"
-                    :class="{ 'rotate-90': !collapsed.rivers.has(`${basin.name}::${river.name}`) }"
-                    viewBox="0 0 20 20" fill="currentColor"
+                <div class="flex items-center group/river">
+                  <button
+                    class="flex items-center gap-2 pl-6 pr-2 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors flex-1 min-w-0"
+                    @click="toggleRiver(basin.name, river.name)"
                   >
-                    <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                  </svg>
-                  <span class="text-xs font-semibold text-gray-600 dark:text-gray-400 flex-1 text-left">{{ river.name }}</span>
-                  <span class="text-xs text-gray-400">{{ river.reaches.length }}</span>
-                </button>
+                    <svg
+                      class="w-2.5 h-2.5 text-gray-400 shrink-0 transition-transform duration-150"
+                      :class="{ 'rotate-90': !collapsed.rivers.has(`${basin.name}::${river.name}`) }"
+                      viewBox="0 0 20 20" fill="currentColor"
+                    >
+                      <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-xs font-semibold text-gray-600 dark:text-gray-400 flex-1 text-left truncate">{{ river.name }}</span>
+                    <span class="text-xs text-gray-400 shrink-0">{{ river.reaches.length }}</span>
+                  </button>
+                  <!-- Bulk add all reaches in this river -->
+                  <button
+                    class="shrink-0 px-2 py-1.5 opacity-60 sm:opacity-0 sm:group-hover/river:opacity-100 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 dark:hover:text-blue-400"
+                    :aria-label="`Add all ${river.name} reaches to dashboard`"
+                    @click.stop="addAllRiverReaches(river.reaches)"
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                      <circle cx="10" cy="10" r="8"/><line x1="10" y1="6" x2="10" y2="14"/><line x1="6" y1="10" x2="14" y2="10"/>
+                    </svg>
+                  </button>
+                </div>
 
                 <!-- Reach rows -->
                 <template v-if="!collapsed.rivers.has(`${basin.name}::${river.name}`)">
@@ -116,14 +128,13 @@
                       :style="{ color: flowStatusColor(reach.flow_status) }"
                     >{{ reach.current_cfs.toLocaleString() }}</span>
                     <span v-else class="text-xs text-gray-300 dark:text-gray-600 shrink-0">—</span>
-                    <!-- Reach page link -->
                     <!-- Add to dashboard -->
                     <button
                       v-if="reach.gauge_id"
-                      class="shrink-0 p-0.5 rounded transition-colors opacity-0 group-hover:opacity-100"
+                      class="shrink-0 p-0.5 rounded transition-opacity"
                       :class="isOnDashboard(reach)
-                        ? 'text-blue-500 dark:text-blue-400'
-                        : 'text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400'"
+                        ? 'text-blue-500 dark:text-blue-400 opacity-100'
+                        : 'text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100'"
                       :aria-label="isOnDashboard(reach) ? 'On dashboard' : 'Add to dashboard'"
                       @click.stop="toggleDashboard(reach)"
                     >
@@ -134,9 +145,10 @@
                         <circle cx="10" cy="10" r="8"/><line x1="10" y1="6" x2="10" y2="14"/><line x1="6" y1="10" x2="14" y2="10"/>
                       </svg>
                     </button>
+                    <!-- Reach page link -->
                     <NuxtLink
                       :to="`/reaches/${reach.slug}`"
-                      class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
+                      class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-opacity opacity-60 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100"
                       aria-label="View reach"
                       @click.stop
                     >
@@ -236,10 +248,19 @@ const query = ref('')
 interface RiverGroup { name: string; reaches: ReachListItem[] }
 interface BasinGroup  { name: string; reachCount: number; rivers: RiverGroup[] }
 
+function cleanBasinName(name: string | null | undefined): string | null {
+  if (!name) return null
+  const cleaned = name
+    .replace(/^(Upper|Middle|Lower)\s+/i, '')
+    .replace(/\s+(River|Rivers|Basin)s?$/i, '')
+    .trim()
+  return cleaned || null
+}
+
 function buildTree(items: ReachListItem[]): BasinGroup[] {
   const basinMap = new Map<string, Map<string, ReachListItem[]>>()
   for (const r of items) {
-    const basin = r.basin ?? 'Other'
+    const basin = cleanBasinName(r.basin) ?? 'Other'
     const river = r.river_name ?? 'Unknown River'
     if (!basinMap.has(basin)) basinMap.set(basin, new Map())
     const riverMap = basinMap.get(basin)!
@@ -379,6 +400,14 @@ function toggleDashboard(reach: ReachListItem) {
     removeAndSync(reach.gauge_id, reach.slug)
   } else {
     addAndSync(buildWatchedGauge(reach))
+  }
+}
+
+function addAllRiverReaches(reaches: ReachListItem[]) {
+  for (const reach of reaches) {
+    if (reach.gauge_id && !isOnDashboard(reach)) {
+      addAndSync(buildWatchedGauge(reach))
+    }
   }
 }
 

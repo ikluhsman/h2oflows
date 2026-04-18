@@ -177,6 +177,7 @@ func main() {
 			r.Get("/admin/rivers/{riverSlug}", admin.GetRiver)
 			r.Post("/admin/rivers", admin.CreateRiver)
 			r.Put("/admin/rivers/{riverSlug}", admin.UpdateRiver)
+			r.Delete("/admin/rivers/{riverSlug}", admin.DeleteRiver)
 		})
 
 		// Site admin only — role management.

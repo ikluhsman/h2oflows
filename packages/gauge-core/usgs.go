@@ -406,12 +406,13 @@ func parseNWISSiteRDB(r io.Reader) ([]*SiteMetadata, error) {
 		beginDate := parseNWISDate(get(fields, "begin_date"))
 		endDate := parseNWISDatePtr(get(fields, "end_date"))
 
+		hucCode := get(fields, "huc_cd")
 		site := &SiteMetadata{
 			ExternalID:       externalID,
 			Name:             get(fields, "station_nm"),
 			StateCode:        fipsToAlpha(get(fields, "state_cd")),
 			CountyCode:       get(fields, "county_cd"),
-			HUCCode:          get(fields, "huc_cd"),
+			HUCCode:          hucCode,
 			Parameters:       []string{},
 			Active:           endDate == nil,
 			BeginDate:        beginDate,
@@ -419,6 +420,7 @@ func parseNWISSiteRDB(r io.Reader) ([]*SiteMetadata, error) {
 			DrainageAreaSqMi: drainArea,
 			ElevationFt:      elevationFt,
 			SourceType:       SourceUSGS,
+			CanonicalBasin:   CanonicalBasin(hucCode),
 		}
 
 		if lat != 0 && lng != 0 {

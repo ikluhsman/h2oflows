@@ -144,3 +144,71 @@ func huc4Watershed(huc4 string) string {
 		return ""
 	}
 }
+
+// CanonicalBasin returns a single, source-agnostic basin label for grouping in
+// the UI. It uses HUC2 (major drainage region) for broad consistency, with two
+// overrides for the Missouri River system: the South Platte and North Platte are
+// well-known Colorado rivers that nobody calls "Missouri River Basin."
+//
+// The returned strings are intentionally short and suffix-free ("Arkansas" not
+// "Arkansas River Basin") so the frontend can use them as-is without stripping.
+//
+// DWR gauges use CanonicalBasinFromDWRDivision instead since they have no HUC code.
+func CanonicalBasin(huc8 string) string {
+	if len(huc8) < 4 {
+		return ""
+	}
+	huc2 := huc8[:2]
+	huc4 := huc8[:4]
+
+	// Missouri system override: South/North Platte are the names paddlers use.
+	if huc2 == "10" {
+		switch huc4 {
+		case "1018":
+			return "South Platte"
+		case "1019", "1023":
+			return "North Platte"
+		default:
+			return "Missouri"
+		}
+	}
+
+	switch huc2 {
+	case "11":
+		return "Arkansas"
+	case "12":
+		return "Texas Gulf"
+	case "13":
+		return "Rio Grande"
+	case "14":
+		return "Colorado"
+	case "15":
+		return "Lower Colorado"
+	case "16":
+		return "Great Basin"
+	case "17":
+		return "Pacific Northwest"
+	case "18":
+		return "California"
+	default:
+		return ""
+	}
+}
+
+// CanonicalBasinFromDWRDivision maps a Colorado DWR water division number (1–7)
+// to the same canonical basin labels used by CanonicalBasin for USGS gauges.
+// Divisions 4–7 all drain into the Colorado River system.
+func CanonicalBasinFromDWRDivision(div int) string {
+	switch div {
+	case 1:
+		return "South Platte"
+	case 2:
+		return "Arkansas"
+	case 3:
+		return "Rio Grande"
+	case 4, 5, 6, 7:
+		return "Colorado"
+	default:
+		return ""
+	}
+}

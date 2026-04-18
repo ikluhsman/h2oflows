@@ -237,15 +237,16 @@ type dwrStation struct {
 
 func (st *dwrStation) toSiteMetadata() *SiteMetadata {
 	site := &SiteMetadata{
-		ExternalID:  st.Abbrev,
-		Name:        st.StationName,
-		StateCode:   "CO", // DWR is Colorado-only
-		CountyCode:  st.County,
-		Parameters:  []string{"DISCHRG"},
-		Active:      true, // station list only returns active stations
-		BeginDate:   time.Time{},
-		EndDate:     nil,
-		SourceType:  SourceDWR,
+		ExternalID:     st.Abbrev,
+		Name:           st.StationName,
+		StateCode:      "CO", // DWR is Colorado-only
+		CountyCode:     st.County,
+		Parameters:     []string{"DISCHRG"},
+		Active:         true, // station list only returns active stations
+		BeginDate:      time.Time{},
+		EndDate:        nil,
+		SourceType:     SourceDWR,
+		CanonicalBasin: CanonicalBasinFromDWRDivision(st.Division),
 	}
 
 	if st.Latitude != 0 && st.Longitude != 0 {

@@ -40,24 +40,6 @@
         <span class="hidden sm:inline text-xs font-medium">Explore</span>
       </NuxtLink>
 
-      <!-- Admin shortcut — data admins only -->
-      <ClientOnly>
-        <NuxtLink
-          v-if="isDataAdmin"
-          to="/admin"
-          class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md transition-colors"
-          :class="route.path === '/admin'
-            ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
-            : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
-          title="Admin"
-        >
-          <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-          <span class="hidden sm:inline text-xs font-medium">Admin</span>
-        </NuxtLink>
-      </ClientOnly>
-
       <!-- AI Ask button — left side -->
       <button
         class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
@@ -136,6 +118,17 @@
               <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
               {{ colorMode.value === 'dark' ? 'Light mode' : 'Dark mode' }}
             </button>
+            <NuxtLink
+              v-if="isDataAdmin"
+              to="/admin"
+              class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              @click="userMenuOpen = false"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              Admin
+            </NuxtLink>
             <div class="border-t border-gray-100 dark:border-gray-800" />
             <template v-if="isAuthenticated">
               <button
@@ -184,22 +177,6 @@
         </svg>
         Explore
       </NuxtLink>
-      <ClientOnly>
-        <NuxtLink
-          v-if="isDataAdmin"
-          to="/admin"
-          class="text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors"
-          :class="route.path === '/admin'
-            ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
-            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'"
-          @click="menuOpen = false"
-        >
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-          </svg>
-          Admin
-        </NuxtLink>
-      </ClientOnly>
       <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2 flex flex-col gap-1">
         <!-- Ask — mobile -->
         <button

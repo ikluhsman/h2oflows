@@ -32,9 +32,14 @@
               <svg v-if="m.key === 'list'" class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
                 <line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/>
               </svg>
-              <!-- Comfortable icon -->
-              <svg v-else-if="m.key === 'comfortable'" class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <!-- Compact icon: 2 full-width stacked cards -->
+              <svg v-else-if="m.key === 'compact'" class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="2" y="2" width="12" height="5" rx="1"/><rect x="2" y="9" width="12" height="5" rx="1"/>
+              </svg>
+              <!-- Comfortable icon: 2x2 grid -->
+              <svg v-else-if="m.key === 'comfortable'" class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
+                <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
               </svg>
               <!-- Full icon -->
               <svg v-else class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -86,13 +91,13 @@
               <!-- Reach cards — always visible when only one river (no header to collapse) -->
               <div
                 v-if="basin.rivers.length === 1 && basin.standaloneGauges.length === 0 || !collapsedRivers.has(`${basin.name}::${river.name}`)"
-                class="space-y-2 mt-1"
+                :class="reachContainerClass"
               >
                 <DashboardReachRow
                   v-for="reach in river.reaches"
                   :key="`${reach.id}::${reach.contextReachSlug}`"
                   :gauge="reach"
-                  :view="viewMode"
+                  :view="rowView"
                   @open-gauge="openGauge($event, 'reach')"
                 />
               </div>
@@ -108,7 +113,7 @@
                 </svg>
                 <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">Standalone Gauges</span>
               </div>
-              <div class="space-y-2 mt-1">
+              <div :class="reachContainerClass">
                 <div
                   v-for="g in basin.standaloneGauges"
                   :key="g.id"
@@ -125,10 +130,7 @@
                     <span class="flex-1 min-w-0 text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
                       {{ g.name ?? `${g.source.toUpperCase()} ${g.externalId}` }}
                     </span>
-                    <div v-if="viewMode !== 'list'" class="w-20 shrink-0 hidden sm:block opacity-50">
-                      <GaugeSparkline :gauge-id="g.id" flow-status="unknown" color="#3b82f6" compact />
-                    </div>
-                    <div v-else class="w-24 shrink-0 hidden sm:block h-5 opacity-50">
+                    <div class="w-24 shrink-0 hidden sm:block h-5 opacity-50 pointer-events-none">
                       <GaugeSparkline :gauge-id="g.id" flow-status="unknown" color="#3b82f6" compact />
                     </div>
                     <span :class="viewMode === 'list' ? 'text-sm font-bold tabular-nums text-gray-900 dark:text-white' : 'text-[22px] font-bold tabular-nums text-gray-900 dark:text-white leading-none'">
@@ -240,7 +242,7 @@ const byBasinTree = computed<BasinGroup[]>(() => {
     if (seen.has(dedupeKey)) continue
     seen.add(dedupeKey)
 
-    const basin = g.contextReachBasinGroup
+    const basin = cleanBasinName(g.contextReachBasinGroup)
       ?? cleanBasinName(g.watershedName)
       ?? cleanBasinName(g.basinName)
       ?? cleanBasinName(g.contextReachRiverName)
@@ -317,19 +319,36 @@ function toggleRiver(basin: string, river: string) {
 const VIEW_MODE_KEY = 'h2oflow_dashboard_view_mode'
 const VIEW_MODES = [
   { key: 'list',        label: 'List'        },
+  { key: 'compact',     label: 'Compact'     },
   { key: 'comfortable', label: 'Comfortable' },
   { key: 'full',        label: 'Full'        },
 ] as const
-type ViewMode = 'list' | 'comfortable' | 'full'
-const viewMode = ref<ViewMode>('comfortable')
+type ViewMode = 'list' | 'compact' | 'comfortable' | 'full'
+const viewMode = ref<ViewMode>('compact')
 onMounted(() => {
   const saved = localStorage.getItem(VIEW_MODE_KEY)
-  if (saved === 'list' || saved === 'comfortable' || saved === 'full') viewMode.value = saved
+  if (saved === 'list' || saved === 'compact' || saved === 'comfortable' || saved === 'full') {
+    viewMode.value = saved
+  }
 })
 function setViewMode(m: ViewMode) {
   viewMode.value = m
   localStorage.setItem(VIEW_MODE_KEY, m)
 }
+
+// Maps viewMode → DashboardReachRow 'view' prop
+const rowView = computed<'list' | 'compact' | 'full'>(() => {
+  if (viewMode.value === 'full') return 'full'
+  if (viewMode.value === 'list') return 'list'
+  return 'compact' // 'compact' and 'comfortable' both use compact cards
+})
+
+// Container class: 2-col grid for comfortable + full
+const reachContainerClass = computed(() =>
+  viewMode.value === 'comfortable' || viewMode.value === 'full'
+    ? 'grid sm:grid-cols-2 gap-2 mt-1'
+    : 'space-y-2 mt-1'
+)
 
 // ── UI state ─────────────────────────────────────────────────────────────────
 const searchOpen  = ref(false)
