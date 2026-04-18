@@ -16,7 +16,32 @@
 
       <!-- Reaches grouped by basin → river -->
       <template v-else>
-        <div class="flex items-center justify-end mb-4">
+        <div class="flex items-center justify-between mb-4">
+          <!-- View mode toggle -->
+          <div class="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <button
+              v-for="m in VIEW_MODES" :key="m.key"
+              class="p-1.5 rounded-md transition-colors"
+              :class="viewMode === m.key
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+              :title="m.label"
+              @click="setViewMode(m.key)"
+            >
+              <!-- List icon -->
+              <svg v-if="m.key === 'list'" class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/>
+              </svg>
+              <!-- Comfortable icon -->
+              <svg v-else-if="m.key === 'comfortable'" class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="12" height="5" rx="1"/><rect x="2" y="9" width="12" height="5" rx="1"/>
+              </svg>
+              <!-- Full icon -->
+              <svg v-else class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="12" height="4" rx="1"/><rect x="2" y="7" width="12" height="3" rx="1"/><rect x="2" y="11" width="12" height="3" rx="1"/>
+              </svg>
+            </button>
+          </div>
           <UButton size="xs" color="neutral" variant="outline" icon="i-heroicons-plus" @click="searchOpen = true">
             Add gauge
           </UButton>
@@ -67,6 +92,7 @@
                   v-for="reach in river.reaches"
                   :key="`${reach.id}::${reach.contextReachSlug}`"
                   :gauge="reach"
+                  :view="viewMode"
                   @open-gauge="openGauge($event, 'reach')"
                 />
               </div>
@@ -86,33 +112,39 @@
                 <div
                   v-for="g in basin.standaloneGauges"
                   :key="g.id"
-                  class="rounded-2xl border border-gray-200 dark:border-gray-700/60 bg-white dark:bg-gray-900 shadow-sm px-4 py-3 flex items-center gap-3 cursor-pointer active:opacity-80 transition-opacity"
+                  class="rounded-2xl border border-gray-200 dark:border-gray-700/60 bg-white dark:bg-gray-900 shadow-sm cursor-pointer active:opacity-80 transition-opacity"
+                  :class="viewMode === 'list' ? 'px-3 py-2.5' : 'px-4 py-3'"
                   @click="openGauge(g, 'gauge')"
                 >
-                  <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
-                    <path d="M12 12 16 8"/>
-                    <path d="M3 12a9 9 0 0 1 18 0"/>
-                  </svg>
-                  <span class="flex-1 min-w-0 text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
-                    {{ g.name ?? `${g.source.toUpperCase()} ${g.externalId}` }}
-                  </span>
-                  <div class="w-20 shrink-0 hidden sm:block opacity-50">
-                    <GaugeSparkline :gauge-id="g.id" flow-status="unknown" color="#3b82f6" compact />
-                  </div>
-                  <span class="text-[22px] font-bold tabular-nums text-gray-900 dark:text-white leading-none">
-                    {{ g.currentCfs != null ? g.currentCfs.toLocaleString() : '—' }}
-                  </span>
-                  <span class="text-xs text-gray-400">cfs</span>
-                  <button
-                    class="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors shrink-0"
-                    aria-label="Remove"
-                    @click.stop="removeAndSync(g.id, g.contextReachSlug)"
-                  >
-                    <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                  <div class="flex items-center gap-3">
+                    <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
+                      <path d="M12 12 16 8"/>
+                      <path d="M3 12a9 9 0 0 1 18 0"/>
                     </svg>
-                  </button>
+                    <span class="flex-1 min-w-0 text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
+                      {{ g.name ?? `${g.source.toUpperCase()} ${g.externalId}` }}
+                    </span>
+                    <div v-if="viewMode !== 'list'" class="w-20 shrink-0 hidden sm:block opacity-50">
+                      <GaugeSparkline :gauge-id="g.id" flow-status="unknown" color="#3b82f6" compact />
+                    </div>
+                    <div v-else class="w-24 shrink-0 hidden sm:block h-5 opacity-50">
+                      <GaugeSparkline :gauge-id="g.id" flow-status="unknown" color="#3b82f6" compact />
+                    </div>
+                    <span :class="viewMode === 'list' ? 'text-sm font-bold tabular-nums text-gray-900 dark:text-white' : 'text-[22px] font-bold tabular-nums text-gray-900 dark:text-white leading-none'">
+                      {{ g.currentCfs != null ? g.currentCfs.toLocaleString() : '—' }}
+                    </span>
+                    <span class="text-xs text-gray-400">cfs</span>
+                    <button
+                      class="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors shrink-0"
+                      aria-label="Remove"
+                      @click.stop="removeAndSync(g.id, g.contextReachSlug)"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -279,6 +311,24 @@ function toggleRiver(basin: string, river: string) {
   if (s.has(key)) s.delete(key); else s.add(key)
   collapsedRivers.value = s
   localStorage.setItem(COLLAPSED_RIVERS_KEY, JSON.stringify([...s]))
+}
+
+// ── View mode ────────────────────────────────────────────────────────────────
+const VIEW_MODE_KEY = 'h2oflow_dashboard_view_mode'
+const VIEW_MODES = [
+  { key: 'list',        label: 'List'        },
+  { key: 'comfortable', label: 'Comfortable' },
+  { key: 'full',        label: 'Full'        },
+] as const
+type ViewMode = 'list' | 'comfortable' | 'full'
+const viewMode = ref<ViewMode>('comfortable')
+onMounted(() => {
+  const saved = localStorage.getItem(VIEW_MODE_KEY)
+  if (saved === 'list' || saved === 'comfortable' || saved === 'full') viewMode.value = saved
+})
+function setViewMode(m: ViewMode) {
+  viewMode.value = m
+  localStorage.setItem(VIEW_MODE_KEY, m)
 }
 
 // ── UI state ─────────────────────────────────────────────────────────────────

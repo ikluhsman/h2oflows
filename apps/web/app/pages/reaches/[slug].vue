@@ -7,6 +7,33 @@
         <span class="text-sm font-medium truncate text-gray-700 dark:text-gray-200">{{ reach.common_name ?? reach.name }}</span>
       </template>
       <template #actions>
+        <!-- Add / remove from dashboard (primary gauge) -->
+        <ClientOnly>
+          <template v-if="allGauges.length > 0">
+            <button
+              v-if="!onDashboard(allGauges[0].id)"
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shrink-0"
+              @click="addToDashboard(allGauges[0])"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
+              </svg>
+              <span class="hidden sm:inline">Add to dashboard</span>
+              <span class="sm:hidden">Add</span>
+            </button>
+            <button
+              v-else
+              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950 transition-colors shrink-0"
+              @click="confirmRemoveDashboard(allGauges[0].id)"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
+              </svg>
+              <span class="hidden sm:inline">On dashboard</span>
+              <span class="sm:hidden">Saved</span>
+            </button>
+          </template>
+        </ClientOnly>
         <button
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shrink-0"
           @click="openShareForm"
@@ -343,95 +370,6 @@
         </div>
       </section>
 
-      <!-- Admin controls — collapsible, bottom of page -->
-      <ClientOnly>
-        <details v-if="reach && isAdmin" class="group rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
-          <summary class="flex items-center gap-2 px-4 py-2.5 cursor-pointer text-xs font-medium text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 select-none list-none">
-            <svg class="w-3.5 h-3.5 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-            Admin controls
-          </summary>
-          <div class="px-4 pb-3 pt-1 flex items-center gap-4 flex-wrap border-t border-dashed border-gray-200 dark:border-gray-700">
-            <!-- Fetch river line -->
-            <div class="flex items-center gap-2">
-              <div v-if="needsCoordsInput" class="flex items-center gap-1.5">
-                <input
-                  v-model="manualLat"
-                  type="text"
-                  placeholder="lat"
-                  class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-24 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
-                />
-                <input
-                  v-model="manualLng"
-                  type="text"
-                  placeholder="lng"
-                  class="text-xs border border-gray-200 dark:border-gray-700 rounded px-2 py-1 w-28 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200"
-                />
-              </div>
-              <button
-                class="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1 disabled:opacity-50"
-                :disabled="fetchingCenterline || (needsCoordsInput && (!manualLat || !manualLng))"
-                @click="fetchCenterline"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                <span v-if="fetchingCenterline">Fetching…</span>
-                <span v-else-if="(reach as any).centerline_source === 'kml'">Re-fetch (overrides KML)</span>
-                <span v-else-if="displayCenterline">Re-fetch river line</span>
-                <span v-else>Fetch river line</span>
-              </button>
-              <span v-if="centerlineError" class="text-xs text-red-500">{{ centerlineError }}</span>
-            </div>
-
-            <span class="text-gray-200 dark:text-gray-700">|</span>
-
-            <!-- Import KMZ -->
-            <div class="flex items-center gap-2">
-              <button
-                class="text-xs text-sky-500 hover:text-sky-600 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1"
-                @click="showImport = !showImport"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                Import KMZ
-              </button>
-              <template v-if="showImport">
-                <input
-                  ref="kmzInput"
-                  type="file"
-                  accept=".kml,.kmz"
-                  class="text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-100 dark:file:bg-gray-800 file:text-gray-700 dark:file:text-gray-300 hover:file:bg-gray-200 dark:hover:file:bg-gray-700 cursor-pointer"
-                  @change="onKmzSelect"
-                />
-                <UButton v-if="kmzFile" size="xs" color="primary" :loading="importing" @click="runImport">
-                  Import
-                </UButton>
-              </template>
-            </div>
-
-            <!-- Import result inline -->
-            <div v-if="importResult" class="text-xs text-gray-500 flex items-center gap-2">
-              <span class="text-emerald-500 font-medium">✓ Imported</span>
-              <template v-for="(r, slug) in importResult.reaches" :key="slug">
-                rapids: {{ r.rapids }}, put-ins: {{ r.put_ins }}, take-outs: {{ r.take_outs }}, parking: {{ r.parking }}
-                <span v-if="r.errors?.length" class="text-red-500"> · {{ r.errors.length }} error(s)</span>
-              </template>
-            </div>
-            <p v-if="importError" class="text-xs text-red-500">{{ importError }}</p>
-
-            <span class="text-gray-200 dark:text-gray-700">|</span>
-
-            <!-- Delete reach -->
-            <button
-              class="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 flex items-center gap-1 disabled:opacity-50"
-              :disabled="deleting"
-              @click="deleteReach"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-              <span v-if="deleting">Deleting…</span>
-              <span v-else>Delete reach</span>
-            </button>
-          </div>
-        </details>
-      </ClientOnly>
-
     </main>
 
     <!-- Scroll-to-top button -->
@@ -463,7 +401,7 @@ const route  = useRoute()
 const config = useRuntimeConfig()
 const store  = useWatchlistStore()
 const { addAndSync, removeAndSync } = useWatchlistSync()
-const { isAdmin, getToken } = useAuth()
+
 
 // ---- Scroll-to-top ----------------------------------------------------------
 
@@ -1042,46 +980,11 @@ function bandDisplayLabel(label: string): string {
   return flowBandLabelFn(label)
 }
 
-// ---- OSM centerline fetch ---------------------------------------------------
-
-const fetchingCenterline  = ref(false)
-const centerlineError     = ref<string | null>(null)
-const liveCenterline      = ref<any>(null)
-const manualLat           = ref('')
-const manualLng           = ref('')
-
-// Show the lat/lng input after the server tells us it has no location to work from.
-const needsCoordsInput = computed(() =>
-  centerlineError.value?.includes('no location available') ?? false
-)
+// ---- OSM centerline (read-only for map display) -----------------------------
 
 const displayCenterline = computed(() =>
-  liveCenterline.value ?? (reach.value as any)?.centerline ?? null
+  (reach.value as any)?.centerline ?? null
 )
-
-async function fetchCenterline() {
-  fetchingCenterline.value = true
-  centerlineError.value = null
-  try {
-    let url = `${config.public.apiBase}/api/v1/reaches/${route.params.slug}/fetch-centerline`
-    if (manualLat.value && manualLng.value) {
-      url += `?lat=${encodeURIComponent(manualLat.value)}&lng=${encodeURIComponent(manualLng.value)}`
-    }
-    const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${await getToken()}` } })
-    const text = await res.text()
-    let json: any
-    try { json = JSON.parse(text) } catch { json = null }
-    if (!res.ok || !json) {
-      centerlineError.value = json?.error ?? `Server error ${res.status}`
-    } else {
-      liveCenterline.value = json.centerline
-    }
-  } catch (err: any) {
-    centerlineError.value = err?.message ?? 'Network error'
-  } finally {
-    fetchingCenterline.value = false
-  }
-}
 
 // ---- River assistant chat ---------------------------------------------------
 
@@ -1130,65 +1033,4 @@ function openShareForm() {
   shareModalOpen.value = true
 }
 
-// ---- Delete reach -----------------------------------------------------------
-
-const deleting = ref(false)
-
-async function deleteReach() {
-  if (!confirm(`Permanently delete "${(reach.value as any)?.common_name ?? (reach.value as any)?.name}"?\n\nThis removes all rapids, access points, and features. Gauges are unlinked but kept.`)) return
-  deleting.value = true
-  try {
-    const res = await fetch(`${config.public.apiBase}/api/v1/reaches/${route.params.slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${await getToken()}` } })
-    if (!res.ok) throw new Error(`Server error ${res.status}`)
-    navigateTo('/')
-  } catch (err: any) {
-    alert(err?.message ?? 'Delete failed')
-  } finally {
-    deleting.value = false
-  }
-}
-
-// ---- KMZ import -------------------------------------------------------------
-
-const showImport  = ref(false)
-const kmzFile     = ref<File | null>(null)
-const kmzInput    = ref<HTMLInputElement>()
-const importing   = ref(false)
-const importResult = ref<any>(null)
-const importError  = ref<string | null>(null)
-
-function onKmzSelect(e: Event) {
-  const input = e.target as HTMLInputElement
-  kmzFile.value = input.files?.[0] ?? null
-  importResult.value = null
-  importError.value = null
-}
-
-async function runImport() {
-  if (!kmzFile.value) return
-  importing.value = true
-  importError.value = null
-  importResult.value = null
-  try {
-    const form = new FormData()
-    form.append('file', kmzFile.value)
-    const res = await fetch(`${config.public.apiBase}/api/v1/import/kmz`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${await getToken()}` },
-      body: form,
-    })
-    const json = await res.json()
-    if (!res.ok) {
-      importError.value = json.error ?? `Server error ${res.status}`
-    } else {
-      importResult.value = json
-      // Hard reload to pick up new access points / rapids on the map
-      window.location.reload()
-    }
-  } catch (err: any) {
-    importError.value = err?.message ?? 'Network error'
-  } finally {
-    importing.value = false
-  }
-}
 </script>

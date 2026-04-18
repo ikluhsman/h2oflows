@@ -192,6 +192,10 @@
                   size="xs" variant="outline" color="neutral"
                   @click="fetchCenterline(reach.slug)"
                 >Fetch line</UButton>
+                <UButton
+                  size="xs" variant="outline" color="error"
+                  @click="deleteReach(reach.slug, reach.common_name ?? reach.name)"
+                >Delete</UButton>
                 <NuxtLink :to="`/reaches/${reach.slug}`" class="text-xs text-blue-500 hover:underline">View</NuxtLink>
               </div>
             </div>
@@ -329,6 +333,21 @@ async function fetchCenterline(reachSlug: string) {
     headers: { Authorization: `Bearer ${token}` },
   })
   // Refresh river detail to update has_centerline
+  if (selectedRiver.value) openRiver(selectedRiver.value)
+}
+
+async function deleteReach(reachSlug: string, displayName: string) {
+  if (!confirm(`Permanently delete "${displayName}"?\n\nThis removes all rapids, access points, and features. Gauges are unlinked but kept.`)) return
+  const token = await getToken()
+  const res = await fetch(`${apiBase}/api/v1/reaches/${reachSlug}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    alert(`Delete failed: ${res.status}`)
+    return
+  }
+  // Refresh river detail
   if (selectedRiver.value) openRiver(selectedRiver.value)
 }
 

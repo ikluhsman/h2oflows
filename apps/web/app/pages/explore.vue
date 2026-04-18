@@ -117,6 +117,23 @@
                     >{{ reach.current_cfs.toLocaleString() }}</span>
                     <span v-else class="text-xs text-gray-300 dark:text-gray-600 shrink-0">—</span>
                     <!-- Reach page link -->
+                    <!-- Add to dashboard -->
+                    <button
+                      v-if="reach.gauge_id"
+                      class="shrink-0 p-0.5 rounded transition-colors opacity-0 group-hover:opacity-100"
+                      :class="isOnDashboard(reach)
+                        ? 'text-blue-500 dark:text-blue-400'
+                        : 'text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400'"
+                      :aria-label="isOnDashboard(reach) ? 'On dashboard' : 'Add to dashboard'"
+                      @click.stop="toggleDashboard(reach)"
+                    >
+                      <svg v-if="isOnDashboard(reach)" class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                      </svg>
+                      <svg v-else class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <circle cx="10" cy="10" r="8"/><line x1="10" y1="6" x2="10" y2="14"/><line x1="6" y1="10" x2="14" y2="10"/>
+                      </svg>
+                    </button>
                     <NuxtLink
                       :to="`/reaches/${reach.slug}`"
                       class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
@@ -177,11 +194,13 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import type { ReachListItem as MapReachItem } from '~/components/map/ReachesMap.vue'
 import type { ReachListItem } from '~/components/reach/ReachBrowseRow.vue'
 import type { WatchedGauge } from '~/stores/watchlist'
+import { useWatchlistStore } from '~/stores/watchlist'
 
 definePageMeta({ ssr: false })
 
-
 const { apiBase } = useRuntimeConfig().public
+const watchlistStore = useWatchlistStore()
+const { addAndSync, removeAndSync } = useWatchlistSync()
 
 // ── Demo banner ───────────────────────────────────────────────────────────────
 const showDemoBanner = ref(false)
@@ -318,14 +337,10 @@ function flowStatusColor(status: string): string {
 // ── Mobile list/map toggle ────────────────────────────────────────────────────
 const listVisible = ref(false)
 
-// ── Gauge detail modal ────────────────────────────────────────────────────────
-const detailOpen  = ref(false)
-const detailGauge = ref<WatchedGauge | null>(null)
-
-function openGaugeModal(reach: ReachListItem) {
-  if (!reach.gauge_id) return
-  detailGauge.value = {
-    id: reach.gauge_id,
+// ── Dashboard watchlist integration ───────────────────────────────────────────
+function buildWatchedGauge(reach: ReachListItem): WatchedGauge {
+  return {
+    id: reach.gauge_id!,
     externalId: reach.gauge_external_id ?? '',
     source: reach.gauge_source ?? 'usgs',
     name: reach.gauge_name ?? null,
@@ -351,6 +366,29 @@ function openGaugeModal(reach: ReachListItem) {
     lastReadingAt: null,
     watchState: 'saved', activeSince: null,
   }
+}
+
+function isOnDashboard(reach: ReachListItem): boolean {
+  if (!reach.gauge_id) return false
+  return watchlistStore.gauges.some(g => g.id === reach.gauge_id && g.contextReachSlug === reach.slug)
+}
+
+function toggleDashboard(reach: ReachListItem) {
+  if (!reach.gauge_id) return
+  if (isOnDashboard(reach)) {
+    removeAndSync(reach.gauge_id, reach.slug)
+  } else {
+    addAndSync(buildWatchedGauge(reach))
+  }
+}
+
+// ── Gauge detail modal ────────────────────────────────────────────────────────
+const detailOpen  = ref(false)
+const detailGauge = ref<WatchedGauge | null>(null)
+
+function openGaugeModal(reach: ReachListItem) {
+  if (!reach.gauge_id) return
+  detailGauge.value = buildWatchedGauge(reach)
   detailOpen.value = true
 }
 
