@@ -135,6 +135,23 @@ const reachTooltip = new maplibregl.Popup({
 
 // Initial viewport — western US (Colorado + surrounding states)
 const INITIAL_BBOX = { west: -116.0, south: 35.5, east: -101.5, north: 45.5 }
+const MAP_POS_KEY  = 'h2o-explore-map-pos'
+
+function loadSavedPos(): { center: [number, number]; zoom: number } | null {
+  try {
+    const raw = localStorage.getItem(MAP_POS_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return null
+}
+
+function saveMapPos() {
+  if (!map) return
+  try {
+    const c = map.getCenter()
+    localStorage.setItem(MAP_POS_KEY, JSON.stringify({ center: [c.lng, c.lat], zoom: map.getZoom() }))
+  } catch {}
+}
 
 // ── Difficulty config ─────────────────────────────────────────────────────────
 
@@ -197,45 +214,57 @@ function loadSvgImage(m: maplibregl.Map, id: string, svg: string, w: number, h: 
 onMounted(async () => {
   if (!container.value) return
 
-  map = new maplibregl.Map({
-    container: container.value,
-    style: {
-      version: 8,
-      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-      sources: {
-        street: {
-          type: 'raster',
-          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'],
-          tileSize: 256,
-          attribution: 'Tiles © Esri — Esri, DeLorme, NAVTEQ',
-          maxzoom: 18,
-        },
-        topo: {
-          type: 'raster',
-          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/USA_Topo_Maps/MapServer/tile/{z}/{y}/{x}'],
-          tileSize: 256,
-          attribution: 'Tiles © Esri — USGS, NPS',
-          maxzoom: 15,
-        },
-        esri: {
-          type: 'raster',
-          tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-          tileSize: 256,
-          attribution: 'Tiles © Esri',
-          maxzoom: 18,
-        },
+  const savedPos = loadSavedPos()
+  const mapStyle = {
+    version: 8 as const,
+    glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+    sources: {
+      street: {
+        type: 'raster' as const,
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        attribution: 'Tiles © Esri — Esri, DeLorme, NAVTEQ',
+        maxzoom: 18,
       },
-      layers: [
-        { id: 'street-tiles', type: 'raster', source: 'street', layout: { visibility: 'visible' } },
-        { id: 'topo-tiles',   type: 'raster', source: 'topo',   layout: { visibility: 'none'    } },
-        { id: 'esri-tiles',   type: 'raster', source: 'esri',   layout: { visibility: 'none'    } },
-      ],
+      topo: {
+        type: 'raster' as const,
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/USA_Topo_Maps/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        attribution: 'Tiles © Esri — USGS, NPS',
+        maxzoom: 15,
+      },
+      esri: {
+        type: 'raster' as const,
+        tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        tileSize: 256,
+        attribution: 'Tiles © Esri',
+        maxzoom: 18,
+      },
     },
-    bounds: [INITIAL_BBOX.west, INITIAL_BBOX.south, INITIAL_BBOX.east, INITIAL_BBOX.north],
-    fitBoundsOptions: { padding: 20 },
-    attributionControl: false,
-    fadeDuration: 0,
-  })
+    layers: [
+      { id: 'street-tiles', type: 'raster' as const, source: 'street', layout: { visibility: 'visible' as const } },
+      { id: 'topo-tiles',   type: 'raster' as const, source: 'topo',   layout: { visibility: 'none' as const    } },
+      { id: 'esri-tiles',   type: 'raster' as const, source: 'esri',   layout: { visibility: 'none' as const    } },
+    ],
+  }
+
+  map = savedPos
+    ? new maplibregl.Map({
+        container: container.value,
+        style: mapStyle,
+        center: savedPos.center,
+        zoom:   savedPos.zoom,
+        attributionControl: false,
+        fadeDuration: 0,
+      })
+    : new maplibregl.Map({
+        container: container.value,
+        style: mapStyle,
+        bounds: [INITIAL_BBOX.west, INITIAL_BBOX.south, INITIAL_BBOX.east, INITIAL_BBOX.north],
+        fitBoundsOptions: { padding: 20 },
+        attributionControl: false,
+        fadeDuration: 0,
+      })
 
   map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right')
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
@@ -254,6 +283,7 @@ onMounted(async () => {
   map.on('moveend', () => {
     emit('zoom-updated', map!.getZoom())
     filterVisible()   // no network call — filter already-loaded features
+    saveMapPos()
   })
   map.on('error', e => console.warn('[ReachesMap]', e.error?.message ?? e))
 })

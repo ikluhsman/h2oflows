@@ -53,6 +53,10 @@
           <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
         </svg>
         <span class="flex-1 min-w-0 text-sm font-semibold text-gray-900 dark:text-white truncate">{{ reachName }}</span>
+        <span
+          v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
+          :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+        >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
         <div class="shrink-0 text-right leading-none">
           <span class="text-[22px] font-bold tabular-nums" :class="cfsColorClass">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
@@ -67,10 +71,6 @@
         <div class="w-24 shrink-0 h-5 opacity-50 pointer-events-none">
           <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" :color="sparklineColor" compact @latest-cfs="liveCfs = $event" />
         </div>
-        <span
-          v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
-          :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
-        >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
         <NuxtLink
           :to="`/reaches/${gauge.contextReachSlug}`"
           class="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors shrink-0"
@@ -106,6 +106,10 @@
             {{ gauge.contextReachRiverName }}
           </div>
         </div>
+        <span
+          v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
+          :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+        >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
         <div class="shrink-0 text-right leading-none">
           <span class="text-[22px] font-bold tabular-nums" :class="cfsColorClass">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
@@ -121,10 +125,6 @@
       </div>
       <div class="flex items-center gap-2 px-4 pb-3">
         <span class="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider shrink-0 max-w-24 truncate">{{ gaugeName }}</span>
-        <span
-          v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
-          :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
-        >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
         <span v-if="lastReadingRelative" class="flex-1 text-[10px] text-gray-400 truncate text-right">{{ lastReadingRelative }}</span>
         <div v-else class="flex-1" />
         <NuxtLink

@@ -7,33 +7,6 @@
         <span class="text-sm font-medium truncate text-gray-700 dark:text-gray-200">{{ reach.common_name ?? reach.name }}</span>
       </template>
       <template #actions>
-        <!-- Add / remove from dashboard (primary gauge) -->
-        <ClientOnly>
-          <template v-if="allGauges.length > 0">
-            <button
-              v-if="!onDashboard(allGauges[0].id)"
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shrink-0"
-              @click="addToDashboard(allGauges[0])"
-            >
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
-              </svg>
-              <span class="hidden sm:inline">Add to dashboard</span>
-              <span class="sm:hidden">Add</span>
-            </button>
-            <button
-              v-else
-              class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/50 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950 transition-colors shrink-0"
-              @click="confirmRemoveDashboard(allGauges[0].id)"
-            >
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="4" rx="1"/><rect x="14" y="10" width="7" height="11" rx="1"/><rect x="3" y="13" width="7" height="8" rx="1"/>
-              </svg>
-              <span class="hidden sm:inline">On dashboard</span>
-              <span class="sm:hidden">Saved</span>
-            </button>
-          </template>
-        </ClientOnly>
         <button
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shrink-0"
           @click="openShareForm"
@@ -153,8 +126,8 @@
 
       <!-- Quick stats — consolidated -->
       <section>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
-          <div class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 flex-wrap gap-y-3">
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 overflow-x-auto">
+          <div class="flex items-center divide-x divide-gray-200 dark:divide-gray-700 min-w-0">
             <div class="pr-4">
               <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Difficulty</div>
               <div class="flex items-center gap-1.5">
@@ -449,7 +422,7 @@ function onScroll() {
 }
 
 function scrollToTop() {
-  gsap.to(window, { scrollTo: { y: 0 }, duration: 0.4, ease: 'power2.inOut' })
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 onMounted(() => {

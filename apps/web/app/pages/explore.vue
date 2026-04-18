@@ -23,7 +23,7 @@
           : 'hidden sm:flex sm:w-80'"
       >
         <!-- Search + mobile map toggle -->
-        <div class="px-3 py-2.5 border-b border-gray-100 dark:border-gray-800 shrink-0 flex items-center gap-2">
+        <div class="px-3 py-2.5 sm:border-b border-gray-100 dark:border-gray-800 shrink-0 flex items-center gap-2">
           <input
             v-model="query"
             type="search"
@@ -134,7 +134,7 @@
                       class="shrink-0 p-0.5 rounded transition-opacity"
                       :class="isOnDashboard(reach)
                         ? 'text-blue-500 dark:text-blue-400 opacity-100'
-                        : 'text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 opacity-60 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100'"
+                        : 'text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100'"
                       :aria-label="isOnDashboard(reach) ? 'On dashboard' : 'Add to dashboard'"
                       @click.stop="toggleDashboard(reach)"
                     >
