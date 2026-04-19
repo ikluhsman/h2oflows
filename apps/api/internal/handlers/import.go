@@ -61,10 +61,18 @@ func (h *Import) ImportKMZ(w http.ResponseWriter, r *http.Request) {
 		go h.CacheWarmer()
 	}
 
-	// Sync gauge metadata (basin, watershed, location) immediately so newly
-	// imported DWR gauges get their basin assigned without a server restart.
+	// Sync gauge metadata then rewarm the cache a second time so the list
+	// cache reflects the basin assignments that the sync just wrote. The first
+	// CacheWarmer above runs immediately (new reaches appear on the map); this
+	// second one runs after the sync so the explore/rivers pages group reaches
+	// under the correct basin rather than "Other".
 	if h.MetadataSyncer != nil {
-		go h.MetadataSyncer()
+		go func() {
+			h.MetadataSyncer()
+			if h.CacheWarmer != nil {
+				h.CacheWarmer()
+			}
+		}()
 	}
 
 	// Auto-fetch centerlines for all imported reaches in the background.
