@@ -74,17 +74,17 @@
 
         <section v-for="basin in byBasinTree" :key="basin.name" class="mb-2">
           <!-- Basin header -->
-          <button class="flex items-center gap-2 mb-2 w-full text-left" @click="toggleBasin(basin.name)">
+          <button class="flex items-center gap-2 py-1 mb-1 w-full text-left" @click="toggleBasin(basin.name)">
             <svg
-              class="w-3 h-3 text-gray-400 transition-transform duration-200"
+              class="w-2.5 h-2.5 text-gray-300 dark:text-gray-600 transition-transform duration-200"
               :class="{ 'rotate-90': !collapsedBasins.has(basin.name) }"
               viewBox="0 0 20 20" fill="currentColor"
             >
               <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
             </svg>
-            <h2 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">{{ basin.name }} Basin</h2>
-            <span class="text-xs text-gray-400">({{ basin.reachCount }})</span>
-            <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+            <h2 class="text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest">{{ basin.name }} Basin</h2>
+            <span class="text-[10px] text-gray-300 dark:text-gray-600">({{ basin.reachCount }})</span>
+            <div class="flex-1 h-px bg-gray-100 dark:bg-gray-800/60" />
           </button>
 
           <template v-if="!collapsedBasins.has(basin.name)">
@@ -92,9 +92,9 @@
             <div class="mb-2">
               <template v-for="river in basin.rivers" :key="river.name">
                 <!-- River section divider — always shown -->
-                <div class="flex items-center gap-2 mt-2 first:mt-0 sm:mb-2">
+                <div class="flex items-center gap-2 mt-4 first:mt-1 mb-2">
                   <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                  <span class="text-sm font-semibold text-blue-600 dark:text-blue-400 shrink-0">{{ river.name }}</span>
+                  <span class="text-base font-semibold text-blue-600 dark:text-blue-400 shrink-0">{{ river.name }}</span>
                 </div>
                 <!-- Cards wrapper: list = stacked; comfortable/full = 2-col grid -->
                 <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
@@ -108,6 +108,7 @@
                         :density="viewMode"
                         :hide-river-name="true"
                         @open="(g, mode) => openGauge(g, mode)"
+                        @remove-group="group.all.forEach(g => removeAndSync(g.id, g.contextReachSlug))"
                       />
                       <DashboardReachRow
                         v-else

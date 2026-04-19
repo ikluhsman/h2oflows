@@ -6,7 +6,7 @@
   >
     <!-- Gauge station header row -->
     <div
-      class="flex items-center gap-2 sm:gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+      class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
       @click="$emit('open', leadGauge, 'gauge')"
     >
       <div class="min-w-0 flex-1 flex items-center gap-1.5">
@@ -30,10 +30,19 @@
             @latest-cfs="liveCfs = $event"
           />
         </div>
-        <span class="text-base font-bold tabular-nums min-w-[3.5rem] text-right text-gray-900 dark:text-white">
+        <span class="w-16 shrink-0 text-right text-base font-bold tabular-nums text-gray-900 dark:text-white">
           {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
-          <span class="text-xs font-normal text-gray-400 dark:text-gray-500">cfs</span>
         </span>
+        <span class="text-xs font-normal text-gray-400 dark:text-gray-500 shrink-0">cfs</span>
+        <button
+          class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+          aria-label="Remove gauge group"
+          @click.stop="$emit('remove-group')"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C9.327 4.025 10 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/>
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -206,7 +215,10 @@ const props = defineProps<{
   hideRiverName?: boolean
 }>()
 
-const emit = defineEmits<{ (e: 'open', gauge: WatchedGauge, mode: 'gauge' | 'reach'): void }>()
+const emit = defineEmits<{
+  (e: 'open', gauge: WatchedGauge, mode: 'gauge' | 'reach'): void
+  (e: 'remove-group'): void
+}>()
 
 const { removeAndSync } = useWatchlistSync()
 
