@@ -273,7 +273,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 
 definePageMeta({ ssr: false })
 
@@ -286,6 +286,16 @@ onMounted(async () => {
   await loadAdminRoles()
   authReady.value = true
   if (isDataAdmin.value) {
+    loadRivers()
+    if (isAdmin.value) loadUserRoles()
+  }
+})
+
+// Hard-refresh race: Supabase restores the session asynchronously, so
+// user.value may be null when onMounted runs. Once isDataAdmin flips to
+// true we trigger a load if rivers haven't been fetched yet.
+watch(isDataAdmin, (val) => {
+  if (val && authReady.value && !riversLoading.value && rivers.value.length === 0) {
     loadRivers()
     if (isAdmin.value) loadUserRoles()
   }
@@ -311,8 +321,8 @@ const riversLoading = ref(false)
 
 async function loadRivers() {
   riversLoading.value = true
-  rivers.value = []
   const token = await getToken()
+  if (!token) { riversLoading.value = false; return }
   try {
     const res = await fetch(`${apiBase}/api/v1/admin/rivers`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -437,6 +447,7 @@ const rolesLoading = ref(false)
 async function loadUserRoles() {
   rolesLoading.value = true
   const token = await getToken()
+  if (!token) { rolesLoading.value = false; return }
   try {
     const res = await fetch(`${apiBase}/api/v1/admin/users/roles`, {
       headers: { Authorization: `Bearer ${token}` },
