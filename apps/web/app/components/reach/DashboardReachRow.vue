@@ -31,11 +31,14 @@
         <div class="w-24 shrink-0 hidden sm:block h-5 opacity-50 pointer-events-none">
           <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" :color="sparklineColor" compact @latest-cfs="liveCfs = $event" />
         </div>
-        <span
-          v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
-          :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
-        >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
-        <span class="text-sm font-bold tabular-nums shrink-0" :class="cfsColorClass">
+        <!-- Fixed-width badge slot keeps CFS column aligned across cards -->
+        <div class="shrink-0 w-20 flex justify-end">
+          <span
+            v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
+            :class="['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+          >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
+        </div>
+        <span class="text-sm font-bold tabular-nums shrink-0 w-16 text-right" :class="cfsColorClass">
           {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
           <span class="text-xs font-normal text-gray-400">cfs</span>
         </span>
@@ -115,9 +118,21 @@
             <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
             <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
           </svg>
-          <div class="flex-1 min-w-0">
-            <span class="text-sm font-semibold text-gray-900 dark:text-white truncate block leading-tight">{{ reachName }}</span>
-            <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+          <div class="flex items-center gap-1 min-w-0 flex-1">
+            <div class="min-w-0">
+              <span class="text-sm font-semibold text-gray-900 dark:text-white truncate block leading-tight">{{ reachName }}</span>
+              <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+            </div>
+            <NuxtLink
+              :to="`/reaches/${gauge.contextReachSlug}`"
+              class="shrink-0 p-1 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+              aria-label="View reach detail"
+              @click.stop
+            >
+              <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11"/>
+              </svg>
+            </NuxtLink>
           </div>
           <span
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
@@ -127,23 +142,13 @@
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
           </span>
           <span class="text-xs text-gray-400 shrink-0">cfs</span>
-          <NuxtLink
-            :to="`/reaches/${gauge.contextReachSlug}`"
-            class="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors shrink-0"
-            aria-label="View reach detail"
-            @click.stop
-          >
-            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11"/>
-            </svg>
-          </NuxtLink>
           <button
-            class="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-colors shrink-0"
+            class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
             aria-label="Remove from dashboard"
             @click.stop="$emit('removeGauge', gauge)"
           >
-            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/>
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C9.327 4.025 10 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/>
             </svg>
           </button>
         </div>

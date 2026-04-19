@@ -15,7 +15,10 @@
           <path d="M12 12 16 8"/>
           <path d="M3 12a9 9 0 0 1 18 0"/>
         </svg>
-        <span class="text-sm font-medium text-gray-600 dark:text-gray-400 truncate block">{{ gaugeName }}</span>
+        <div class="min-w-0">
+          <span class="text-sm font-medium text-gray-600 dark:text-gray-400 truncate block">{{ gaugeName }}</span>
+          <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+        </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <div class="w-28 shrink-0 hidden sm:block opacity-60">
@@ -48,7 +51,7 @@
         </svg>
         <!-- Name + link button side-by-side -->
         <div class="flex items-center gap-1 min-w-0 flex-1">
-          <span class="min-w-0 text-sm text-blue-600 dark:text-blue-400 truncate">
+          <span class="min-w-0 text-sm text-gray-700 dark:text-gray-300 truncate">
             {{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}
           </span>
           <NuxtLink
@@ -65,14 +68,14 @@
         </div>
         <span
           v-if="item.flowStatus !== 'unknown' || item.flowBandLabel"
-          :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
+          :class="['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
         >{{ flowBandLabel(item.flowBandLabel, item.flowStatus) }}</span>
         <button
           class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           aria-label="Remove"
           @click.stop="removeAndSync(item.id, item.contextReachSlug)"
         >
-          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C9.327 4.025 10 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/>
           </svg>
         </button>
@@ -98,10 +101,13 @@
           <path d="M12 12 16 8"/>
           <path d="M3 12a9 9 0 0 1 18 0"/>
         </svg>
-        <span
-          class="font-medium text-gray-600 dark:text-gray-400 truncate block leading-tight"
-          :class="density === 'compact' ? 'text-xs' : 'text-sm'"
-        >{{ gaugeName }}</span>
+        <div class="min-w-0">
+          <span
+            class="font-medium text-gray-600 dark:text-gray-400 truncate block leading-tight"
+            :class="density === 'compact' ? 'text-xs' : 'text-sm'"
+          >{{ gaugeName }}</span>
+          <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+        </div>
       </div>
 
       <!-- CFS + trend -->
@@ -170,14 +176,14 @@
         </div>
         <span
           v-if="item.flowStatus !== 'unknown' || item.flowBandLabel"
-          :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
+          :class="['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
         >{{ flowBandLabel(item.flowBandLabel, item.flowStatus) }}</span>
         <button
           class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           aria-label="Remove"
           @click.stop="removeAndSync(item.id, item.contextReachSlug)"
         >
-          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C9.327 4.025 10 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/>
           </svg>
         </button>
@@ -216,5 +222,9 @@ const gaugeName = computed(() =>
   props.density === 'full'
     ? (props.leadGauge.name ?? gaugeShortLabel.value)
     : gaugeShortLabel.value
+)
+
+const riverDisplayName = computed(() =>
+  props.leadGauge.contextReachRiverName ?? props.leadGauge.riverName ?? null
 )
 </script>
