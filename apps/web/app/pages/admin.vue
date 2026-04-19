@@ -101,7 +101,8 @@
               <div>
                 <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">Metadata placemarks (coordinate-less)</p>
                 <p class="text-gray-400">Keys: <code>common_name</code>, <code>description</code>, <code>min_class</code>, <code>max_class</code>, <code>gauge</code>, <code>basin</code>, <code>permit_required</code>, <code>multi_day</code></p>
-                <p class="mt-1 text-amber-500 dark:text-amber-400 text-[11px]">⚠ <strong>basin</strong> is required when a river name exists in multiple drainages (e.g. "Clear Creek" appears in both South Platte and Arkansas basins). Omitting it will merge reaches into the wrong river.</p>
+                <p class="mt-1 text-gray-400 text-[11px]">When omitted, basin is auto-inferred from the gauge's watershed data (works for USGS gauges) or the river name. Safe to omit for rivers with unique names.</p>
+                <p class="mt-0.5 text-amber-500 dark:text-amber-400 text-[11px]">⚠ <strong>basin</strong> is required when a river name exists in multiple drainages (e.g. "Clear Creek" in both South Platte and Arkansas). Omitting it will merge reaches under the wrong basin.</p>
                 <p class="mt-1 text-gray-400">Flow bands: <code>below</code> (upper Too Low CFS), <code>running</code> (min,max), <code>high</code> (min,max), <code>above</code> (lower Very High CFS)</p>
                 <p class="mt-1 text-gray-400">Pin prefixes: <code>Rapid:</code>, <code>Wave:</code>, <code>Put-in:</code>, <code>Take-out:</code>, <code>Parking:</code>, <code>Campsite:</code>, <code>Hazard:</code></p>
               </div>

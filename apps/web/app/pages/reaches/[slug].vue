@@ -169,42 +169,11 @@
         </div>
       </section>
 
-      <!-- River assistant — inline search box -->
-      <section>
-        <form class="flex gap-2" @submit.prevent="sendQuestion(chatInput)">
-          <div class="relative flex-1">
-            <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-sky-400 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <input
-              v-model="chatInput"
-              type="text"
-              placeholder="Ask anything about this reach…"
-              :disabled="chatLoading"
-              class="w-full text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 pl-9 pr-3 py-2 text-gray-800 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50"
-            />
-          </div>
-          <button
-            type="submit"
-            :disabled="chatLoading || !chatInput.trim()"
-            class="shrink-0 rounded-lg bg-sky-500 hover:bg-sky-600 disabled:opacity-40 px-3 py-2 text-white transition-colors"
-          >
-            <svg v-if="!chatLoading" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-            </svg>
-            <span v-else class="flex gap-1 items-center">
-              <span class="w-1.5 h-1.5 rounded-full bg-white/80 animate-bounce" style="animation-delay:0ms"/>
-              <span class="w-1.5 h-1.5 rounded-full bg-white/80 animate-bounce" style="animation-delay:150ms"/>
-              <span class="w-1.5 h-1.5 rounded-full bg-white/80 animate-bounce" style="animation-delay:300ms"/>
-            </span>
-          </button>
-        </form>
-
-        <!-- Last assistant response -->
-        <div v-if="lastAssistantMessage" class="mt-3 rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800 px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
-          {{ lastAssistantMessage }}
+      <!-- Reach Description -->
+      <section v-if="reach.description">
+        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed">
+          {{ reach.description }}
         </div>
-        <p v-if="chatError" class="mt-2 text-xs text-red-500">{{ chatError }}</p>
       </section>
 
       <!-- Reach map -->
@@ -318,14 +287,6 @@
               No features in this category
             </div>
           </div>
-        </div>
-      </section>
-
-      <!-- Reach Description -->
-      <section v-if="reach.description">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Reach Description</h2>
-        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line">
-          {{ reach.description }}
         </div>
       </section>
 
@@ -927,6 +888,7 @@ function openGaugeModal(g: any) {
     flowBandLabel:          null,
     lastReadingAt:          g.last_reading_at ?? null,
     contextReachBasinGroup:     null,
+    contextReachCenterLng:      null,
     contextReachPermitRequired: r?.permit_required ?? false,
     contextReachMultiDayDays:   r?.multi_day_days ?? 1,
   }
@@ -973,45 +935,6 @@ function bandDisplayLabel(label: string): string {
 const displayCenterline = computed(() =>
   (reach.value as any)?.centerline ?? null
 )
-
-// ---- River assistant chat ---------------------------------------------------
-
-const chatMessages  = ref<{ role: 'user' | 'assistant'; content: string }[]>([])
-const chatInput     = ref('')
-const chatLoading   = ref(false)
-const chatError     = ref<string | null>(null)
-
-const lastAssistantMessage = computed(() => {
-  const msgs = chatMessages.value.filter(m => m.role === 'assistant')
-  return msgs.length ? msgs[msgs.length - 1].content : null
-})
-
-async function sendQuestion(question: string) {
-  const q = question.trim()
-  if (!q || chatLoading.value) return
-  chatInput.value = ''
-  chatError.value = null
-  chatMessages.value.push({ role: 'user', content: q })
-  chatLoading.value = true
-  try {
-    const res = await fetch(
-      `${config.public.apiBase}/api/v1/reaches/${route.params.slug}/ask`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q }),
-      }
-    )
-    const json = await res.json()
-    if (!res.ok) throw new Error(json.error ?? `Server error ${res.status}`)
-    chatMessages.value.push({ role: 'assistant', content: json.answer })
-  } catch (err: any) {
-    chatError.value = err?.message ?? 'Something went wrong'
-    chatMessages.value.pop() // remove the user message if we got nothing back
-  } finally {
-    chatLoading.value = false
-  }
-}
 
 // ---- Share modal ------------------------------------------------------------
 

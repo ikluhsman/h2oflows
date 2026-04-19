@@ -226,6 +226,7 @@ function openGaugeModal(reach: ReachListItem) {
       : null,
     contextReachRiverName: reach.river_name ?? null,
     contextReachBasinGroup: reach.basin ?? null,
+    contextReachCenterLng: null,
     contextReachPermitRequired: false,
     contextReachMultiDayDays: 0,
     reachId: null,

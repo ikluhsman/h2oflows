@@ -380,6 +380,7 @@ function buildWatchedGauge(reach: ReachListItem): WatchedGauge {
       ? `${reach.put_in_name} to ${reach.take_out_name}` : null,
     contextReachRiverName: reach.river_name ?? null,
     contextReachBasinGroup: reach.basin ?? null,
+    contextReachCenterLng: null,
     contextReachPermitRequired: false,
     contextReachMultiDayDays: 0,
     reachId: null, reachName: null, reachNames: [],

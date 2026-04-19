@@ -283,7 +283,10 @@ const byBasinTree = computed<BasinGroup[]>(() => {
           // Sort upstream→downstream: gauge lng ascending (west = upstream for CO rivers).
           // Nulls go last.
           reaches: [...reaches].sort((a, b) => {
-            const al = a.lng, bl = b.lng
+            // Prefer reach centerline centroid over gauge location — avoids
+            // misordering when multiple reaches share the same gauge.
+            const al = a.contextReachCenterLng ?? a.lng
+            const bl = b.contextReachCenterLng ?? b.lng
             if (al == null && bl == null) return 0
             if (al == null) return 1
             if (bl == null) return -1
