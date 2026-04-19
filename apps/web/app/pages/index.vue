@@ -34,7 +34,7 @@
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"/>
             <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"/>
           </span>
-          Live Streamflow · Community-driven
+          Live Gauges · Paddler Powered
         </div>
 
         <!-- Headline -->
@@ -44,11 +44,11 @@
 
         <!-- Feature pills — plain text -->
         <div class="flex items-center gap-2 sm:gap-3 mb-6 text-sm font-medium text-gray-500 dark:text-gray-400">
-          <span>Real-time Gauges</span>
+          <span>Live Streamflows</span>
           <span class="text-gray-300 dark:text-gray-700">·</span>
-          <span>Smart Sharing</span>
+          <span>Shared Beta</span>
           <span class="text-gray-300 dark:text-gray-700">·</span>
-          <span>AI Intel</span>
+          <span>Flow Insights</span>
         </div>
 
         <!-- Primary nav buttons -->
