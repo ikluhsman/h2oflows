@@ -88,31 +88,9 @@
           </button>
 
           <template v-if="!collapsedBasins.has(basin.name)">
-            <!-- River groups within basin.
-                 Only show river sub-header when there are multiple rivers (or standalones). -->
-            <div v-for="river in basin.rivers" :key="river.name" class="mb-2">
-              <!-- River header — hidden when this basin has only one river and no standalones -->
-              <button
-                v-if="basin.rivers.length > 1 || basin.standaloneGauges.length > 0"
-                class="flex items-center gap-2 py-1 w-full text-left"
-                @click="toggleRiver(basin.name, river.name)"
-              >
-                <svg
-                  class="w-2.5 h-2.5 text-gray-400 transition-transform duration-200"
-                  :class="{ 'rotate-90': !collapsedRivers.has(`${basin.name}::${river.name}`) }"
-                  viewBox="0 0 20 20" fill="currentColor"
-                >
-                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                </svg>
-                <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">{{ river.name }}</span>
-                <span class="text-xs text-gray-400">({{ river.reaches.length }})</span>
-              </button>
-
-              <!-- Reach cards — always visible when only one river (no header to collapse) -->
-              <div
-                v-if="basin.rivers.length === 1 && basin.standaloneGauges.length === 0 || !collapsedRivers.has(`${basin.name}::${river.name}`)"
-                :class="reachContainerClass"
-              >
+            <!-- All reaches flat under the basin, sorted by river then upstream→downstream -->
+            <div :class="[reachContainerClass, 'mb-2']">
+              <template v-for="river in basin.rivers" :key="river.name">
                 <!-- Grouped mode: merge reaches sharing the same gauge into one card -->
                 <template v-if="groupByGauge">
                   <template v-for="group in groupReaches(river.reaches)" :key="group.lead.id">
@@ -143,7 +121,7 @@
                     @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
                   />
                 </template>
-              </div>
+              </template>
             </div>
 
             <!-- Standalone gauges (no reach context) -->
@@ -319,18 +297,12 @@ const byBasinTree = computed<BasinGroup[]>(() => {
 
 // ── Collapsible sections ────────────────────────────────────────────────────
 const COLLAPSED_KEY = 'h2oflow_dashboard_collapsed'
-const COLLAPSED_RIVERS_KEY = 'h2oflow_dashboard_collapsed_rivers'
 const collapsedBasins = ref<Set<string>>(new Set())
-const collapsedRivers = ref<Set<string>>(new Set())
 
 onMounted(() => {
   try {
     const saved = localStorage.getItem(COLLAPSED_KEY)
     if (saved) collapsedBasins.value = new Set(JSON.parse(saved))
-  } catch {}
-  try {
-    const saved = localStorage.getItem(COLLAPSED_RIVERS_KEY)
-    if (saved) collapsedRivers.value = new Set(JSON.parse(saved))
   } catch {}
 })
 
@@ -341,34 +313,17 @@ function toggleBasin(basin: string) {
   localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...s]))
 }
 
-function toggleRiver(basin: string, river: string) {
-  const key = `${basin}::${river}`
-  const s = new Set(collapsedRivers.value)
-  if (s.has(key)) s.delete(key); else s.add(key)
-  collapsedRivers.value = s
-  localStorage.setItem(COLLAPSED_RIVERS_KEY, JSON.stringify([...s]))
-}
-
 // ── Expand / collapse all ────────────────────────────────────────────────────
-const allExpanded = computed(() => collapsedBasins.value.size === 0 && collapsedRivers.value.size === 0)
+const allExpanded = computed(() => collapsedBasins.value.size === 0)
 
 function toggleAllSections() {
   if (allExpanded.value) {
-    // Collapse everything
     const basins = new Set(byBasinTree.value.map(b => b.name))
-    const rivers = new Set(
-      byBasinTree.value.flatMap(b => b.rivers.map(r => `${b.name}::${r.name}`))
-    )
     collapsedBasins.value = basins
-    collapsedRivers.value = rivers
     localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...basins]))
-    localStorage.setItem(COLLAPSED_RIVERS_KEY, JSON.stringify([...rivers]))
   } else {
-    // Expand everything
     collapsedBasins.value = new Set()
-    collapsedRivers.value = new Set()
     localStorage.setItem(COLLAPSED_KEY, '[]')
-    localStorage.setItem(COLLAPSED_RIVERS_KEY, '[]')
   }
 }
 

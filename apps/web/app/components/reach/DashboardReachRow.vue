@@ -10,7 +10,10 @@
           <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
           <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
         </svg>
-        <span class="flex-1 min-w-0 text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ reachName }}</span>
+        <div class="flex-1 min-w-0">
+          <span class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate block">{{ reachName }}</span>
+          <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+        </div>
         <!-- Sparkline: fixed width, desktop only, pointer-events-none so card click passes through -->
         <div class="w-24 shrink-0 hidden sm:block h-5 opacity-50 pointer-events-none">
           <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" :color="sparklineColor" compact @latest-cfs="liveCfs = $event" />
@@ -44,7 +47,10 @@
             <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
             <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
           </svg>
-          <span class="flex-1 min-w-0 text-sm font-semibold text-gray-900 dark:text-white truncate">{{ reachName }}</span>
+          <div class="flex-1 min-w-0">
+            <span class="text-sm font-semibold text-gray-900 dark:text-white truncate block leading-tight">{{ reachName }}</span>
+            <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+          </div>
           <span
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
             :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
@@ -85,7 +91,10 @@
             <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
             <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
           </svg>
-          <span class="flex-1 min-w-0 text-sm font-semibold text-gray-900 dark:text-white truncate">{{ reachName }}</span>
+          <div class="flex-1 min-w-0">
+            <span class="text-sm font-semibold text-gray-900 dark:text-white truncate block leading-tight">{{ reachName }}</span>
+            <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+          </div>
           <span
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
             :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
@@ -156,6 +165,10 @@ const reachName = computed(() =>
     ?? props.gauge.reachName
     ?? props.gauge.name
     ?? props.gauge.externalId
+)
+
+const riverDisplayName = computed(() =>
+  props.gauge.contextReachRiverName ?? props.gauge.riverName ?? null
 )
 
 const gaugeSourceLabel = computed(() => {
