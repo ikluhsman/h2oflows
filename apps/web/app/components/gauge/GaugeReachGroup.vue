@@ -17,7 +17,7 @@
         </svg>
         <div class="min-w-0">
           <span class="text-sm font-medium text-gray-600 dark:text-gray-400 truncate block">{{ gaugeName }}</span>
-          <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+          <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -106,7 +106,7 @@
             class="font-medium text-gray-600 dark:text-gray-400 truncate block leading-tight"
             :class="density === 'compact' ? 'text-xs' : 'text-sm'"
           >{{ gaugeName }}</span>
-          <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+          <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
         </div>
       </div>
 
@@ -203,6 +203,7 @@ const props = defineProps<{
   leadGauge: WatchedGauge
   reachItems: WatchedGauge[]
   density?: 'compact' | 'comfortable' | 'full' | 'list'
+  hideRiverName?: boolean
 }>()
 
 const emit = defineEmits<{ (e: 'open', gauge: WatchedGauge, mode: 'gauge' | 'reach'): void }>()

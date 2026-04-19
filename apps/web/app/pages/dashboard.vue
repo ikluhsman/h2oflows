@@ -88,39 +88,53 @@
           </button>
 
           <template v-if="!collapsedBasins.has(basin.name)">
-            <!-- All reaches flat under the basin, sorted by river then upstream→downstream -->
-            <div :class="[reachContainerClass, 'mb-2']">
+            <!-- Reaches grouped by river.
+                 List mode: hr divider with river name on right, no river label on cards.
+                 Card modes: flat grid, river name shown on each card. -->
+            <div :class="viewMode !== 'list' ? [reachContainerClass, 'mb-2'] : 'mb-2'">
               <template v-for="river in basin.rivers" :key="river.name">
-                <!-- Grouped mode: merge reaches sharing the same gauge into one card -->
-                <template v-if="groupByGauge">
-                  <template v-for="group in groupReaches(river.reaches)" :key="group.lead.id">
-                    <GaugeReachGroup
-                      v-if="group.all.length > 1"
-                      :lead-gauge="group.lead"
-                      :reach-items="group.all"
-                      :density="viewMode"
-                      @open="(g, mode) => openGauge(g, mode)"
-                    />
+                <!-- River section divider — list view only -->
+                <div v-if="viewMode === 'list'" class="flex items-center gap-2 py-1 mt-1 first:mt-0">
+                  <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                  <span class="text-xs text-gray-400 dark:text-gray-500 font-medium shrink-0">{{ river.name }}</span>
+                </div>
+                <!-- Cards wrapper: space-y-1.5 in list mode; 'contents' in card modes so
+                     children flow directly into the parent grid without breaking layout -->
+                <div :class="viewMode === 'list' ? 'space-y-1.5' : 'contents'">
+                  <!-- Grouped mode: merge reaches sharing the same gauge into one card -->
+                  <template v-if="groupByGauge">
+                    <template v-for="group in groupReaches(river.reaches)" :key="group.lead.id">
+                      <GaugeReachGroup
+                        v-if="group.all.length > 1"
+                        :lead-gauge="group.lead"
+                        :reach-items="group.all"
+                        :density="viewMode"
+                        :hide-river-name="viewMode === 'list'"
+                        @open="(g, mode) => openGauge(g, mode)"
+                      />
+                      <DashboardReachRow
+                        v-else
+                        :gauge="group.lead"
+                        :view="rowView"
+                        :hide-river-name="viewMode === 'list'"
+                        @open-gauge="openGauge($event, 'reach')"
+                        @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
+                      />
+                    </template>
+                  </template>
+                  <!-- Normal mode: one card per reach -->
+                  <template v-else>
                     <DashboardReachRow
-                      v-else
-                      :gauge="group.lead"
+                      v-for="reach in river.reaches"
+                      :key="`${reach.id}::${reach.contextReachSlug}`"
+                      :gauge="reach"
                       :view="rowView"
+                      :hide-river-name="viewMode === 'list'"
                       @open-gauge="openGauge($event, 'reach')"
                       @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
                     />
                   </template>
-                </template>
-                <!-- Normal mode: one card per reach -->
-                <template v-else>
-                  <DashboardReachRow
-                    v-for="reach in river.reaches"
-                    :key="`${reach.id}::${reach.contextReachSlug}`"
-                    :gauge="reach"
-                    :view="rowView"
-                    @open-gauge="openGauge($event, 'reach')"
-                    @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
-                  />
-                </template>
+                </div>
               </template>
             </div>
 

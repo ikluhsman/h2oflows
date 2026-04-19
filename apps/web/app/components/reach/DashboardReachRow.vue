@@ -14,7 +14,7 @@
         <div class="flex items-center gap-1 min-w-0 flex-1">
           <div class="min-w-0">
             <span class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate block">{{ reachName }}</span>
-            <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+            <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
           </div>
           <NuxtLink
             :to="`/reaches/${gauge.contextReachSlug}`"
@@ -66,7 +66,7 @@
           <div class="flex items-center gap-1 min-w-0 flex-1">
             <div class="min-w-0">
               <span class="text-sm font-semibold text-gray-900 dark:text-white truncate block leading-tight">{{ reachName }}</span>
-              <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+              <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
             </div>
             <NuxtLink
               :to="`/reaches/${gauge.contextReachSlug}`"
@@ -121,7 +121,7 @@
           <div class="flex items-center gap-1 min-w-0 flex-1">
             <div class="min-w-0">
               <span class="text-sm font-semibold text-gray-900 dark:text-white truncate block leading-tight">{{ reachName }}</span>
-              <span v-if="riverDisplayName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+              <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
             </div>
             <NuxtLink
               :to="`/reaches/${gauge.contextReachSlug}`"
@@ -178,6 +178,7 @@ import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
 const props = defineProps<{
   gauge: WatchedGauge
   view?: 'list' | 'compact' | 'full'
+  hideRiverName?: boolean
 }>()
 
 defineEmits<{
