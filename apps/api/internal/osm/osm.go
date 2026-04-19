@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"net/url"
@@ -624,7 +625,8 @@ var overpassEndpoints = []string{
 }
 
 // OverpassQuery POSTs a query to the Overpass API and returns the raw response body.
-// Falls back through overpassEndpoints on 429/5xx errors.
+// Falls back through all overpassEndpoints before giving up — a 406 or 503 from
+// one endpoint is endpoint-specific and doesn't mean others will fail too.
 func OverpassQuery(ctx context.Context, query string) ([]byte, error) {
 	form := url.Values{"data": {query}}
 	var lastErr error
@@ -638,6 +640,7 @@ func OverpassQuery(ctx context.Context, query string) ([]byte, error) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		resp, err := httpClient.Do(req)
 		if err != nil {
+			log.Printf("overpass %s: %v", endpoint, err)
 			lastErr = err
 			continue
 		}
@@ -650,11 +653,13 @@ func OverpassQuery(ctx context.Context, query string) ([]byte, error) {
 		if resp.StatusCode == http.StatusOK {
 			return body, nil
 		}
-		// Retry on server errors and rate limiting; bail on client errors.
-		lastErr = fmt.Errorf("overpass returned %d", resp.StatusCode)
-		if resp.StatusCode < 429 {
-			return nil, lastErr
+		snippet := string(body)
+		if len(snippet) > 120 {
+			snippet = snippet[:120]
 		}
+		log.Printf("overpass %s: status %d — %s", endpoint, resp.StatusCode, snippet)
+		lastErr = fmt.Errorf("overpass returned %d", resp.StatusCode)
+		// Always try the next endpoint — never bail early on a specific status code.
 	}
 	return nil, lastErr
 }
