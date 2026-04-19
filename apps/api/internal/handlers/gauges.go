@@ -589,7 +589,7 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			  AND fr.craft_type = 'general'
 			  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
 			  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
-			ORDER BY fr.min_cfs ASC NULLS FIRST
+			ORDER BY fr.min_cfs ASC NULLS FIRST, fr.max_cfs ASC NULLS LAST
 			LIMIT 1
 		) fr_band ON TRUE
 		WHERE %s
@@ -774,7 +774,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			  AND fr.craft_type = 'general'
 			  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
 			  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
-			ORDER BY fr.min_cfs ASC NULLS FIRST
+			ORDER BY fr.min_cfs ASC NULLS FIRST, fr.max_cfs ASC NULLS LAST
 			LIMIT 1
 		) fr_band ON TRUE
 	`, gaugeIDs, reachSlugs)

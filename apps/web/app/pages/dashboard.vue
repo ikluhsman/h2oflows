@@ -82,25 +82,22 @@
             >
               <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
             </svg>
-            <h2 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">{{ basin.name }}</h2>
+            <h2 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">{{ basin.name }} Basin</h2>
             <span class="text-xs text-gray-400">({{ basin.reachCount }})</span>
             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
           </button>
 
           <template v-if="!collapsedBasins.has(basin.name)">
-            <!-- Reaches grouped by river.
-                 List mode: hr divider with river name on right, no river label on cards.
-                 Card modes: flat grid, river name shown on each card. -->
-            <div :class="viewMode !== 'list' ? [reachContainerClass, 'mb-2'] : 'mb-2'">
+            <!-- Reaches grouped by river — river name divider shown in all view modes -->
+            <div class="mb-2">
               <template v-for="river in basin.rivers" :key="river.name">
-                <!-- River section divider — list view only -->
-                <div v-if="viewMode === 'list'" class="flex items-center gap-2 py-1 mt-1 first:mt-0">
+                <!-- River section divider — always shown -->
+                <div class="flex items-center gap-2 mt-2 first:mt-0 sm:mb-2">
                   <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                  <span class="text-xs text-gray-400 dark:text-gray-500 font-medium shrink-0">{{ river.name }}</span>
+                  <span class="text-sm font-semibold text-blue-600 dark:text-blue-400 shrink-0">{{ river.name }}</span>
                 </div>
-                <!-- Cards wrapper: space-y-1.5 in list mode; 'contents' in card modes so
-                     children flow directly into the parent grid without breaking layout -->
-                <div :class="viewMode === 'list' ? 'space-y-1.5' : 'contents'">
+                <!-- Cards wrapper: list = stacked; comfortable/full = 2-col grid -->
+                <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
                   <!-- Grouped mode: merge reaches sharing the same gauge into one card -->
                   <template v-if="groupByGauge">
                     <template v-for="group in groupReaches(river.reaches)" :key="group.lead.id">
@@ -109,14 +106,14 @@
                         :lead-gauge="group.lead"
                         :reach-items="group.all"
                         :density="viewMode"
-                        :hide-river-name="viewMode === 'list'"
+                        :hide-river-name="true"
                         @open="(g, mode) => openGauge(g, mode)"
                       />
                       <DashboardReachRow
                         v-else
                         :gauge="group.lead"
                         :view="rowView"
-                        :hide-river-name="viewMode === 'list'"
+                        :hide-river-name="true"
                         @open-gauge="openGauge($event, 'reach')"
                         @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
                       />
@@ -129,7 +126,7 @@
                       :key="`${reach.id}::${reach.contextReachSlug}`"
                       :gauge="reach"
                       :view="rowView"
-                      :hide-river-name="viewMode === 'list'"
+                      :hide-river-name="true"
                       @open-gauge="openGauge($event, 'reach')"
                       @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
                     />

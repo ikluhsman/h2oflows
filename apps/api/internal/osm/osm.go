@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var httpClient = &http.Client{Timeout: 30 * time.Second}
+var httpClient = &http.Client{Timeout: 15 * time.Second}
 
 // Coord is a [longitude, latitude] pair (exported for callers that pass
 // intermediate waypoints to FetchReachLine).

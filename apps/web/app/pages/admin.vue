@@ -431,7 +431,9 @@ async function fetchCenterline(reachSlug: string) {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!res.ok) {
-      centerlineErrors.value = new Map([...centerlineErrors.value, [reachSlug, `Error ${res.status}`]])
+      const body = await res.json().catch(() => ({}))
+      const msg = body.error ?? `Error ${res.status}`
+      centerlineErrors.value = new Map([...centerlineErrors.value, [reachSlug, msg]])
     } else if (selectedRiver.value) {
       openRiver(selectedRiver.value)
     }
