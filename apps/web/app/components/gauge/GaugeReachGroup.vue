@@ -39,39 +39,41 @@
       <div
         v-for="item in reachItems"
         :key="item.contextReachSlug!"
-        class="flex items-center gap-2 pl-5 pr-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors group border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0 cursor-pointer"
+        class="flex items-center gap-2 pl-5 pr-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0 cursor-pointer"
         @click.stop="$emit('open', item, 'reach')"
       >
         <svg class="w-3.5 h-3.5 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-label="Reach">
           <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
           <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
         </svg>
-        <span class="flex-1 min-w-0 text-sm text-blue-600 dark:text-blue-400 truncate">
-          {{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}
-        </span>
+        <!-- Name + link button side-by-side -->
+        <div class="flex items-center gap-1 min-w-0 flex-1">
+          <span class="min-w-0 text-sm text-blue-600 dark:text-blue-400 truncate">
+            {{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}
+          </span>
+          <NuxtLink
+            :to="`/reaches/${item.contextReachSlug}`"
+            class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            aria-label="View reach page"
+            title="View reach page"
+            @click.stop
+          >
+            <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </NuxtLink>
+        </div>
         <span
           v-if="item.flowStatus !== 'unknown' || item.flowBandLabel"
           :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
         >{{ flowBandLabel(item.flowBandLabel, item.flowStatus) }}</span>
-        <!-- Link to reach page -->
-        <NuxtLink
-          :to="`/reaches/${item.contextReachSlug}`"
-          class="shrink-0 p-1 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
-          aria-label="View reach page"
-          title="View reach page"
-          @click.stop
-        >
-          <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </NuxtLink>
         <button
-          class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors shrink-0"
+          class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           aria-label="Remove"
           @click.stop="removeAndSync(item.id, item.contextReachSlug)"
         >
-          <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C9.327 4.025 10 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/>
           </svg>
         </button>
       </div>
@@ -142,39 +144,41 @@
       <div
         v-for="item in reachItems"
         :key="item.contextReachSlug!"
-        class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors group border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0 cursor-pointer"
+        class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0 cursor-pointer"
         @click.stop="$emit('open', item, 'reach')"
       >
         <svg class="w-3.5 h-3.5 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-label="Reach">
           <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
           <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
         </svg>
-        <span class="flex-1 min-w-0 text-sm text-gray-700 dark:text-gray-300 truncate">
-          {{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}
-        </span>
+        <!-- Name + link button side-by-side -->
+        <div class="flex items-center gap-1 min-w-0 flex-1">
+          <span class="min-w-0 text-sm text-gray-700 dark:text-gray-300 truncate">
+            {{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}
+          </span>
+          <NuxtLink
+            :to="`/reaches/${item.contextReachSlug}`"
+            class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            aria-label="View reach page"
+            title="View reach page"
+            @click.stop
+          >
+            <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </NuxtLink>
+        </div>
         <span
           v-if="item.flowStatus !== 'unknown' || item.flowBandLabel"
           :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
         >{{ flowBandLabel(item.flowBandLabel, item.flowStatus) }}</span>
-        <!-- Link to reach page -->
-        <NuxtLink
-          :to="`/reaches/${item.contextReachSlug}`"
-          class="shrink-0 opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-all"
-          aria-label="View reach page"
-          title="View reach page"
-          @click.stop
-        >
-          <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </NuxtLink>
         <button
-          class="opacity-0 group-hover:opacity-100 rounded p-0.5 text-gray-400 hover:text-red-400 transition-all shrink-0"
+          class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           aria-label="Remove"
           @click.stop="removeAndSync(item.id, item.contextReachSlug)"
         >
-          <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+          <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C9.327 4.025 10 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clip-rule="evenodd"/>
           </svg>
         </button>
       </div>
