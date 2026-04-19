@@ -737,7 +737,16 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				     ELSE NULL END                     AS full_name,
 				rctx.river_name,
 				rctx_rv.basin AS basin_group,
-				ST_X(ST_Centroid(rctx.centerline::geometry)) AS center_lng
+				-- Sort key: westernmost put-in = most upstream for CO rivers (west→east).
+				-- Falls back to centerline centroid when no put-in access point exists.
+				COALESCE(
+				    (SELECT MIN(ST_X(ra.location::geometry))
+				     FROM reach_access ra
+				     WHERE ra.reach_id = rctx.id
+				       AND ra.access_type = 'put_in'
+				       AND ra.location IS NOT NULL),
+				    ST_X(ST_Centroid(rctx.centerline::geometry))
+				) AS center_lng
 			FROM reaches rctx
 			LEFT JOIN rivers rctx_rv ON rctx_rv.id = rctx.river_id
 			WHERE rctx.primary_gauge_id = g.id
