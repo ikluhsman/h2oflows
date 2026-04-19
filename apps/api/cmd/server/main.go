@@ -114,6 +114,7 @@ func main() {
 		CacheWarmer:       func() { reaches.WarmCache(context.Background()) },
 		CenterlineFetcher: reaches.BackgroundFetchCenterline,
 		Embedder:          importEmbedder,
+		MetadataSyncer:    func() { p.SyncMetadataNow(context.Background()) },
 	}
 	// LoadAppRoles queries user_roles for the authenticated user on each request.
 	// Runs after Optional/Required so the user ID is already in context.

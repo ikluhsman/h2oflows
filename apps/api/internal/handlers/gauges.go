@@ -736,7 +736,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				     THEN rctx.put_in_name || ' to ' || rctx.take_out_name
 				     ELSE NULL END                     AS full_name,
 				rctx.river_name,
-				rctx_rv.basin AS basin_group,
+				COALESCE(rctx_rv.basin, g.watershed_name) AS basin_group,
 				-- Sort key: westernmost put-in = most upstream for CO rivers (west→east).
 				-- Falls back to centerline centroid when no put-in access point exists.
 				COALESCE(

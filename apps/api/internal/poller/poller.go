@@ -465,6 +465,14 @@ func (p *Poller) bulkWriteReadings(ctx context.Context, gaugeID string, readings
 
 // --- Metadata sync ----------------------------------------------------------
 
+// SyncMetadataNow runs the metadata sync immediately for all sources.
+// Safe to call at any time — skips gauges that already have complete metadata.
+// Used by the import handler so newly imported gauges get basin/location data
+// without waiting for the next server restart.
+func (p *Poller) SyncMetadataNow(ctx context.Context) {
+	p.syncAllMetadata(ctx)
+}
+
 // syncAllMetadata fetches site metadata (location, HUC, state) from USGS for
 // any gauges that are missing it. Runs once on startup. Safe to re-run.
 func (p *Poller) syncAllMetadata(ctx context.Context) {
@@ -489,7 +497,7 @@ func (p *Poller) syncSourceMetadata(ctx context.Context, sourceType string, disc
 		FROM   gauges
 		WHERE  source = $1
 		  AND  status != 'retired'
-		  AND  (location IS NULL OR huc8 IS NULL OR basin_name IS NULL OR state_abbr IS NULL OR state_abbr = '' OR elevation_ft IS NULL)
+		  AND  (location IS NULL OR huc8 IS NULL OR basin_name IS NULL OR state_abbr IS NULL OR state_abbr = '' OR elevation_ft IS NULL OR watershed_name IS NULL)
 		LIMIT  500
 	`, sourceType)
 	if err != nil {

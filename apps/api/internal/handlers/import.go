@@ -17,6 +17,7 @@ type Import struct {
 	CacheWarmer        func()             // optional; called after a successful import to refresh the map cache
 	CenterlineFetcher  func(slug string)  // optional; called for each imported reach to auto-fetch its river line
 	Embedder           *ai.Embedder       // optional; when set, auto-embeds imported reaches for the AI assistant
+	MetadataSyncer     func()             // optional; called after import to sync gauge basin/location metadata immediately
 }
 
 // ImportKMZ handles POST /api/v1/import/kmz
@@ -58,6 +59,12 @@ func (h *Import) ImportKMZ(w http.ResponseWriter, r *http.Request) {
 	// Rewarm the map cache so imported reaches appear on the map immediately.
 	if h.CacheWarmer != nil {
 		go h.CacheWarmer()
+	}
+
+	// Sync gauge metadata (basin, watershed, location) immediately so newly
+	// imported DWR gauges get their basin assigned without a server restart.
+	if h.MetadataSyncer != nil {
+		go h.MetadataSyncer()
 	}
 
 	// Auto-fetch centerlines for all imported reaches in the background.
