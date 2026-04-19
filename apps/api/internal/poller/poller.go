@@ -496,7 +496,8 @@ func (p *Poller) syncAllMetadata(ctx context.Context) {
 
 // propagateRiverBasins fills rivers.basin for any river that is missing it by
 // joining through reaches to the primary gauge's watershed_name. Safe to run
-// repeatedly — only touches rivers where basin IS NULL.
+// repeatedly — only touches rivers where basin IS NULL and basin_locked = FALSE.
+// Rivers with basin_locked = TRUE have a human-set override and are skipped.
 func (p *Poller) propagateRiverBasins(ctx context.Context) {
 	tag, err := p.db.Exec(ctx, `
 		UPDATE rivers rv
@@ -504,6 +505,7 @@ func (p *Poller) propagateRiverBasins(ctx context.Context) {
 		FROM   reaches re
 		JOIN   gauges  g ON g.id = re.primary_gauge_id
 		WHERE  re.river_id        = rv.id
+		  AND  rv.basin_locked    = FALSE
 		  AND  rv.basin           IS NULL
 		  AND  g.watershed_name   IS NOT NULL
 	`)
@@ -659,6 +661,7 @@ func (p *Poller) applyMetadata(ctx context.Context, gaugeID string, site *gauge.
 			FROM   reaches re
 			WHERE  re.river_id         = rv.id
 			  AND  re.primary_gauge_id = $1
+			  AND  rv.basin_locked     = FALSE
 			  AND  rv.basin            IS NULL
 		`, gaugeID, site.CanonicalBasin); err != nil {
 			log.Printf("poller: propagate basin to river for gauge %s: %v", gaugeID, err)

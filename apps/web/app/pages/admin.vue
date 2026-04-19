@@ -55,7 +55,12 @@
             >
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.name }}</p>
-                <p class="text-xs text-gray-400 truncate">{{ river.basin ?? 'No basin' }} · {{ river.slug }}</p>
+                <p class="text-xs text-gray-400 truncate flex items-center gap-1">
+                  <span v-if="river.basin_locked" title="Basin manually locked" class="text-amber-500">&#x1F512;</span>
+                  <span>{{ river.basin ?? 'No basin' }}</span>
+                  <span class="text-gray-300">·</span>
+                  <span>{{ river.slug }}</span>
+                </p>
               </div>
               <span class="text-xs text-gray-400 shrink-0">{{ river.reach_count }} reach{{ river.reach_count !== 1 ? 'es' : '' }}</span>
               <svg class="w-4 h-4 text-gray-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -178,7 +183,44 @@
         </div>
       </template>
       <template #body>
-        <div class="space-y-3">
+        <div class="space-y-4">
+
+          <!-- Basin override editor -->
+          <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-4 py-3 space-y-2">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Basin assignment</p>
+
+            <!-- HUC source row -->
+            <div v-if="selectedRiver.gauge_basin" class="flex items-center gap-2 text-xs text-gray-400">
+              <span class="text-gray-300">HUC-derived:</span>
+              <span class="font-medium text-gray-600 dark:text-gray-300">{{ selectedRiver.gauge_basin }}</span>
+              <template v-if="selectedRiver.gauge_watershed">
+                <span class="text-gray-300">via</span>
+                <span>{{ selectedRiver.gauge_watershed }}</span>
+              </template>
+              <template v-if="selectedRiver.gauge_huc8">
+                <span class="text-gray-300">·</span>
+                <span class="font-mono">HUC{{ selectedRiver.gauge_huc8.slice(0,4) }}</span>
+              </template>
+            </div>
+            <p v-else class="text-xs text-gray-400 italic">No gauge with HUC data linked yet</p>
+
+            <!-- Edit row -->
+            <div class="flex items-center gap-2">
+              <input
+                v-model="basinEdit"
+                class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm"
+                placeholder="e.g. South Platte"
+              />
+              <label class="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300 cursor-pointer select-none shrink-0">
+                <input type="checkbox" v-model="basinLockEdit" class="rounded" />
+                Lock
+              </label>
+              <UButton size="xs" :loading="basinSaving" @click="saveBasin">Save</UButton>
+            </div>
+            <p v-if="selectedRiver.basin_locked && !basinLockEdit" class="text-xs text-amber-500">Removing the lock will allow the metadata sync to overwrite this basin.</p>
+            <p v-if="!selectedRiver.basin_locked && basinLockEdit" class="text-xs text-blue-500">Locking prevents the sync from overwriting this basin in the future.</p>
+          </div>
+
           <p class="text-sm text-gray-500">{{ selectedRiver.reaches?.length ?? 0 }} reaches</p>
           <div class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div
@@ -211,6 +253,7 @@
             </div>
             <div v-if="!selectedRiver.reaches?.length" class="px-3 py-6 text-center text-sm text-gray-400">No reaches linked to this river</div>
           </div>
+
         </div>
       </template>
     </UModal>
@@ -313,8 +356,13 @@ const visibleTabs = computed(() => {
 })
 
 // ── Rivers ────────────────────────────────────────────────────────────────────
-interface River { id: string; slug: string; name: string; basin: string | null; state_abbr: string | null; reach_count: number }
-interface RiverDetail extends River { reaches: { id: string; slug: string; name: string; common_name: string | null; has_centerline: boolean }[] }
+interface River { id: string; slug: string; name: string; basin: string | null; basin_locked: boolean; state_abbr: string | null; reach_count: number }
+interface RiverDetail extends River {
+  gauge_basin: string | null      // system-derived canonical basin (from HUC)
+  gauge_watershed: string | null  // HUC4 watershed name (e.g. "Cache La Poudre River")
+  gauge_huc8: string | null       // raw HUC8 for reference
+  reaches: { id: string; slug: string; name: string; common_name: string | null; has_centerline: boolean }[]
+}
 
 const rivers = ref<River[]>([])
 const riversLoading = ref(false)
@@ -335,6 +383,9 @@ async function loadRivers() {
 
 const selectedRiver = ref<RiverDetail | null>(null)
 const riverDetailOpen = ref(false)
+const basinEdit = ref('')
+const basinLockEdit = ref(false)
+const basinSaving = ref(false)
 
 async function openRiver(river: River) {
   const token = await getToken()
@@ -343,7 +394,27 @@ async function openRiver(river: River) {
   })
   if (res.ok) {
     selectedRiver.value = await res.json()
+    basinEdit.value = selectedRiver.value?.basin ?? ''
+    basinLockEdit.value = selectedRiver.value?.basin_locked ?? false
     riverDetailOpen.value = true
+  }
+}
+
+async function saveBasin() {
+  if (!selectedRiver.value) return
+  basinSaving.value = true
+  const token = await getToken()
+  try {
+    await fetch(`${apiBase}/api/v1/admin/rivers/${selectedRiver.value.slug}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ basin: basinEdit.value || null, basin_locked: basinLockEdit.value }),
+    })
+    // Refresh detail + list so the lock badge updates.
+    await openRiver(selectedRiver.value)
+    loadRivers()
+  } finally {
+    basinSaving.value = false
   }
 }
 

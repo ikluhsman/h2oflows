@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/h2oflow/h2oflow/apps/api/internal/auth"
+	gauge "github.com/h2oflow/h2oflow/packages/gauge-core"
 )
 
 type AdminHandler struct {
@@ -24,7 +25,7 @@ func NewAdminHandler(db *pgxpool.Pool) *AdminHandler {
 // GET /api/v1/admin/rivers
 func (h *AdminHandler) ListRivers(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(r.Context(), `
-		SELECT rv.id, rv.slug, rv.name, rv.basin, rv.state_abbr,
+		SELECT rv.id, rv.slug, rv.name, rv.basin, rv.basin_locked, rv.state_abbr,
 		       COUNT(re.id) AS reach_count
 		FROM rivers rv
 		LEFT JOIN reaches re ON re.river_id = rv.id
@@ -38,18 +39,19 @@ func (h *AdminHandler) ListRivers(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type River struct {
-		ID         string  `json:"id"`
-		Slug       string  `json:"slug"`
-		Name       string  `json:"name"`
-		Basin      *string `json:"basin"`
-		StateAbbr  *string `json:"state_abbr"`
-		ReachCount int     `json:"reach_count"`
+		ID          string  `json:"id"`
+		Slug        string  `json:"slug"`
+		Name        string  `json:"name"`
+		Basin       *string `json:"basin"`
+		BasinLocked bool    `json:"basin_locked"`
+		StateAbbr   *string `json:"state_abbr"`
+		ReachCount  int     `json:"reach_count"`
 	}
 
 	rivers := make([]River, 0)
 	for rows.Next() {
 		var rv River
-		if err := rows.Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.Basin, &rv.StateAbbr, &rv.ReachCount); err != nil {
+		if err := rows.Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.Basin, &rv.BasinLocked, &rv.StateAbbr, &rv.ReachCount); err != nil {
 			continue
 		}
 		rivers = append(rivers, rv)
@@ -72,21 +74,46 @@ func (h *AdminHandler) GetRiver(w http.ResponseWriter, r *http.Request) {
 		HasCenterline bool  `json:"has_centerline"`
 	}
 	type RiverDetail struct {
-		ID        string  `json:"id"`
-		Slug      string  `json:"slug"`
-		Name      string  `json:"name"`
-		Basin     *string `json:"basin"`
-		StateAbbr *string `json:"state_abbr"`
-		Reaches   []Reach `json:"reaches"`
+		ID              string  `json:"id"`
+		Slug            string  `json:"slug"`
+		Name            string  `json:"name"`
+		Basin           *string `json:"basin"`
+		BasinLocked     bool    `json:"basin_locked"`
+		StateAbbr       *string `json:"state_abbr"`
+		// HUC-derived basin from the primary gauge of the first linked reach.
+		// Null when no linked reach has a gauge with metadata yet.
+		GaugeBasin      *string `json:"gauge_basin"`       // e.g. "South Platte"
+		GaugeWatershed  *string `json:"gauge_watershed"`   // e.g. "Cache La Poudre River"
+		GaugeHUC8       *string `json:"gauge_huc8"`        // e.g. "10190007"
+		Reaches         []Reach `json:"reaches"`
 	}
 
 	var rv RiverDetail
 	err := h.db.QueryRow(r.Context(), `
-		SELECT id, slug, name, basin, state_abbr FROM rivers WHERE slug = $1
-	`, slug).Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.Basin, &rv.StateAbbr)
+		SELECT id, slug, name, basin, basin_locked, state_abbr FROM rivers WHERE slug = $1
+	`, slug).Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.Basin, &rv.BasinLocked, &rv.StateAbbr)
 	if err != nil {
 		errorResponse(w, http.StatusNotFound, "river not found")
 		return
+	}
+
+	// Pull the HUC-derived basin from the primary gauge of any linked reach.
+	// This lets the admin compare the system-derived value against the stored one.
+	var gaugeHUC8 string
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT g.watershed_name, g.huc8
+		FROM   reaches re
+		JOIN   gauges  g ON g.id = re.primary_gauge_id
+		WHERE  re.river_id = $1
+		  AND  g.watershed_name IS NOT NULL
+		LIMIT 1
+	`, rv.ID).Scan(&rv.GaugeBasin, &gaugeHUC8)
+	if gaugeHUC8 != "" {
+		rv.GaugeHUC8 = &gaugeHUC8
+		_, watershedName := gauge.HUCNames(gaugeHUC8)
+		if watershedName != "" {
+			rv.GaugeWatershed = &watershedName
+		}
 	}
 
 	rows, err := h.db.Query(r.Context(), `
@@ -173,12 +200,16 @@ func (h *AdminHandler) DeleteRiver(w http.ResponseWriter, r *http.Request) {
 
 // UpdateRiver updates a river's metadata.
 // PUT /api/v1/admin/rivers/{riverSlug}
+// When basin is provided it is always written (even if identical) so the
+// caller can explicitly set it. basin_locked controls whether the metadata
+// sync is allowed to overwrite it in the future.
 func (h *AdminHandler) UpdateRiver(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "riverSlug")
 	var body struct {
-		Name      *string `json:"name"`
-		Basin     *string `json:"basin"`
-		StateAbbr *string `json:"state_abbr"`
+		Name        *string `json:"name"`
+		Basin       *string `json:"basin"`
+		BasinLocked *bool   `json:"basin_locked"`
+		StateAbbr   *string `json:"state_abbr"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		errorResponse(w, http.StatusBadRequest, "invalid JSON")
@@ -187,11 +218,12 @@ func (h *AdminHandler) UpdateRiver(w http.ResponseWriter, r *http.Request) {
 
 	_, err := h.db.Exec(r.Context(), `
 		UPDATE rivers
-		SET name       = COALESCE($2, name),
-		    basin      = COALESCE($3, basin),
-		    state_abbr = COALESCE($4, state_abbr)
+		SET name         = COALESCE($2, name),
+		    basin        = COALESCE($3, basin),
+		    basin_locked = COALESCE($4, basin_locked),
+		    state_abbr   = COALESCE($5, state_abbr)
 		WHERE slug = $1
-	`, slug, body.Name, body.Basin, body.StateAbbr)
+	`, slug, body.Name, body.Basin, body.BasinLocked, body.StateAbbr)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "update failed")
 		return

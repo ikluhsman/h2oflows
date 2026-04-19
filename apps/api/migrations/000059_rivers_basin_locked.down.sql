@@ -1,0 +1,1 @@
+ALTER TABLE rivers DROP COLUMN IF EXISTS basin_locked;

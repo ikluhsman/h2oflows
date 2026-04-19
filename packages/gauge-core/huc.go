@@ -116,7 +116,7 @@ func huc4Watershed(huc4 string) string {
 	case "1018":
 		return "South Platte River"
 	case "1019":
-		return "North Platte River"
+		return "Cache La Poudre River" // HUC4 1019 = Cache la Poudre subregion (South Platte tributary)
 	case "1023":
 		return "North Platte River"
 	case "1024":
@@ -166,7 +166,9 @@ func CanonicalBasin(huc8 string) string {
 		switch huc4 {
 		case "1018":
 			return "South Platte"
-		case "1019", "1023":
+		case "1019":
+			return "South Platte" // Cache La Poudre drains into South Platte, not North Platte
+		case "1023":
 			return "North Platte"
 		default:
 			return "Missouri"
