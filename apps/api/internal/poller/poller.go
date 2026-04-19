@@ -486,6 +486,34 @@ func (p *Poller) syncAllMetadata(ctx context.Context) {
 			log.Printf("poller: metadata sync [%s]: %v", sourceType, err)
 		}
 	}
+
+	// Bulk-propagate basin from gauges → rivers for any river still missing it.
+	// Runs after all source syncs so it catches:
+	//   (a) gauges just synced above, and
+	//   (b) gauges already fully synced whose river was recently re-created.
+	p.propagateRiverBasins(ctx)
+}
+
+// propagateRiverBasins fills rivers.basin for any river that is missing it by
+// joining through reaches to the primary gauge's watershed_name. Safe to run
+// repeatedly — only touches rivers where basin IS NULL.
+func (p *Poller) propagateRiverBasins(ctx context.Context) {
+	tag, err := p.db.Exec(ctx, `
+		UPDATE rivers rv
+		SET    basin = g.watershed_name
+		FROM   reaches re
+		JOIN   gauges  g ON g.id = re.primary_gauge_id
+		WHERE  re.river_id        = rv.id
+		  AND  rv.basin           IS NULL
+		  AND  g.watershed_name   IS NOT NULL
+	`)
+	if err != nil {
+		log.Printf("poller: propagate river basins: %v", err)
+		return
+	}
+	if tag.RowsAffected() > 0 {
+		log.Printf("poller: set basin on %d river(s) from gauge watershed data", tag.RowsAffected())
+	}
 }
 
 // syncSourceMetadata fetches and stores metadata for gauges of one source
