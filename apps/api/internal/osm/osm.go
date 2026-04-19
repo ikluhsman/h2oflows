@@ -617,11 +617,13 @@ func buildLineString(coords []coord) string {
 	return fmt.Sprintf(`{"type":"LineString","coordinates":[%s]}`, strings.Join(parts, ","))
 }
 
-// overpassEndpoints is tried in order; on 429/5xx the next is tried.
+// overpassEndpoints is tried in order until one succeeds.
+// lz4/z are load-balanced slaves of overpass-api.de; osm.ch is an independent
+// Swiss instance — both tend to be reachable from cloud-hosted servers.
 var overpassEndpoints = []string{
-	"https://overpass-api.de/api/interpreter",
-	"https://overpass.kumi.systems/api/interpreter",
-	"https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+	"https://lz4.overpass-api.de/api/interpreter",
+	"https://z.overpass-api.de/api/interpreter",
+	"https://overpass.osm.ch/api/interpreter",
 }
 
 // OverpassQuery POSTs a query to the Overpass API and returns the raw response body.
@@ -638,6 +640,7 @@ func OverpassQuery(ctx context.Context, query string) ([]byte, error) {
 			return nil, err
 		}
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("User-Agent", "h2oflows/1.0 (https://h2oflows.org)")
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			log.Printf("overpass %s: %v", endpoint, err)
