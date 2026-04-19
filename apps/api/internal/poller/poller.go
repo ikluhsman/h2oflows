@@ -621,6 +621,21 @@ func (p *Poller) applyMetadata(ctx context.Context, gaugeID string, site *gauge.
 	if _, err := p.db.Exec(ctx, sql, args...); err != nil {
 		log.Printf("poller: apply metadata for %s: %v", gaugeID, err)
 	}
+
+	// Propagate canonical basin to any river whose reaches use this gauge as
+	// primary. Skips rivers that already have an explicit basin set.
+	if site.CanonicalBasin != "" {
+		if _, err := p.db.Exec(ctx, `
+			UPDATE rivers rv
+			SET    basin = $2
+			FROM   reaches re
+			WHERE  re.river_id         = rv.id
+			  AND  re.primary_gauge_id = $1
+			  AND  rv.basin            IS NULL
+		`, gaugeID, site.CanonicalBasin); err != nil {
+			log.Printf("poller: propagate basin to river for gauge %s: %v", gaugeID, err)
+		}
+	}
 }
 
 // --- DB helpers -------------------------------------------------------------
