@@ -29,7 +29,7 @@ type Geometry struct {
 type FeatureProps struct {
 	Identifier   string   `json:"identifier"`    // e.g. "USGS-09058000" for gauges, "14837340" for flowlines
 	Name         string   `json:"name"`          // gauge name or flowline GNIS name
-	NhdplusComID *int64   `json:"nhdplus_comid"` // set on flowline features
+	NhdplusComID *string  `json:"nhdplus_comid"` // set on flowline features; NLDI returns as a JSON string
 	ComID        *string  `json:"comid"`         // set on gauge features — the reach the gauge sits on
 	ReachCode    *string  `json:"reachcode"`
 	GnisName     *string  `json:"gnis_name"`

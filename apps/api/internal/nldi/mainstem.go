@@ -32,8 +32,7 @@ func MergeMainstem(features []Feature, targetComID string) ([]Coord, error) {
 		} else {
 			out = append(out, coords[1:]...)
 		}
-		if targetComID != "" && f.Props.NhdplusComID != nil &&
-			fmt.Sprintf("%d", *f.Props.NhdplusComID) == targetComID {
+		if targetComID != "" && f.Props.NhdplusComID != nil && *f.Props.NhdplusComID == targetComID {
 			break
 		}
 	}
