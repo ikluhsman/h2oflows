@@ -25,7 +25,9 @@ type Gauge struct {
 	// Prominence
 	Featured        bool
 	ProminenceScore float64
-	CreatedAt       time.Time
+	// NHD/NLDI reference (nullable — populated for USGS gauges once NLDI lookup runs).
+	ComID     *string
+	CreatedAt time.Time
 }
 
 // GaugeReading mirrors the gauge_readings table.
