@@ -19,7 +19,13 @@ type Reach struct {
 	LengthMi       *float64
 	Region         *string
 	PrimaryGaugeID *string
-	CreatedAt      time.Time
+	// NHD/NLDI reference layer (nullable — not required for boatable-reach definition).
+	AnchorComID   *string
+	PutInComID    *string
+	TakeOutComID  *string
+	ReachCode     *string
+	TotDASqKm     *float64
+	CreatedAt     time.Time
 }
 
 // ReachCondition mirrors the reach_conditions table.
