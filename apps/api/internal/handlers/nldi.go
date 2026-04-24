@@ -388,6 +388,35 @@ func (h *NLDIHandler) GenerateDescription(w http.ResponseWriter, r *http.Request
 	jsonResponse(w, http.StatusOK, map[string]any{"description": text})
 }
 
+// PatchReach handles PATCH /api/v1/admin/reaches/{slug}
+//
+// Accepts { description?: string } and updates only those fields.
+// Currently only description is patchable via this endpoint.
+func (h *NLDIHandler) PatchReach(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	var req struct {
+		Description *string `json:"description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	ctx := r.Context()
+	tag, err := h.db.Exec(ctx,
+		`UPDATE reaches SET description = $1 WHERE slug = $2`,
+		req.Description, slug,
+	)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("update: %v", err))
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		errorResponse(w, http.StatusNotFound, fmt.Sprintf("reach %q not found", slug))
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]any{"slug": slug})
+}
+
 // buildSlug produces a URL-safe slug from river name + reach name,
 // matching the KML importer convention.
 func buildSlug(riverName, reachName string) string {

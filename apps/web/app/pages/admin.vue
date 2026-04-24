@@ -76,7 +76,7 @@
           <div class="space-y-4">
             <div>
               <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Import KMZ / KML</h2>
-              <p class="text-xs text-gray-400 mb-3">Upload a KMZ or KML file to import or update reaches. Existing reaches are updated; new ones are created.</p>
+              <p class="text-xs text-gray-400 mb-3">Upload a KMZ or KML file to enrich existing reaches with access points, rapids, and hazards. Each folder must include a slug placemark matching a reach created in the NHD Explorer tab.</p>
               <div class="flex items-center gap-3">
                 <UButton
                   :loading="importing"
@@ -99,8 +99,9 @@
                 <ul class="list-disc pl-4 space-y-0.5">
                   <li><strong>Document name</strong> → sets <code>river_name</code> on all reaches in the file</li>
                   <li><strong>Document description</strong> → optional <code>Basin: South Platte</code> line sets the basin for all reaches (overridable per-folder via metadata placemark)</li>
-                  <li><strong>One folder per reach</strong> — folder name becomes the reach display name</li>
-                  <li><strong>LineString placemark</strong> → reach centerline geometry</li>
+                  <li><strong>One folder per reach</strong> — folder name is informational; the <strong>slug placemark</strong> is what links it to the DB</li>
+                  <li><strong>Slug placemark</strong> (required): a coordinate-less <code>&lt;Placemark&gt;&lt;name&gt;slug&lt;/name&gt;&lt;description&gt;reach-slug-here&lt;/description&gt;&lt;/Placemark&gt;</code> inside the folder</li>
+                  <li>Folders missing a slug placemark are skipped with a warning — create the reach in NHD Explorer first</li>
                 </ul>
               </div>
               <div>
@@ -196,61 +197,81 @@
 
             <!-- ── AUTHOR MODE ──────────────────────────────────────────────── -->
             <div v-if="nhdMode === 'author'">
+              <p class="text-xs text-gray-400 mb-3">Pick an anchor point near the reach to load NHD tributary flowlines. Then click flowline segments to select the upstream and downstream ComIDs — no access-point coordinates needed yet.</p>
 
-              <!-- Step indicator -->
-              <div class="flex items-center gap-2 mb-3 text-xs">
-                <span :class="authorStep === 'put-in' ? 'text-green-700 dark:text-green-400 font-semibold' : authorPutIn ? 'text-gray-400 line-through' : 'text-gray-400'">1. Pick put-in</span>
-                <span class="text-gray-300">→</span>
-                <span :class="authorStep === 'take-out' ? 'text-red-700 dark:text-red-400 font-semibold' : authorTakeOut ? 'text-gray-400 line-through' : 'text-gray-400'">2. Pick take-out</span>
-                <span class="text-gray-300">→</span>
-                <span :class="authorStep === 'form' ? 'text-blue-700 dark:text-blue-400 font-semibold' : 'text-gray-400'">3. Fill &amp; save</span>
-                <UButton v-if="authorStep !== 'put-in'" size="xs" variant="ghost" color="neutral" class="ml-auto" @click="resetAuthor">Reset</UButton>
+              <!-- Anchor controls -->
+              <div class="flex flex-wrap items-center gap-2 mb-3">
+                <UButton
+                  size="xs"
+                  :color="authorPickMode ? 'primary' : 'neutral'"
+                  :variant="authorPickMode ? 'solid' : 'outline'"
+                  @click="authorPickMode = !authorPickMode"
+                >{{ authorPickMode ? 'Cancel' : 'Pick anchor point' }}</UButton>
+                <UButton v-if="authorAnchorSnap" size="xs" variant="ghost" color="neutral" @click="resetAuthor">Clear</UButton>
+                <span v-if="authorAnchorSnapping" class="text-xs text-blue-600 dark:text-blue-400 animate-pulse">Snapping to NHD…</span>
               </div>
 
-              <!-- Map with authoring pins -->
-              <div v-if="authorSnapping" class="mb-2 text-xs text-blue-600 dark:text-blue-400 text-center animate-pulse">Snapping to NHD…</div>
+              <!-- Anchor badge -->
+              <div v-if="authorAnchorSnap" class="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                <span class="font-medium text-blue-800 dark:text-blue-200">Anchor ComID {{ authorAnchorSnap.comid }}</span>
+                <span v-if="authorAnchorSnap.name" class="text-blue-600 dark:text-blue-300">{{ authorAnchorSnap.name }}</span>
+              </div>
+
+              <!-- ComID slot selector -->
+              <div v-if="authorTributaries" class="flex items-center gap-3 mb-3 text-xs">
+                <span class="text-gray-500 shrink-0">Click flowline for:</span>
+                <button
+                  class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
+                  :class="authorComIDSlot === 'up' ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                  @click="authorComIDSlot = 'up'"
+                >
+                  <span class="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                  Upstream<template v-if="authorUpComID"> · <span class="font-mono">{{ authorUpComID }}</span></template>
+                </button>
+                <button
+                  class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
+                  :class="authorComIDSlot === 'down' ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                  @click="authorComIDSlot = 'down'"
+                >
+                  <span class="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                  Downstream<template v-if="authorDownComID"> · <span class="font-mono">{{ authorDownComID }}</span></template>
+                </button>
+              </div>
+
               <NHDExplorerMap
-                :upstream-flowlines="authorUpstream"
-                :downstream-flowlines="authorDownstream"
+                :upstream-flowlines="authorTributaries"
+                :downstream-flowlines="null"
                 :upstream-gauges="null"
                 :snap-lat="null"
                 :snap-lng="null"
-                :put-in-pin="authorPutIn ? { lat: authorPutIn.lat, lng: authorPutIn.lng, label: authorPutIn.name || 'Put-in' } : null"
-                :take-out-pin="authorTakeOut ? { lat: authorTakeOut.lat, lng: authorTakeOut.lng, label: authorTakeOut.name || 'Take-out' } : null"
-                :pick-mode="authorStep === 'put-in' || authorStep === 'take-out'"
-                @pick="onAuthorPick"
+                :pick-mode="authorPickMode"
+                :comid-select-mode="!!authorAnchorSnap && !authorPickMode"
+                :selected-up-comid="authorUpComID"
+                :selected-down-comid="authorDownComID"
+                @pick="onAuthorAnchorPick"
+                @comid-select="onAuthorComIDSelect"
               />
 
-              <!-- Reach form — shown once both pins placed -->
-              <div v-if="authorStep === 'form'" class="mt-4 space-y-3 rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
+              <!-- Reach form — shown once both ComIDs selected -->
+              <div v-if="authorUpComID && authorDownComID" class="mt-4 space-y-3 rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
                 <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100">New reach details</h3>
 
-                <!-- Pin summary -->
+                <!-- ComID summary -->
                 <div class="grid grid-cols-2 gap-2 text-xs">
                   <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
                     <span class="w-2 h-2 rounded-full bg-green-600 shrink-0" />
                     <div>
-                      <div class="font-medium text-green-800 dark:text-green-200">Put-in · {{ authorPutIn!.comid }}</div>
-                      <div class="text-green-600 dark:text-green-400 font-mono">{{ authorPutIn!.lat.toFixed(5) }}, {{ authorPutIn!.lng.toFixed(5) }}</div>
+                      <div class="font-medium text-green-800 dark:text-green-200">Upstream (put-in) ComID</div>
+                      <div class="text-green-600 dark:text-green-400 font-mono">{{ authorUpComID }}</div>
                     </div>
                   </div>
                   <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
                     <span class="w-2 h-2 rounded-full bg-red-600 shrink-0" />
                     <div>
-                      <div class="font-medium text-red-800 dark:text-red-200">Take-out · {{ authorTakeOut!.comid }}</div>
-                      <div class="text-red-600 dark:text-red-400 font-mono">{{ authorTakeOut!.lat.toFixed(5) }}, {{ authorTakeOut!.lng.toFixed(5) }}</div>
+                      <div class="font-medium text-red-800 dark:text-red-200">Downstream (take-out) ComID</div>
+                      <div class="text-red-600 dark:text-red-400 font-mono">{{ authorDownComID }}</div>
                     </div>
-                  </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Put-in name</label>
-                    <input v-model="authorForm.putInName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Kremmling" />
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Take-out name</label>
-                    <input v-model="authorForm.takeOutName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Pumphouse" />
                   </div>
                 </div>
 
@@ -281,11 +302,6 @@
                   </div>
                 </div>
 
-                <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
-                  <input v-model="authorForm.fetchCenterline" type="checkbox" class="rounded" />
-                  <span>Fetch NLDI centerline after save</span>
-                </label>
-
                 <div v-if="authorError" class="text-xs text-red-500">{{ authorError }}</div>
                 <div v-if="authorSuccess" class="text-xs text-green-600 dark:text-green-400">{{ authorSuccess }}</div>
 
@@ -314,6 +330,25 @@
 
               <div v-if="repinReach" class="space-y-3">
                 <p class="text-xs text-gray-500">Re-pinning: <span class="font-medium text-gray-800 dark:text-gray-100">{{ repinReach.name }}</span></p>
+
+                <!-- Description editor -->
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-2">
+                  <div class="flex items-center justify-between">
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</p>
+                    <UButton size="xs" variant="outline" color="neutral" :loading="repinDescGenerating" @click="generateRepinDescription">Generate with AI</UButton>
+                  </div>
+                  <textarea
+                    v-model="repinDescEdit"
+                    rows="5"
+                    class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm resize-y"
+                    placeholder="No description yet — click Generate to create one with AI, or type directly."
+                  />
+                  <div class="flex items-center gap-3">
+                    <span v-if="repinDescMsg" class="text-xs" :class="repinDescMsg === 'Description saved' ? 'text-green-600 dark:text-green-400' : 'text-red-500'">{{ repinDescMsg }}</span>
+                    <div class="flex-1" />
+                    <UButton size="xs" :loading="repinDescSaving" @click="saveRepinDescription">Save description</UButton>
+                  </div>
+                </div>
 
                 <!-- Step indicator -->
                 <div class="flex items-center gap-2 text-xs">
@@ -857,7 +892,12 @@ interface NHDSnap { comid: string; name: string; lat: number; lng: number }
 interface NHDGaugeItem { id: string; name: string }
 interface NHDFC { type: string; features: any[] }
 interface AuthorPin { lat: number; lng: number; name: string; comid: string }
-interface RepinReach { slug: string; name: string; river_name: string | null }
+interface RepinReach {
+  slug: string; name: string; river_name: string | null
+  description: string | null
+  put_in: { lat: number; lng: number } | null
+  take_out: { lat: number; lng: number } | null
+}
 
 // ---- Shared ----
 const nhdMode = ref<'explore' | 'author' | 'repin'>('explore')
@@ -904,97 +944,87 @@ async function onNHDPick(lat: number, lng: number) {
   finally { nhdLoading.value = false }
 }
 
-// ---- Author mode ----
-const authorStep     = ref<'put-in' | 'take-out' | 'form'>('put-in')
-const authorSnapping = ref(false)
-const authorPutIn    = ref<AuthorPin | null>(null)
-const authorTakeOut  = ref<AuthorPin | null>(null)
-const authorUpstream   = ref<NHDFC | null>(null)
-const authorDownstream = ref<NHDFC | null>(null)
-const authorError    = ref('')
-const authorSuccess  = ref('')
-const authorSaving   = ref(false)
-const authorForm     = ref({ name: '', commonName: '', riverName: '', putInName: '', takeOutName: '', classMin: null as number | null, classMax: null as number | null, fetchCenterline: true })
+// ---- Author mode (ComID-first) ----
+const authorPickMode      = ref(false)
+const authorAnchorSnapping = ref(false)
+const authorAnchorSnap    = ref<{ comid: string; name: string } | null>(null)
+const authorTributaries   = ref<NHDFC | null>(null)
+const authorComIDSlot     = ref<'up' | 'down'>('up')
+const authorUpComID       = ref<string | null>(null)
+const authorDownComID     = ref<string | null>(null)
+const authorError         = ref('')
+const authorSuccess       = ref('')
+const authorSaving        = ref(false)
+const authorForm          = ref({ name: '', commonName: '', riverName: '', classMin: null as number | null, classMax: null as number | null })
 
 function resetAuthor() {
-  authorStep.value = 'put-in'; authorPutIn.value = null; authorTakeOut.value = null
-  authorUpstream.value = null; authorDownstream.value = null
+  authorPickMode.value = false
+  authorAnchorSnapping.value = false
+  authorAnchorSnap.value = null
+  authorTributaries.value = null
+  authorComIDSlot.value = 'up'
+  authorUpComID.value = null
+  authorDownComID.value = null
   authorError.value = ''; authorSuccess.value = ''
   authorSaving.value = false
-  authorForm.value = { name: '', commonName: '', riverName: '', putInName: '', takeOutName: '', classMin: null, classMax: null, fetchCenterline: true }
+  authorForm.value = { name: '', commonName: '', riverName: '', classMin: null, classMax: null }
 }
 
-async function snapAuthorPin(lat: number, lng: number): Promise<AuthorPin | null> {
-  const token = await getToken()
-  if (!token) return null
-  const url = `${apiBase}/api/v1/admin/nldi/watershed?lat=${lat}&lng=${lng}&distance=150`
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-  if (!res.ok) return null
-  const data = await res.json()
-  return { lat, lng, comid: data.snap.comid, name: data.snap.name ?? '' }
-}
-
-async function onAuthorPick(lat: number, lng: number) {
-  authorSnapping.value = true
+async function onAuthorAnchorPick(lat: number, lng: number) {
+  authorPickMode.value = false
+  authorAnchorSnapping.value = true
+  authorAnchorSnap.value = null
+  authorTributaries.value = null
   authorError.value = ''
   try {
-    if (authorStep.value === 'put-in') {
-      const pin = await snapAuthorPin(lat, lng)
-      if (!pin) { authorError.value = 'Snap failed — try another point'; return }
-      authorPutIn.value = pin
-      authorForm.value.putInName = pin.name
-      authorStep.value = 'take-out'
-    } else if (authorStep.value === 'take-out') {
-      const pin = await snapAuthorPin(lat, lng)
-      if (!pin) { authorError.value = 'Snap failed — try another point'; return }
-      authorTakeOut.value = pin
-      authorForm.value.takeOutName = pin.name
-      if (authorForm.value.name === '' && authorPutIn.value) {
-        authorForm.value.name = `${authorPutIn.value.name || 'Put-in'} to ${pin.name || 'Take-out'}`
-      }
-      // Fetch mainstem between the two pins for the map preview.
-      fetchAuthorMainstem()
-      authorStep.value = 'form'
-    }
+    const token = await getToken()
+    if (!token) return
+    const url = `${apiBase}/api/v1/admin/nldi/upstream-tributaries?lat=${lat}&lng=${lng}&distance=50`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) { authorError.value = `Snap failed: HTTP ${res.status}`; return }
+    const data = await res.json()
+    authorAnchorSnap.value = { comid: data.snap.comid, name: data.snap.name ?? '' }
+    authorTributaries.value = data.tributaries
+  } catch (e: any) {
+    authorError.value = e.message ?? 'Snap failed'
   } finally {
-    authorSnapping.value = false
+    authorAnchorSnapping.value = false
   }
 }
 
-async function fetchAuthorMainstem() {
-  if (!authorPutIn.value || !authorTakeOut.value) return
-  const token = await getToken()
-  if (!token) return
-  try {
-    const url = `${apiBase}/api/v1/admin/nldi/watershed?lat=${authorPutIn.value.lat}&lng=${authorPutIn.value.lng}&distance=500`
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    if (!res.ok) return
-    const data = await res.json()
-    authorUpstream.value  = data.upstream_flowlines
-    authorDownstream.value = data.downstream_flowlines
-  } catch { /* non-fatal */ }
+function onAuthorComIDSelect(comid: string) {
+  if (authorComIDSlot.value === 'up') {
+    authorUpComID.value = comid
+    if (!authorDownComID.value) authorComIDSlot.value = 'down'
+  } else {
+    authorDownComID.value = comid
+  }
 }
 
 // ---- Re-pin mode ----
-const repinSlug         = ref('')
-const repinLoadingReach = ref(false)
-const repinLoadError    = ref('')
-const repinReach        = ref<RepinReach | null>(null)
-const repinStep         = ref<'put-in' | 'take-out' | 'confirm'>('put-in')
-const repinSnapping     = ref(false)
-const repinPutIn        = ref<AuthorPin | null>(null)
-const repinTakeOut      = ref<AuthorPin | null>(null)
-const repinUpstream     = ref<NHDFC | null>(null)
-const repinDownstream   = ref<NHDFC | null>(null)
-const repinError        = ref('')
-const repinSuccess      = ref('')
-const repinSaving       = ref(false)
+const repinSlug           = ref('')
+const repinLoadingReach   = ref(false)
+const repinLoadError      = ref('')
+const repinReach          = ref<RepinReach | null>(null)
+const repinStep           = ref<'put-in' | 'take-out' | 'confirm'>('put-in')
+const repinSnapping       = ref(false)
+const repinPutIn          = ref<AuthorPin | null>(null)
+const repinTakeOut        = ref<AuthorPin | null>(null)
+const repinUpstream       = ref<NHDFC | null>(null)
+const repinDownstream     = ref<NHDFC | null>(null)
+const repinError          = ref('')
+const repinSuccess        = ref('')
+const repinSaving         = ref(false)
+const repinDescEdit       = ref('')
+const repinDescGenerating = ref(false)
+const repinDescSaving     = ref(false)
+const repinDescMsg        = ref('')
 
 function resetRepin() {
   repinStep.value = 'put-in'; repinPutIn.value = null; repinTakeOut.value = null
   repinUpstream.value = null; repinDownstream.value = null
   repinError.value = ''; repinSuccess.value = ''
-  repinSaving.value = false
+  repinSaving.value = false; repinDescMsg.value = ''
 }
 
 async function loadRepinReach() {
@@ -1005,10 +1035,29 @@ async function loadRepinReach() {
   repinReach.value = null
   resetRepin()
   try {
-    const res = await fetch(`${apiBase}/api/v1/reaches/${slug}`)
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/reaches/${slug}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
     if (!res.ok) { repinLoadError.value = res.status === 404 ? `Reach "${slug}" not found` : `HTTP ${res.status}`; return }
     const data = await res.json()
-    repinReach.value = { slug, name: data.name ?? slug, river_name: data.river_name ?? null }
+    repinReach.value = {
+      slug,
+      name: data.name ?? slug,
+      river_name: data.river_name ?? null,
+      description: data.description ?? null,
+      put_in: data.put_in ?? null,
+      take_out: data.take_out ?? null,
+    }
+    repinDescEdit.value = data.description ?? ''
+    // Pre-fill existing access points so the map zooms to them.
+    if (data.put_in) {
+      repinPutIn.value = { lat: data.put_in.lat, lng: data.put_in.lng, name: 'Put-in', comid: data.put_in_comid ?? '' }
+    }
+    if (data.take_out) {
+      repinTakeOut.value = { lat: data.take_out.lat, lng: data.take_out.lng, name: 'Take-out', comid: data.take_out_comid ?? '' }
+    }
+    if (data.put_in && data.take_out) repinStep.value = 'confirm'
   } catch (e: any) {
     repinLoadError.value = e.message ?? 'Unknown error'
   } finally {
@@ -1016,17 +1065,72 @@ async function loadRepinReach() {
   }
 }
 
+async function generateRepinDescription() {
+  if (!repinReach.value) return
+  repinDescGenerating.value = true
+  repinDescMsg.value = ''
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/generate-description`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    const data = await res.json()
+    if (!res.ok) { repinDescMsg.value = data.error ?? `HTTP ${res.status}`; return }
+    repinDescEdit.value = data.description ?? ''
+  } catch (e: any) {
+    repinDescMsg.value = e.message ?? 'Generate failed'
+  } finally {
+    repinDescGenerating.value = false
+  }
+}
+
+async function saveRepinDescription() {
+  if (!repinReach.value) return
+  repinDescSaving.value = true
+  repinDescMsg.value = ''
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ description: repinDescEdit.value || null }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      repinDescMsg.value = d.error ?? `HTTP ${res.status}`
+      return
+    }
+    repinDescMsg.value = 'Description saved'
+  } catch (e: any) {
+    repinDescMsg.value = e.message ?? 'Save failed'
+  } finally {
+    repinDescSaving.value = false
+  }
+}
+
+async function snapToNHD(lat: number, lng: number): Promise<AuthorPin | null> {
+  const token = await getToken()
+  if (!token) return null
+  const res = await fetch(`${apiBase}/api/v1/admin/nldi/watershed?lat=${lat}&lng=${lng}&distance=150`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) return null
+  const data = await res.json()
+  return { lat, lng, comid: data.snap.comid, name: data.snap.name ?? '' }
+}
+
 async function onRepinPick(lat: number, lng: number) {
   repinSnapping.value = true
   repinError.value = ''
   try {
     if (repinStep.value === 'put-in') {
-      const pin = await snapAuthorPin(lat, lng)
+      const pin = await snapToNHD(lat, lng)
       if (!pin) { repinError.value = 'Snap failed — try another point'; return }
       repinPutIn.value = pin
       repinStep.value = 'take-out'
     } else if (repinStep.value === 'take-out') {
-      const pin = await snapAuthorPin(lat, lng)
+      const pin = await snapToNHD(lat, lng)
       if (!pin) { repinError.value = 'Snap failed — try another point'; return }
       repinTakeOut.value = pin
       fetchRepinMainstem()
@@ -1080,7 +1184,7 @@ async function submitRepin() {
 }
 
 async function submitAuthorReach() {
-  if (!authorForm.value.name.trim() || !authorPutIn.value || !authorTakeOut.value) return
+  if (!authorForm.value.name.trim() || !authorUpComID.value || !authorDownComID.value) return
   authorSaving.value = true
   authorError.value = ''
   authorSuccess.value = ''
@@ -1088,14 +1192,13 @@ async function submitAuthorReach() {
   if (!token) { authorSaving.value = false; return }
   try {
     const body = {
-      name:             authorForm.value.name.trim(),
-      common_name:      authorForm.value.commonName.trim(),
-      river_name:       authorForm.value.riverName.trim(),
-      put_in:  { lat: authorPutIn.value.lat,  lng: authorPutIn.value.lng,  name: authorForm.value.putInName,  comid: authorPutIn.value.comid },
-      take_out: { lat: authorTakeOut.value.lat, lng: authorTakeOut.value.lng, name: authorForm.value.takeOutName, comid: authorTakeOut.value.comid },
-      class_min:        authorForm.value.classMin,
-      class_max:        authorForm.value.classMax,
-      fetch_centerline: authorForm.value.fetchCenterline,
+      name:        authorForm.value.name.trim(),
+      common_name: authorForm.value.commonName.trim(),
+      river_name:  authorForm.value.riverName.trim(),
+      up_comid:    authorUpComID.value,
+      down_comid:  authorDownComID.value,
+      class_min:   authorForm.value.classMin,
+      class_max:   authorForm.value.classMax,
     }
     const res = await fetch(`${apiBase}/api/v1/admin/reaches`, {
       method: 'POST',
@@ -1104,8 +1207,7 @@ async function submitAuthorReach() {
     })
     const data = await res.json()
     if (!res.ok) { authorError.value = data.error ?? `HTTP ${res.status}`; return }
-    const lengthStr = data.length_mi != null ? ` · ${data.length_mi} mi` : ''
-    authorSuccess.value = `Saved! Slug: ${data.slug}${lengthStr}`
+    authorSuccess.value = `Saved! Slug: ${data.slug}. Import a KML with a slug placemark to add access points.`
   } catch (e: any) {
     authorError.value = e.message ?? 'Unknown error'
   } finally {

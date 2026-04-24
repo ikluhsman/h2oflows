@@ -185,6 +185,7 @@ func main() {
 			r.Post("/admin/reaches", nldiH.CreateReach)
 			r.Get("/admin/reaches/{slug}", nldiH.GetAdminReach)
 			r.Post("/admin/reaches/{slug}/generate-description", nldiH.GenerateDescription)
+			r.Patch("/admin/reaches/{slug}", nldiH.PatchReach)
 			r.Post("/admin/reaches/{slug}/nldi-centerline", nldiH.UpdateReachCenterline)
 		})
 
