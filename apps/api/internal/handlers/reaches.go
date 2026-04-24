@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/h2oflow/h2oflow/apps/api/internal/ai"
 	"github.com/h2oflow/h2oflow/apps/api/internal/elevation"
+	"github.com/h2oflow/h2oflow/apps/api/internal/kmlimport"
 	"github.com/h2oflow/h2oflow/apps/api/internal/osm"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -1267,6 +1268,9 @@ func (h *ReachHandler) FetchCenterline(w http.ResponseWriter, r *http.Request) {
 
 	// Rewarm the map cache so the reach appears on the map immediately.
 	go h.WarmCache(context.Background())
+	// Best-effort: snap put-in/take-out to NHD ComIDs and store them.
+	// Only writes if put_in_comid is currently NULL; never overwrites NLDI data.
+	go func() { _ = kmlimport.SnapReachComIDs(context.Background(), h.db, slug) }()
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"centerline": rawGeometry([]byte(lineJSON)),
