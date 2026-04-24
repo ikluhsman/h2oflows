@@ -782,6 +782,10 @@ func (imp *Importer) updateReachNaming(ctx context.Context, reachID string) erro
 
 // slugify converts a display name to a URL-safe slug.
 // "Browns Canyon" → "browns-canyon", "Cache La Poudre" → "cache-la-poudre"
+// Slugify converts a string to a URL-safe slug. Exported so admin handlers
+// can generate consistent slugs without re-implementing the logic.
+func Slugify(s string) string { return slugify(s) }
+
 func slugify(s string) string {
 	var b strings.Builder
 	prevDash := false

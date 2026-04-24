@@ -100,7 +100,7 @@ func main() {
 	reaches   := handlers.NewReachHandler(pool, asker).WithPoller(p)
 	watchlist := handlers.NewWatchlistHandler(pool)
 	admin     := handlers.NewAdminHandler(pool)
-	nldiH    := handlers.NewNLDIHandler()
+	nldiH    := handlers.NewNLDIHandler(pool)
 	// Warm the reach map cache immediately, then refresh every poll cycle.
 	reaches.WarmCache(context.Background())
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
@@ -181,6 +181,7 @@ func main() {
 			r.Put("/admin/rivers/{riverSlug}", admin.UpdateRiver)
 			r.Delete("/admin/rivers/{riverSlug}", admin.DeleteRiver)
 			r.Get("/admin/nldi/watershed", nldiH.WatershedExplorer)
+			r.Post("/admin/reaches", nldiH.CreateReach)
 		})
 
 		// Site admin only — role management.

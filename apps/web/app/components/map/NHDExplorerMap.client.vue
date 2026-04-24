@@ -38,6 +38,12 @@ export interface NHDFeatureCollection {
   features: any[]
 }
 
+export interface AuthoringPin {
+  lat: number
+  lng: number
+  label?: string
+}
+
 const props = defineProps<{
   upstreamFlowlines:   NHDFeatureCollection | null
   downstreamFlowlines: NHDFeatureCollection | null
@@ -45,6 +51,8 @@ const props = defineProps<{
   snapLat?:            number | null
   snapLng?:            number | null
   pickMode?:           boolean
+  putInPin?:           AuthoringPin | null
+  takeOutPin?:         AuthoringPin | null
 }>()
 
 const emit = defineEmits<{
@@ -63,6 +71,8 @@ const basemap   = ref<'street' | 'topo' | 'satellite'>('topo')
 
 let map: maplibregl.Map | null = null
 let snapMarker: maplibregl.Marker | null = null
+let putInMarker: maplibregl.Marker | null = null
+let takeOutMarker: maplibregl.Marker | null = null
 
 const BASEMAP_LAYER_IDS = { street: 'street-tiles', topo: 'topo-tiles', satellite: 'esri-tiles' } as const
 
@@ -84,11 +94,37 @@ function setLayerData(sourceId: string, fc: NHDFeatureCollection | null) {
   src?.setData(fc ?? empty())
 }
 
+function makePin(color: string, label?: string): HTMLElement {
+  const el = document.createElement('div')
+  el.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);cursor:default`
+  if (label) el.title = label
+  return el
+}
+
+function updateAuthoringPins() {
+  putInMarker?.remove()
+  putInMarker = null
+  takeOutMarker?.remove()
+  takeOutMarker = null
+  if (!map) return
+  if (props.putInPin) {
+    putInMarker = new maplibregl.Marker({ element: makePin('#16a34a', props.putInPin.label ?? 'Put-in') })
+      .setLngLat([props.putInPin.lng, props.putInPin.lat])
+      .addTo(map)
+  }
+  if (props.takeOutPin) {
+    takeOutMarker = new maplibregl.Marker({ element: makePin('#dc2626', props.takeOutPin.label ?? 'Take-out') })
+      .setLngLat([props.takeOutPin.lng, props.takeOutPin.lat])
+      .addTo(map)
+  }
+}
+
 function updateData() {
   setLayerData('nhd-upstream',   props.upstreamFlowlines)
   setLayerData('nhd-downstream', props.downstreamFlowlines)
   setLayerData('nhd-gauges',     props.upstreamGauges)
   updateSnapMarker()
+  updateAuthoringPins()
   fitToData()
 }
 
@@ -262,7 +298,8 @@ watch(() => props.pickMode, (active) => {
 })
 
 watch(
-  () => [props.upstreamFlowlines, props.downstreamFlowlines, props.upstreamGauges, props.snapLat, props.snapLng],
+  () => [props.upstreamFlowlines, props.downstreamFlowlines, props.upstreamGauges,
+         props.snapLat, props.snapLng, props.putInPin, props.takeOutPin],
   () => { if (mapReady.value) updateData() },
   { deep: true },
 )
@@ -275,8 +312,12 @@ onMounted(async () => {
 
 onUnmounted(() => {
   snapMarker?.remove()
+  putInMarker?.remove()
+  takeOutMarker?.remove()
   map?.remove()
   map = null
   snapMarker = null
+  putInMarker = null
+  takeOutMarker = null
 })
 </script>

@@ -133,11 +133,17 @@
         <!-- NHD Explorer tab -->
         <div v-if="activeTab === 'nhd'">
           <div class="space-y-4">
-            <div>
-              <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">NHD Watershed Explorer</h2>
+
+            <!-- Mode switcher -->
+            <div class="flex gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
+              <UButton size="xs" :variant="nhdMode === 'explore' ? 'solid' : 'outline'" :color="nhdMode === 'explore' ? 'primary' : 'neutral'" @click="setNHDMode('explore')">Explore</UButton>
+              <UButton size="xs" :variant="nhdMode === 'author' ? 'solid' : 'outline'" :color="nhdMode === 'author' ? 'primary' : 'neutral'" @click="setNHDMode('author')">New reach</UButton>
+            </div>
+
+            <!-- ── EXPLORE MODE ─────────────────────────────────────────────── -->
+            <div v-if="nhdMode === 'explore'">
               <p class="text-xs text-gray-400 mb-3">Click the map to snap a point to the nearest NHD reach. Upstream flowlines (blue), downstream mainstem (teal), and USGS gauges (amber) are drawn automatically.</p>
 
-              <!-- Controls row -->
               <div class="flex flex-wrap items-end gap-3 mb-3">
                 <div>
                   <label class="block text-xs text-gray-500 mb-1">Distance (km)</label>
@@ -149,18 +155,12 @@
                     <option value="500">500 km</option>
                   </select>
                 </div>
-                <UButton
-                  size="xs"
-                  :color="nhdPickMode ? 'primary' : 'neutral'"
-                  :variant="nhdPickMode ? 'solid' : 'outline'"
-                  @click="nhdPickMode = !nhdPickMode"
-                >
+                <UButton size="xs" :color="nhdPickMode ? 'primary' : 'neutral'" :variant="nhdPickMode ? 'solid' : 'outline'" @click="nhdPickMode = !nhdPickMode">
                   {{ nhdPickMode ? 'Cancel pick' : 'Pick point' }}
                 </UButton>
                 <UButton v-if="nhdSnap" size="xs" variant="ghost" color="neutral" @click="clearNHD">Clear</UButton>
               </div>
 
-              <!-- Snap result info -->
               <div v-if="nhdSnap" class="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs">
                 <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
                 <span class="font-medium text-blue-800 dark:text-blue-200">ComID {{ nhdSnap.comid }}</span>
@@ -168,12 +168,8 @@
                 <span class="text-blue-400 font-mono ml-auto">{{ nhdSnap.lat.toFixed(5) }}, {{ nhdSnap.lng.toFixed(5) }}</span>
               </div>
 
-              <div v-if="nhdLoading" class="h-120 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse flex items-center justify-center text-sm text-gray-400">
-                Fetching NHD data…
-              </div>
-              <div v-else-if="nhdError" class="h-32 rounded-xl border border-red-200 dark:border-red-800 flex items-center justify-center text-sm text-red-500">
-                {{ nhdError }}
-              </div>
+              <div v-if="nhdLoading" class="h-120 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse flex items-center justify-center text-sm text-gray-400">Fetching NHD data…</div>
+              <div v-else-if="nhdError" class="h-32 rounded-xl border border-red-200 dark:border-red-800 flex items-center justify-center text-sm text-red-500">{{ nhdError }}</div>
               <MapNHDExplorerMap
                 v-else
                 :upstream-flowlines="nhdUpstream"
@@ -185,7 +181,6 @@
                 @pick="onNHDPick"
               />
 
-              <!-- Upstream gauge list -->
               <div v-if="nhdGaugeList.length > 0" class="mt-3">
                 <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Upstream USGS gauges</p>
                 <div class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -197,6 +192,109 @@
                 </div>
               </div>
             </div>
+
+            <!-- ── AUTHOR MODE ──────────────────────────────────────────────── -->
+            <div v-if="nhdMode === 'author'">
+
+              <!-- Step indicator -->
+              <div class="flex items-center gap-2 mb-3 text-xs">
+                <span :class="authorStep === 'put-in' ? 'text-green-700 dark:text-green-400 font-semibold' : authorPutIn ? 'text-gray-400 line-through' : 'text-gray-400'">1. Pick put-in</span>
+                <span class="text-gray-300">→</span>
+                <span :class="authorStep === 'take-out' ? 'text-red-700 dark:text-red-400 font-semibold' : authorTakeOut ? 'text-gray-400 line-through' : 'text-gray-400'">2. Pick take-out</span>
+                <span class="text-gray-300">→</span>
+                <span :class="authorStep === 'form' ? 'text-blue-700 dark:text-blue-400 font-semibold' : 'text-gray-400'">3. Fill &amp; save</span>
+                <UButton v-if="authorStep !== 'put-in'" size="xs" variant="ghost" color="neutral" class="ml-auto" @click="resetAuthor">Reset</UButton>
+              </div>
+
+              <!-- Map with authoring pins -->
+              <div v-if="authorSnapping" class="mb-2 text-xs text-blue-600 dark:text-blue-400 text-center animate-pulse">Snapping to NHD…</div>
+              <MapNHDExplorerMap
+                :upstream-flowlines="authorUpstream"
+                :downstream-flowlines="authorDownstream"
+                :upstream-gauges="null"
+                :snap-lat="null"
+                :snap-lng="null"
+                :put-in-pin="authorPutIn ? { lat: authorPutIn.lat, lng: authorPutIn.lng, label: authorPutIn.name || 'Put-in' } : null"
+                :take-out-pin="authorTakeOut ? { lat: authorTakeOut.lat, lng: authorTakeOut.lng, label: authorTakeOut.name || 'Take-out' } : null"
+                :pick-mode="authorStep === 'put-in' || authorStep === 'take-out'"
+                @pick="onAuthorPick"
+              />
+
+              <!-- Reach form — shown once both pins placed -->
+              <div v-if="authorStep === 'form'" class="mt-4 space-y-3 rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
+                <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100">New reach details</h3>
+
+                <!-- Pin summary -->
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                  <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+                    <span class="w-2 h-2 rounded-full bg-green-600 shrink-0" />
+                    <div>
+                      <div class="font-medium text-green-800 dark:text-green-200">Put-in · {{ authorPutIn!.comid }}</div>
+                      <div class="text-green-600 dark:text-green-400 font-mono">{{ authorPutIn!.lat.toFixed(5) }}, {{ authorPutIn!.lng.toFixed(5) }}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
+                    <span class="w-2 h-2 rounded-full bg-red-600 shrink-0" />
+                    <div>
+                      <div class="font-medium text-red-800 dark:text-red-200">Take-out · {{ authorTakeOut!.comid }}</div>
+                      <div class="text-red-600 dark:text-red-400 font-mono">{{ authorTakeOut!.lat.toFixed(5) }}, {{ authorTakeOut!.lng.toFixed(5) }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Put-in name</label>
+                    <input v-model="authorForm.putInName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Kremmling" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Take-out name</label>
+                    <input v-model="authorForm.takeOutName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Pumphouse" />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Reach name <span class="text-red-400">*</span></label>
+                  <input v-model="authorForm.name" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Kremmling to Pumphouse" />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Common name</label>
+                    <input v-model="authorForm.commonName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Gore Canyon" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">River name</label>
+                    <input v-model="authorForm.riverName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Colorado River" />
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Class min</label>
+                    <input v-model.number="authorForm.classMin" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="3" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Class max</label>
+                    <input v-model.number="authorForm.classMax" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="5" />
+                  </div>
+                </div>
+
+                <label class="flex items-center gap-2 text-sm cursor-pointer select-none">
+                  <input v-model="authorForm.fetchCenterline" type="checkbox" class="rounded" />
+                  <span>Fetch NLDI centerline after save</span>
+                </label>
+
+                <div v-if="authorError" class="text-xs text-red-500">{{ authorError }}</div>
+                <div v-if="authorSuccess" class="text-xs text-green-600 dark:text-green-400">{{ authorSuccess }}</div>
+
+                <div class="flex gap-2 justify-end pt-1">
+                  <UButton size="sm" variant="ghost" color="neutral" @click="resetAuthor">Cancel</UButton>
+                  <UButton size="sm" :loading="authorSaving" :disabled="!authorForm.name.trim()" @click="submitAuthorReach">Save reach</UButton>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -686,28 +784,34 @@ async function assignRole() {
   }
 }
 
-// ── NHD Explorer ──────────────────────────────────────────────────────────────
+// ── NHD Explorer + Reach Authoring ───────────────────────────────────────────
 interface NHDSnap { comid: string; name: string; lat: number; lng: number }
 interface NHDGaugeItem { id: string; name: string }
 interface NHDFC { type: string; features: any[] }
+interface AuthorPin { lat: number; lng: number; name: string; comid: string }
 
-const nhdDistance  = ref('150')
-const nhdPickMode  = ref(false)
-const nhdLoading   = ref(false)
-const nhdError     = ref('')
-const nhdSnap      = ref<NHDSnap | null>(null)
-const nhdUpstream  = ref<NHDFC | null>(null)
+// ---- Shared ----
+const nhdMode = ref<'explore' | 'author'>('explore')
+function setNHDMode(mode: 'explore' | 'author') {
+  nhdMode.value = mode
+  if (mode === 'explore') resetAuthor()
+  else { clearNHD(); nhdPickMode.value = false }
+}
+
+// ---- Explore mode ----
+const nhdDistance   = ref('150')
+const nhdPickMode   = ref(false)
+const nhdLoading    = ref(false)
+const nhdError      = ref('')
+const nhdSnap       = ref<NHDSnap | null>(null)
+const nhdUpstream   = ref<NHDFC | null>(null)
 const nhdDownstream = ref<NHDFC | null>(null)
-const nhdGauges    = ref<NHDFC | null>(null)
-const nhdGaugeList = ref<NHDGaugeItem[]>([])
+const nhdGauges     = ref<NHDFC | null>(null)
+const nhdGaugeList  = ref<NHDGaugeItem[]>([])
 
 function clearNHD() {
-  nhdSnap.value = null
-  nhdUpstream.value = null
-  nhdDownstream.value = null
-  nhdGauges.value = null
-  nhdGaugeList.value = []
-  nhdError.value = ''
+  nhdSnap.value = null; nhdUpstream.value = null; nhdDownstream.value = null
+  nhdGauges.value = null; nhdGaugeList.value = []; nhdError.value = ''
 }
 
 async function onNHDPick(lat: number, lng: number) {
@@ -719,25 +823,119 @@ async function onNHDPick(lat: number, lng: number) {
   try {
     const url = `${apiBase}/api/v1/admin/nldi/watershed?lat=${lat}&lng=${lng}&distance=${nhdDistance.value}`
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}))
-      nhdError.value = body.error ?? `HTTP ${res.status}`
-      return
-    }
+    if (!res.ok) { const b = await res.json().catch(() => ({})); nhdError.value = b.error ?? `HTTP ${res.status}`; return }
     const data = await res.json()
-    nhdSnap.value      = data.snap
-    nhdUpstream.value  = data.upstream_flowlines
-    nhdDownstream.value = data.downstream_flowlines
-    nhdGauges.value    = data.upstream_gauges
-
+    nhdSnap.value = data.snap; nhdUpstream.value = data.upstream_flowlines
+    nhdDownstream.value = data.downstream_flowlines; nhdGauges.value = data.upstream_gauges
     nhdGaugeList.value = (data.upstream_gauges?.features ?? []).map((f: any) => ({
-      id:   f.properties?.identifier ?? '',
-      name: f.properties?.name ?? '',
+      id: f.properties?.identifier ?? '', name: f.properties?.name ?? '',
     }))
-  } catch (e: any) {
-    nhdError.value = e.message ?? 'Unknown error'
+  } catch (e: any) { nhdError.value = e.message ?? 'Unknown error' }
+  finally { nhdLoading.value = false }
+}
+
+// ---- Author mode ----
+const authorStep     = ref<'put-in' | 'take-out' | 'form'>('put-in')
+const authorSnapping = ref(false)
+const authorPutIn    = ref<AuthorPin | null>(null)
+const authorTakeOut  = ref<AuthorPin | null>(null)
+const authorUpstream   = ref<NHDFC | null>(null)
+const authorDownstream = ref<NHDFC | null>(null)
+const authorError    = ref('')
+const authorSuccess  = ref('')
+const authorSaving   = ref(false)
+const authorForm     = ref({ name: '', commonName: '', riverName: '', putInName: '', takeOutName: '', classMin: null as number | null, classMax: null as number | null, fetchCenterline: true })
+
+function resetAuthor() {
+  authorStep.value = 'put-in'; authorPutIn.value = null; authorTakeOut.value = null
+  authorUpstream.value = null; authorDownstream.value = null
+  authorError.value = ''; authorSuccess.value = ''
+  authorSaving.value = false
+  authorForm.value = { name: '', commonName: '', riverName: '', putInName: '', takeOutName: '', classMin: null, classMax: null, fetchCenterline: true }
+}
+
+async function snapAuthorPin(lat: number, lng: number): Promise<AuthorPin | null> {
+  const token = await getToken()
+  if (!token) return null
+  const url = `${apiBase}/api/v1/admin/nldi/watershed?lat=${lat}&lng=${lng}&distance=150`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) return null
+  const data = await res.json()
+  return { lat, lng, comid: data.snap.comid, name: data.snap.name ?? '' }
+}
+
+async function onAuthorPick(lat: number, lng: number) {
+  authorSnapping.value = true
+  authorError.value = ''
+  try {
+    if (authorStep.value === 'put-in') {
+      const pin = await snapAuthorPin(lat, lng)
+      if (!pin) { authorError.value = 'Snap failed — try another point'; return }
+      authorPutIn.value = pin
+      authorForm.value.putInName = pin.name
+      authorStep.value = 'take-out'
+    } else if (authorStep.value === 'take-out') {
+      const pin = await snapAuthorPin(lat, lng)
+      if (!pin) { authorError.value = 'Snap failed — try another point'; return }
+      authorTakeOut.value = pin
+      authorForm.value.takeOutName = pin.name
+      if (authorForm.value.name === '' && authorPutIn.value) {
+        authorForm.value.name = `${authorPutIn.value.name || 'Put-in'} to ${pin.name || 'Take-out'}`
+      }
+      // Fetch mainstem between the two pins for the map preview.
+      fetchAuthorMainstem()
+      authorStep.value = 'form'
+    }
   } finally {
-    nhdLoading.value = false
+    authorSnapping.value = false
+  }
+}
+
+async function fetchAuthorMainstem() {
+  if (!authorPutIn.value || !authorTakeOut.value) return
+  const token = await getToken()
+  if (!token) return
+  try {
+    const url = `${apiBase}/api/v1/admin/nldi/watershed?lat=${authorPutIn.value.lat}&lng=${authorPutIn.value.lng}&distance=500`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) return
+    const data = await res.json()
+    authorUpstream.value  = data.upstream_flowlines
+    authorDownstream.value = data.downstream_flowlines
+  } catch { /* non-fatal */ }
+}
+
+async function submitAuthorReach() {
+  if (!authorForm.value.name.trim() || !authorPutIn.value || !authorTakeOut.value) return
+  authorSaving.value = true
+  authorError.value = ''
+  authorSuccess.value = ''
+  const token = await getToken()
+  if (!token) { authorSaving.value = false; return }
+  try {
+    const body = {
+      name:             authorForm.value.name.trim(),
+      common_name:      authorForm.value.commonName.trim(),
+      river_name:       authorForm.value.riverName.trim(),
+      put_in:  { lat: authorPutIn.value.lat,  lng: authorPutIn.value.lng,  name: authorForm.value.putInName,  comid: authorPutIn.value.comid },
+      take_out: { lat: authorTakeOut.value.lat, lng: authorTakeOut.value.lng, name: authorForm.value.takeOutName, comid: authorTakeOut.value.comid },
+      class_min:        authorForm.value.classMin,
+      class_max:        authorForm.value.classMax,
+      fetch_centerline: authorForm.value.fetchCenterline,
+    }
+    const res = await fetch(`${apiBase}/api/v1/admin/reaches`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    })
+    const data = await res.json()
+    if (!res.ok) { authorError.value = data.error ?? `HTTP ${res.status}`; return }
+    const lengthStr = data.length_mi != null ? ` · ${data.length_mi} mi` : ''
+    authorSuccess.value = `Saved! Slug: ${data.slug}${lengthStr}`
+  } catch (e: any) {
+    authorError.value = e.message ?? 'Unknown error'
+  } finally {
+    authorSaving.value = false
   }
 }
 </script>
