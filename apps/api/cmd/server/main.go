@@ -181,7 +181,9 @@ func main() {
 			r.Put("/admin/rivers/{riverSlug}", admin.UpdateRiver)
 			r.Delete("/admin/rivers/{riverSlug}", admin.DeleteRiver)
 			r.Get("/admin/nldi/watershed", nldiH.WatershedExplorer)
+			r.Get("/admin/nldi/upstream-tributaries", nldiH.UpstreamTributaries)
 			r.Post("/admin/reaches", nldiH.CreateReach)
+			r.Get("/admin/reaches/{slug}", nldiH.GetAdminReach)
 			r.Post("/admin/reaches/{slug}/nldi-centerline", nldiH.UpdateReachCenterline)
 		})
 

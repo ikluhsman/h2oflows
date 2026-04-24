@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/h2oflow/h2oflow/apps/api/internal/kmlimport"
 	"github.com/h2oflow/h2oflow/apps/api/internal/nldi"
@@ -94,32 +92,25 @@ func (h *NLDIHandler) WatershedExplorer(w http.ResponseWriter, r *http.Request) 
 
 // ── Reach authoring ───────────────────────────────────────────────────────────
 
+// createReachRequest uses ComID-first authoring: admin selects upstream and
+// downstream ComID segments from the NHD network on the map. Access point
+// coords are not required here — they come from KML import later, at which
+// point the NLDI centerline is trimmed and stored.
 type createReachRequest struct {
-	Name            string       `json:"name"`
-	CommonName      string       `json:"common_name"`
-	RiverName       string       `json:"river_name"`
-	PutIn           accessPoint  `json:"put_in"`
-	TakeOut         accessPoint  `json:"take_out"`
-	ClassMin        *float64     `json:"class_min"`
-	ClassMax        *float64     `json:"class_max"`
-	FetchCenterline bool         `json:"fetch_centerline"`
-}
-
-type accessPoint struct {
-	Lat   float64 `json:"lat"`
-	Lng   float64 `json:"lng"`
-	Name  string  `json:"name"`
-	ComID string  `json:"comid"`
+	Name       string   `json:"name"`
+	CommonName string   `json:"common_name"`
+	RiverName  string   `json:"river_name"`
+	UpComID    string   `json:"up_comid"`   // upstream (put-in) ComID — required
+	DownComID  string   `json:"down_comid"` // downstream (take-out) ComID — required
+	ClassMin   *float64 `json:"class_min"`
+	ClassMax   *float64 `json:"class_max"`
 }
 
 // CreateReach handles POST /api/v1/admin/reaches.
 //
-// Creates a reach with its put-in and take-out access points. If
-// fetch_centerline is true it calls the NLDI centerline path synchronously
-// (same 500 km budget as the CLI tool) and returns the computed length_mi.
-//
-// The slug is derived from river_name + name using the same slugify logic as
-// the KML importer. On conflict the request fails — the admin should dedupe.
+// Creates a reach shell with the upstream/downstream ComIDs selected from the
+// NHD network. No access points or centerline geometry are stored yet — those
+// are finalised when a KML is imported for this reach.
 func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 	var req createReachRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -130,12 +121,12 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, http.StatusBadRequest, "name is required")
 		return
 	}
-	if req.PutIn.Lat == 0 && req.PutIn.Lng == 0 {
-		errorResponse(w, http.StatusBadRequest, "put_in coordinates are required")
+	if strings.TrimSpace(req.UpComID) == "" {
+		errorResponse(w, http.StatusBadRequest, "up_comid is required")
 		return
 	}
-	if req.TakeOut.Lat == 0 && req.TakeOut.Lng == 0 {
-		errorResponse(w, http.StatusBadRequest, "take_out coordinates are required")
+	if strings.TrimSpace(req.DownComID) == "" {
+		errorResponse(w, http.StatusBadRequest, "down_comid is required")
 		return
 	}
 
@@ -143,61 +134,23 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var reachID string
-	err := pgx.BeginTxFunc(ctx, h.db, pgx.TxOptions{}, func(tx pgx.Tx) error {
-		// Create the reach. put_in / take_out geography columns are convenience
-		// denorms — SyncCenterline reads from reach_access.location, but the map
-		// handler reads from these columns for display.
-		err := tx.QueryRow(ctx, `
-			INSERT INTO reaches (
-				slug, name, common_name, river_name,
-				class_min, class_max,
-				put_in, take_out,
-				put_in_name, take_out_name,
-				put_in_comid, take_out_comid,
-				anchor_comid,
-				centerline_source
-			) VALUES (
-				$1, $2, NULLIF($3,''), NULLIF($4,''),
-				$5, $6,
-				ST_SetSRID(ST_MakePoint($7, $8),  4326)::geography,
-				ST_SetSRID(ST_MakePoint($9, $10), 4326)::geography,
-				NULLIF($11,''), NULLIF($12,''),
-				NULLIF($13,''), NULLIF($14,''),
-				NULLIF($13,''),
-				'nldi'
-			)
-			RETURNING id
-		`, slug, req.Name, req.CommonName, req.RiverName,
-			req.ClassMin, req.ClassMax,
-			req.PutIn.Lng, req.PutIn.Lat,
-			req.TakeOut.Lng, req.TakeOut.Lat,
-			req.PutIn.Name, req.TakeOut.Name,
-			req.PutIn.ComID, req.TakeOut.ComID,
-		).Scan(&reachID)
-		if err != nil {
-			return fmt.Errorf("insert reach: %w", err)
-		}
-
-		// Put-in access point.
-		_, err = tx.Exec(ctx, `
-			INSERT INTO reach_access (reach_id, access_type, name, location, data_source)
-			VALUES ($1, 'put_in', NULLIF($2,''),
-			        ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
-			        'admin')
-		`, reachID, req.PutIn.Name, req.PutIn.Lng, req.PutIn.Lat)
-		if err != nil {
-			return fmt.Errorf("insert put-in: %w", err)
-		}
-
-		// Take-out access point (may be same coords as put-in for playspots).
-		_, err = tx.Exec(ctx, `
-			INSERT INTO reach_access (reach_id, access_type, name, location, data_source)
-			VALUES ($1, 'take_out', NULLIF($2,''),
-			        ST_SetSRID(ST_MakePoint($3, $4), 4326)::geography,
-			        'admin')
-		`, reachID, req.TakeOut.Name, req.TakeOut.Lng, req.TakeOut.Lat)
-		return err
-	})
+	err := h.db.QueryRow(ctx, `
+		INSERT INTO reaches (
+			slug, name, common_name, river_name,
+			class_min, class_max,
+			put_in_comid, take_out_comid, anchor_comid,
+			centerline_source
+		) VALUES (
+			$1, $2, NULLIF($3,''), NULLIF($4,''),
+			$5, $6,
+			$7, $8, $7,
+			'nldi'
+		)
+		RETURNING id
+	`, slug, req.Name, req.CommonName, req.RiverName,
+		req.ClassMin, req.ClassMax,
+		req.UpComID, req.DownComID,
+	).Scan(&reachID)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
 			errorResponse(w, http.StatusConflict, fmt.Sprintf("reach with slug %q already exists", slug))
@@ -207,25 +160,125 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// NLDI centerline fetch — skip for playspots (identical put-in + take-out).
-	var lengthMi *float64
-	isPlayspot := req.PutIn.Lat == req.TakeOut.Lat && req.PutIn.Lng == req.TakeOut.Lng
-	if req.FetchCenterline && !isPlayspot {
-		if err := kmlimport.SyncCenterline(context.Background(), h.db, slug, kmlimport.CenterlineNLDI, false); err != nil {
-			// Non-fatal — reach is already created; admin can re-fetch later.
-			_ = err
-		} else {
-			var mi float64
-			_ = h.db.QueryRow(context.Background(),
-				`SELECT length_mi FROM reaches WHERE id = $1`, reachID).Scan(&mi)
-			lengthMi = &mi
+	jsonResponse(w, http.StatusCreated, map[string]any{
+		"slug": slug,
+		"id":   reachID,
+	})
+}
+
+// GetAdminReach handles GET /api/v1/admin/reaches/{slug}
+//
+// Returns admin-relevant reach detail: ComIDs, access point coords, metadata.
+// Used to populate the re-pin and edit forms in the admin panel.
+func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	ctx := r.Context()
+
+	var (
+		id, name, riverName, commonName string
+		classMin, classMax              *float64
+		description                     *string
+		putInComID, takeOutComID        *string
+		putInLng, putInLat              *float64
+		takeOutLng, takeOutLat          *float64
+	)
+	err := h.db.QueryRow(ctx, `
+		SELECT
+			id, name, COALESCE(river_name,''), COALESCE(common_name,''),
+			class_min, class_max, description,
+			put_in_comid, take_out_comid,
+			ST_X(put_in::geometry),  ST_Y(put_in::geometry),
+			ST_X(take_out::geometry), ST_Y(take_out::geometry)
+		FROM reaches WHERE slug = $1
+	`, slug).Scan(
+		&id, &name, &riverName, &commonName,
+		&classMin, &classMax, &description,
+		&putInComID, &takeOutComID,
+		&putInLng, &putInLat, &takeOutLng, &takeOutLat,
+	)
+	if err != nil {
+		errorResponse(w, http.StatusNotFound, fmt.Sprintf("reach %q not found", slug))
+		return
+	}
+
+	type coordPair struct {
+		Lat float64 `json:"lat"`
+		Lng float64 `json:"lng"`
+	}
+	var putIn, takeOut *coordPair
+	if putInLat != nil && putInLng != nil {
+		putIn = &coordPair{Lat: *putInLat, Lng: *putInLng}
+	}
+	if takeOutLat != nil && takeOutLng != nil {
+		takeOut = &coordPair{Lat: *takeOutLat, Lng: *takeOutLng}
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"id":             id,
+		"slug":           slug,
+		"name":           name,
+		"river_name":     riverName,
+		"common_name":    commonName,
+		"class_min":      classMin,
+		"class_max":      classMax,
+		"description":    description,
+		"put_in_comid":   putInComID,
+		"take_out_comid": takeOutComID,
+		"put_in":         putIn,
+		"take_out":       takeOut,
+	})
+}
+
+// UpstreamTributaries handles GET /api/v1/admin/nldi/upstream-tributaries
+//
+// Snaps lat/lng to the nearest NHD ComID (anchor), then returns all upstream
+// tributary flowlines (UT navigation). Used to discover ComIDs for small
+// creeks that don't snap reliably via comid/position alone — once the larger
+// river's anchor is found, all its tributaries appear as clickable segments.
+//
+// Query params:
+//
+//	lat, lng    float64  — coordinate to snap (required)
+//	distance    int      — km radius (default 50, max 200)
+func (h *NLDIHandler) UpstreamTributaries(w http.ResponseWriter, r *http.Request) {
+	lat, lng, err := parseLatLng(r)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	distanceKm := 50
+	if d := r.URL.Query().Get("distance"); d != "" {
+		if v, err2 := strconv.Atoi(d); err2 == nil && v > 0 && v <= 200 {
+			distanceKm = v
 		}
 	}
 
-	jsonResponse(w, http.StatusCreated, map[string]any{
-		"slug":      slug,
-		"id":        reachID,
-		"length_mi": lengthMi,
+	ctx := r.Context()
+	c := nldi.New()
+
+	snap, err := c.SnapToComID(ctx, lat, lng)
+	if err != nil {
+		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("snap to NHD: %v", err))
+		return
+	}
+
+	tributaries, err := c.UpstreamFlowlines(ctx, snap.ComID, distanceKm)
+	if err != nil {
+		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("upstream tributaries: %v", err))
+		return
+	}
+
+	type snapInfo struct {
+		ComID string  `json:"comid"`
+		Name  string  `json:"name"`
+		Lat   float64 `json:"lat"`
+		Lng   float64 `json:"lng"`
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"snap":        snapInfo{ComID: snap.ComID, Name: snap.Name, Lat: lat, Lng: lng},
+		"tributaries": tributaries,
 	})
 }
 
