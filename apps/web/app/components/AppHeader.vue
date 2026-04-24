@@ -88,8 +88,9 @@
       </button>
 
       <!-- User avatar — far right -->
-      <ClientOnly>
-        <div class="relative shrink-0" data-user-menu>
+      <!-- No ClientOnly needed: server always renders unauthenticated (gray), client
+           reactively updates to blue after Supabase restores session — no mismatch. -->
+      <div class="relative shrink-0" data-user-menu>
           <button
             class="flex items-center justify-center w-7 h-7 rounded-full transition-colors"
             :class="isAuthenticated
@@ -145,7 +146,6 @@
             </template>
           </div>
         </div>
-      </ClientOnly>
     </div>
 
     <!-- Mobile menu dropdown -->
@@ -200,19 +200,17 @@
         </button>
       </div>
       <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2">
-        <ClientOnly>
-          <button
-            v-if="isAuthenticated"
-            class="w-full text-left px-3 py-2 rounded-md text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-            @click="handleSignOut"
-          >Sign out</button>
-          <NuxtLink
-            v-else
-            to="/login"
-            class="block px-3 py-2 rounded-md text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
-            @click="menuOpen = false"
-          >Sign in</NuxtLink>
-        </ClientOnly>
+        <button
+          v-if="isAuthenticated"
+          class="w-full text-left px-3 py-2 rounded-md text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+          @click="handleSignOut"
+        >Sign out</button>
+        <NuxtLink
+          v-else
+          to="/login"
+          class="block px-3 py-2 rounded-md text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+          @click="menuOpen = false"
+        >Sign in</NuxtLink>
       </div>
     </div>
   </header>
