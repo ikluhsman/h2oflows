@@ -130,6 +130,76 @@
           </div>
         </div>
 
+        <!-- NHD Explorer tab -->
+        <div v-if="activeTab === 'nhd'">
+          <div class="space-y-4">
+            <div>
+              <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">NHD Watershed Explorer</h2>
+              <p class="text-xs text-gray-400 mb-3">Click the map to snap a point to the nearest NHD reach. Upstream flowlines (blue), downstream mainstem (teal), and USGS gauges (amber) are drawn automatically.</p>
+
+              <!-- Controls row -->
+              <div class="flex flex-wrap items-end gap-3 mb-3">
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Distance (km)</label>
+                  <select v-model="nhdDistance" class="rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm">
+                    <option value="50">50 km</option>
+                    <option value="100">100 km</option>
+                    <option value="150">150 km</option>
+                    <option value="300">300 km</option>
+                    <option value="500">500 km</option>
+                  </select>
+                </div>
+                <UButton
+                  size="xs"
+                  :color="nhdPickMode ? 'primary' : 'neutral'"
+                  :variant="nhdPickMode ? 'solid' : 'outline'"
+                  @click="nhdPickMode = !nhdPickMode"
+                >
+                  {{ nhdPickMode ? 'Cancel pick' : 'Pick point' }}
+                </UButton>
+                <UButton v-if="nhdSnap" size="xs" variant="ghost" color="neutral" @click="clearNHD">Clear</UButton>
+              </div>
+
+              <!-- Snap result info -->
+              <div v-if="nhdSnap" class="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                <span class="font-medium text-blue-800 dark:text-blue-200">ComID {{ nhdSnap.comid }}</span>
+                <span v-if="nhdSnap.name" class="text-blue-600 dark:text-blue-300">{{ nhdSnap.name }}</span>
+                <span class="text-blue-400 font-mono ml-auto">{{ nhdSnap.lat.toFixed(5) }}, {{ nhdSnap.lng.toFixed(5) }}</span>
+              </div>
+
+              <div v-if="nhdLoading" class="h-120 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse flex items-center justify-center text-sm text-gray-400">
+                Fetching NHD data…
+              </div>
+              <div v-else-if="nhdError" class="h-32 rounded-xl border border-red-200 dark:border-red-800 flex items-center justify-center text-sm text-red-500">
+                {{ nhdError }}
+              </div>
+              <MapNHDExplorerMap
+                v-else
+                :upstream-flowlines="nhdUpstream"
+                :downstream-flowlines="nhdDownstream"
+                :upstream-gauges="nhdGauges"
+                :snap-lat="nhdSnap?.lat ?? null"
+                :snap-lng="nhdSnap?.lng ?? null"
+                :pick-mode="nhdPickMode"
+                @pick="onNHDPick"
+              />
+
+              <!-- Upstream gauge list -->
+              <div v-if="nhdGaugeList.length > 0" class="mt-3">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Upstream USGS gauges</p>
+                <div class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div v-for="g in nhdGaugeList" :key="g.id" class="flex items-center gap-3 px-3 py-2 bg-white dark:bg-gray-900 text-xs">
+                    <span class="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                    <span class="font-medium text-gray-800 dark:text-gray-100 flex-1 truncate">{{ g.name || g.id }}</span>
+                    <span class="text-gray-400 font-mono shrink-0">{{ g.id }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Users tab (site admin only) -->
         <div v-if="activeTab === 'users'">
           <div class="flex items-center justify-between mb-4">
@@ -350,6 +420,7 @@ const visibleTabs = computed(() => {
   const tabs = [
     { key: 'rivers', label: 'Rivers' },
     { key: 'import', label: 'Import' },
+    { key: 'nhd',    label: 'NHD Explorer' },
   ]
   if (isAdmin.value) tabs.push({ key: 'users', label: 'Users' })
   return tabs
@@ -612,6 +683,61 @@ async function assignRole() {
     }
   } finally {
     assignLoading.value = false
+  }
+}
+
+// ── NHD Explorer ──────────────────────────────────────────────────────────────
+interface NHDSnap { comid: string; name: string; lat: number; lng: number }
+interface NHDGaugeItem { id: string; name: string }
+interface NHDFC { type: string; features: any[] }
+
+const nhdDistance  = ref('150')
+const nhdPickMode  = ref(false)
+const nhdLoading   = ref(false)
+const nhdError     = ref('')
+const nhdSnap      = ref<NHDSnap | null>(null)
+const nhdUpstream  = ref<NHDFC | null>(null)
+const nhdDownstream = ref<NHDFC | null>(null)
+const nhdGauges    = ref<NHDFC | null>(null)
+const nhdGaugeList = ref<NHDGaugeItem[]>([])
+
+function clearNHD() {
+  nhdSnap.value = null
+  nhdUpstream.value = null
+  nhdDownstream.value = null
+  nhdGauges.value = null
+  nhdGaugeList.value = []
+  nhdError.value = ''
+}
+
+async function onNHDPick(lat: number, lng: number) {
+  nhdPickMode.value = false
+  nhdLoading.value = true
+  nhdError.value = ''
+  const token = await getToken()
+  if (!token) { nhdLoading.value = false; return }
+  try {
+    const url = `${apiBase}/api/v1/admin/nldi/watershed?lat=${lat}&lng=${lng}&distance=${nhdDistance.value}`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      nhdError.value = body.error ?? `HTTP ${res.status}`
+      return
+    }
+    const data = await res.json()
+    nhdSnap.value      = data.snap
+    nhdUpstream.value  = data.upstream_flowlines
+    nhdDownstream.value = data.downstream_flowlines
+    nhdGauges.value    = data.upstream_gauges
+
+    nhdGaugeList.value = (data.upstream_gauges?.features ?? []).map((f: any) => ({
+      id:   f.properties?.identifier ?? '',
+      name: f.properties?.name ?? '',
+    }))
+  } catch (e: any) {
+    nhdError.value = e.message ?? 'Unknown error'
+  } finally {
+    nhdLoading.value = false
   }
 }
 </script>
