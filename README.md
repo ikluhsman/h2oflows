@@ -47,9 +47,18 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for full technical design.
 - Dashboard and Map quick-nav buttons
 - App Store and Google Play placeholder badges (native apps coming soon)
 
+### Admin reach authoring (NHD Explorer)
+- Step-based pin picker in the admin panel: click the map to place put-in and take-out, auto-snapped to the nearest NHD reach via USGS NLDI
+- Upstream flowlines (blue), downstream mainstem (teal), and upstream USGS gauges (amber) drawn on a MapLibre topo map after each snap
+- NLDI centerline fetched between the two pins, trimmed to exact extent via PostGIS `ST_LineSubstring`, and stored alongside the reach geometry
+- Re-pin existing reaches: update any reach's centerline from the admin panel without modifying its access points — used to fix or improve centerlines on already-imported reaches
+- Creates reaches with slug, name, river, class, put-in/take-out ComIDs, and length in miles; 409 on slug collision
+- Basemap switcher (Street / Topo / Satellite) on all admin maps
+
 ### Data pipeline
 - Reaches seeded with AI-generated descriptions, rapid inventories, access points, and flow ranges (all marked `ai_seed`, confidence-scored)
-- OSM centerline fetch for each reach using the Overpass API
+- OSM centerline fetch for each reach using the Overpass API; NLDI centerline fetch available as an alternative (`--centerlines=nldi` on import)
+- Best-effort NHD ComID capture on every OSM centerline fetch — stored for future NLDI switch-over without re-snapping
 - Polling tiers: trusted reaches always polled, demand-tier gauges polled when recently viewed, cold gauges skipped until requested
 - USGS and Colorado DWR gauge import commands
 
@@ -142,15 +151,17 @@ apps/
     internal/
       ai/             Claude + Voyage AI (RAG asker, reach seeder, search enrichment)
       handlers/       HTTP route handlers
+      kmlimport/      KMZ/KML importer, OSM + NLDI centerline sync
+      nldi/           USGS NLDI API client (snap, navigate, mainstem merge)
       osm/            Overpass API client + reach centerline fetch
       poller/         Gauge polling scheduler (trusted/demand/cold tiers)
       config/         Environment config
-    migrations/       golang-migrate SQL files (041 migrations)
+    migrations/       golang-migrate SQL files (060 migrations)
   web/                Nuxt 4 frontend
     app/
       pages/          Landing, dashboard, explore, reach detail, trips
       components/
-        map/          DashboardMap, ReachesMap, ReachMap (MapLibre)
+        map/          DashboardMap, ReachesMap, ReachMap, NHDExplorerMap (MapLibre)
         gauge/        GaugeCard, GaugeGraph, GaugeSparkline
       composables/    useAuth, useWatchlistSync, useWatchlistRefresh, useTrips, useGaugeGraph
       stores/         Pinia — watchlist (localStorage + server sync)
@@ -164,6 +175,8 @@ packages/
 
 - **USGS Water Services API** — no API key, covers most of the US
 - **Colorado DWR telemetry** — CDSS API, abbreviation-based station IDs
+- **USGS NLDI (Network Linked Data Index)** — snaps coordinates to NHD ComIDs, navigates upstream/downstream flowlines, discovers upstream USGS gauge sites; used for admin reach authoring and centerline generation
+- **OpenStreetMap Overpass API** — fallback centerline source; longest river/stream waterway within a bounding box
 - **AI seeder (Claude)** — generates reach descriptions, rapid inventories, access points, and flow ranges from training knowledge; all output is marked `data_source='ai_seed'` and confidence-scored
 
 Community corrections and verified data take precedence over AI-seeded content once contributed.
