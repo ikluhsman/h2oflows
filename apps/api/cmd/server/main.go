@@ -100,7 +100,7 @@ func main() {
 	reaches   := handlers.NewReachHandler(pool, asker).WithPoller(p)
 	watchlist := handlers.NewWatchlistHandler(pool)
 	admin     := handlers.NewAdminHandler(pool)
-	nldiH    := handlers.NewNLDIHandler(pool)
+	nldiH    := handlers.NewNLDIHandler(pool).WithAnthropicKey(cfg.AnthropicAPIKey)
 	// Warm the reach map cache immediately, then refresh every poll cycle.
 	reaches.WarmCache(context.Background())
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
@@ -181,7 +181,11 @@ func main() {
 			r.Put("/admin/rivers/{riverSlug}", admin.UpdateRiver)
 			r.Delete("/admin/rivers/{riverSlug}", admin.DeleteRiver)
 			r.Get("/admin/nldi/watershed", nldiH.WatershedExplorer)
+			r.Get("/admin/nldi/upstream-tributaries", nldiH.UpstreamTributaries)
 			r.Post("/admin/reaches", nldiH.CreateReach)
+			r.Get("/admin/reaches/{slug}", nldiH.GetAdminReach)
+			r.Post("/admin/reaches/{slug}/generate-description", nldiH.GenerateDescription)
+			r.Patch("/admin/reaches/{slug}", nldiH.PatchReach)
 			r.Post("/admin/reaches/{slug}/nldi-centerline", nldiH.UpdateReachCenterline)
 		})
 

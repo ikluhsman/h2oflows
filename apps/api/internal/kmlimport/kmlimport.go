@@ -278,6 +278,7 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		folderName string
 	}
 	var pins []assignment
+	enrichedSlugs := map[string]bool{}
 
 	if IsCategoryMap(doc.Folders) {
 		res.Log = append(res.Log, "category-organized map — inferring reach from pin names + geography")
@@ -372,8 +373,10 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 
 		for _, folder := range doc.Folders {
 			// Pre-scan metadata placemarks (no coordinates) to extract reach
-			// properties before calling matchOrCreateReach.
+			// properties. The slug placemark is required — import fails per-reach
+			// if absent or if it doesn't match an existing reach in the DB.
 			var (
+				folderSlug     string
 				commonName     string
 				reachDesc      string
 				classMin       *float64
@@ -382,21 +385,21 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				basinGroup     = docBasin // inherit document-level basin; folder metadata can override
 				permitRequired *bool
 				multiDayDays   *int
-				lineStrings    []KMLPlacemark // LineString placemarks found in this folder
 			)
 			var folderFlowRanges []reachFlowRange
 			var folderPins []KMLPlacemark
 
 			for _, pm := range folder.Placemarks {
-				// Collect LineString placemarks for potential centerline use.
+				// Ignore LineString geometry — centerlines are sourced from NLDI, not KML.
 				if pm.LineString != nil {
-					lineStrings = append(lineStrings, pm)
 					continue
 				}
 				if pm.Point == nil {
 					key := strings.ToLower(strings.TrimSpace(pm.Name))
 					val := strings.TrimSpace(pm.Description)
 					switch key {
+					case "slug":
+						folderSlug = val
 					case "common_name":
 						commonName = val
 					case "description":
@@ -430,38 +433,38 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 				folderPins = append(folderPins, pm)
 			}
 
-			rid, rslug, rname, created, err := imp.matchOrCreateReach(ctx, folder.Name, doc.Name, commonName, classMin, classMax)
-			if err != nil {
-				res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — %v", folder.Name, err))
+			// Slug is required — fail this folder (not the whole import) if missing.
+			if folderSlug == "" {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — missing slug placemark; create the reach in admin first (skipping)", folder.Name))
 				continue
 			}
-			if created {
-				res.Log = append(res.Log, fmt.Sprintf("+ created reach %q (slug: %s)", folder.Name, rslug))
+			var rid, rslug, rname string
+			if err := imp.pool.QueryRow(ctx,
+				`SELECT id, slug, name FROM reaches WHERE slug = $1`, folderSlug,
+			).Scan(&rid, &rslug, &rname); err != nil {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — reach %q not found in database; create it in admin first (skipping)", folder.Name, folderSlug))
+				continue
+			}
+			res.Log = append(res.Log, fmt.Sprintf("~ folder %q → matched reach %q (%s)", folder.Name, rname, rslug))
+			enrichedSlugs[rslug] = true
+
+			// Apply any metadata overrides the KML provides.
+			if !imp.DryRun {
+				_, _ = imp.pool.Exec(ctx, `
+					UPDATE reaches SET
+						common_name = COALESCE(NULLIF($2, ''), common_name),
+						class_min   = COALESCE($3::numeric, class_min),
+						class_max   = COALESCE($4::numeric, class_max)
+					WHERE id = $1
+				`, rid, commonName, classMin, classMax)
 			}
 
+			// Overwrite description when KML provides one.
 			if reachDesc != "" {
 				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET description = $1 WHERE id = $2`, reachDesc, rid); err != nil {
 					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] description update failed: %v", rname, err))
 				} else {
 					res.Log = append(res.Log, fmt.Sprintf("~ [%s] description updated", rname))
-				}
-			}
-			// LineString → centerline. Exactly one required; reject if multiple.
-			if len(lineStrings) > 1 {
-				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] %d LineStrings found — expected at most 1; skipping centerline import", rname, len(lineStrings)))
-			} else if len(lineStrings) == 1 {
-				geoJSON, err := kmlCoordsToLineStringGeoJSON(lineStrings[0].LineString.Coordinates)
-				if err != nil {
-					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] centerline parse failed: %v", rname, err))
-				} else {
-					if _, err := imp.pool.Exec(ctx,
-						`UPDATE reaches SET centerline = ST_GeomFromGeoJSON($1)::geography, centerline_source = 'kml' WHERE id = $2`,
-						geoJSON, rid,
-					); err != nil {
-						res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] centerline update failed: %v", rname, err))
-					} else {
-						res.Log = append(res.Log, fmt.Sprintf("~ [%s] centerline imported from KML (%d points)", rname, strings.Count(geoJSON, "[")-1))
-					}
 				}
 			}
 			// Upsert river and link the reach to it.
@@ -637,6 +640,25 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		seen[a.reachID] = struct{}{}
 		if err := imp.updateReachNaming(ctx, a.reachID); err != nil {
 			res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] name update: %v", a.reachName, err))
+		}
+	}
+
+	// For each enriched reach that has put_in_comid set, finalize the NLDI
+	// centerline now that access points have been written by KML import.
+	// SyncCenterline reads put-in/take-out coords from reach_access, so this
+	// works without any extra data being passed here.
+	if !imp.DryRun {
+		for slug := range enrichedSlugs {
+			var putInComID *string
+			_ = imp.pool.QueryRow(ctx, `SELECT put_in_comid FROM reaches WHERE slug = $1`, slug).Scan(&putInComID)
+			if putInComID == nil {
+				continue
+			}
+			if err := SyncCenterline(ctx, imp.pool, slug, CenterlineNLDI, false); err != nil {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] NLDI centerline sync: %v", slug, err))
+			} else {
+				res.Log = append(res.Log, fmt.Sprintf("✓ [%s] NLDI centerline finalized from access points", slug))
+			}
 		}
 	}
 

@@ -8,8 +8,21 @@
     </div>
 
     <!-- Pick-mode crosshair hint -->
-    <div v-if="mapReady && pickMode" class="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow pointer-events-none">
+    <div v-if="mapReady && pickMode && !comidSelectMode" class="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow pointer-events-none">
       Click the map to snap to NHD
+    </div>
+
+    <!-- ComID select mode hint -->
+    <div v-if="mapReady && comidSelectMode" class="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex gap-1.5 pointer-events-none">
+      <span v-if="!selectedUpComID" class="bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
+        Click a flowline to set upstream ComID
+      </span>
+      <span v-else-if="!selectedDownComID" class="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
+        Click a flowline to set downstream ComID
+      </span>
+      <span v-else class="bg-gray-800 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
+        Both ComIDs selected — adjust or continue
+      </span>
     </div>
 
     <!-- Basemap switcher -->
@@ -53,10 +66,15 @@ const props = defineProps<{
   pickMode?:           boolean
   putInPin?:           AuthoringPin | null
   takeOutPin?:         AuthoringPin | null
+  // ComID selection mode: click a flowline segment to emit its ComID
+  comidSelectMode?:    boolean
+  selectedUpComID?:    string | null
+  selectedDownComID?:  string | null
 }>()
 
 const emit = defineEmits<{
-  pick: [lat: number, lng: number]
+  pick:          [lat: number, lng: number]
+  'comid-select': [comid: string]
 }>()
 
 const BASEMAP_OPTIONS = [
@@ -140,6 +158,14 @@ function updateSnapMarker() {
   }
 }
 
+function updateComIDFilters() {
+  if (!map || !mapReady.value) return
+  const up   = props.selectedUpComID   ?? ''
+  const down = props.selectedDownComID ?? ''
+  map.setFilter('nhd-upstream-selected',   up   ? ['==', ['get', 'nhdplus_comid'], up]   : ['==', ['literal', true], false])
+  map.setFilter('nhd-downstream-selected', down ? ['==', ['get', 'nhdplus_comid'], down] : ['==', ['literal', true], false])
+}
+
 function fitToData() {
   if (!map) return
   const allCoords: [number, number][] = []
@@ -152,12 +178,16 @@ function fitToData() {
       else if (geom.type === 'MultiLineString') allCoords.push(...geom.coordinates.flat())
     }
   }
+  // Include authoring pins so re-pin mode zooms to existing access points
+  // even before any flowlines are loaded.
+  if (props.putInPin)   allCoords.push([props.putInPin.lng,   props.putInPin.lat])
+  if (props.takeOutPin) allCoords.push([props.takeOutPin.lng, props.takeOutPin.lat])
   if (allCoords.length < 2) return
   const bounds = allCoords.reduce(
     (b, [lng, lat]) => b.extend([lng, lat] as [number, number]),
     new maplibregl.LngLatBounds(allCoords[0], allCoords[0]),
   )
-  map.fitBounds(bounds, { padding: 40, maxZoom: 13 })
+  map.fitBounds(bounds, { padding: 60, maxZoom: 14 })
 }
 
 function addLayers() {
@@ -182,6 +212,32 @@ function addLayers() {
       'line-color': '#93c5fd',
       'line-width': 1.5,
       'line-opacity': 0.7,
+    },
+  })
+
+  // ── Selected upstream ComID — green highlight (on top) ────────────────
+  map.addLayer({
+    id: 'nhd-upstream-selected',
+    type: 'line',
+    source: 'nhd-upstream',
+    filter: ['==', ['literal', true], false], // nothing highlighted initially
+    paint: {
+      'line-color': '#16a34a',
+      'line-width': 5,
+      'line-opacity': 1,
+    },
+  })
+
+  // ── Selected downstream ComID — red highlight (on top) ───────────────
+  map.addLayer({
+    id: 'nhd-downstream-selected',
+    type: 'line',
+    source: 'nhd-upstream', // same UT source — downstream segment also lives here
+    filter: ['==', ['literal', true], false],
+    paint: {
+      'line-color': '#dc2626',
+      'line-width': 5,
+      'line-opacity': 1,
     },
   })
 
@@ -215,19 +271,35 @@ function addLayers() {
   map.on('click', 'nhd-gauges-circle', (e) => {
     const f = e.features?.[0]
     if (!f || !map) return
-    const props = f.properties ?? {}
+    const p = f.properties ?? {}
     const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number]
     new maplibregl.Popup({ closeButton: false, maxWidth: '220px' })
       .setLngLat(coords)
       .setHTML(`<div style="font-size:12px;line-height:1.5">
-        <b>${props.name || props.identifier || 'USGS gauge'}</b>
-        <div style="color:#6b7280;margin-top:2px">${props.identifier ?? ''}</div>
+        <b>${p.name || p.identifier || 'USGS gauge'}</b>
+        <div style="color:#6b7280;margin-top:2px">${p.identifier ?? ''}</div>
       </div>`)
       .addTo(map)
   })
 
   map.on('mouseenter', 'nhd-gauges-circle', () => { if (map) map.getCanvas().style.cursor = 'pointer' })
   map.on('mouseleave', 'nhd-gauges-circle', () => { if (map) map.getCanvas().style.cursor = props.pickMode ? 'crosshair' : '' })
+
+  // ── ComID selection: click on any upstream flowline segment ───────────
+  map.on('click', 'nhd-upstream-line', (e) => {
+    if (!props.comidSelectMode) return
+    const comid = e.features?.[0]?.properties?.nhdplus_comid as string | undefined
+    if (comid) {
+      e.preventDefault()
+      emit('comid-select', comid)
+    }
+  })
+  map.on('mouseenter', 'nhd-upstream-line', () => {
+    if (map && props.comidSelectMode) map.getCanvas().style.cursor = 'pointer'
+  })
+  map.on('mouseleave', 'nhd-upstream-line', () => {
+    if (map) map.getCanvas().style.cursor = props.pickMode ? 'crosshair' : ''
+  })
 }
 
 function initMap() {
@@ -281,13 +353,15 @@ function initMap() {
     map.resize()
     mapReady.value = true
     addLayers()
-    if (props.upstreamFlowlines?.features.length || props.downstreamFlowlines?.features.length) {
+    updateComIDFilters()
+    if (props.upstreamFlowlines?.features.length || props.downstreamFlowlines?.features.length
+        || props.putInPin || props.takeOutPin) {
       updateData()
     }
   })
 
   map.on('click', (e) => {
-    if (props.pickMode) emit('pick', e.lngLat.lat, e.lngLat.lng)
+    if (props.pickMode && !props.comidSelectMode) emit('pick', e.lngLat.lat, e.lngLat.lng)
   })
 
   map.on('error', (e) => console.warn('[NHDExplorerMap]', e.error?.message ?? e))
@@ -297,6 +371,13 @@ watch(() => props.pickMode, (active) => {
   if (!map) return
   map.getCanvas().style.cursor = active ? 'crosshair' : ''
 })
+
+watch(() => props.comidSelectMode, () => {
+  if (!map) return
+  map.getCanvas().style.cursor = props.comidSelectMode ? 'crosshair' : (props.pickMode ? 'crosshair' : '')
+})
+
+watch([() => props.selectedUpComID, () => props.selectedDownComID], updateComIDFilters)
 
 watch(
   () => [props.upstreamFlowlines, props.downstreamFlowlines, props.upstreamGauges,
