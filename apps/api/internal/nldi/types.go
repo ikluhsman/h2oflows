@@ -41,8 +41,11 @@ type Collection struct {
 	Features []Feature `json:"features"`
 }
 
-// SnapResult is the resolved ComID and reach name for a (lat, lng).
+// SnapResult is the resolved ComID for a (lat, lng). The comid/position
+// endpoint returns only identifier/comid/navigation-link — name, reachcode,
+// and totdasqkm are NOT populated by this endpoint (they live on the NHDPlus
+// characteristics service, which we don't query yet).
 type SnapResult struct {
 	ComID string
-	Name  string
+	Name  string // usually empty from comid/position
 }

@@ -17,7 +17,8 @@
 // Usage:
 //
 //	go run ./cmd/import-kml/ --file arkansas.kmz
-//	go run ./cmd/import-kml/ --file arkansas.kmz --centerlines
+//	go run ./cmd/import-kml/ --file arkansas.kmz --centerlines=osm
+//	go run ./cmd/import-kml/ --file arkansas.kmz --centerlines=nldi
 //	go run ./cmd/import-kml/ --file arkansas.kmz --dry-run
 //
 // Env vars: DATABASE_URL
@@ -36,12 +37,24 @@ import (
 
 func main() {
 	file        := flag.String("file", "", "path to KML or KMZ file (required)")
-	centerlines := flag.Bool("centerlines", false, "fetch OSM centerlines for imported reaches")
+	centerlines := flag.String("centerlines", "", "fetch centerlines for imported reaches — 'osm' or 'nldi'")
 	dryRun      := flag.Bool("dry-run", false, "parse and match without writing to DB")
 	flag.Parse()
 
 	if *file == "" {
 		log.Fatal("--file is required")
+	}
+
+	var centerlineSource kmlimport.CenterlineSource
+	switch *centerlines {
+	case "":
+		// centerline fetch disabled
+	case "osm":
+		centerlineSource = kmlimport.CenterlineOSM
+	case "nldi":
+		centerlineSource = kmlimport.CenterlineNLDI
+	default:
+		log.Fatalf("--centerlines must be 'osm' or 'nldi' (got %q)", *centerlines)
 	}
 
 	ctx := context.Background()
@@ -84,10 +97,10 @@ func main() {
 		}
 	}
 
-	if *centerlines && len(centerlineReaches) > 0 {
-		fmt.Printf("\n── Fetching OSM centerlines ──\n")
+	if centerlineSource != "" && len(centerlineReaches) > 0 {
+		fmt.Printf("\n── Fetching %s centerlines ──\n", centerlineSource)
 		for _, slug := range centerlineReaches {
-			if err := kmlimport.SyncCenterline(ctx, pool, slug, *dryRun); err != nil {
+			if err := kmlimport.SyncCenterline(ctx, pool, slug, centerlineSource, *dryRun); err != nil {
 				fmt.Printf("  ✗ %s: %v\n", slug, err)
 			} else {
 				fmt.Printf("  ✓ %s\n", slug)

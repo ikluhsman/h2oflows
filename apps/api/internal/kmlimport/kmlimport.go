@@ -1344,9 +1344,19 @@ func StripHTML(s string) string {
 	return strings.TrimSpace(b.String())
 }
 
-// SyncCenterline fetches the OSM river geometry between a reach's put-in and
-// take-out and stores it as reaches.centerline.
-func SyncCenterline(ctx context.Context, pool *pgxpool.Pool, slug string, dryRun bool) error {
+// CenterlineSource selects which upstream geometry source SyncCenterline uses.
+type CenterlineSource string
+
+const (
+	CenterlineOSM  CenterlineSource = "osm"
+	CenterlineNLDI CenterlineSource = "nldi"
+)
+
+// SyncCenterline fetches a river centerline from the chosen source, trims it to
+// the reach's put-in/take-out via PostGIS ST_LineSubstring, and stores it on
+// reaches.centerline. When source is NLDI the reach's NHD reference fields
+// (put_in_comid, take_out_comid, reachcode, totdasqkm) are populated too.
+func SyncCenterline(ctx context.Context, pool *pgxpool.Pool, slug string, source CenterlineSource, dryRun bool) error {
 	var putInLon, putInLat, takeOutLon, takeOutLat float64
 	err := pool.QueryRow(ctx, `
 		SELECT
@@ -1363,6 +1373,17 @@ func SyncCenterline(ctx context.Context, pool *pgxpool.Pool, slug string, dryRun
 		return fmt.Errorf("no put-in/take-out found: %w", err)
 	}
 
+	switch source {
+	case "", CenterlineOSM:
+		return syncCenterlineOSM(ctx, pool, slug, putInLon, putInLat, takeOutLon, takeOutLat, dryRun)
+	case CenterlineNLDI:
+		return syncCenterlineNLDI(ctx, pool, slug, putInLon, putInLat, takeOutLon, takeOutLat, dryRun)
+	default:
+		return fmt.Errorf("unknown centerline source %q", source)
+	}
+}
+
+func syncCenterlineOSM(ctx context.Context, pool *pgxpool.Pool, slug string, putInLon, putInLat, takeOutLon, takeOutLat float64, dryRun bool) error {
 	minLon := math.Min(putInLon, takeOutLon) - 0.05
 	maxLon := math.Max(putInLon, takeOutLon) + 0.05
 	minLat := math.Min(putInLat, takeOutLat) - 0.05
@@ -1396,6 +1417,7 @@ func SyncCenterline(ctx context.Context, pool *pgxpool.Pool, slug string, dryRun
 					    ST_SetSRID(ST_MakePoint($5, $6), 4326))                AS take_pt
 			) sub
 		),
+		       centerline_source = 'osm',
 		       length_mi = ROUND((
 		           ST_Length((
 		               SELECT ST_LineSubstring(
@@ -1407,6 +1429,50 @@ func SyncCenterline(ctx context.Context, pool *pgxpool.Pool, slug string, dryRun
 		       )::numeric, 2)
 		WHERE slug = $1
 	`, slug, geojson, putInLon, putInLat, takeOutLon, takeOutLat)
+	return err
+}
+
+func syncCenterlineNLDI(ctx context.Context, pool *pgxpool.Pool, slug string, putInLon, putInLat, takeOutLon, takeOutLat float64, dryRun bool) error {
+	line, err := fetchNLDIRiverLine(ctx, putInLon, putInLat, takeOutLon, takeOutLat)
+	if err != nil {
+		return fmt.Errorf("nldi fetch: %w", err)
+	}
+	if dryRun {
+		return nil
+	}
+
+	_, err = pool.Exec(ctx, `
+		UPDATE reaches
+		SET    centerline = (
+			SELECT ST_LineSubstring(
+				line,
+				ST_LineLocatePoint(line, put_pt),
+				ST_LineLocatePoint(line, take_pt)
+			)::geography
+			FROM (
+				SELECT
+					ST_GeomFromGeoJSON($2)                                     AS line,
+					ST_ClosestPoint(ST_GeomFromGeoJSON($2),
+					    ST_SetSRID(ST_MakePoint($3, $4), 4326))                AS put_pt,
+					ST_ClosestPoint(ST_GeomFromGeoJSON($2),
+					    ST_SetSRID(ST_MakePoint($5, $6), 4326))                AS take_pt
+			) sub
+		),
+		       centerline_source = 'nldi',
+		       put_in_comid      = $7,
+		       take_out_comid    = $8,
+		       length_mi = ROUND((
+		           ST_Length((
+		               SELECT ST_LineSubstring(
+		                   ST_GeomFromGeoJSON($2),
+		                   ST_LineLocatePoint(ST_GeomFromGeoJSON($2), ST_ClosestPoint(ST_GeomFromGeoJSON($2), ST_SetSRID(ST_MakePoint($3,$4),4326))),
+		                   ST_LineLocatePoint(ST_GeomFromGeoJSON($2), ST_ClosestPoint(ST_GeomFromGeoJSON($2), ST_SetSRID(ST_MakePoint($5,$6),4326)))
+		               )::geography
+		           )) / 1609.344
+		       )::numeric, 2)
+		WHERE slug = $1
+	`, slug, line.GeoJSON, putInLon, putInLat, takeOutLon, takeOutLat,
+		line.PutInComID, line.TakeOutComID)
 	return err
 }
 
