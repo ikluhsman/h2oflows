@@ -182,6 +182,7 @@ func main() {
 			r.Delete("/admin/rivers/{riverSlug}", admin.DeleteRiver)
 			r.Get("/admin/nldi/watershed", nldiH.WatershedExplorer)
 			r.Post("/admin/reaches", nldiH.CreateReach)
+			r.Post("/admin/reaches/{slug}/nldi-centerline", nldiH.UpdateReachCenterline)
 		})
 
 		// Site admin only — role management.

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/h2oflow/h2oflow/apps/api/internal/kmlimport"
@@ -225,6 +226,72 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 		"slug":      slug,
 		"id":        reachID,
 		"length_mi": lengthMi,
+	})
+}
+
+type updateReachCenterlineRequest struct {
+	PutIn   latLng `json:"put_in"`
+	TakeOut latLng `json:"take_out"`
+	DryRun  bool   `json:"dry_run"`
+}
+
+type latLng struct {
+	Lat float64 `json:"lat"`
+	Lng float64 `json:"lng"`
+}
+
+// UpdateReachCenterline handles POST /api/v1/admin/reaches/{slug}/nldi-centerline
+//
+// Fetches an NLDI centerline between the supplied coordinates and replaces the
+// reach's stored centerline geometry. The reach's reach_access rows are not
+// modified — only centerline, length_mi, put_in_comid, take_out_comid update.
+func (h *NLDIHandler) UpdateReachCenterline(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	var req updateReachCenterlineRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if req.PutIn.Lat == 0 && req.PutIn.Lng == 0 {
+		errorResponse(w, http.StatusBadRequest, "put_in coordinates required")
+		return
+	}
+	if req.TakeOut.Lat == 0 && req.TakeOut.Lng == 0 {
+		errorResponse(w, http.StatusBadRequest, "take_out coordinates required")
+		return
+	}
+
+	ctx := r.Context()
+
+	var reachID string
+	if err := h.db.QueryRow(ctx, `SELECT id FROM reaches WHERE slug = $1`, slug).Scan(&reachID); err != nil {
+		errorResponse(w, http.StatusNotFound, fmt.Sprintf("reach %q not found", slug))
+		return
+	}
+
+	if err := kmlimport.SyncCenterlineAt(ctx, h.db, slug, kmlimport.CenterlineNLDI,
+		req.PutIn.Lng, req.PutIn.Lat, req.TakeOut.Lng, req.TakeOut.Lat, req.DryRun); err != nil {
+		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("nldi centerline: %v", err))
+		return
+	}
+
+	if req.DryRun {
+		jsonResponse(w, http.StatusOK, map[string]any{"dry_run": true})
+		return
+	}
+
+	var lengthMi *float64
+	var putInComID, takeOutComID *string
+	_ = h.db.QueryRow(ctx, `
+		SELECT length_mi, put_in_comid, take_out_comid FROM reaches WHERE id = $1
+	`, reachID).Scan(&lengthMi, &putInComID, &takeOutComID)
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"slug":           slug,
+		"length_mi":      lengthMi,
+		"put_in_comid":   putInComID,
+		"take_out_comid": takeOutComID,
 	})
 }
 

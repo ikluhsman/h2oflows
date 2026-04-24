@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/h2oflow/h2oflow/apps/api/internal/nldi"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // defaultNLDIDistanceKm bounds how far downstream we'll fetch flowlines from a
@@ -78,4 +79,46 @@ func fetchNLDIRiverLineWithClient(ctx context.Context, c *nldi.Client, putInLon,
 		PutInComID:   putIn.ComID,
 		TakeOutComID: takeOut.ComID,
 	}, nil
+}
+
+// SnapReachComIDs snaps the reach's existing put-in/take-out access points to
+// NHD ComIDs and stores them. It only writes when put_in_comid is NULL, so it
+// won't overwrite data set by the NLDI centerline path. Designed to be called
+// in a background goroutine after a successful OSM centerline fetch.
+func SnapReachComIDs(ctx context.Context, pool *pgxpool.Pool, slug string) error {
+	var putInLon, putInLat, takeOutLon, takeOutLat float64
+	err := pool.QueryRow(ctx, `
+		SELECT
+		  ST_X(a_in.location::geometry),  ST_Y(a_in.location::geometry),
+		  ST_X(a_out.location::geometry), ST_Y(a_out.location::geometry)
+		FROM reaches r
+		JOIN reach_access a_in  ON a_in.reach_id  = r.id AND a_in.access_type  = 'put_in'
+		JOIN reach_access a_out ON a_out.reach_id = r.id AND a_out.access_type = 'take_out'
+		WHERE r.slug = $1
+		ORDER BY a_in.created_at ASC, a_out.created_at ASC
+		LIMIT 1
+	`, slug).Scan(&putInLon, &putInLat, &takeOutLon, &takeOutLat)
+	if err != nil {
+		return fmt.Errorf("no access points for %q: %w", slug, err)
+	}
+
+	c := nldi.New()
+	putInSnap, err := c.SnapToComID(ctx, putInLat, putInLon)
+	if err != nil {
+		return nil // best-effort
+	}
+	takeOutSnap, err := c.SnapToComID(ctx, takeOutLat, takeOutLon)
+	if err != nil {
+		return nil
+	}
+
+	_, err = pool.Exec(ctx, `
+		UPDATE reaches
+		SET    put_in_comid   = $2,
+		       take_out_comid = $3,
+		       anchor_comid   = COALESCE(anchor_comid, $2)
+		WHERE  slug = $1
+		  AND  put_in_comid IS NULL
+	`, slug, putInSnap.ComID, takeOutSnap.ComID)
+	return err
 }

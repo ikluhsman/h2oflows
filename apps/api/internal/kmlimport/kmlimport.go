@@ -1387,6 +1387,21 @@ func SyncCenterline(ctx context.Context, pool *pgxpool.Pool, slug string, source
 	}
 }
 
+// SyncCenterlineAt is like SyncCenterline but uses the supplied put-in/take-out
+// coordinates instead of reading them from reach_access. The reach's access
+// points are left unchanged — only centerline geometry and ComID fields update.
+func SyncCenterlineAt(ctx context.Context, pool *pgxpool.Pool, slug string, source CenterlineSource,
+	putInLon, putInLat, takeOutLon, takeOutLat float64, dryRun bool) error {
+	switch source {
+	case "", CenterlineOSM:
+		return syncCenterlineOSM(ctx, pool, slug, putInLon, putInLat, takeOutLon, takeOutLat, dryRun)
+	case CenterlineNLDI:
+		return syncCenterlineNLDI(ctx, pool, slug, putInLon, putInLat, takeOutLon, takeOutLat, dryRun)
+	default:
+		return fmt.Errorf("unknown centerline source %q", source)
+	}
+}
+
 func syncCenterlineOSM(ctx context.Context, pool *pgxpool.Pool, slug string, putInLon, putInLat, takeOutLon, takeOutLat float64, dryRun bool) error {
 	minLon := math.Min(putInLon, takeOutLon) - 0.05
 	maxLon := math.Max(putInLon, takeOutLon) + 0.05

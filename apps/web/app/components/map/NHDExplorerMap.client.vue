@@ -1,6 +1,6 @@
 <template>
-  <div class="relative rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800" style="height:480px">
-    <div ref="container" class="w-full h-full bg-gray-100 dark:bg-gray-900" />
+  <div class="relative rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800">
+    <div ref="container" class="w-full bg-gray-100 dark:bg-gray-900" style="height:480px" />
 
     <!-- Loading overlay -->
     <div v-if="!mapReady" class="absolute inset-0 flex items-center justify-center text-sm text-gray-400 pointer-events-none">
@@ -29,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, watch, watchEffect, onMounted, onUnmounted, nextTick } from 'vue'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
@@ -278,6 +278,7 @@ function initMap() {
 
   map.on('load', () => {
     if (!map) return
+    map.resize()
     mapReady.value = true
     addLayers()
     if (props.upstreamFlowlines?.features.length || props.downstreamFlowlines?.features.length) {
@@ -306,8 +307,19 @@ watch(
 
 onMounted(async () => {
   await nextTick()
-  await new Promise<void>(r => requestAnimationFrame(() => r()))
+  // Two rAF passes: first clears the .client.vue / ClientOnly render deferral,
+  // second waits for the browser layout so the container has non-zero dimensions.
+  await new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(r)))
   initMap()
+})
+
+// Fallback: if the container ref wasn't ready when onMounted ran (can happen
+// when the component is mounted inside a tab v-if that flips after mount),
+// watch for it to become available and init then.
+watchEffect(() => {
+  if (container.value && !map) {
+    nextTick(() => initMap())
+  }
 })
 
 onUnmounted(() => {
