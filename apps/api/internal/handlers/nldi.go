@@ -9,15 +9,22 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/h2oflow/h2oflow/apps/api/internal/ai"
 	"github.com/h2oflow/h2oflow/apps/api/internal/kmlimport"
 	"github.com/h2oflow/h2oflow/apps/api/internal/nldi"
 )
 
 type NLDIHandler struct {
-	db *pgxpool.Pool
+	db           *pgxpool.Pool
+	anthropicKey string
 }
 
 func NewNLDIHandler(db *pgxpool.Pool) *NLDIHandler { return &NLDIHandler{db: db} }
+
+func (h *NLDIHandler) WithAnthropicKey(key string) *NLDIHandler {
+	h.anthropicKey = key
+	return h
+}
 
 // WatershedExplorer handles GET /api/v1/admin/nldi/watershed
 //
@@ -346,6 +353,39 @@ func (h *NLDIHandler) UpdateReachCenterline(w http.ResponseWriter, r *http.Reque
 		"put_in_comid":   putInComID,
 		"take_out_comid": takeOutComID,
 	})
+}
+
+// GenerateDescription handles POST /api/v1/admin/reaches/{slug}/generate-description
+//
+// Asks Claude to write a 1-2 paragraph description for the reach using its
+// training knowledge. Returns the generated text without storing it — the
+// admin reviews and saves via a separate update. If the Anthropic key is not
+// configured, returns 501.
+func (h *NLDIHandler) GenerateDescription(w http.ResponseWriter, r *http.Request) {
+	if h.anthropicKey == "" {
+		errorResponse(w, http.StatusNotImplemented, "AI description generation not configured (ANTHROPIC_API_KEY missing)")
+		return
+	}
+	slug := chi.URLParam(r, "slug")
+	ctx := r.Context()
+
+	var name, riverName, commonName string
+	var classMin, classMax *float64
+	if err := h.db.QueryRow(ctx, `
+		SELECT name, COALESCE(river_name,''), COALESCE(common_name,''), class_min, class_max
+		FROM reaches WHERE slug = $1
+	`, slug).Scan(&name, &riverName, &commonName, &classMin, &classMax); err != nil {
+		errorResponse(w, http.StatusNotFound, fmt.Sprintf("reach %q not found", slug))
+		return
+	}
+
+	text, err := ai.GenerateReachDescription(ctx, h.anthropicKey, name, riverName, commonName, classMin, classMax)
+	if err != nil {
+		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("generate description: %v", err))
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{"description": text})
 }
 
 // buildSlug produces a URL-safe slug from river name + reach name,
