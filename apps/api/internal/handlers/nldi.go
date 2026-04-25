@@ -104,13 +104,16 @@ func (h *NLDIHandler) WatershedExplorer(w http.ResponseWriter, r *http.Request) 
 // coords are not required here — they come from KML import later, at which
 // point the NLDI centerline is trimmed and stored.
 type createReachRequest struct {
-	Name       string   `json:"name"`
-	CommonName string   `json:"common_name"`
-	RiverName  string   `json:"river_name"`
-	UpComID    string   `json:"up_comid"`   // upstream (put-in) ComID — required
-	DownComID  string   `json:"down_comid"` // downstream (take-out) ComID — required
-	ClassMin   *float64 `json:"class_min"`
-	ClassMax   *float64 `json:"class_max"`
+	Name           string   `json:"name"`
+	CommonName     string   `json:"common_name"`
+	RiverName      string   `json:"river_name"`
+	UpComID        string   `json:"up_comid"`   // upstream (put-in) ComID — required
+	DownComID      string   `json:"down_comid"` // downstream (take-out) ComID — required
+	ClassMin       *float64 `json:"class_min"`
+	ClassMax       *float64 `json:"class_max"`
+	Description    string   `json:"description"`
+	PermitRequired bool     `json:"permit_required"`
+	MultiDayDays   int      `json:"multi_day_days"` // 0 or 1 = single day
 }
 
 // CreateReach handles POST /api/v1/admin/reaches.
@@ -140,23 +143,31 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 	slug := buildSlug(req.RiverName, req.Name)
 	ctx := r.Context()
 
+	days := req.MultiDayDays
+	if days < 1 {
+		days = 1
+	}
+
 	var reachID string
 	err := h.db.QueryRow(ctx, `
 		INSERT INTO reaches (
 			slug, name, common_name, river_name,
 			class_min, class_max,
 			put_in_comid, take_out_comid, anchor_comid,
-			centerline_source
+			centerline_source,
+			description, permit_required, multi_day_days
 		) VALUES (
 			$1, $2, NULLIF($3,''), NULLIF($4,''),
 			$5, $6,
 			$7, $8, $7,
-			'nldi'
+			'nldi',
+			NULLIF($9,''), $10, $11
 		)
 		RETURNING id
 	`, slug, req.Name, req.CommonName, req.RiverName,
 		req.ClassMin, req.ClassMax,
 		req.UpComID, req.DownComID,
+		req.Description, req.PermitRequired, days,
 	).Scan(&reachID)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {

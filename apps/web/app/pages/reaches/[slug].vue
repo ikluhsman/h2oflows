@@ -247,7 +247,7 @@
                   class="shrink-0 w-6 h-6 rounded-full flex items-center justify-center p-1 mt-0.5"
                   :style="{ background: featureIconColor(feat) }"
                   :title="featureTypeLabel(feat)"
-                  v-html="featurePanelIcon(feat.type, { isHazard: feat.is_permanent_hazard })"
+                  v-html="featurePanelIcon(feat.type, { isHazard: feat.is_permanent_hazard, isSurf: feat.is_surf_wave })"
                 />
 
                 <!-- Content -->
@@ -256,7 +256,7 @@
                     <span class="text-[10px] uppercase tracking-wider font-semibold text-gray-400 dark:text-gray-500">{{ featureTypeLabel(feat) }}</span>
                     <span class="text-sm font-medium text-gray-800 dark:text-gray-100">{{ feat.name }}</span>
                     <span
-                      v-if="(feat.type === 'rapid' || feat.type === 'hazard') && feat.class_rating"
+                      v-if="(feat.type === 'rapid' || feat.type === 'wave' || feat.type === 'hazard') && feat.class_rating"
                       class="text-xs font-mono font-medium text-gray-500 dark:text-gray-400"
                     >{{ romanClass(feat.class_rating) }}<span v-if="feat.class_at_high && feat.class_at_high > feat.class_rating" class="text-gray-400">({{ romanClass(feat.class_at_high) }})</span></span>
                   </div>
@@ -407,7 +407,7 @@ const { data: flowRanges } = await useAsyncData(
 interface RiverFeature {
   key:          string
   id:           string          // raw UUID for map selectFeature calls
-  type:         'rapid' | 'put_in' | 'take_out' | 'hazard' | 'access' | 'camp' | 'parking'
+  type:         'rapid' | 'wave' | 'put_in' | 'take_out' | 'hazard' | 'access' | 'camp' | 'parking'
   name:         string
   description?: string | null
   // rapids-specific
@@ -417,6 +417,7 @@ interface RiverFeature {
   is_portage_recommended?: boolean
   is_permanent_hazard?:   boolean
   hazard_type?:           string | null
+  is_surf_wave?:          boolean
   // sorting — river_order is 0→1 along centerline (preferred); lng is fallback
   river_order?: number | null
   lng?:         number | null
@@ -431,10 +432,11 @@ const allFeatures = computed<RiverFeature[]>(() => {
   const items: RiverFeature[] = []
 
   for (const rap of r.rapids ?? []) {
+    const type = rap.is_permanent_hazard ? 'hazard' : rap.is_surf_wave ? 'wave' : 'rapid'
     items.push({
       key:  `rapid-${rap.id}`,
       id:   rap.id,
-      type: rap.is_permanent_hazard ? 'hazard' : 'rapid',
+      type,
       name: stripRapidClass(rap.name),
       description: rap.description,
       class_rating: rap.class_rating,
@@ -443,6 +445,7 @@ const allFeatures = computed<RiverFeature[]>(() => {
       is_portage_recommended: rap.is_portage_recommended,
       is_permanent_hazard: rap.is_permanent_hazard,
       hazard_type: rap.hazard_type,
+      is_surf_wave: rap.is_surf_wave,
       river_order: rap.river_order,
       lng: rap.lng,
       lat: rap.lat,
@@ -535,7 +538,7 @@ const featureTabs = computed(() => {
   const tabs = [
     { key: 'all',     label: 'All',           count: f.length },
     { key: 'access',  label: 'Access Points', count: f.filter(x => ['put_in','take_out','access'].includes(x.type)).length },
-    { key: 'rapids',  label: 'Rapids',        count: f.filter(x => x.type === 'rapid' || x.type === 'hazard').length },
+    { key: 'rapids',  label: 'Rapids & Waves', count: f.filter(x => x.type === 'rapid' || x.type === 'wave' || x.type === 'hazard').length },
     { key: 'camps',   label: 'Camps',         count: f.filter(x => x.type === 'camp').length },
     { key: 'parking', label: 'Parking',       count: f.filter(x => x.type === 'parking').length },
   ]
@@ -546,7 +549,7 @@ const featureTabs = computed(() => {
 const filteredFeatures = computed(() => {
   switch (featuresTab.value) {
     case 'access':  return allFeatures.value.filter(f => ['put_in','take_out','access'].includes(f.type))
-    case 'rapids':  return allFeatures.value.filter(f => f.type === 'rapid' || f.type === 'hazard')
+    case 'rapids':  return allFeatures.value.filter(f => f.type === 'rapid' || f.type === 'wave' || f.type === 'hazard')
     case 'camps':   return allFeatures.value.filter(f => f.type === 'camp')
     case 'parking': return allFeatures.value.filter(f => f.type === 'parking')
     default:        return allFeatures.value
@@ -556,6 +559,7 @@ const filteredFeatures = computed(() => {
 function featureTypeLabel(feat: RiverFeature): string {
   if (feat.is_permanent_hazard) return 'Hazard'
   switch (feat.type) {
+    case 'wave':     return 'Wave'
     case 'rapid':    return 'Rapid'
     case 'put_in':   return 'Put-in'
     case 'take_out': return 'Take-out'
@@ -570,6 +574,7 @@ function featureTypeLabel(feat: RiverFeature): string {
 function featureIconColor(feat: RiverFeature): string {
   if (feat.is_permanent_hazard) return '#ef4444'
   switch (feat.type) {
+    case 'wave':     return '#06b6d4'  // cyan — surf/play wave
     case 'rapid':    return '#3b82f6'
     case 'put_in':   return '#22c55e'
     case 'take_out': return '#ef4444'
