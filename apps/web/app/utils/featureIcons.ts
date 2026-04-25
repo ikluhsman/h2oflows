@@ -86,6 +86,7 @@ export function featurePanelIcon(
   options: { isHazard?: boolean; isSurf?: boolean } = {}
 ): string {
   if (options.isHazard) return hazardFeatureIcon()
+  if (type === 'wave') return rapidFeatureIcon(true)
   if (type === 'rapid' || type === 'hazard') return rapidFeatureIcon(options.isSurf)
   return accessFeatureIcon(type)
 }

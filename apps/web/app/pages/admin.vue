@@ -353,6 +353,65 @@
                   </div>
                 </div>
 
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Description</label>
+                  <textarea
+                    v-model="authorForm.description"
+                    rows="4"
+                    class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm resize-y"
+                    placeholder="Overview of the reach — character, season, access notes…"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Multi-day (days)</label>
+                    <input
+                      v-model.number="authorForm.multiDay"
+                      type="number" min="1" max="30"
+                      class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
+                      placeholder="1"
+                    />
+                    <p class="text-xs text-gray-400 mt-0.5">1 = single day</p>
+                  </div>
+                  <div class="flex items-start pt-5">
+                    <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700 dark:text-gray-300">
+                      <input type="checkbox" v-model="authorForm.permitRequired" class="rounded" />
+                      Permit required
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Flow ranges -->
+                <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-3 space-y-2">
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow ranges (CFS)</p>
+                  <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div v-for="band in authorFlowBands" :key="band.key" class="space-y-1">
+                      <div class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: band.dot }" />
+                        <span class="font-medium text-gray-600 dark:text-gray-300">{{ band.label }}</span>
+                      </div>
+                      <div class="flex items-center gap-1">
+                        <input
+                          v-model.number="authorForm.flowRanges[band.key].min"
+                          type="number" min="0"
+                          class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-1 text-xs"
+                          :placeholder="band.showMin ? 'min' : '—'"
+                          :disabled="!band.showMin"
+                        />
+                        <span class="text-gray-300 shrink-0">–</span>
+                        <input
+                          v-model.number="authorForm.flowRanges[band.key].max"
+                          type="number" min="0"
+                          class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-1 text-xs"
+                          :placeholder="band.showMax ? 'max' : '—'"
+                          :disabled="!band.showMax"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div v-if="authorError" class="text-xs text-red-500">{{ authorError }}</div>
                 <div v-if="authorSuccess" class="text-xs text-green-600 dark:text-green-400">{{ authorSuccess }}</div>
 
@@ -904,7 +963,26 @@ const authorRiverNameOverride   = ref(false)
 const authorError               = ref('')
 const authorSuccess             = ref('')
 const authorSaving              = ref(false)
-const authorForm                = ref({ name: '', commonName: '', riverName: '', classMin: null as number | null, classMax: null as number | null })
+const authorForm = ref({
+  name: '', commonName: '', riverName: '',
+  classMin: null as number | null, classMax: null as number | null,
+  description: '',
+  permitRequired: false,
+  multiDay: 1,
+  flowRanges: {
+    too_low:  { min: null as number | null, max: null as number | null },
+    running:  { min: null as number | null, max: null as number | null },
+    high:     { min: null as number | null, max: null as number | null },
+    very_high: { min: null as number | null, max: null as number | null },
+  },
+})
+
+const authorFlowBands = [
+  { key: 'too_low',  label: 'Too Low',   dot: '#64748b', showMin: false, showMax: true  },
+  { key: 'running',  label: 'Runnable',  dot: '#22c55e', showMin: true,  showMax: true  },
+  { key: 'high',     label: 'High',      dot: '#f97316', showMin: true,  showMax: true  },
+  { key: 'very_high', label: 'Very High', dot: '#ef4444', showMin: true,  showMax: false },
+] as const
 
 const authorComputedSlug = computed(() => {
   const river = authorForm.value.riverName.trim()
@@ -927,7 +1005,19 @@ function resetAuthor() {
   authorRiverNameOverride.value = false
   authorError.value = ''; authorSuccess.value = ''
   authorSaving.value = false
-  authorForm.value = { name: '', commonName: '', riverName: '', classMin: null, classMax: null }
+  authorForm.value = {
+    name: '', commonName: '', riverName: '',
+    classMin: null, classMax: null,
+    description: '',
+    permitRequired: false,
+    multiDay: 1,
+    flowRanges: {
+      too_low:  { min: null, max: null },
+      running:  { min: null, max: null },
+      high:     { min: null, max: null },
+      very_high: { min: null, max: null },
+    },
+  }
 }
 
 async function onAuthorAnchorPick(lat: number, lng: number) {
@@ -1175,14 +1265,19 @@ async function submitAuthorReach() {
   const token = await getToken()
   if (!token) { authorSaving.value = false; return }
   try {
+    const f = authorForm.value
+    const days = (f.multiDay ?? 1) < 1 ? 1 : (f.multiDay ?? 1)
     const body = {
-      name:        authorForm.value.name.trim(),
-      common_name: authorForm.value.commonName.trim(),
-      river_name:  authorForm.value.riverName.trim(),
-      up_comid:    authorUpComID.value,
-      down_comid:  authorDownComID.value,
-      class_min:   authorForm.value.classMin,
-      class_max:   authorForm.value.classMax,
+      name:            f.name.trim(),
+      common_name:     f.commonName.trim(),
+      river_name:      f.riverName.trim(),
+      up_comid:        authorUpComID.value,
+      down_comid:      authorDownComID.value,
+      class_min:       f.classMin,
+      class_max:       f.classMax,
+      description:     f.description.trim() || undefined,
+      permit_required: f.permitRequired,
+      multi_day_days:  days,
     }
     const res = await fetch(`${apiBase}/api/v1/admin/reaches`, {
       method: 'POST',
@@ -1191,7 +1286,28 @@ async function submitAuthorReach() {
     })
     const data = await res.json()
     if (!res.ok) { authorError.value = data.error ?? `HTTP ${res.status}`; return }
-    authorSuccess.value = `Saved! Slug: ${data.slug}. Import a KML with a slug placemark to add access points.`
+
+    const slug: string = data.slug
+
+    // Submit flow ranges if any band has at least one value set
+    const ranges = f.flowRanges
+    const hasRanges = Object.values(ranges).some(b => b.min != null || b.max != null)
+    if (hasRanges) {
+      const bands = [
+        { label: 'too_low',  min: null,        max: ranges.too_low.max  },
+        { label: 'running',  min: ranges.running.min,  max: ranges.running.max  },
+        { label: 'high',     min: ranges.high.min,     max: ranges.high.max     },
+        { label: 'very_high', min: ranges.very_high.min, max: null               },
+      ].filter(b => b.min != null || b.max != null)
+        .map(b => ({ label: b.label, min_cfs: b.min, max_cfs: b.max }))
+      await fetch(`${apiBase}/api/v1/reaches/${slug}/flow-ranges`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ranges: bands }),
+      })
+    }
+
+    authorSuccess.value = `Saved! Slug: ${slug}. Import a KML with a slug placemark to add access points.`
   } catch (e: any) {
     authorError.value = e.message ?? 'Unknown error'
   } finally {
