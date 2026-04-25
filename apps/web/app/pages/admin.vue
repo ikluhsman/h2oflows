@@ -100,7 +100,7 @@
                         <span v-if="centerlineErrors.get(reach.slug)" class="text-xs text-red-400">{{ centerlineErrors.get(reach.slug) }}</span>
                         <UButton size="xs" variant="outline" color="neutral" :loading="fetchingCenterlines.has(reach.slug)" @click="fetchCenterline(reach.slug)">Fetch line</UButton>
                         <UButton size="xs" variant="outline" color="error" @click="deleteReach(reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
-                        <NuxtLink :to="`/reaches/${reach.slug}`" class="text-xs text-blue-500 hover:underline">View</NuxtLink>
+                        <button class="text-xs text-blue-500 hover:underline" @click="openReachInEditor(reach.slug)">Edit</button>
                       </div>
                     </div>
                     <div v-if="!selectedRiver.reaches?.length" class="px-6 py-4 text-center text-sm text-gray-400">No reaches linked to this river</div>
@@ -117,7 +117,7 @@
           <div class="space-y-4">
             <div>
               <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Import KMZ / KML</h2>
-              <p class="text-xs text-gray-400 mb-3">Upload a KMZ or KML file to enrich existing reaches with access points, rapids, and hazards. Each folder must include a slug placemark matching a reach created in the NHD Explorer tab.</p>
+              <p class="text-xs text-gray-400 mb-3">Upload a KMZ or KML file to enrich existing reaches with access points, rapids, and hazards. Each folder must include a slug placemark matching a reach created in the Reaches tab.</p>
               <div class="flex items-center gap-3">
                 <UButton
                   :loading="importing"
@@ -140,7 +140,7 @@
                 <ul class="list-disc pl-4 space-y-0.5">
                   <li><strong>One folder per reach</strong> — folder name is informational; the <strong>slug placemark</strong> is what links it to the DB</li>
                   <li><strong>Slug placemark</strong> (required): a coordinate-less <code>&lt;Placemark&gt;&lt;name&gt;slug&lt;/name&gt;&lt;description&gt;reach-slug-here&lt;/description&gt;&lt;/Placemark&gt;</code> inside the folder</li>
-                  <li>Folders missing a slug placemark are skipped with a warning — create the reach in NHD Explorer first</li>
+                  <li>Folders missing a slug placemark are skipped with a warning — create the reach in the Reaches tab first</li>
                   <li>River name and basin are set from NHD data when the reach is created — no document-level overrides needed</li>
                 </ul>
               </div>
@@ -169,7 +169,7 @@
           </div>
         </div>
 
-        <!-- NHD Explorer tab -->
+        <!-- Reaches tab -->
         <div v-if="activeTab === 'nhd'">
           <div class="space-y-4">
 
@@ -177,7 +177,7 @@
             <div class="flex gap-2 border-b border-gray-100 dark:border-gray-800 pb-3">
               <UButton size="xs" :variant="nhdMode === 'explore' ? 'solid' : 'outline'" :color="nhdMode === 'explore' ? 'primary' : 'neutral'" @click="setNHDMode('explore')">Explore</UButton>
               <UButton size="xs" :variant="nhdMode === 'author' ? 'solid' : 'outline'" :color="nhdMode === 'author' ? 'primary' : 'neutral'" @click="setNHDMode('author')">New reach</UButton>
-              <UButton size="xs" :variant="nhdMode === 'repin' ? 'solid' : 'outline'" :color="nhdMode === 'repin' ? 'primary' : 'neutral'" @click="setNHDMode('repin')">Re-pin existing</UButton>
+              <UButton size="xs" :variant="nhdMode === 'repin' ? 'solid' : 'outline'" :color="nhdMode === 'repin' ? 'primary' : 'neutral'" @click="setNHDMode('repin')">Load Reach</UButton>
             </div>
 
             <!-- ── EXPLORE MODE ─────────────────────────────────────────────── -->
@@ -424,7 +424,7 @@
 
             <!-- ── RE-PIN EXISTING MODE ────────────────────────────────────────── -->
             <div v-if="nhdMode === 'repin'">
-              <p class="text-xs text-gray-400 mb-3">Enter a reach slug to update its NLDI centerline without modifying its access points.</p>
+              <p class="text-xs text-gray-400 mb-3">Enter a reach slug to load it for editing — flow lines, metadata, and description.</p>
 
               <!-- Reach selector -->
               <div class="flex gap-2 mb-3">
@@ -434,12 +434,57 @@
                   placeholder="Reach slug (e.g. colorado-gore-canyon)"
                   @keydown.enter="loadRepinReach"
                 />
-                <UButton size="sm" :loading="repinLoadingReach" @click="loadRepinReach">Load</UButton>
+                <UButton size="sm" :loading="repinLoadingReach" @click="loadRepinReach">Load Reach</UButton>
               </div>
               <div v-if="repinLoadError" class="text-xs text-red-500 mb-2">{{ repinLoadError }}</div>
 
-              <div v-if="repinReach" class="space-y-3">
-                <p class="text-xs text-gray-500">Re-pinning: <span class="font-medium text-gray-800 dark:text-gray-100">{{ repinReach.name }}</span></p>
+              <div v-if="repinReach" class="space-y-4">
+                <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100">{{ repinReach.name }}<span v-if="repinReach.river_name" class="text-gray-400 font-normal"> · {{ repinReach.river_name }}</span></h3>
+
+                <!-- Metadata form -->
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-3">
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Metadata</p>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Reach name <span class="text-red-400">*</span></label>
+                    <input v-model="repinForm.name" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Common name</label>
+                    <input v-model="repinForm.commonName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">River name</label>
+                    <input v-model="repinForm.riverName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Class min</label>
+                      <input v-model.number="repinForm.classMin" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+                    </div>
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Class max</label>
+                      <input v-model.number="repinForm.classMax" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-xs text-gray-500 mb-1">Multi-day (days)</label>
+                      <input v-model.number="repinForm.multiDay" type="number" min="1" max="30" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+                      <p class="text-xs text-gray-400 mt-0.5">1 = single day</p>
+                    </div>
+                    <div class="flex items-start pt-5">
+                      <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700 dark:text-gray-300">
+                        <input type="checkbox" v-model="repinForm.permitRequired" class="rounded" />
+                        Permit required
+                      </label>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 pt-1">
+                    <span v-if="repinMetaMsg" class="text-xs" :class="repinMetaMsg === 'Saved' ? 'text-green-600 dark:text-green-400' : 'text-red-500'">{{ repinMetaMsg }}</span>
+                    <div class="flex-1" />
+                    <UButton size="sm" :loading="repinMetaSaving" :disabled="!repinForm.name.trim()" @click="saveRepinMeta">Save metadata</UButton>
+                  </div>
+                </div>
 
                 <!-- Description editor -->
                 <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-2">
@@ -460,51 +505,62 @@
                   </div>
                 </div>
 
-                <!-- Step indicator -->
-                <div class="flex items-center gap-2 text-xs">
-                  <span :class="repinStep === 'put-in' ? 'text-green-700 dark:text-green-400 font-semibold' : repinPutIn ? 'text-gray-400 line-through' : 'text-gray-400'">1. Pick put-in</span>
-                  <span class="text-gray-300">→</span>
-                  <span :class="repinStep === 'take-out' ? 'text-red-700 dark:text-red-400 font-semibold' : repinTakeOut ? 'text-gray-400 line-through' : 'text-gray-400'">2. Pick take-out</span>
-                  <span class="text-gray-300">→</span>
-                  <span :class="repinStep === 'confirm' ? 'text-blue-700 dark:text-blue-400 font-semibold' : 'text-gray-400'">3. Confirm</span>
-                  <UButton v-if="repinStep !== 'put-in'" size="xs" variant="ghost" color="neutral" class="ml-auto" @click="resetRepin">Reset</UButton>
-                </div>
+                <!-- Flow lines / ComIDs -->
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-3">
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow lines</p>
 
-                <div v-if="repinSnapping" class="text-xs text-blue-600 dark:text-blue-400 text-center animate-pulse">Snapping to NHD…</div>
-
-                <NHDExplorerMap
-                  :upstream-flowlines="repinUpstream"
-                  :downstream-flowlines="repinDownstream"
-                  :upstream-gauges="null"
-                  :snap-lat="null"
-                  :snap-lng="null"
-                  :put-in-pin="repinPutIn ? { lat: repinPutIn.lat, lng: repinPutIn.lng, label: repinPutIn.name || 'Put-in' } : null"
-                  :take-out-pin="repinTakeOut ? { lat: repinTakeOut.lat, lng: repinTakeOut.lng, label: repinTakeOut.name || 'Take-out' } : null"
-                  :pick-mode="repinStep === 'put-in' || repinStep === 'take-out'"
-                  @pick="onRepinPick"
-                />
-
-                <!-- Confirm panel -->
-                <div v-if="repinStep === 'confirm'" class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-3">
-                  <div class="grid grid-cols-2 gap-3 text-xs">
-                    <div class="rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 p-2">
-                      <div class="font-medium text-green-800 dark:text-green-200">Put-in · {{ repinPutIn!.comid }}</div>
-                      <div class="text-green-600 dark:text-green-400 font-mono">{{ repinPutIn!.lat.toFixed(5) }}, {{ repinPutIn!.lng.toFixed(5) }}</div>
+                  <div class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+                      <span class="w-2 h-2 rounded-full bg-green-600 shrink-0" />
+                      <div class="min-w-0 flex-1">
+                        <div class="font-medium text-green-800 dark:text-green-200">Put-In</div>
+                        <div class="text-green-600 dark:text-green-400 font-mono truncate">{{ repinUpComID || '—' }}</div>
+                      </div>
+                      <UButton size="xs"
+                        :variant="repinComIDEditMode === 'up' ? 'solid' : 'outline'"
+                        :color="repinComIDEditMode === 'up' ? 'primary' : 'neutral'"
+                        @click="repinComIDEditMode = repinComIDEditMode === 'up' ? null : 'up'"
+                      >{{ repinComIDEditMode === 'up' ? 'Cancel' : 'Set Put-In Flow Line' }}</UButton>
                     </div>
-                    <div class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 p-2">
-                      <div class="font-medium text-red-800 dark:text-red-200">Take-out · {{ repinTakeOut!.comid }}</div>
-                      <div class="text-red-600 dark:text-red-400 font-mono">{{ repinTakeOut!.lat.toFixed(5) }}, {{ repinTakeOut!.lng.toFixed(5) }}</div>
+                    <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
+                      <span class="w-2 h-2 rounded-full bg-red-600 shrink-0" />
+                      <div class="min-w-0 flex-1">
+                        <div class="font-medium text-red-800 dark:text-red-200">Take-Out</div>
+                        <div class="text-red-600 dark:text-red-400 font-mono truncate">{{ repinDownComID || '—' }}</div>
+                      </div>
+                      <UButton size="xs"
+                        :variant="repinComIDEditMode === 'down' ? 'solid' : 'outline'"
+                        :color="repinComIDEditMode === 'down' ? 'primary' : 'neutral'"
+                        @click="repinComIDEditMode = repinComIDEditMode === 'down' ? null : 'down'"
+                      >{{ repinComIDEditMode === 'down' ? 'Cancel' : 'Set Take-Out Flow Line' }}</UButton>
                     </div>
                   </div>
-                  <div v-if="repinError" class="text-xs text-red-500">{{ repinError }}</div>
-                  <div v-if="repinSuccess" class="text-xs text-green-600 dark:text-green-400">{{ repinSuccess }}</div>
-                  <div class="flex gap-2">
-                    <UButton size="sm" color="neutral" variant="outline" @click="resetRepin">Start over</UButton>
-                    <UButton size="sm" :loading="repinSaving" @click="submitRepin">Replace centerline</UButton>
+
+                  <p v-if="repinFlowlinesLoading" class="text-xs text-blue-500 animate-pulse">Loading downstream mainstem…</p>
+                  <p v-if="repinComIDEditMode" class="text-xs text-blue-600 dark:text-blue-400">Click any flowline segment on the map to set the {{ repinComIDEditMode === 'up' ? 'put-in' : 'take-out' }} flow line.</p>
+
+                  <NHDExplorerMap
+                    :upstream-flowlines="null"
+                    :downstream-flowlines="repinDownstream"
+                    :upstream-gauges="null"
+                    :snap-lat="null"
+                    :snap-lng="null"
+                    :put-in-pin="repinPutInPin"
+                    :take-out-pin="repinTakeOutPin"
+                    :comid-select-mode="!!repinComIDEditMode"
+                    :selected-up-comid="repinUpComID"
+                    :selected-down-comid="repinDownComID"
+                    @comid-select="onRepinComIDSelect"
+                  />
+
+                  <div class="flex items-center gap-3 pt-1">
+                    <span v-if="repinError" class="text-xs text-red-500">{{ repinError }}</span>
+                    <span v-if="repinSuccess" class="text-xs text-green-600 dark:text-green-400">{{ repinSuccess }}</span>
+                    <div class="flex-1" />
+                    <UButton size="sm" variant="outline" color="neutral" @click="resetRepinComIDs" v-if="repinComIDsDirty">Revert</UButton>
+                    <UButton size="sm" :loading="repinSaving" :disabled="!repinComIDsDirty || !repinUpComID || !repinDownComID" @click="submitRepinByComID">Save flow lines</UButton>
                   </div>
                 </div>
-
-                <div v-if="repinError && repinStep !== 'confirm'" class="text-xs text-red-500">{{ repinError }}</div>
               </div>
             </div>
 
@@ -636,8 +692,8 @@ const activeTab = ref('rivers')
 const visibleTabs = computed(() => {
   const tabs = [
     { key: 'rivers', label: 'Rivers' },
-    { key: 'import', label: 'Import' },
-    { key: 'nhd',    label: 'NHD Explorer' },
+    { key: 'nhd',    label: 'Reaches' },
+    { key: 'import', label: 'Metadata' },
   ]
   if (isAdmin.value) tabs.push({ key: 'users', label: 'Users' })
   return tabs
@@ -898,10 +954,13 @@ interface NHDGaugeItem { id: string; name: string }
 interface NHDFC { type: string; features: any[] }
 interface AuthorPin { lat: number; lng: number; name: string; comid: string }
 interface RepinReach {
-  slug: string; name: string; river_name: string | null
+  slug: string; name: string; river_name: string | null; common_name: string | null
   description: string | null
+  class_min: number | null; class_max: number | null
+  permit_required: boolean; multi_day_days: number
   put_in: { lat: number; lng: number } | null
   take_out: { lat: number; lng: number } | null
+  put_in_comid: string | null; take_out_comid: string | null
 }
 
 // ---- Shared ----
@@ -1075,30 +1134,73 @@ watch(authorUpComID, async (comid) => {
   finally { authorDownstreamLoading.value = false }
 })
 
-// ---- Re-pin mode ----
-const repinSlug           = ref('')
-const repinLoadingReach   = ref(false)
-const repinLoadError      = ref('')
-const repinReach          = ref<RepinReach | null>(null)
-const repinStep           = ref<'put-in' | 'take-out' | 'confirm'>('put-in')
-const repinSnapping       = ref(false)
-const repinPutIn          = ref<AuthorPin | null>(null)
-const repinTakeOut        = ref<AuthorPin | null>(null)
-const repinUpstream       = ref<NHDFC | null>(null)
-const repinDownstream     = ref<NHDFC | null>(null)
-const repinError          = ref('')
-const repinSuccess        = ref('')
-const repinSaving         = ref(false)
-const repinDescEdit       = ref('')
-const repinDescGenerating = ref(false)
-const repinDescSaving     = ref(false)
-const repinDescMsg        = ref('')
+// ---- Load Reach mode ----
+const repinSlug             = ref('')
+const repinLoadingReach     = ref(false)
+const repinLoadError        = ref('')
+const repinReach            = ref<RepinReach | null>(null)
+const repinDownstream       = ref<NHDFC | null>(null)
+const repinFlowlinesLoading = ref(false)
+const repinError            = ref('')
+const repinSuccess          = ref('')
+const repinSaving           = ref(false)
+const repinDescEdit         = ref('')
+const repinDescGenerating   = ref(false)
+const repinDescSaving       = ref(false)
+const repinDescMsg          = ref('')
+
+const repinForm = ref({
+  name: '', commonName: '', riverName: '',
+  classMin: null as number | null, classMax: null as number | null,
+  permitRequired: false, multiDay: 1,
+})
+const repinMetaSaving = ref(false)
+const repinMetaMsg    = ref('')
+
+const repinUpComID        = ref<string | null>(null)
+const repinDownComID      = ref<string | null>(null)
+const repinOrigUpComID    = ref<string | null>(null)
+const repinOrigDownComID  = ref<string | null>(null)
+const repinComIDEditMode  = ref<'up' | 'down' | null>(null)
+
+const repinComIDsDirty = computed(() =>
+  repinUpComID.value !== repinOrigUpComID.value ||
+  repinDownComID.value !== repinOrigDownComID.value
+)
+
+const repinPutInPin = computed(() =>
+  repinReach.value?.put_in
+    ? { lat: repinReach.value.put_in.lat, lng: repinReach.value.put_in.lng, label: 'Put-in' }
+    : null
+)
+const repinTakeOutPin = computed(() =>
+  repinReach.value?.take_out
+    ? { lat: repinReach.value.take_out.lat, lng: repinReach.value.take_out.lng, label: 'Take-out' }
+    : null
+)
 
 function resetRepin() {
-  repinStep.value = 'put-in'; repinPutIn.value = null; repinTakeOut.value = null
-  repinUpstream.value = null; repinDownstream.value = null
+  repinReach.value = null
+  repinDownstream.value = null
   repinError.value = ''; repinSuccess.value = ''
-  repinSaving.value = false; repinDescMsg.value = ''
+  repinSaving.value = false
+  repinDescMsg.value = ''
+  repinMetaMsg.value = ''
+  repinUpComID.value = null; repinDownComID.value = null
+  repinOrigUpComID.value = null; repinOrigDownComID.value = null
+  repinComIDEditMode.value = null
+  repinForm.value = {
+    name: '', commonName: '', riverName: '',
+    classMin: null, classMax: null,
+    permitRequired: false, multiDay: 1,
+  }
+}
+
+function resetRepinComIDs() {
+  repinUpComID.value = repinOrigUpComID.value
+  repinDownComID.value = repinOrigDownComID.value
+  repinComIDEditMode.value = null
+  repinError.value = ''; repinSuccess.value = ''
 }
 
 async function loadRepinReach() {
@@ -1106,7 +1208,6 @@ async function loadRepinReach() {
   if (!slug) return
   repinLoadingReach.value = true
   repinLoadError.value = ''
-  repinReach.value = null
   resetRepin()
   try {
     const token = await getToken()
@@ -1118,24 +1219,141 @@ async function loadRepinReach() {
     repinReach.value = {
       slug,
       name: data.name ?? slug,
+      common_name: data.common_name ?? null,
       river_name: data.river_name ?? null,
       description: data.description ?? null,
+      class_min: data.class_min ?? null,
+      class_max: data.class_max ?? null,
+      permit_required: !!data.permit_required,
+      multi_day_days: data.multi_day_days ?? 1,
       put_in: data.put_in ?? null,
       take_out: data.take_out ?? null,
+      put_in_comid: data.put_in_comid ?? null,
+      take_out_comid: data.take_out_comid ?? null,
+    }
+    repinForm.value = {
+      name:           data.name ?? '',
+      commonName:     data.common_name ?? '',
+      riverName:      data.river_name ?? '',
+      classMin:       data.class_min ?? null,
+      classMax:       data.class_max ?? null,
+      permitRequired: !!data.permit_required,
+      multiDay:       data.multi_day_days ?? 1,
     }
     repinDescEdit.value = data.description ?? ''
-    // Pre-fill existing access points so the map zooms to them.
-    if (data.put_in) {
-      repinPutIn.value = { lat: data.put_in.lat, lng: data.put_in.lng, name: 'Put-in', comid: data.put_in_comid ?? '' }
+
+    repinUpComID.value       = data.put_in_comid ?? null
+    repinDownComID.value     = data.take_out_comid ?? null
+    repinOrigUpComID.value   = data.put_in_comid ?? null
+    repinOrigDownComID.value = data.take_out_comid ?? null
+
+    if (data.put_in_comid) {
+      await fetchRepinFlowlines(data.put_in_comid)
     }
-    if (data.take_out) {
-      repinTakeOut.value = { lat: data.take_out.lat, lng: data.take_out.lng, name: 'Take-out', comid: data.take_out_comid ?? '' }
-    }
-    if (data.put_in && data.take_out) repinStep.value = 'confirm'
   } catch (e: any) {
     repinLoadError.value = e.message ?? 'Unknown error'
   } finally {
     repinLoadingReach.value = false
+  }
+}
+
+async function openReachInEditor(slug: string) {
+  activeTab.value = 'nhd'
+  setNHDMode('repin')
+  repinSlug.value = slug
+  await loadRepinReach()
+}
+
+async function fetchRepinFlowlines(comid: string) {
+  repinFlowlinesLoading.value = true
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/nldi/downstream?comid=${comid}&distance=800`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (res.ok) {
+      const data = await res.json()
+      repinDownstream.value = data.downstream_flowlines
+    }
+  } catch { /* non-fatal */ }
+  finally { repinFlowlinesLoading.value = false }
+}
+
+function onRepinComIDSelect(comid: string) {
+  if (!repinComIDEditMode.value) return
+  if (repinComIDEditMode.value === 'up') {
+    repinUpComID.value = comid
+  } else {
+    repinDownComID.value = comid
+  }
+  repinComIDEditMode.value = null
+}
+
+async function saveRepinMeta() {
+  if (!repinReach.value) return
+  if (!repinForm.value.name.trim()) return
+  repinMetaSaving.value = true
+  repinMetaMsg.value = ''
+  try {
+    const f = repinForm.value
+    const days = (f.multiDay ?? 1) < 1 ? 1 : (f.multiDay ?? 1)
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/meta`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({
+        name:            f.name.trim(),
+        common_name:     f.commonName.trim(),
+        river_name:      f.riverName.trim(),
+        class_min:       f.classMin,
+        class_max:       f.classMax,
+        permit_required: f.permitRequired,
+        multi_day_days:  days,
+      }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      repinMetaMsg.value = d.error ?? `HTTP ${res.status}`
+      return
+    }
+    repinMetaMsg.value = 'Saved'
+    if (repinReach.value) {
+      repinReach.value.name = f.name.trim()
+      repinReach.value.river_name = f.riverName.trim() || null
+    }
+  } catch (e: any) {
+    repinMetaMsg.value = e.message ?? 'Save failed'
+  } finally {
+    repinMetaSaving.value = false
+  }
+}
+
+async function submitRepinByComID() {
+  if (!repinReach.value || !repinUpComID.value || !repinDownComID.value) return
+  repinSaving.value = true
+  repinError.value = ''
+  repinSuccess.value = ''
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/nldi-centerline-by-comid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ up_comid: repinUpComID.value, down_comid: repinDownComID.value }),
+    })
+    const data = await res.json()
+    if (!res.ok) { repinError.value = data.error ?? `HTTP ${res.status}`; return }
+    const lengthStr = data.length_mi != null ? ` · ${data.length_mi} mi` : ''
+    repinSuccess.value = `Flow lines saved${lengthStr}`
+    repinOrigUpComID.value = repinUpComID.value
+    repinOrigDownComID.value = repinDownComID.value
+    if (repinReach.value) {
+      repinReach.value.put_in_comid = repinUpComID.value
+      repinReach.value.take_out_comid = repinDownComID.value
+    }
+  } catch (e: any) {
+    repinError.value = e.message ?? 'Unknown error'
+  } finally {
+    repinSaving.value = false
   }
 }
 
@@ -1180,80 +1398,6 @@ async function saveRepinDescription() {
     repinDescMsg.value = e.message ?? 'Save failed'
   } finally {
     repinDescSaving.value = false
-  }
-}
-
-async function snapToNHD(lat: number, lng: number): Promise<AuthorPin | null> {
-  const token = await getToken()
-  if (!token) return null
-  const res = await fetch(`${apiBase}/api/v1/admin/nldi/watershed?lat=${lat}&lng=${lng}&distance=150`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) return null
-  const data = await res.json()
-  return { lat, lng, comid: data.snap.comid, name: data.snap.name ?? '' }
-}
-
-async function onRepinPick(lat: number, lng: number) {
-  repinSnapping.value = true
-  repinError.value = ''
-  try {
-    if (repinStep.value === 'put-in') {
-      const pin = await snapToNHD(lat, lng)
-      if (!pin) { repinError.value = 'Snap failed — try another point'; return }
-      repinPutIn.value = pin
-      repinStep.value = 'take-out'
-    } else if (repinStep.value === 'take-out') {
-      const pin = await snapToNHD(lat, lng)
-      if (!pin) { repinError.value = 'Snap failed — try another point'; return }
-      repinTakeOut.value = pin
-      fetchRepinMainstem()
-      repinStep.value = 'confirm'
-    }
-  } finally {
-    repinSnapping.value = false
-  }
-}
-
-async function fetchRepinMainstem() {
-  if (!repinPutIn.value || !repinTakeOut.value) return
-  const token = await getToken()
-  if (!token) return
-  try {
-    const url = `${apiBase}/api/v1/admin/nldi/watershed?lat=${repinPutIn.value.lat}&lng=${repinPutIn.value.lng}&distance=500`
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    if (!res.ok) return
-    const data = await res.json()
-    repinUpstream.value = data.upstream_flowlines
-    repinDownstream.value = data.downstream_flowlines
-  } catch { /* non-fatal */ }
-}
-
-async function submitRepin() {
-  if (!repinReach.value || !repinPutIn.value || !repinTakeOut.value) return
-  repinSaving.value = true
-  repinError.value = ''
-  repinSuccess.value = ''
-  const token = await getToken()
-  if (!token) { repinSaving.value = false; return }
-  try {
-    const body = {
-      put_in:   { lat: repinPutIn.value.lat,  lng: repinPutIn.value.lng  },
-      take_out: { lat: repinTakeOut.value.lat, lng: repinTakeOut.value.lng },
-    }
-    const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/nldi-centerline`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
-    })
-    const data = await res.json()
-    if (!res.ok) { repinError.value = data.error ?? `HTTP ${res.status}`; return }
-    const lengthStr = data.length_mi != null ? ` · ${data.length_mi} mi` : ''
-    repinSuccess.value = `Centerline updated${lengthStr}`
-  } catch (e: any) {
-    repinError.value = e.message ?? 'Unknown error'
-  } finally {
-    repinSaving.value = false
   }
 }
 

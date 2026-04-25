@@ -196,6 +196,8 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 		id, name, riverName, commonName string
 		classMin, classMax              *float64
 		description                     *string
+		permitRequired                  bool
+		multiDayDays                    int
 		putInComID, takeOutComID        *string
 		putInLng, putInLat              *float64
 		takeOutLng, takeOutLat          *float64
@@ -204,6 +206,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 		SELECT
 			id, name, COALESCE(river_name,''), COALESCE(common_name,''),
 			class_min, class_max, description,
+			COALESCE(permit_required, false), COALESCE(multi_day_days, 1),
 			put_in_comid, take_out_comid,
 			ST_X(put_in::geometry),  ST_Y(put_in::geometry),
 			ST_X(take_out::geometry), ST_Y(take_out::geometry)
@@ -211,6 +214,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 	`, slug).Scan(
 		&id, &name, &riverName, &commonName,
 		&classMin, &classMax, &description,
+		&permitRequired, &multiDayDays,
 		&putInComID, &takeOutComID,
 		&putInLng, &putInLat, &takeOutLng, &takeOutLat,
 	)
@@ -232,19 +236,75 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"id":             id,
-		"slug":           slug,
-		"name":           name,
-		"river_name":     riverName,
-		"common_name":    commonName,
-		"class_min":      classMin,
-		"class_max":      classMax,
-		"description":    description,
-		"put_in_comid":   putInComID,
-		"take_out_comid": takeOutComID,
-		"put_in":         putIn,
-		"take_out":       takeOut,
+		"id":              id,
+		"slug":            slug,
+		"name":            name,
+		"river_name":      riverName,
+		"common_name":     commonName,
+		"class_min":       classMin,
+		"class_max":       classMax,
+		"description":     description,
+		"permit_required": permitRequired,
+		"multi_day_days":  multiDayDays,
+		"put_in_comid":    putInComID,
+		"take_out_comid":  takeOutComID,
+		"put_in":          putIn,
+		"take_out":        takeOut,
 	})
+}
+
+// UpdateReachMeta handles PUT /api/v1/admin/reaches/{slug}/meta
+//
+// Full metadata update: name, common_name, river_name, class_min, class_max,
+// permit_required, multi_day_days. Does not touch centerline or description.
+func (h *NLDIHandler) UpdateReachMeta(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	var req struct {
+		Name           string   `json:"name"`
+		CommonName     string   `json:"common_name"`
+		RiverName      string   `json:"river_name"`
+		ClassMin       *float64 `json:"class_min"`
+		ClassMax       *float64 `json:"class_max"`
+		PermitRequired bool     `json:"permit_required"`
+		MultiDayDays   int      `json:"multi_day_days"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if strings.TrimSpace(req.Name) == "" {
+		errorResponse(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	days := req.MultiDayDays
+	if days < 1 {
+		days = 1
+	}
+	ctx := r.Context()
+	tag, err := h.db.Exec(ctx, `
+		UPDATE reaches SET
+			name            = $1,
+			common_name     = NULLIF($2, ''),
+			river_name      = NULLIF($3, ''),
+			class_min       = $4,
+			class_max       = $5,
+			permit_required = $6,
+			multi_day_days  = $7
+		WHERE slug = $8
+	`, req.Name, req.CommonName, req.RiverName,
+		req.ClassMin, req.ClassMax,
+		req.PermitRequired, days,
+		slug,
+	)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("update: %v", err))
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		errorResponse(w, http.StatusNotFound, fmt.Sprintf("reach %q not found", slug))
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]any{"slug": slug})
 }
 
 // UpstreamTributaries handles GET /api/v1/admin/nldi/upstream-tributaries
@@ -382,6 +442,83 @@ func (h *NLDIHandler) UpdateReachCenterline(w http.ResponseWriter, r *http.Reque
 
 	if err := kmlimport.SyncCenterlineAt(ctx, h.db, slug, kmlimport.CenterlineNLDI,
 		req.PutIn.Lng, req.PutIn.Lat, req.TakeOut.Lng, req.TakeOut.Lat, req.DryRun); err != nil {
+		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("nldi centerline: %v", err))
+		return
+	}
+
+	if req.DryRun {
+		jsonResponse(w, http.StatusOK, map[string]any{"dry_run": true})
+		return
+	}
+
+	var lengthMi *float64
+	var putInComID, takeOutComID *string
+	_ = h.db.QueryRow(ctx, `
+		SELECT length_mi, put_in_comid, take_out_comid FROM reaches WHERE id = $1
+	`, reachID).Scan(&lengthMi, &putInComID, &takeOutComID)
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"slug":           slug,
+		"length_mi":      lengthMi,
+		"put_in_comid":   putInComID,
+		"take_out_comid": takeOutComID,
+	})
+}
+
+// UpdateReachCenterlineByComID handles POST /api/v1/admin/reaches/{slug}/nldi-centerline-by-comid
+//
+// Re-traces the reach's centerline from the supplied upstream/downstream ComIDs
+// while keeping the existing put_in/take_out access point coordinates intact.
+// The access points are looked up from the reaches row and used solely for
+// trimming the merged mainstem to the exact reach extent.
+func (h *NLDIHandler) UpdateReachCenterlineByComID(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	var req struct {
+		UpComID   string `json:"up_comid"`
+		DownComID string `json:"down_comid"`
+		DryRun    bool   `json:"dry_run"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	req.UpComID = strings.TrimSpace(req.UpComID)
+	req.DownComID = strings.TrimSpace(req.DownComID)
+	if req.UpComID == "" {
+		errorResponse(w, http.StatusBadRequest, "up_comid required")
+		return
+	}
+	if req.DownComID == "" {
+		errorResponse(w, http.StatusBadRequest, "down_comid required")
+		return
+	}
+
+	ctx := r.Context()
+
+	var (
+		reachID                                   string
+		putInLng, putInLat, takeOutLng, takeOutLat *float64
+	)
+	err := h.db.QueryRow(ctx, `
+		SELECT id,
+		       ST_X(put_in::geometry),  ST_Y(put_in::geometry),
+		       ST_X(take_out::geometry), ST_Y(take_out::geometry)
+		FROM reaches WHERE slug = $1
+	`, slug).Scan(&reachID, &putInLng, &putInLat, &takeOutLng, &takeOutLat)
+	if err != nil {
+		errorResponse(w, http.StatusNotFound, fmt.Sprintf("reach %q not found", slug))
+		return
+	}
+	if putInLat == nil || putInLng == nil || takeOutLat == nil || takeOutLng == nil {
+		errorResponse(w, http.StatusBadRequest, "reach is missing put-in or take-out access points")
+		return
+	}
+
+	if err := kmlimport.SyncCenterlineNLDIByComID(ctx, h.db, slug,
+		req.UpComID, req.DownComID,
+		*putInLng, *putInLat, *takeOutLng, *takeOutLat,
+		req.DryRun); err != nil {
 		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("nldi centerline: %v", err))
 		return
 	}

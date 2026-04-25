@@ -1517,4 +1517,56 @@ func syncCenterlineNLDI(ctx context.Context, pool *pgxpool.Pool, slug string, pu
 	return err
 }
 
+// SyncCenterlineNLDIByComID is like syncCenterlineNLDI but the upstream and
+// downstream ComIDs are supplied directly instead of being snapped from
+// coordinates. The put-in/take-out coordinates are still used for trimming the
+// merged mainstem to the exact reach extent. Used by the admin UI when the
+// user picks ComIDs by clicking flowline segments.
+func SyncCenterlineNLDIByComID(ctx context.Context, pool *pgxpool.Pool, slug string,
+	upComID, downComID string,
+	putInLon, putInLat, takeOutLon, takeOutLat float64,
+	dryRun bool,
+) error {
+	line, err := fetchNLDIRiverLineByComID(ctx, upComID, downComID)
+	if err != nil {
+		return fmt.Errorf("nldi fetch: %w", err)
+	}
+	if dryRun {
+		return nil
+	}
+	_, err = pool.Exec(ctx, `
+		UPDATE reaches
+		SET    centerline = (
+			SELECT ST_LineSubstring(
+				line,
+				ST_LineLocatePoint(line, put_pt),
+				ST_LineLocatePoint(line, take_pt)
+			)::geography
+			FROM (
+				SELECT
+					ST_GeomFromGeoJSON($2)                                     AS line,
+					ST_ClosestPoint(ST_GeomFromGeoJSON($2),
+					    ST_SetSRID(ST_MakePoint($3, $4), 4326))                AS put_pt,
+					ST_ClosestPoint(ST_GeomFromGeoJSON($2),
+					    ST_SetSRID(ST_MakePoint($5, $6), 4326))                AS take_pt
+			) sub
+		),
+		       centerline_source = 'nldi',
+		       put_in_comid      = $7,
+		       take_out_comid    = $8,
+		       length_mi = ROUND((
+		           ST_Length((
+		               SELECT ST_LineSubstring(
+		                   ST_GeomFromGeoJSON($2),
+		                   ST_LineLocatePoint(ST_GeomFromGeoJSON($2), ST_ClosestPoint(ST_GeomFromGeoJSON($2), ST_SetSRID(ST_MakePoint($3,$4),4326))),
+		                   ST_LineLocatePoint(ST_GeomFromGeoJSON($2), ST_ClosestPoint(ST_GeomFromGeoJSON($2), ST_SetSRID(ST_MakePoint($5,$6),4326)))
+		               )::geography
+		           )) / 1609.344
+		       )::numeric, 2)
+		WHERE slug = $1
+	`, slug, line.GeoJSON, putInLon, putInLat, takeOutLon, takeOutLat,
+		line.PutInComID, line.TakeOutComID)
+	return err
+}
+
 func sq(x float64) float64 { return x * x }
