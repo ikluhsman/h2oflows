@@ -48,25 +48,66 @@
           </div>
 
           <div v-else class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div
-              v-for="river in rivers" :key="river.id"
-              class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
-              @click="openRiver(river)"
-            >
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.name }}</p>
-                <p class="text-xs text-gray-400 truncate flex items-center gap-1">
-                  <span v-if="river.basin_locked" title="Basin manually locked" class="text-amber-500">&#x1F512;</span>
-                  <span>{{ river.basin ?? 'No basin' }}</span>
-                  <span class="text-gray-300">·</span>
-                  <span>{{ river.slug }}</span>
-                </p>
+            <template v-for="river in rivers" :key="river.id">
+              <!-- River row -->
+              <div
+                class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
+                @click="toggleRiver(river)"
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.name }}</p>
+                  <p class="text-xs text-gray-400 truncate flex items-center gap-1">
+                    <span>{{ river.slug }}</span>
+                    <span v-if="river.gnis_id" class="text-gray-300">· gnis {{ river.gnis_id }}</span>
+                  </p>
+                </div>
+                <span class="text-xs text-gray-400 shrink-0">{{ river.reach_count }} reach{{ river.reach_count !== 1 ? 'es' : '' }}</span>
+                <svg
+                  class="w-4 h-4 text-gray-400 shrink-0 transition-transform"
+                  :class="expandedRiverId === river.id ? 'rotate-90' : ''"
+                  viewBox="0 0 20 20" fill="currentColor"
+                >
+                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+                </svg>
               </div>
-              <span class="text-xs text-gray-400 shrink-0">{{ river.reach_count }} reach{{ river.reach_count !== 1 ? 'es' : '' }}</span>
-              <svg class="w-4 h-4 text-gray-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
-              </svg>
-            </div>
+
+              <!-- Expanded reaches -->
+              <div v-if="expandedRiverId === river.id" class="bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
+                <div v-if="riverDetailLoading" class="px-6 py-4 text-xs text-gray-400 animate-pulse">Loading reaches…</div>
+                <template v-else-if="selectedRiver">
+                  <!-- Delete river -->
+                  <div class="flex items-center justify-between px-6 py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span class="text-xs text-gray-400">{{ selectedRiver.reaches?.length ?? 0 }} reaches</span>
+                    <UButton size="xs" variant="ghost" color="error" @click="deleteRiver(selectedRiver.slug, selectedRiver.name)">Delete river</UButton>
+                  </div>
+                  <!-- Reach rows -->
+                  <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <div
+                      v-for="reach in selectedRiver.reaches" :key="reach.id"
+                      class="flex items-center gap-3 px-6 py-2.5 bg-white dark:bg-gray-900/60"
+                    >
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium truncate">{{ reach.common_name ?? reach.name }}</p>
+                        <p class="text-xs text-gray-400 truncate">{{ reach.slug }}</p>
+                      </div>
+                      <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        <span
+                          class="text-xs px-1.5 py-0.5 rounded"
+                          :class="reach.has_centerline
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
+                        >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
+                        <span v-if="centerlineErrors.get(reach.slug)" class="text-xs text-red-400">{{ centerlineErrors.get(reach.slug) }}</span>
+                        <UButton size="xs" variant="outline" color="neutral" :loading="fetchingCenterlines.has(reach.slug)" @click="fetchCenterline(reach.slug)">Fetch line</UButton>
+                        <UButton size="xs" variant="outline" color="error" @click="deleteReach(reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
+                        <NuxtLink :to="`/reaches/${reach.slug}`" class="text-xs text-blue-500 hover:underline">View</NuxtLink>
+                      </div>
+                    </div>
+                    <div v-if="!selectedRiver.reaches?.length" class="px-6 py-4 text-center text-sm text-gray-400">No reaches linked to this river</div>
+                  </div>
+                </template>
+              </div>
+            </template>
             <div v-if="rivers.length === 0" class="px-4 py-8 text-center text-sm text-gray-400">No rivers yet</div>
           </div>
         </div>
@@ -97,18 +138,15 @@
               <div>
                 <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">Document / folder structure</p>
                 <ul class="list-disc pl-4 space-y-0.5">
-                  <li><strong>Document name</strong> → sets <code>river_name</code> on all reaches in the file</li>
-                  <li><strong>Document description</strong> → optional <code>Basin: South Platte</code> line sets the basin for all reaches (overridable per-folder via metadata placemark)</li>
                   <li><strong>One folder per reach</strong> — folder name is informational; the <strong>slug placemark</strong> is what links it to the DB</li>
                   <li><strong>Slug placemark</strong> (required): a coordinate-less <code>&lt;Placemark&gt;&lt;name&gt;slug&lt;/name&gt;&lt;description&gt;reach-slug-here&lt;/description&gt;&lt;/Placemark&gt;</code> inside the folder</li>
                   <li>Folders missing a slug placemark are skipped with a warning — create the reach in NHD Explorer first</li>
+                  <li>River name and basin are set from NHD data when the reach is created — no document-level overrides needed</li>
                 </ul>
               </div>
               <div>
                 <p class="font-semibold text-gray-700 dark:text-gray-200 mb-1">Metadata placemarks (coordinate-less)</p>
-                <p class="text-gray-400">Keys: <code>common_name</code>, <code>description</code>, <code>min_class</code>, <code>max_class</code>, <code>gauge</code>, <code>basin</code>, <code>permit_required</code>, <code>multi_day</code></p>
-                <p class="mt-1 text-gray-400 text-[11px]">When omitted, basin is auto-inferred from the gauge's watershed data (works for USGS gauges) or the river name. Safe to omit for rivers with unique names.</p>
-                <p class="mt-0.5 text-amber-500 dark:text-amber-400 text-[11px]">⚠ <strong>basin</strong> is required when a river name exists in multiple drainages (e.g. "Clear Creek" in both South Platte and Arkansas). Omitting it will merge reaches under the wrong basin.</p>
+                <p class="text-gray-400">Keys: <code>common_name</code>, <code>description</code>, <code>min_class</code>, <code>max_class</code>, <code>gauge</code>, <code>permit_required</code>, <code>multi_day</code></p>
                 <p class="mt-1 text-gray-400">Flow bands: <code>below</code> (upper Too Low CFS), <code>running</code> (min,max), <code>high</code> (min,max), <code>above</code> (lower Very High CFS)</p>
                 <p class="mt-1 text-gray-400">Pin prefixes: <code>Rapid:</code>, <code>Wave:</code>, <code>Put-in:</code>, <code>Take-out:</code>, <code>Parking:</code>, <code>Campsite:</code>, <code>Hazard:</code></p>
               </div>
@@ -241,7 +279,7 @@
 
               <NHDExplorerMap
                 :upstream-flowlines="authorTributaries"
-                :downstream-flowlines="null"
+                :downstream-flowlines="authorDownstreamFlowlines"
                 :upstream-gauges="null"
                 :snap-lat="null"
                 :snap-lng="null"
@@ -252,6 +290,7 @@
                 @pick="onAuthorAnchorPick"
                 @comid-select="onAuthorComIDSelect"
               />
+              <p v-if="authorDownstreamLoading" class="text-xs text-blue-500 dark:text-blue-400 mt-1 animate-pulse">Loading downstream mainstem…</p>
 
               <!-- Reach form — shown once both ComIDs selected -->
               <div v-if="authorUpComID && authorDownComID" class="mt-4 space-y-3 rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
@@ -275,20 +314,32 @@
                   </div>
                 </div>
 
+                <!-- River name (auto from NHD snap, read-only) -->
                 <div>
-                  <label class="block text-xs text-gray-500 mb-1">Reach name <span class="text-red-400">*</span></label>
-                  <input v-model="authorForm.name" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Kremmling to Pumphouse" />
+                  <label class="block text-xs text-gray-500 mb-1">River name <span class="text-gray-300">(from NHD)</span></label>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model="authorForm.riverName"
+                      :readonly="!authorRiverNameOverride"
+                      class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
+                      :class="authorRiverNameOverride ? '' : 'text-gray-400 dark:text-gray-500 cursor-default'"
+                      placeholder="Auto-filled from anchor snap"
+                    />
+                    <button class="text-xs text-blue-500 hover:text-blue-400 shrink-0" @click="authorRiverNameOverride = !authorRiverNameOverride">
+                      {{ authorRiverNameOverride ? 'Lock' : 'Override' }}
+                    </button>
+                  </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Common name</label>
-                    <input v-model="authorForm.commonName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Gore Canyon" />
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">River name</label>
-                    <input v-model="authorForm.riverName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Colorado River" />
-                  </div>
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Reach name <span class="text-red-400">*</span></label>
+                  <input v-model="authorForm.name" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Lees Ferry to Diamond Creek" />
+                  <p v-if="authorComputedSlug" class="mt-1 text-xs text-gray-400 font-mono">slug: {{ authorComputedSlug }}</p>
+                </div>
+
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Common name</label>
+                  <input v-model="authorForm.commonName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Grand Canyon" />
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -435,100 +486,6 @@
       </template>
     </main>
 
-    <!-- River detail slide-over -->
-    <UModal v-if="selectedRiver" v-model:open="riverDetailOpen" :ui="{ width: 'max-w-2xl' }">
-      <template #header>
-        <div class="flex items-center justify-between w-full">
-          <div>
-            <h2 class="text-lg font-bold">{{ selectedRiver.name }}</h2>
-            <p class="text-xs text-gray-400 mt-0.5">{{ selectedRiver.basin }} · {{ selectedRiver.slug }}</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <UButton size="xs" variant="outline" color="error" @click="deleteRiver(selectedRiver.slug, selectedRiver.name)">
-              Delete river
-            </UButton>
-            <button class="p-1 rounded text-gray-400 hover:text-gray-600" @click="riverDetailOpen = false">
-              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
-            </button>
-          </div>
-        </div>
-      </template>
-      <template #body>
-        <div class="space-y-4">
-
-          <!-- Basin override editor -->
-          <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-4 py-3 space-y-2">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Basin assignment</p>
-
-            <!-- HUC source row -->
-            <div v-if="selectedRiver.gauge_basin" class="flex items-center gap-2 text-xs text-gray-400">
-              <span class="text-gray-300">HUC-derived:</span>
-              <span class="font-medium text-gray-600 dark:text-gray-300">{{ selectedRiver.gauge_basin }}</span>
-              <template v-if="selectedRiver.gauge_watershed">
-                <span class="text-gray-300">via</span>
-                <span>{{ selectedRiver.gauge_watershed }}</span>
-              </template>
-              <template v-if="selectedRiver.gauge_huc8">
-                <span class="text-gray-300">·</span>
-                <span class="font-mono">HUC{{ selectedRiver.gauge_huc8.slice(0,4) }}</span>
-              </template>
-            </div>
-            <p v-else class="text-xs text-gray-400 italic">No gauge with HUC data linked yet</p>
-
-            <!-- Edit row -->
-            <div class="flex items-center gap-2">
-              <input
-                v-model="basinEdit"
-                class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 text-sm"
-                placeholder="e.g. South Platte"
-              />
-              <label class="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300 cursor-pointer select-none shrink-0">
-                <input type="checkbox" v-model="basinLockEdit" class="rounded" />
-                Lock
-              </label>
-              <UButton size="xs" :loading="basinSaving" @click="saveBasin">Save</UButton>
-            </div>
-            <p v-if="selectedRiver.basin_locked && !basinLockEdit" class="text-xs text-amber-500">Removing the lock will allow the metadata sync to overwrite this basin.</p>
-            <p v-if="!selectedRiver.basin_locked && basinLockEdit" class="text-xs text-blue-500">Locking prevents the sync from overwriting this basin in the future.</p>
-          </div>
-
-          <p class="text-sm text-gray-500">{{ selectedRiver.reaches?.length ?? 0 }} reaches</p>
-          <div class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div
-              v-for="reach in selectedRiver.reaches" :key="reach.id"
-              class="flex items-center gap-3 px-3 py-2.5 bg-white dark:bg-gray-900"
-            >
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium truncate">{{ reach.common_name ?? reach.name }}</p>
-                <p class="text-xs text-gray-400 truncate">{{ reach.slug }}</p>
-              </div>
-              <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                <span
-                  class="text-xs px-1.5 py-0.5 rounded"
-                  :class="reach.has_centerline
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
-                    : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
-                >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
-                <span v-if="centerlineErrors.get(reach.slug)" class="text-xs text-red-400">{{ centerlineErrors.get(reach.slug) }}</span>
-                <UButton
-                  size="xs" variant="outline" color="neutral"
-                  :loading="fetchingCenterlines.has(reach.slug)"
-                  @click="fetchCenterline(reach.slug)"
-                >Fetch line</UButton>
-                <UButton
-                  size="xs" variant="outline" color="error"
-                  @click="deleteReach(reach.slug, reach.common_name ?? reach.name)"
-                >Delete</UButton>
-                <NuxtLink :to="`/reaches/${reach.slug}`" class="text-xs text-blue-500 hover:underline">View</NuxtLink>
-              </div>
-            </div>
-            <div v-if="!selectedRiver.reaches?.length" class="px-3 py-6 text-center text-sm text-gray-400">No reaches linked to this river</div>
-          </div>
-
-        </div>
-      </template>
-    </UModal>
-
     <!-- Create river modal -->
     <UModal v-model:open="createRiverOpen" title="New river">
       <template #body>
@@ -628,16 +585,16 @@ const visibleTabs = computed(() => {
 })
 
 // ── Rivers ────────────────────────────────────────────────────────────────────
-interface River { id: string; slug: string; name: string; basin: string | null; basin_locked: boolean; state_abbr: string | null; reach_count: number }
+interface River { id: string; slug: string; name: string; gnis_id: string | null; basin: string | null; basin_locked: boolean; state_abbr: string | null; reach_count: number }
 interface RiverDetail extends River {
-  gauge_basin: string | null      // system-derived canonical basin (from HUC)
-  gauge_watershed: string | null  // HUC4 watershed name (e.g. "Cache La Poudre River")
-  gauge_huc8: string | null       // raw HUC8 for reference
   reaches: { id: string; slug: string; name: string; common_name: string | null; has_centerline: boolean }[]
 }
 
 const rivers = ref<River[]>([])
 const riversLoading = ref(false)
+const expandedRiverId = ref<string | null>(null)
+const selectedRiver = ref<RiverDetail | null>(null)
+const riverDetailLoading = ref(false)
 
 async function loadRivers() {
   riversLoading.value = true
@@ -653,40 +610,23 @@ async function loadRivers() {
   }
 }
 
-const selectedRiver = ref<RiverDetail | null>(null)
-const riverDetailOpen = ref(false)
-const basinEdit = ref('')
-const basinLockEdit = ref(false)
-const basinSaving = ref(false)
-
-async function openRiver(river: River) {
-  const token = await getToken()
-  const res = await fetch(`${apiBase}/api/v1/admin/rivers/${river.slug}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (res.ok) {
-    selectedRiver.value = await res.json()
-    basinEdit.value = selectedRiver.value?.basin ?? ''
-    basinLockEdit.value = selectedRiver.value?.basin_locked ?? false
-    riverDetailOpen.value = true
+async function toggleRiver(river: River) {
+  if (expandedRiverId.value === river.id) {
+    expandedRiverId.value = null
+    selectedRiver.value = null
+    return
   }
-}
-
-async function saveBasin() {
-  if (!selectedRiver.value) return
-  basinSaving.value = true
-  const token = await getToken()
+  expandedRiverId.value = river.id
+  selectedRiver.value = null
+  riverDetailLoading.value = true
   try {
-    await fetch(`${apiBase}/api/v1/admin/rivers/${selectedRiver.value.slug}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ basin: basinEdit.value || null, basin_locked: basinLockEdit.value }),
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/rivers/${river.slug}`, {
+      headers: { Authorization: `Bearer ${token}` },
     })
-    // Refresh detail + list so the lock badge updates.
-    await openRiver(selectedRiver.value)
-    loadRivers()
+    if (res.ok) selectedRiver.value = await res.json()
   } finally {
-    basinSaving.value = false
+    riverDetailLoading.value = false
   }
 }
 
@@ -707,7 +647,12 @@ async function fetchCenterline(reachSlug: string) {
       const msg = body.error ?? `Error ${res.status}`
       centerlineErrors.value = new Map([...centerlineErrors.value, [reachSlug, msg]])
     } else if (selectedRiver.value) {
-      openRiver(selectedRiver.value)
+      // Refresh expanded detail
+      const token2 = await getToken()
+      const r2 = await fetch(`${apiBase}/api/v1/admin/rivers/${selectedRiver.value.slug}`, {
+        headers: { Authorization: `Bearer ${token2}` },
+      })
+      if (r2.ok) selectedRiver.value = await r2.json()
     }
   } catch (err: any) {
     centerlineErrors.value = new Map([...centerlineErrors.value, [reachSlug, err?.message ?? 'Failed']])
@@ -725,11 +670,15 @@ async function deleteReach(reachSlug: string, displayName: string) {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (!res.ok) {
-    alert(`Delete failed: ${res.status}`)
-    return
+  if (!res.ok) { alert(`Delete failed: ${res.status}`); return }
+  // Refresh expanded river detail
+  if (selectedRiver.value) {
+    const token2 = await getToken()
+    const r2 = await fetch(`${apiBase}/api/v1/admin/rivers/${selectedRiver.value.slug}`, {
+      headers: { Authorization: `Bearer ${token2}` },
+    })
+    if (r2.ok) selectedRiver.value = await r2.json()
   }
-  if (selectedRiver.value) openRiver(selectedRiver.value)
   loadRivers()
 }
 
@@ -740,11 +689,8 @@ async function deleteRiver(riverSlug: string, riverName: string) {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (!res.ok) {
-    alert(`Delete failed: ${res.status}`)
-    return
-  }
-  riverDetailOpen.value = false
+  if (!res.ok) { alert(`Delete failed: ${res.status}`); return }
+  expandedRiverId.value = null
   selectedRiver.value = null
   loadRivers()
 }
@@ -945,26 +891,40 @@ async function onNHDPick(lat: number, lng: number) {
 }
 
 // ---- Author mode (ComID-first) ----
-const authorPickMode      = ref(false)
-const authorAnchorSnapping = ref(false)
-const authorAnchorSnap    = ref<{ comid: string; name: string } | null>(null)
-const authorTributaries   = ref<NHDFC | null>(null)
-const authorComIDSlot     = ref<'up' | 'down'>('up')
-const authorUpComID       = ref<string | null>(null)
-const authorDownComID     = ref<string | null>(null)
-const authorError         = ref('')
-const authorSuccess       = ref('')
-const authorSaving        = ref(false)
-const authorForm          = ref({ name: '', commonName: '', riverName: '', classMin: null as number | null, classMax: null as number | null })
+const authorPickMode            = ref(false)
+const authorAnchorSnapping      = ref(false)
+const authorAnchorSnap          = ref<{ comid: string; name: string } | null>(null)
+const authorTributaries         = ref<NHDFC | null>(null)
+const authorDownstreamFlowlines = ref<NHDFC | null>(null)
+const authorDownstreamLoading   = ref(false)
+const authorComIDSlot           = ref<'up' | 'down'>('up')
+const authorUpComID             = ref<string | null>(null)
+const authorDownComID           = ref<string | null>(null)
+const authorRiverNameOverride   = ref(false)
+const authorError               = ref('')
+const authorSuccess             = ref('')
+const authorSaving              = ref(false)
+const authorForm                = ref({ name: '', commonName: '', riverName: '', classMin: null as number | null, classMax: null as number | null })
+
+const authorComputedSlug = computed(() => {
+  const river = authorForm.value.riverName.trim()
+  const name  = authorForm.value.name.trim()
+  if (!river || !name) return ''
+  const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return `${slugify(river)}-${slugify(name)}`
+})
 
 function resetAuthor() {
   authorPickMode.value = false
   authorAnchorSnapping.value = false
   authorAnchorSnap.value = null
   authorTributaries.value = null
+  authorDownstreamFlowlines.value = null
+  authorDownstreamLoading.value = false
   authorComIDSlot.value = 'up'
   authorUpComID.value = null
   authorDownComID.value = null
+  authorRiverNameOverride.value = false
   authorError.value = ''; authorSuccess.value = ''
   authorSaving.value = false
   authorForm.value = { name: '', commonName: '', riverName: '', classMin: null, classMax: null }
@@ -975,6 +935,7 @@ async function onAuthorAnchorPick(lat: number, lng: number) {
   authorAnchorSnapping.value = true
   authorAnchorSnap.value = null
   authorTributaries.value = null
+  // Don't reset ComID picks or downstream — anchor is just a viewport hint.
   authorError.value = ''
   try {
     const token = await getToken()
@@ -985,6 +946,10 @@ async function onAuthorAnchorPick(lat: number, lng: number) {
     const data = await res.json()
     authorAnchorSnap.value = { comid: data.snap.comid, name: data.snap.name ?? '' }
     authorTributaries.value = data.tributaries
+    // Pre-fill river name from NHD snap (unless user has overridden it)
+    if (!authorRiverNameOverride.value && data.snap.name) {
+      authorForm.value.riverName = data.snap.name
+    }
   } catch (e: any) {
     authorError.value = e.message ?? 'Snap failed'
   } finally {
@@ -1000,6 +965,25 @@ function onAuthorComIDSelect(comid: string) {
     authorDownComID.value = comid
   }
 }
+
+// When upstream ComID is picked, fetch the full downstream mainstem so the user
+// can click anywhere along it to set the take-out — even 300mi downstream.
+watch(authorUpComID, async (comid) => {
+  authorDownstreamFlowlines.value = null
+  if (!comid) return
+  authorDownstreamLoading.value = true
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/nldi/downstream?comid=${comid}&distance=800`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (res.ok) {
+      const data = await res.json()
+      authorDownstreamFlowlines.value = data.downstream_flowlines
+    }
+  } catch { /* non-fatal — user can still pick downstream from tributaries */ }
+  finally { authorDownstreamLoading.value = false }
+})
 
 // ---- Re-pin mode ----
 const repinSlug           = ref('')
