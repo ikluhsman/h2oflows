@@ -289,6 +289,45 @@ func (h *NLDIHandler) UpstreamTributaries(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// DownstreamMainstem handles GET /api/v1/admin/nldi/downstream
+//
+// Returns the downstream mainstem flowlines from a known ComID. Used after the
+// upstream ComID is selected in the author flow — displays the full downstream
+// river so the user can click anywhere along it to set the take-out ComID,
+// even for very long reaches (e.g. Grand Canyon ~300 mi).
+//
+// Query params:
+//
+//	comid       string — NHD ComID to trace downstream from (required)
+//	distance    int    — km radius (default 500, max 1000)
+func (h *NLDIHandler) DownstreamMainstem(w http.ResponseWriter, r *http.Request) {
+	comid := strings.TrimSpace(r.URL.Query().Get("comid"))
+	if comid == "" {
+		errorResponse(w, http.StatusBadRequest, "comid is required")
+		return
+	}
+	distanceKm := 500
+	if d := r.URL.Query().Get("distance"); d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= 1000 {
+			distanceKm = v
+		}
+	}
+
+	ctx := r.Context()
+	c := nldi.New()
+
+	flowlines, err := c.DownstreamFlowlines(ctx, comid, distanceKm)
+	if err != nil {
+		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("downstream flowlines: %v", err))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"downstream_flowlines": flowlines,
+	})
+}
+
 type updateReachCenterlineRequest struct {
 	PutIn   latLng `json:"put_in"`
 	TakeOut latLng `json:"take_out"`

@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/h2oflow/h2oflow/apps/api/internal/auth"
-	gauge "github.com/h2oflow/h2oflow/packages/gauge-core"
 )
 
 type AdminHandler struct {
@@ -25,7 +24,7 @@ func NewAdminHandler(db *pgxpool.Pool) *AdminHandler {
 // GET /api/v1/admin/rivers
 func (h *AdminHandler) ListRivers(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(r.Context(), `
-		SELECT rv.id, rv.slug, rv.name, rv.basin, rv.basin_locked, rv.state_abbr,
+		SELECT rv.id, rv.slug, rv.name, rv.gnis_id, rv.basin, rv.basin_locked, rv.state_abbr,
 		       COUNT(re.id) AS reach_count
 		FROM rivers rv
 		LEFT JOIN reaches re ON re.river_id = rv.id
@@ -42,6 +41,7 @@ func (h *AdminHandler) ListRivers(w http.ResponseWriter, r *http.Request) {
 		ID          string  `json:"id"`
 		Slug        string  `json:"slug"`
 		Name        string  `json:"name"`
+		GNISID      *string `json:"gnis_id"`
 		Basin       *string `json:"basin"`
 		BasinLocked bool    `json:"basin_locked"`
 		StateAbbr   *string `json:"state_abbr"`
@@ -51,7 +51,7 @@ func (h *AdminHandler) ListRivers(w http.ResponseWriter, r *http.Request) {
 	rivers := make([]River, 0)
 	for rows.Next() {
 		var rv River
-		if err := rows.Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.Basin, &rv.BasinLocked, &rv.StateAbbr, &rv.ReachCount); err != nil {
+		if err := rows.Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.GNISID, &rv.Basin, &rv.BasinLocked, &rv.StateAbbr, &rv.ReachCount); err != nil {
 			continue
 		}
 		rivers = append(rivers, rv)
@@ -74,24 +74,20 @@ func (h *AdminHandler) GetRiver(w http.ResponseWriter, r *http.Request) {
 		HasCenterline bool  `json:"has_centerline"`
 	}
 	type RiverDetail struct {
-		ID              string  `json:"id"`
-		Slug            string  `json:"slug"`
-		Name            string  `json:"name"`
-		Basin           *string `json:"basin"`
-		BasinLocked     bool    `json:"basin_locked"`
-		StateAbbr       *string `json:"state_abbr"`
-		// HUC-derived basin from the primary gauge of the first linked reach.
-		// Null when no linked reach has a gauge with metadata yet.
-		GaugeBasin      *string `json:"gauge_basin"`       // e.g. "South Platte"
-		GaugeWatershed  *string `json:"gauge_watershed"`   // e.g. "Cache La Poudre River"
-		GaugeHUC8       *string `json:"gauge_huc8"`        // e.g. "10190007"
-		Reaches         []Reach `json:"reaches"`
+		ID          string  `json:"id"`
+		Slug        string  `json:"slug"`
+		Name        string  `json:"name"`
+		GNISID      *string `json:"gnis_id"`
+		Basin       *string `json:"basin"`
+		BasinLocked bool    `json:"basin_locked"`
+		StateAbbr   *string `json:"state_abbr"`
+		Reaches     []Reach `json:"reaches"`
 	}
 
 	var rv RiverDetail
 	err := h.db.QueryRow(r.Context(), `
-		SELECT id, slug, name, basin, basin_locked, state_abbr FROM rivers WHERE slug = $1
-	`, slug).Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.Basin, &rv.BasinLocked, &rv.StateAbbr)
+		SELECT id, slug, name, gnis_id, basin, basin_locked, state_abbr FROM rivers WHERE slug = $1
+	`, slug).Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.GNISID, &rv.Basin, &rv.BasinLocked, &rv.StateAbbr)
 	if err != nil {
 		errorResponse(w, http.StatusNotFound, "river not found")
 		return
@@ -99,23 +95,6 @@ func (h *AdminHandler) GetRiver(w http.ResponseWriter, r *http.Request) {
 
 	// Pull the HUC-derived basin from the primary gauge of any linked reach.
 	// This lets the admin compare the system-derived value against the stored one.
-	var gaugeHUC8 string
-	_ = h.db.QueryRow(r.Context(), `
-		SELECT g.watershed_name, g.huc8
-		FROM   reaches re
-		JOIN   gauges  g ON g.id = re.primary_gauge_id
-		WHERE  re.river_id = $1
-		  AND  g.watershed_name IS NOT NULL
-		LIMIT 1
-	`, rv.ID).Scan(&rv.GaugeBasin, &gaugeHUC8)
-	if gaugeHUC8 != "" {
-		rv.GaugeHUC8 = &gaugeHUC8
-		_, watershedName := gauge.HUCNames(gaugeHUC8)
-		if watershedName != "" {
-			rv.GaugeWatershed = &watershedName
-		}
-	}
-
 	rows, err := h.db.Query(r.Context(), `
 		SELECT id, slug, name, common_name, class_min, class_max,
 		       (centerline IS NOT NULL) AS has_centerline

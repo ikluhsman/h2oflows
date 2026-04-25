@@ -85,7 +85,7 @@ const BASEMAP_OPTIONS = [
 
 const container = ref<HTMLDivElement>()
 const mapReady  = ref(false)
-const basemap   = ref<'street' | 'topo' | 'satellite'>('topo')
+const basemap   = ref<'street' | 'topo' | 'satellite'>('street')
 
 let map: maplibregl.Map | null = null
 let snapMarker: maplibregl.Marker | null = null
@@ -334,8 +334,8 @@ function initMap() {
         },
       },
       layers: [
-        { id: 'street-tiles',    type: 'raster', source: 'street',    layout: { visibility: 'none'    } },
-        { id: 'topo-tiles',      type: 'raster', source: 'topo',      layout: { visibility: 'visible' } },
+        { id: 'street-tiles',    type: 'raster', source: 'street',    layout: { visibility: 'visible' } },
+        { id: 'topo-tiles',      type: 'raster', source: 'topo',      layout: { visibility: 'none'    } },
         { id: 'esri-tiles',      type: 'raster', source: 'esri',      layout: { visibility: 'none'    } },
       ],
     },
