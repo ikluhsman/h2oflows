@@ -81,6 +81,51 @@ func fetchNLDIRiverLineWithClient(ctx context.Context, c *nldi.Client, putInLon,
 	}, nil
 }
 
+// fetchNLDIRiverLineByComID is the ComID-driven counterpart to fetchNLDIRiverLine:
+// the caller supplies the upstream and downstream ComIDs directly (e.g. the user
+// clicked specific flowline segments in the admin UI), and we trace the
+// downstream mainstem from upComID, stopping at downComID. No NHD snapping
+// happens here — the supplied ComIDs are taken as authoritative.
+func fetchNLDIRiverLineByComID(ctx context.Context, upComID, downComID string) (*nldiCenterline, error) {
+	return fetchNLDIRiverLineByComIDWithClient(ctx, nldi.New(), upComID, downComID)
+}
+
+func fetchNLDIRiverLineByComIDWithClient(ctx context.Context, c *nldi.Client, upComID, downComID string) (*nldiCenterline, error) {
+	coll, err := c.DownstreamFlowlines(ctx, upComID, defaultNLDIDistanceKm)
+	if err != nil {
+		return nil, fmt.Errorf("downstream flowlines: %w", err)
+	}
+	if coll == nil || len(coll.Features) == 0 {
+		return nil, fmt.Errorf("no downstream flowlines from ComID %s", upComID)
+	}
+
+	coords, err := nldi.MergeMainstem(coll.Features, downComID)
+	if err != nil {
+		return nil, fmt.Errorf("merge mainstem: %w", err)
+	}
+	if len(coords) < 2 {
+		return nil, fmt.Errorf("merged mainstem too short (%d coords)", len(coords))
+	}
+
+	foundTakeOut := false
+	for _, f := range coll.Features {
+		if f.Props.NhdplusComID != nil && *f.Props.NhdplusComID == downComID {
+			foundTakeOut = true
+			break
+		}
+	}
+	if !foundTakeOut {
+		return nil, fmt.Errorf("take-out ComID %s not downstream of put-in ComID %s within %dkm",
+			downComID, upComID, defaultNLDIDistanceKm)
+	}
+
+	return &nldiCenterline{
+		GeoJSON:      nldi.ToGeoJSONLineString(coords),
+		PutInComID:   upComID,
+		TakeOutComID: downComID,
+	}, nil
+}
+
 // SnapReachComIDs snaps the reach's existing put-in/take-out access points to
 // NHD ComIDs and stores them. It only writes when put_in_comid is NULL, so it
 // won't overwrite data set by the NLDI centerline path. Designed to be called
