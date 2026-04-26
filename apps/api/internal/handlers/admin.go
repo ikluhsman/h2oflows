@@ -18,6 +18,24 @@ func NewAdminHandler(db *pgxpool.Pool) *AdminHandler {
 	return &AdminHandler{db: db}
 }
 
+// SlugCheck reports whether a reach slug is available (not already taken).
+// GET /api/v1/admin/slug-check?slug=…&exclude=…
+// exclude is the caller's current slug so an in-place rename doesn't self-conflict.
+func (h *AdminHandler) SlugCheck(w http.ResponseWriter, r *http.Request) {
+	slug := r.URL.Query().Get("slug")
+	if slug == "" {
+		errorResponse(w, http.StatusBadRequest, "slug is required")
+		return
+	}
+	exclude := r.URL.Query().Get("exclude")
+	var exists bool
+	_ = h.db.QueryRow(r.Context(),
+		`SELECT EXISTS(SELECT 1 FROM reaches WHERE slug = $1 AND slug != $2)`,
+		slug, exclude,
+	).Scan(&exists)
+	jsonResponse(w, http.StatusOK, map[string]bool{"available": !exists})
+}
+
 // ── Rivers ────────────────────────────────────────────────────────────────────
 
 // ListRivers returns all rivers with their reach count.

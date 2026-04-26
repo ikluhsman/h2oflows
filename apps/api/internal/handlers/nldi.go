@@ -104,6 +104,7 @@ func (h *NLDIHandler) WatershedExplorer(w http.ResponseWriter, r *http.Request) 
 // coords are not required here — they come from KML import later, at which
 // point the NLDI centerline is trimmed and stored.
 type createReachRequest struct {
+	Slug           string   `json:"slug"`        // optional — auto-derived from river+name if blank
 	Name           string   `json:"name"`
 	CommonName     string   `json:"common_name"`
 	RiverName      string   `json:"river_name"`
@@ -144,7 +145,10 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slug := buildSlug(req.RiverName, req.Name)
+	slug := strings.TrimSpace(req.Slug)
+	if slug == "" {
+		slug = buildSlug(req.RiverName, req.Name)
+	}
 	ctx := r.Context()
 
 	days := req.MultiDayDays
