@@ -210,6 +210,45 @@ func (h *AdminHandler) UpdateRiver(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ListUnassignedReaches returns reaches that have no river association.
+// GET /api/v1/admin/reaches/unassigned
+func (h *AdminHandler) ListUnassignedReaches(w http.ResponseWriter, r *http.Request) {
+	type Reach struct {
+		ID            string   `json:"id"`
+		Slug          string   `json:"slug"`
+		Name          string   `json:"name"`
+		CommonName    *string  `json:"common_name"`
+		RiverName     *string  `json:"river_name"`
+		ClassMin      *float64 `json:"class_min"`
+		ClassMax      *float64 `json:"class_max"`
+		HasCenterline bool     `json:"has_centerline"`
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT id, slug, name, common_name, river_name, class_min, class_max,
+		       (centerline IS NOT NULL) AS has_centerline
+		FROM reaches
+		WHERE river_id IS NULL
+		ORDER BY name
+	`)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "query failed")
+		return
+	}
+	defer rows.Close()
+
+	reaches := make([]Reach, 0)
+	for rows.Next() {
+		var re Reach
+		if err := rows.Scan(&re.ID, &re.Slug, &re.Name, &re.CommonName, &re.RiverName,
+			&re.ClassMin, &re.ClassMax, &re.HasCenterline); err != nil {
+			continue
+		}
+		reaches = append(reaches, re)
+	}
+	jsonResponse(w, http.StatusOK, reaches)
+}
+
 // AssignReachToRiver sets reaches.river_id.
 // PUT /api/v1/admin/reaches/{slug}/river
 func (h *AdminHandler) AssignReachToRiver(w http.ResponseWriter, r *http.Request) {
