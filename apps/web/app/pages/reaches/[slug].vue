@@ -189,6 +189,10 @@
             :gauges="allGauges"
             :slug="(reach as any).slug"
             :river-name="(reach as any).river_name ?? undefined"
+            :put-in-lat="(reach as any).put_in_lat ?? undefined"
+            :put-in-lng="(reach as any).put_in_lng ?? undefined"
+            :take-out-lat="(reach as any).take_out_lat ?? undefined"
+            :take-out-lng="(reach as any).take_out_lng ?? undefined"
             @gauge-add="(id) => { const g = allGauges.find((x: any) => x.id === id); if (g) addToDashboard(g) }"
           />
         </ClientOnly>

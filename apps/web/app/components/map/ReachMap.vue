@@ -181,6 +181,11 @@ const props = defineProps<{
   gaugeLat?: number | null
   // Preferred: pass all gauges as an array so each gets a pin
   gauges?: GaugeProp[]
+  // Reach start/end point from NLDI — shown as fallback dots when no access records exist
+  putInLat?: number | null
+  putInLng?: number | null
+  takeOutLat?: number | null
+  takeOutLng?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -317,8 +322,18 @@ const gaugeFeatures = computed<GaugeProp[]>(() =>
   allGauges.value.filter(g => g.lng != null && g.lat != null)
 )
 
+const showPutInDot = computed(() =>
+  !accessFeatures.value.some(a => a.type === 'put_in') &&
+  props.putInLat != null && props.putInLng != null
+)
+const showTakeOutDot = computed(() =>
+  !accessFeatures.value.some(a => a.type === 'take_out') &&
+  props.takeOutLat != null && props.takeOutLng != null
+)
+
 const hasCoords = computed(() =>
   props.centerline || allFeatures.value.length > 0 || gaugeFeatures.value.length > 0
+  || showPutInDot.value || showTakeOutDot.value
 )
 
 // ── Map state ─────────────────────────────────────────────────────────────────
@@ -552,6 +567,24 @@ function addLayers() {
     markerEls.set(a.id, el)
   }
 
+  // Fallback put-in / take-out dots from start_point / end_point
+  if (showPutInDot.value) {
+    const el = makeDotEl('#22c55e')
+    el.title = 'Put-in (approx.)'
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([props.putInLng!, props.putInLat!])
+      .addTo(map!)
+    allMarkers.push(marker)
+  }
+  if (showTakeOutDot.value) {
+    const el = makeDotEl('#ef4444')
+    el.title = 'Take-out (approx.)'
+    const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([props.takeOutLng!, props.takeOutLat!])
+      .addTo(map!)
+    allMarkers.push(marker)
+  }
+
   // Gauge pins — cyan/teal color, "G" label with relationship subtitle
   for (const g of gaugeFeatures.value) {
     const relLabel = gaugeRelLabel(g.reach_relationship)
@@ -685,6 +718,12 @@ function makeHazardPinEl(id: string): HTMLElement {
     <path d="M16 3 L30 28 L2 28 Z" fill="#dc2626" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
     <text x="16" y="24" text-anchor="middle" font-size="14" font-weight="900" font-family="system-ui,sans-serif" fill="white">!</text>
   </svg>`
+  return el
+}
+
+function makeDotEl(color: string): HTMLElement {
+  const el = document.createElement('div')
+  el.style.cssText = `width:12px;height:12px;border-radius:50%;background:${color};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.4);pointer-events:none`
   return el
 }
 
@@ -892,6 +931,8 @@ function fitBounds() {
   const coords: [number, number][] = []
   rapidFeatures.value.forEach(r => coords.push([r.lng, r.lat]))
   accessFeatures.value.forEach(a => coords.push([a.lng, a.lat]))
+  if (showPutInDot.value) coords.push([props.putInLng!, props.putInLat!])
+  if (showTakeOutDot.value) coords.push([props.takeOutLng!, props.takeOutLat!])
   if (props.centerline?.coordinates) {
     const line = props.centerline.coordinates as [number, number][]
     if (line.length > 0) coords.push(line[0] as [number, number], line[line.length - 1] as [number, number])

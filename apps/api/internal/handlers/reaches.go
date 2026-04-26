@@ -651,6 +651,10 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			r.take_out_name,
 			ST_AsGeoJSON(r.centerline::geometry) AS centerline,
 			r.centerline_source,
+			ST_X(r.start_point::geometry)    AS put_in_lng,
+			ST_Y(r.start_point::geometry)    AS put_in_lat,
+			ST_X(r.end_point::geometry)      AS take_out_lng,
+			ST_Y(r.end_point::geometry)      AS take_out_lat,
 			-- Primary gauge fields (all nullable — reach may not have a gauge yet)
 			g.id                AS gauge_id,
 			g.external_id       AS gauge_external_id,
@@ -697,6 +701,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&reach.RiverName, &reach.CommonName, &reach.PutInName, &reach.TakeOutName,
 		&reach.Centerline,
 		&reach.CenterlineSource,
+		&reach.PutInLng, &reach.PutInLat, &reach.TakeOutLng, &reach.TakeOutLat,
 		&reach.Gauge.ID, &reach.Gauge.ExternalID, &reach.Gauge.Source,
 		&reach.Gauge.Name, &reach.Gauge.Featured,
 		&reach.Gauge.CurrentCFS, &reach.Gauge.LastReadingAt,
@@ -943,6 +948,10 @@ type reachDetail struct {
 	CommonName              *string         `json:"common_name"`
 	PutInName               *string         `json:"put_in_name"`
 	TakeOutName             *string         `json:"take_out_name"`
+	PutInLat                *float64        `json:"put_in_lat"`
+	PutInLng                *float64        `json:"put_in_lng"`
+	TakeOutLat              *float64        `json:"take_out_lat"`
+	TakeOutLng              *float64        `json:"take_out_lng"`
 	Region                  *string         `json:"region"`
 	ClassMin                *float64        `json:"class_min"`
 	ClassMax                *float64        `json:"class_max"`
