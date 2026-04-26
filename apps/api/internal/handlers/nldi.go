@@ -437,25 +437,38 @@ func (h *NLDIHandler) RiverName(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 	c := nldi.New()
-	// A 1 km upstream slice is enough to read the stream name from.
-	features, err := c.UpstreamFlowlines(ctx, comid, 1)
+
+	extractName := func(fc *nldi.Collection) string {
+		if fc == nil {
+			return ""
+		}
+		for _, f := range fc.Features {
+			if f.Props.GnisName != nil && *f.Props.GnisName != "" {
+				return *f.Props.GnisName
+			}
+		}
+		for _, f := range fc.Features {
+			if f.Props.Name != "" {
+				return f.Props.Name
+			}
+		}
+		return ""
+	}
+
+	// Try upstream first with a generous distance so named tributaries appear.
+	up, err := c.UpstreamFlowlines(ctx, comid, 50)
 	if err != nil {
 		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("nldi lookup: %v", err))
 		return
 	}
-	var name string
-	if features != nil {
-		for _, f := range features.Features {
-			if f.Props.GnisName != nil && *f.Props.GnisName != "" {
-				name = *f.Props.GnisName
-				break
-			}
-			if f.Props.Name != "" {
-				name = f.Props.Name
-				break
-			}
-		}
+	name := extractName(up)
+
+	// Fall back to downstream mainstem if upstream had no GNIS name.
+	if name == "" {
+		down, _ := c.DownstreamFlowlines(ctx, comid, 5)
+		name = extractName(down)
 	}
+
 	jsonResponse(w, http.StatusOK, map[string]any{"river_name": name})
 }
 
