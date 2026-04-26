@@ -160,16 +160,16 @@ const mapBaseSQL = `
 		) AS class_max,
 		r.character, r.length_mi,
 		ST_AsGeoJSON(r.centerline::geometry)::json AS centerline,
-		ST_X(r.put_in::geometry)    AS put_in_lng,
-		ST_Y(r.put_in::geometry)    AS put_in_lat,
-		ST_X(r.take_out::geometry)  AS take_out_lng,
-		ST_Y(r.take_out::geometry)  AS take_out_lat,
-		lr.value                    AS current_cfs,
+		ST_X(r.start_point::geometry)    AS put_in_lng,
+		ST_Y(r.start_point::geometry)    AS put_in_lat,
+		ST_X(r.end_point::geometry)      AS take_out_lng,
+		ST_Y(r.end_point::geometry)      AS take_out_lat,
+		lr.value                         AS current_cfs,
 		g.last_reading_at,
-		fr.label                    AS flow_label,
-		g.id                        AS gauge_id,
+		fr.label                         AS flow_label,
+		g.id                             AS gauge_id,
 		g.reach_relationship,
-		g.featured                  AS gauge_trusted,
+		g.featured                       AS gauge_trusted,
 		g.gauge_notes,
 		g.info_links,
 		CASE
@@ -375,16 +375,16 @@ func (h *ReachHandler) queryAllFeatures(ctx context.Context) ([]Feature, error) 
 			) AS class_max,
 			r.character, r.length_mi,
 			ST_AsGeoJSON(r.centerline::geometry)::json AS centerline,
-			ST_X(r.put_in::geometry)   AS put_in_lng,
-			ST_Y(r.put_in::geometry)   AS put_in_lat,
-			ST_X(r.take_out::geometry) AS take_out_lng,
-			ST_Y(r.take_out::geometry) AS take_out_lat,
-			lr.value                   AS current_cfs,
+			ST_X(r.start_point::geometry)   AS put_in_lng,
+			ST_Y(r.start_point::geometry)   AS put_in_lat,
+			ST_X(r.end_point::geometry)     AS take_out_lng,
+			ST_Y(r.end_point::geometry)     AS take_out_lat,
+			lr.value                        AS current_cfs,
 			g.last_reading_at,
-			fr.label                   AS flow_label,
-			g.id                       AS gauge_id,
+			fr.label                        AS flow_label,
+			g.id                            AS gauge_id,
 			g.reach_relationship,
-			g.featured                 AS gauge_trusted,
+			g.featured                      AS gauge_trusted,
 			g.gauge_notes,
 			g.info_links,
 			CASE
@@ -568,7 +568,7 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 		ORDER BY rv.basin NULLS LAST,
 		         r.river_name NULLS LAST,
 		         g.elevation_ft DESC NULLS LAST,
-		         ST_X(r.put_in::geometry) ASC NULLS LAST
+		         ST_X(r.start_point::geometry) ASC NULLS LAST
 	`)
 	if err != nil {
 		return nil, err
@@ -1334,12 +1334,12 @@ func (h *ReachHandler) fetchCenterlineCore(ctx context.Context, slug string, exp
 	)
 	err := h.db.QueryRow(ctx, `
 		SELECT r.id,
-		       ST_X(r.put_in::geometry)      AS put_in_lng,
-		       ST_Y(r.put_in::geometry)      AS put_in_lat,
-		       ST_X(r.take_out::geometry)    AS take_out_lng,
-		       ST_Y(r.take_out::geometry)    AS take_out_lat,
-		       ST_X(g.location::geometry)    AS gauge_lng,
-		       ST_Y(g.location::geometry)    AS gauge_lat,
+		       ST_X(r.start_point::geometry)    AS put_in_lng,
+		       ST_Y(r.start_point::geometry)    AS put_in_lat,
+		       ST_X(r.end_point::geometry)      AS take_out_lng,
+		       ST_Y(r.end_point::geometry)      AS take_out_lat,
+		       ST_X(g.location::geometry)       AS gauge_lng,
+		       ST_Y(g.location::geometry)       AS gauge_lat,
 		       r.river_name
 		FROM reaches r
 		LEFT JOIN gauges g ON g.id = r.primary_gauge_id

@@ -1,5 +1,5 @@
 // backfill-comids resolves NHD ComIDs and GNIS names for reaches that pre-date
-// the NLDI integration. For each reach with a centerline but no put_in_comid,
+// the NLDI integration. For each reach with a centerline but no start_comid,
 // it snaps the centerline's start/end points to NHD via the NLDI API, then
 // looks up GNIS names for the resolved ComIDs from EPA's NHDPlus service.
 //
@@ -96,7 +96,7 @@ func main() {
 			ST_Y(ST_EndPoint(centerline::geometry)::geometry),
 			ST_X(ST_EndPoint(centerline::geometry)::geometry)
 		FROM reaches
-		WHERE put_in_comid IS NULL AND centerline IS NOT NULL
+		WHERE start_comid IS NULL AND centerline IS NOT NULL
 		ORDER BY river_name, slug
 	`)
 	if err != nil {
@@ -190,8 +190,8 @@ func main() {
 		}
 		_, err := pool.Exec(ctx, `
 			UPDATE reaches SET
-				put_in_comid   = $1,
-				take_out_comid = $2,
+				start_comid   = $1,
+				end_comid = $2,
 				anchor_comid   = COALESCE(anchor_comid, $1),
 				put_in         = ST_SetSRID(ST_MakePoint($3,$4),4326)::geography,
 				take_out       = ST_SetSRID(ST_MakePoint($5,$6),4326)::geography
@@ -247,9 +247,9 @@ func main() {
 // would seed the rivers table.
 func runReport(ctx context.Context, pool *pgxpool.Pool) {
 	rows, err := pool.Query(ctx, `
-		SELECT slug, COALESCE(river_name,''), put_in_comid, take_out_comid
+		SELECT slug, COALESCE(river_name,''), start_comid, end_comid
 		FROM reaches
-		WHERE put_in_comid IS NOT NULL
+		WHERE start_comid IS NOT NULL
 		ORDER BY river_name, slug
 	`)
 	if err != nil {

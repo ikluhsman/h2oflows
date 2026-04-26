@@ -643,14 +643,14 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		}
 	}
 
-	// For each enriched reach that has put_in_comid set, finalize the NLDI
+	// For each enriched reach that has start_comid set, finalize the NLDI
 	// centerline now that access points have been written by KML import.
-	// SyncCenterline reads put-in/take-out coords from reach_access, so this
+	// SyncCenterline reads start/end coords from reach_access, so this
 	// works without any extra data being passed here.
 	if !imp.DryRun {
 		for slug := range enrichedSlugs {
 			var putInComID *string
-			_ = imp.pool.QueryRow(ctx, `SELECT put_in_comid FROM reaches WHERE slug = $1`, slug).Scan(&putInComID)
+			_ = imp.pool.QueryRow(ctx, `SELECT start_comid FROM reaches WHERE slug = $1`, slug).Scan(&putInComID)
 			if putInComID == nil {
 				continue
 			}
@@ -1379,9 +1379,9 @@ const (
 )
 
 // SyncCenterline fetches a river centerline from the chosen source, trims it to
-// the reach's put-in/take-out via PostGIS ST_LineSubstring, and stores it on
+// the reach's start/end via PostGIS ST_LineSubstring, and stores it on
 // reaches.centerline. When source is NLDI the reach's NHD reference fields
-// (put_in_comid, take_out_comid, reachcode, totdasqkm) are populated too.
+// (start_comid, end_comid, reachcode, totdasqkm) are populated too.
 func SyncCenterline(ctx context.Context, pool *pgxpool.Pool, slug string, source CenterlineSource, dryRun bool) error {
 	var putInLon, putInLat, takeOutLon, takeOutLat float64
 	err := pool.QueryRow(ctx, `
@@ -1500,8 +1500,8 @@ func syncCenterlineNLDI(ctx context.Context, pool *pgxpool.Pool, slug string, pu
 			) sub
 		),
 		       centerline_source = 'nldi',
-		       put_in_comid      = $7,
-		       take_out_comid    = $8,
+		       start_comid       = $7,
+		       end_comid         = $8,
 		       length_mi = ROUND((
 		           ST_Length((
 		               SELECT ST_LineSubstring(
@@ -1519,7 +1519,7 @@ func syncCenterlineNLDI(ctx context.Context, pool *pgxpool.Pool, slug string, pu
 
 // SyncCenterlineNLDIByComID is like syncCenterlineNLDI but the upstream and
 // downstream ComIDs are supplied directly instead of being snapped from
-// coordinates. The put-in/take-out coordinates are still used for trimming the
+// coordinates. The start/end coordinates are still used for trimming the
 // merged mainstem to the exact reach extent. Used by the admin UI when the
 // user picks ComIDs by clicking flowline segments.
 func SyncCenterlineNLDIByComID(ctx context.Context, pool *pgxpool.Pool, slug string,
@@ -1552,8 +1552,8 @@ func SyncCenterlineNLDIByComID(ctx context.Context, pool *pgxpool.Pool, slug str
 			) sub
 		),
 		       centerline_source = 'nldi',
-		       put_in_comid      = $7,
-		       take_out_comid    = $8,
+		       start_comid       = $7,
+		       end_comid         = $8,
 		       length_mi = ROUND((
 		           ST_Length((
 		               SELECT ST_LineSubstring(

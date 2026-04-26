@@ -126,8 +126,8 @@ func fetchNLDIRiverLineByComIDWithClient(ctx context.Context, c *nldi.Client, up
 	}, nil
 }
 
-// SnapReachComIDs snaps the reach's existing put-in/take-out access points to
-// NHD ComIDs and stores them. It only writes when put_in_comid is NULL, so it
+// SnapReachComIDs snaps the reach's existing start/end access points to
+// NHD ComIDs and stores them. It only writes when start_comid is NULL, so it
 // won't overwrite data set by the NLDI centerline path. Designed to be called
 // in a background goroutine after a successful OSM centerline fetch.
 func SnapReachComIDs(ctx context.Context, pool *pgxpool.Pool, slug string) error {
@@ -159,11 +159,11 @@ func SnapReachComIDs(ctx context.Context, pool *pgxpool.Pool, slug string) error
 
 	_, err = pool.Exec(ctx, `
 		UPDATE reaches
-		SET    put_in_comid   = $2,
-		       take_out_comid = $3,
-		       anchor_comid   = COALESCE(anchor_comid, $2)
+		SET    start_comid   = $2,
+		       end_comid     = $3,
+		       anchor_comid  = COALESCE(anchor_comid, $2)
 		WHERE  slug = $1
-		  AND  put_in_comid IS NULL
+		  AND  start_comid IS NULL
 	`, slug, putInSnap.ComID, takeOutSnap.ComID)
 	return err
 }

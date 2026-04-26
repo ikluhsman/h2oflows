@@ -153,7 +153,7 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 		INSERT INTO reaches (
 			slug, name, common_name, river_name,
 			class_min, class_max,
-			put_in_comid, take_out_comid, anchor_comid,
+			start_comid, end_comid, anchor_comid,
 			centerline_source,
 			description, permit_required, multi_day_days
 		) VALUES (
@@ -207,9 +207,9 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 			id, name, COALESCE(river_name,''), COALESCE(common_name,''),
 			class_min, class_max, description,
 			COALESCE(permit_required, false), COALESCE(multi_day_days, 1),
-			put_in_comid, take_out_comid,
-			ST_X(put_in::geometry),  ST_Y(put_in::geometry),
-			ST_X(take_out::geometry), ST_Y(take_out::geometry)
+			start_comid, end_comid,
+			ST_X(start_point::geometry),  ST_Y(start_point::geometry),
+			ST_X(end_point::geometry),    ST_Y(end_point::geometry)
 		FROM reaches WHERE slug = $1
 	`, slug).Scan(
 		&id, &name, &riverName, &commonName,
@@ -246,8 +246,8 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 		"description":     description,
 		"permit_required": permitRequired,
 		"multi_day_days":  multiDayDays,
-		"put_in_comid":    putInComID,
-		"take_out_comid":  takeOutComID,
+		"start_comid":     putInComID,
+		"end_comid":       takeOutComID,
 		"put_in":          putIn,
 		"take_out":        takeOut,
 	})
@@ -414,7 +414,7 @@ type latLng struct {
 //
 // Fetches an NLDI centerline between the supplied coordinates and replaces the
 // reach's stored centerline geometry. The reach's reach_access rows are not
-// modified — only centerline, length_mi, put_in_comid, take_out_comid update.
+// modified — only centerline, length_mi, start_comid, end_comid update.
 func (h *NLDIHandler) UpdateReachCenterline(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
@@ -454,14 +454,14 @@ func (h *NLDIHandler) UpdateReachCenterline(w http.ResponseWriter, r *http.Reque
 	var lengthMi *float64
 	var putInComID, takeOutComID *string
 	_ = h.db.QueryRow(ctx, `
-		SELECT length_mi, put_in_comid, take_out_comid FROM reaches WHERE id = $1
+		SELECT length_mi, start_comid, end_comid FROM reaches WHERE id = $1
 	`, reachID).Scan(&lengthMi, &putInComID, &takeOutComID)
 
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"slug":           slug,
-		"length_mi":      lengthMi,
-		"put_in_comid":   putInComID,
-		"take_out_comid": takeOutComID,
+		"slug":        slug,
+		"length_mi":   lengthMi,
+		"start_comid": putInComID,
+		"end_comid":   takeOutComID,
 	})
 }
 
@@ -502,8 +502,8 @@ func (h *NLDIHandler) UpdateReachCenterlineByComID(w http.ResponseWriter, r *htt
 	)
 	err := h.db.QueryRow(ctx, `
 		SELECT id,
-		       ST_X(put_in::geometry),  ST_Y(put_in::geometry),
-		       ST_X(take_out::geometry), ST_Y(take_out::geometry)
+		       ST_X(start_point::geometry),  ST_Y(start_point::geometry),
+		       ST_X(end_point::geometry),    ST_Y(end_point::geometry)
 		FROM reaches WHERE slug = $1
 	`, slug).Scan(&reachID, &putInLng, &putInLat, &takeOutLng, &takeOutLat)
 	if err != nil {
@@ -511,7 +511,7 @@ func (h *NLDIHandler) UpdateReachCenterlineByComID(w http.ResponseWriter, r *htt
 		return
 	}
 	if putInLat == nil || putInLng == nil || takeOutLat == nil || takeOutLng == nil {
-		errorResponse(w, http.StatusBadRequest, "reach is missing put-in or take-out access points")
+		errorResponse(w, http.StatusBadRequest, "reach is missing start or end point")
 		return
 	}
 
@@ -531,14 +531,14 @@ func (h *NLDIHandler) UpdateReachCenterlineByComID(w http.ResponseWriter, r *htt
 	var lengthMi *float64
 	var putInComID, takeOutComID *string
 	_ = h.db.QueryRow(ctx, `
-		SELECT length_mi, put_in_comid, take_out_comid FROM reaches WHERE id = $1
+		SELECT length_mi, start_comid, end_comid FROM reaches WHERE id = $1
 	`, reachID).Scan(&lengthMi, &putInComID, &takeOutComID)
 
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"slug":           slug,
-		"length_mi":      lengthMi,
-		"put_in_comid":   putInComID,
-		"take_out_comid": takeOutComID,
+		"slug":        slug,
+		"length_mi":   lengthMi,
+		"start_comid": putInComID,
+		"end_comid":   takeOutComID,
 	})
 }
 
