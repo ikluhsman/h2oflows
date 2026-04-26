@@ -14,14 +14,20 @@
 
     <!-- ComID select mode hint -->
     <div v-if="mapReady && comidSelectMode" class="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex gap-1.5 pointer-events-none">
-      <span v-if="!selectedUpComID" class="bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
-        Click a flowline to set upstream ComID
+      <span v-if="comidSelectSlot === 'up'" class="bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
+        Click a flow line to set the reach start
+      </span>
+      <span v-else-if="comidSelectSlot === 'down'" class="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
+        Click a flow line to set the reach end
+      </span>
+      <span v-else-if="!selectedUpComID" class="bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
+        Click a flow line to set the reach start
       </span>
       <span v-else-if="!selectedDownComID" class="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
-        Click a flowline to set downstream ComID
+        Click a flow line to set the reach end
       </span>
       <span v-else class="bg-gray-800 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
-        Both ComIDs selected — adjust or continue
+        Both flow lines selected — adjust or continue
       </span>
     </div>
 
@@ -68,6 +74,8 @@ const props = defineProps<{
   takeOutPin?:         AuthoringPin | null
   // ComID selection mode: click a flowline segment to emit its ComID
   comidSelectMode?:    boolean
+  // Which slot the next ComID click fills — drives the prompt pill text.
+  comidSelectSlot?:    'up' | 'down' | null
   selectedUpComID?:    string | null
   selectedDownComID?:  string | null
 }>()
@@ -91,6 +99,11 @@ let map: maplibregl.Map | null = null
 let snapMarker: maplibregl.Marker | null = null
 let putInMarker: maplibregl.Marker | null = null
 let takeOutMarker: maplibregl.Marker | null = null
+
+// Auto-fit gating — see shouldFit() for the policy.
+let prevUpSet = false
+let prevDownSet = false
+let initialFitDone = false
 
 const BASEMAP_LAYER_IDS = { street: 'street-tiles', topo: 'topo-tiles', satellite: 'esri-tiles' } as const
 
@@ -166,6 +179,31 @@ function updateComIDFilters() {
   map.setFilter('nhd-downstream-selected', down ? ['==', ['get', 'nhdplus_comid'], down] : ['==', ['literal', true], false])
 }
 
+// Returns true only on transitions where we actually want to re-frame the map:
+// initial load, reset back to no ComIDs, or both ComIDs just became set.
+// While exactly one ComID is selected (mid-pick), never auto-fit — that's the
+// jump that happens when the downstream mainstem loads after the first pick.
+function shouldFit(): boolean {
+  const upSet = !!props.selectedUpComID
+  const downSet = !!props.selectedDownComID
+  const wasUpSet = prevUpSet
+  const wasDownSet = prevDownSet
+  prevUpSet = upSet
+  prevDownSet = downSet
+
+  if (upSet !== downSet) return false
+
+  if (upSet && downSet) {
+    return !(wasUpSet && wasDownSet)
+  }
+
+  if (!initialFitDone) {
+    initialFitDone = true
+    return true
+  }
+  return wasUpSet || wasDownSet
+}
+
 function fitToData() {
   if (!map) return
   const allCoords: [number, number][] = []
@@ -183,6 +221,7 @@ function fitToData() {
   if (props.putInPin)   allCoords.push([props.putInPin.lng,   props.putInPin.lat])
   if (props.takeOutPin) allCoords.push([props.takeOutPin.lng, props.takeOutPin.lat])
   if (allCoords.length < 2) return
+  if (!shouldFit()) return
   const bounds = allCoords.reduce(
     (b, [lng, lat]) => b.extend([lng, lat] as [number, number]),
     new maplibregl.LngLatBounds(allCoords[0], allCoords[0]),
@@ -202,6 +241,20 @@ function addLayers() {
   for (const [id, data] of sources) {
     map.addSource(id, { type: 'geojson', data: data ?? empty() })
   }
+
+  // ── Upstream flowlines — fat transparent hit-area ─────────────────────
+  // Sits beneath the visible line so clicks on a thick area still land on
+  // the flowline (the actual rendered line is only 1.5px wide).
+  map.addLayer({
+    id: 'nhd-upstream-hit',
+    type: 'line',
+    source: 'nhd-upstream',
+    paint: {
+      'line-color': '#000',
+      'line-width': 14,
+      'line-opacity': 0,
+    },
+  })
 
   // ── Upstream flowlines — blue ─────────────────────────────────────────
   map.addLayer({
@@ -238,6 +291,18 @@ function addLayers() {
       'line-color': '#dc2626',
       'line-width': 5,
       'line-opacity': 1,
+    },
+  })
+
+  // ── Downstream mainstem — fat transparent hit-area ────────────────────
+  map.addLayer({
+    id: 'nhd-downstream-hit',
+    type: 'line',
+    source: 'nhd-downstream',
+    paint: {
+      'line-color': '#000',
+      'line-width': 14,
+      'line-opacity': 0,
     },
   })
 
@@ -285,21 +350,28 @@ function addLayers() {
   map.on('mouseenter', 'nhd-gauges-circle', () => { if (map) map.getCanvas().style.cursor = 'pointer' })
   map.on('mouseleave', 'nhd-gauges-circle', () => { if (map) map.getCanvas().style.cursor = props.pickMode ? 'crosshair' : '' })
 
-  // ── ComID selection: click on any upstream flowline segment ───────────
-  map.on('click', 'nhd-upstream-line', (e) => {
+  // ── ComID selection: click on any flowline segment ────────────────────
+  // Hit-target layers are transparent + 14px wide so small flowlines stay
+  // clickable. Visible layers stay clickable too as a fallback.
+  const flowlineClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
     if (!props.comidSelectMode) return
     const comid = e.features?.[0]?.properties?.nhdplus_comid as string | undefined
     if (comid) {
       e.preventDefault()
       emit('comid-select', comid)
     }
-  })
-  map.on('mouseenter', 'nhd-upstream-line', () => {
+  }
+  const flowlineHover = () => {
     if (map && props.comidSelectMode) map.getCanvas().style.cursor = 'pointer'
-  })
-  map.on('mouseleave', 'nhd-upstream-line', () => {
+  }
+  const flowlineLeave = () => {
     if (map) map.getCanvas().style.cursor = props.pickMode ? 'crosshair' : ''
-  })
+  }
+  for (const id of ['nhd-upstream-hit', 'nhd-upstream-line', 'nhd-downstream-hit', 'nhd-downstream-line']) {
+    map.on('click', id, flowlineClick)
+    map.on('mouseenter', id, flowlineHover)
+    map.on('mouseleave', id, flowlineLeave)
+  }
 }
 
 function initMap() {
