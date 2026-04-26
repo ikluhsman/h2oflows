@@ -356,12 +356,16 @@ function addLayers() {
   // ── ComID selection: click on any flowline segment ────────────────────
   // Hit-target layers are transparent + 14px wide so small flowlines stay
   // clickable. Visible layers stay clickable too as a fallback.
+  // Multiple layers share the same handler — dedup on originalEvent so a
+  // single physical click only emits once even if several layers overlap.
+  let lastClickedEvent: MouseEvent | null = null
   const flowlineClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
     if (!props.comidSelectMode) return
+    if (e.originalEvent === lastClickedEvent) return
+    lastClickedEvent = e.originalEvent
     const comid = e.features?.[0]?.properties?.nhdplus_comid as string | undefined
     if (comid) {
       e.preventDefault()
-      e.stopPropagation()
       emit('comid-select', comid, e.lngLat.lat, e.lngLat.lng)
     }
   }
