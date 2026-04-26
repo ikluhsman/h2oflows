@@ -157,6 +157,7 @@ func main() {
 		r.Get("/reaches/{slug}/flow-ranges", reaches.GetFlowRanges)
 		r.Post("/reaches/{slug}/ask", reaches.Ask)
 		r.Post("/ask", reaches.GlobalAsk)
+		r.Get("/admin/slug-check", admin.SlugCheck)
 
 		// Authenticated user routes — require a valid Supabase JWT.
 		r.Group(func(r chi.Router) {
@@ -174,7 +175,6 @@ func main() {
 			r.Post("/reaches/{slug}/fetch-centerline", reaches.FetchCenterline)
 			r.Delete("/reaches/{slug}/centerline", reaches.ClearCenterline)
 			r.Post("/import/kmz", imports.ImportKMZ)
-			r.Get("/admin/slug-check", admin.SlugCheck)
 			r.Get("/admin/reaches/unassigned", admin.ListUnassignedReaches)
 			r.Put("/admin/reaches/{slug}/river", admin.AssignReachToRiver)
 			r.Get("/admin/rivers", admin.ListRivers)
