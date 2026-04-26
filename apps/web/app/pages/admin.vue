@@ -455,7 +455,15 @@
                   </div>
                   <div>
                     <label class="block text-xs text-gray-500 mb-1">River name</label>
-                    <input v-model="repinForm.riverName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+                    <div class="flex gap-2">
+                      <input v-model="repinForm.riverName" class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+                      <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID" @click="fetchRepinRiverName">Fetch from NLDI</UButton>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Slug</label>
+                    <input v-model="repinForm.slug" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-xs font-mono" />
+                    <p class="text-xs text-gray-400 mt-0.5">Changing the slug will break existing links.</p>
                   </div>
                   <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -503,6 +511,39 @@
                     <span v-if="repinDescMsg" class="text-xs" :class="repinDescMsg === 'Description saved' ? 'text-green-600 dark:text-green-400' : 'text-red-500'">{{ repinDescMsg }}</span>
                     <div class="flex-1" />
                     <UButton size="xs" :loading="repinDescSaving" @click="saveRepinDescription">Save description</UButton>
+                  </div>
+                </div>
+
+                <!-- Flow bands editor -->
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-3">
+                  <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow bands</p>
+                  <div class="space-y-2">
+                    <div v-for="band in repinFlowBandsDef" :key="band.key" class="flex items-center gap-2 text-xs">
+                      <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="`background:${band.dot}`" />
+                      <span class="w-20 shrink-0 text-gray-600 dark:text-gray-400">{{ band.label }}</span>
+                      <template v-if="band.showMin">
+                        <input
+                          v-model.number="repinFlowBands[band.key].min"
+                          type="number" min="0" placeholder="min cfs"
+                          class="w-24 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-1 text-xs"
+                        />
+                      </template>
+                      <span v-else class="w-24" />
+                      <span class="text-gray-400">–</span>
+                      <template v-if="band.showMax">
+                        <input
+                          v-model.number="repinFlowBands[band.key].max"
+                          type="number" min="0" placeholder="max cfs"
+                          class="w-24 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-1 text-xs"
+                        />
+                      </template>
+                      <span v-else class="w-24 text-gray-400 italic">no limit</span>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3 pt-1">
+                    <span v-if="repinFlowBandsMsg" class="text-xs" :class="repinFlowBandsMsg === 'Saved' ? 'text-green-600 dark:text-green-400' : 'text-red-500'">{{ repinFlowBandsMsg }}</span>
+                    <div class="flex-1" />
+                    <UButton size="xs" :loading="repinFlowBandsSaving" @click="saveRepinFlowBands">Save flow bands</UButton>
                   </div>
                 </div>
 
@@ -1020,6 +1061,10 @@ const authorDownstreamLoading   = ref(false)
 const authorComIDSlot           = ref<'up' | 'down'>('up')
 const authorUpComID             = ref<string | null>(null)
 const authorDownComID           = ref<string | null>(null)
+const authorStartLat            = ref<number | null>(null)
+const authorStartLng            = ref<number | null>(null)
+const authorEndLat              = ref<number | null>(null)
+const authorEndLng              = ref<number | null>(null)
 const authorRiverNameOverride   = ref(false)
 const authorError               = ref('')
 const authorSuccess             = ref('')
@@ -1063,6 +1108,8 @@ function resetAuthor() {
   authorComIDSlot.value = 'up'
   authorUpComID.value = null
   authorDownComID.value = null
+  authorStartLat.value = null; authorStartLng.value = null
+  authorEndLat.value = null;   authorEndLng.value = null
   authorRiverNameOverride.value = false
   authorError.value = ''; authorSuccess.value = ''
   authorSaving.value = false
@@ -1108,12 +1155,14 @@ async function onAuthorAnchorPick(lat: number, lng: number) {
   }
 }
 
-function onAuthorComIDSelect(comid: string) {
+function onAuthorComIDSelect(comid: string, lat: number, lng: number) {
   if (authorComIDSlot.value === 'up') {
     authorUpComID.value = comid
+    authorStartLat.value = lat; authorStartLng.value = lng
     if (!authorDownComID.value) authorComIDSlot.value = 'down'
   } else {
     authorDownComID.value = comid
+    authorEndLat.value = lat; authorEndLng.value = lng
   }
 }
 
@@ -1152,18 +1201,37 @@ const repinDescSaving       = ref(false)
 const repinDescMsg          = ref('')
 
 const repinForm = ref({
-  name: '', commonName: '', riverName: '',
+  name: '', commonName: '', riverName: '', slug: '',
   classMin: null as number | null, classMax: null as number | null,
   permitRequired: false, multiDay: 1,
 })
-const repinMetaSaving = ref(false)
-const repinMetaMsg    = ref('')
+const repinMetaSaving        = ref(false)
+const repinMetaMsg           = ref('')
+const repinRiverNameFetching = ref(false)
+const repinFlowBands = ref({
+  too_low:   { min: null as number | null, max: null as number | null },
+  running:   { min: null as number | null, max: null as number | null },
+  high:      { min: null as number | null, max: null as number | null },
+  very_high: { min: null as number | null, max: null as number | null },
+})
+const repinFlowBandsDef = [
+  { key: 'too_low',   label: 'Too Low',   dot: '#64748b', showMin: false, showMax: true  },
+  { key: 'running',   label: 'Runnable',  dot: '#22c55e', showMin: true,  showMax: true  },
+  { key: 'high',      label: 'High',      dot: '#f97316', showMin: true,  showMax: true  },
+  { key: 'very_high', label: 'Very High', dot: '#ef4444', showMin: true,  showMax: false },
+] as const
+const repinFlowBandsSaving = ref(false)
+const repinFlowBandsMsg    = ref('')
 
 const repinUpComID        = ref<string | null>(null)
 const repinDownComID      = ref<string | null>(null)
 const repinOrigUpComID    = ref<string | null>(null)
 const repinOrigDownComID  = ref<string | null>(null)
 const repinComIDEditMode  = ref<'up' | 'down' | null>(null)
+const repinStartLat       = ref<number | null>(null)
+const repinStartLng       = ref<number | null>(null)
+const repinEndLat         = ref<number | null>(null)
+const repinEndLng         = ref<number | null>(null)
 
 const repinComIDsDirty = computed(() =>
   repinUpComID.value !== repinOrigUpComID.value ||
@@ -1191,11 +1259,21 @@ function resetRepin() {
   repinUpComID.value = null; repinDownComID.value = null
   repinOrigUpComID.value = null; repinOrigDownComID.value = null
   repinComIDEditMode.value = null
+  repinStartLat.value = null; repinStartLng.value = null
+  repinEndLat.value = null;   repinEndLng.value = null
   repinForm.value = {
-    name: '', commonName: '', riverName: '',
+    name: '', commonName: '', riverName: '', slug: '',
     classMin: null, classMax: null,
     permitRequired: false, multiDay: 1,
   }
+  repinFlowBands.value = {
+    too_low:   { min: null, max: null },
+    running:   { min: null, max: null },
+    high:      { min: null, max: null },
+    very_high: { min: null, max: null },
+  }
+  repinFlowBandsSaving.value = false
+  repinFlowBandsMsg.value = ''
 }
 
 function resetRepinComIDs() {
@@ -1237,6 +1315,7 @@ async function loadRepinReach() {
       name:           data.name ?? '',
       commonName:     data.common_name ?? '',
       riverName:      data.river_name ?? '',
+      slug,
       classMin:       data.class_min ?? null,
       classMax:       data.class_max ?? null,
       permitRequired: !!data.permit_required,
@@ -1248,6 +1327,29 @@ async function loadRepinReach() {
     repinDownComID.value     = data.end_comid   ?? null
     repinOrigUpComID.value   = data.start_comid ?? null
     repinOrigDownComID.value = data.end_comid   ?? null
+
+    // Load existing flow bands
+    try {
+      const token2 = await getToken()
+      const frRes = await fetch(`${apiBase}/api/v1/reaches/${slug}/flow-ranges`, {
+        headers: token2 ? { Authorization: `Bearer ${token2}` } : {},
+      })
+      if (frRes.ok) {
+        const bands: Array<{ label: string; min_cfs: number | null; max_cfs: number | null }> = await frRes.json()
+        repinFlowBands.value = {
+          too_low:   { min: null, max: null },
+          running:   { min: null, max: null },
+          high:      { min: null, max: null },
+          very_high: { min: null, max: null },
+        }
+        for (const b of bands) {
+          const k = b.label as keyof typeof repinFlowBands.value
+          if (k in repinFlowBands.value) {
+            repinFlowBands.value[k] = { min: b.min_cfs ?? null, max: b.max_cfs ?? null }
+          }
+        }
+      }
+    } catch { /* non-fatal */ }
 
     if (data.start_comid) {
       await fetchRepinFlowlines(data.start_comid)
@@ -1281,12 +1383,14 @@ async function fetchRepinFlowlines(comid: string) {
   finally { repinFlowlinesLoading.value = false }
 }
 
-function onRepinComIDSelect(comid: string) {
+function onRepinComIDSelect(comid: string, lat: number, lng: number) {
   if (!repinComIDEditMode.value) return
   if (repinComIDEditMode.value === 'up') {
     repinUpComID.value = comid
+    repinStartLat.value = lat; repinStartLng.value = lng
   } else {
     repinDownComID.value = comid
+    repinEndLat.value = lat; repinEndLng.value = lng
   }
   repinComIDEditMode.value = null
 }
@@ -1299,12 +1403,14 @@ async function saveRepinMeta() {
   try {
     const f = repinForm.value
     const days = (f.multiDay ?? 1) < 1 ? 1 : (f.multiDay ?? 1)
+    const newSlug = f.slug.trim() || repinReach.value.slug
     const token = await getToken()
     const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/meta`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({
         name:            f.name.trim(),
+        new_slug:        newSlug !== repinReach.value.slug ? newSlug : undefined,
         common_name:     f.commonName.trim(),
         river_name:      f.riverName.trim(),
         class_min:       f.classMin,
@@ -1318,16 +1424,64 @@ async function saveRepinMeta() {
       repinMetaMsg.value = d.error ?? `HTTP ${res.status}`
       return
     }
+    const d = await res.json().catch(() => ({}))
+    const savedSlug = d.slug ?? newSlug
     repinMetaMsg.value = 'Saved'
     if (repinReach.value) {
       repinReach.value.name = f.name.trim()
       repinReach.value.river_name = f.riverName.trim() || null
+      if (savedSlug !== repinReach.value.slug) {
+        repinReach.value.slug = savedSlug
+        repinSlug.value = savedSlug
+        repinForm.value.slug = savedSlug
+      }
     }
   } catch (e: any) {
     repinMetaMsg.value = e.message ?? 'Save failed'
   } finally {
     repinMetaSaving.value = false
   }
+}
+
+async function saveRepinFlowBands() {
+  if (!repinReach.value) return
+  repinFlowBandsSaving.value = true
+  repinFlowBandsMsg.value = ''
+  try {
+    const b = repinFlowBands.value
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/reaches/${repinReach.value.slug}/flow-ranges`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({
+        too_low:   { min_cfs: null,          max_cfs: b.too_low.max  },
+        running:   { min_cfs: b.running.min,  max_cfs: b.running.max  },
+        high:      { min_cfs: b.high.min,     max_cfs: b.high.max     },
+        very_high: { min_cfs: b.very_high.min, max_cfs: null          },
+      }),
+    })
+    repinFlowBandsMsg.value = res.ok ? 'Saved' : `HTTP ${res.status}`
+  } catch (e: any) {
+    repinFlowBandsMsg.value = e.message ?? 'Save failed'
+  } finally {
+    repinFlowBandsSaving.value = false
+  }
+}
+
+async function fetchRepinRiverName() {
+  if (!repinUpComID.value) return
+  repinRiverNameFetching.value = true
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/nldi/river-name?comid=${repinUpComID.value}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (res.ok) {
+      const d = await res.json()
+      if (d.river_name) repinForm.value.riverName = d.river_name
+    }
+  } catch { /* non-fatal */ }
+  finally { repinRiverNameFetching.value = false }
 }
 
 async function submitRepinByComID() {
@@ -1340,7 +1494,14 @@ async function submitRepinByComID() {
     const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/nldi-centerline-by-comid`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ up_comid: repinUpComID.value, down_comid: repinDownComID.value }),
+      body: JSON.stringify({
+        up_comid:  repinUpComID.value,
+        down_comid: repinDownComID.value,
+        start_lat: repinStartLat.value,
+        start_lng: repinStartLng.value,
+        end_lat:   repinEndLat.value,
+        end_lng:   repinEndLng.value,
+      }),
     })
     const data = await res.json()
     if (!res.ok) { repinError.value = data.error ?? `HTTP ${res.status}`; return }
@@ -1419,6 +1580,10 @@ async function submitAuthorReach() {
       river_name:      f.riverName.trim(),
       up_comid:        authorUpComID.value,
       down_comid:      authorDownComID.value,
+      start_lat:       authorStartLat.value,
+      start_lng:       authorStartLng.value,
+      end_lat:         authorEndLat.value,
+      end_lng:         authorEndLng.value,
       class_min:       f.classMin,
       class_max:       f.classMax,
       description:     f.description.trim() || undefined,
