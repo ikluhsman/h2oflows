@@ -381,7 +381,21 @@
                 <div>
                   <label class="block text-xs text-gray-500 mb-1">Reach name <span class="text-red-400">*</span></label>
                   <input v-model="authorForm.name" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Lees Ferry to Diamond Creek" />
-                  <p v-if="authorComputedSlug" class="mt-1 text-xs text-gray-400 font-mono">slug: {{ authorComputedSlug }}</p>
+                </div>
+
+                <div>
+                  <label class="block text-xs text-gray-500 mb-1">Slug</label>
+                  <div class="flex items-center gap-2">
+                    <input
+                      v-model="authorForm.slug"
+                      class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-xs font-mono"
+                      placeholder="auto-generated from river + reach name"
+                      @input="authorSlugManual = true"
+                    />
+                    <span v-if="authorSlugChecking" class="text-xs text-gray-400 shrink-0">checking…</span>
+                    <span v-else-if="authorForm.slug && authorSlugAvailable === true" class="text-xs text-green-600 dark:text-green-400 shrink-0">available</span>
+                    <span v-else-if="authorForm.slug && authorSlugAvailable === false" class="text-xs text-red-500 shrink-0">taken</span>
+                  </div>
                 </div>
 
                 <div>
@@ -496,6 +510,16 @@
                     <input v-model="repinForm.name" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
                   </div>
                   <div>
+                    <label class="block text-xs text-gray-500 mb-1">Slug</label>
+                    <div class="flex items-center gap-2">
+                      <input v-model="repinForm.slug" class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-xs font-mono" />
+                      <span v-if="repinSlugChecking" class="text-xs text-gray-400 shrink-0">checking…</span>
+                      <span v-else-if="repinForm.slug && repinSlugAvailable === true" class="text-xs text-green-600 dark:text-green-400 shrink-0">available</span>
+                      <span v-else-if="repinForm.slug && repinSlugAvailable === false" class="text-xs text-red-500 shrink-0">taken</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-0.5">Changing the slug will break existing links.</p>
+                  </div>
+                  <div>
                     <label class="block text-xs text-gray-500 mb-1">Common name</label>
                     <input v-model="repinForm.commonName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
                   </div>
@@ -519,11 +543,6 @@
                       <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverAssigning" @click="assignRepinRiver">Assign</UButton>
                     </div>
                     <p class="text-xs text-gray-400 mt-0.5">Links this reach to a river record (controls Rivers tab grouping).</p>
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">Slug</label>
-                    <input v-model="repinForm.slug" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-xs font-mono" />
-                    <p class="text-xs text-gray-400 mt-0.5">Changing the slug will break existing links.</p>
                   </div>
                   <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -1134,7 +1153,7 @@ const authorError               = ref('')
 const authorSuccess             = ref('')
 const authorSaving              = ref(false)
 const authorForm = ref({
-  name: '', commonName: '', riverName: '',
+  name: '', commonName: '', riverName: '', slug: '',
   classMin: null as number | null, classMax: null as number | null,
   description: '',
   permitRequired: false,
@@ -1173,6 +1192,53 @@ const authorComputedSlug = computed(() => {
   return `${slugify(river)}-${slugify(name)}`
 })
 
+// Slug availability check — author form
+const authorSlugManual    = ref(false)  // true once user has hand-edited the slug
+const authorSlugAvailable = ref<boolean | null>(null)
+const authorSlugChecking  = ref(false)
+let   authorSlugTimer: ReturnType<typeof setTimeout> | null = null
+
+// Keep slug in sync with computed unless user has overridden it manually
+watch(authorComputedSlug, (val) => {
+  if (!authorSlugManual.value) authorForm.value.slug = val
+})
+
+watch(() => authorForm.value.slug, (val) => {
+  authorSlugAvailable.value = null
+  if (authorSlugTimer) clearTimeout(authorSlugTimer)
+  if (!val) return
+  authorSlugChecking.value = true
+  authorSlugTimer = setTimeout(async () => {
+    try {
+      const d = await $fetch<{ available: boolean }>(`${apiBase}/api/v1/admin/slug-check?slug=${encodeURIComponent(val)}`)
+      authorSlugAvailable.value = d.available
+    } catch { authorSlugAvailable.value = null }
+    finally { authorSlugChecking.value = false }
+  }, 400)
+})
+
+// Slug availability check — repin form
+const repinSlugAvailable = ref<boolean | null>(null)
+const repinSlugChecking  = ref(false)
+let   repinSlugTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(() => repinForm.value.slug, (val) => {
+  repinSlugAvailable.value = null
+  if (repinSlugTimer) clearTimeout(repinSlugTimer)
+  if (!val) return
+  // If slug unchanged from loaded value, it's trivially available (it IS this reach)
+  if (val === repinReach.value?.slug) { repinSlugAvailable.value = true; return }
+  repinSlugChecking.value = true
+  repinSlugTimer = setTimeout(async () => {
+    try {
+      const exclude = encodeURIComponent(repinReach.value?.slug ?? '')
+      const d = await $fetch<{ available: boolean }>(`${apiBase}/api/v1/admin/slug-check?slug=${encodeURIComponent(val)}&exclude=${exclude}`)
+      repinSlugAvailable.value = d.available
+    } catch { repinSlugAvailable.value = null }
+    finally { repinSlugChecking.value = false }
+  }, 400)
+})
+
 function resetAuthor() {
   authorPickMode.value = false
   authorAnchorSnapping.value = false
@@ -1189,7 +1255,7 @@ function resetAuthor() {
   authorError.value = ''; authorSuccess.value = ''
   authorSaving.value = false
   authorForm.value = {
-    name: '', commonName: '', riverName: '',
+    name: '', commonName: '', riverName: '', slug: '',
     classMin: null, classMax: null,
     description: '',
     permitRequired: false,
@@ -1201,6 +1267,8 @@ function resetAuthor() {
       very_high: { min: null, max: null },
     },
   }
+  authorSlugManual.value = false
+  authorSlugAvailable.value = null
 }
 
 async function onAuthorAnchorPick(lat: number, lng: number) {
@@ -1353,6 +1421,7 @@ function resetRepin() {
   repinFlowBandsMsg.value = ''
   repinRiverId.value = ''
   repinRiverAssigning.value = false
+  repinSlugAvailable.value = null
 }
 
 function resetRepinComIDs() {
@@ -1672,6 +1741,7 @@ async function submitAuthorReach() {
     const f = authorForm.value
     const days = (f.multiDay ?? 1) < 1 ? 1 : (f.multiDay ?? 1)
     const body = {
+      slug:            f.slug.trim() || undefined,
       name:            f.name.trim(),
       common_name:     f.commonName.trim(),
       river_name:      f.riverName.trim(),
