@@ -81,8 +81,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  pick:          [lat: number, lng: number]
-  'comid-select': [comid: string]
+  pick:           [lat: number, lng: number]
+  'comid-select': [comid: string, lat: number, lng: number]
 }>()
 
 const BASEMAP_OPTIONS = [
@@ -358,7 +358,7 @@ function addLayers() {
     const comid = e.features?.[0]?.properties?.nhdplus_comid as string | undefined
     if (comid) {
       e.preventDefault()
-      emit('comid-select', comid)
+      emit('comid-select', comid, e.lngLat.lat, e.lngLat.lng)
     }
   }
   const flowlineHover = () => {

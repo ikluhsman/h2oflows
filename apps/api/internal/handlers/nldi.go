@@ -107,8 +107,12 @@ type createReachRequest struct {
 	Name           string   `json:"name"`
 	CommonName     string   `json:"common_name"`
 	RiverName      string   `json:"river_name"`
-	UpComID        string   `json:"up_comid"`   // upstream (put-in) ComID — required
-	DownComID      string   `json:"down_comid"` // downstream (take-out) ComID — required
+	UpComID        string   `json:"up_comid"`    // reach-start ComID — required
+	DownComID      string   `json:"down_comid"`  // reach-end ComID — required
+	StartLat       *float64 `json:"start_lat"`   // clicked lat for reach start
+	StartLng       *float64 `json:"start_lng"`
+	EndLat         *float64 `json:"end_lat"`     // clicked lat for reach end
+	EndLng         *float64 `json:"end_lng"`
 	ClassMin       *float64 `json:"class_min"`
 	ClassMax       *float64 `json:"class_max"`
 	Description    string   `json:"description"`
@@ -148,25 +152,36 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 		days = 1
 	}
 
+	var startPoint, endPoint interface{}
+	if req.StartLat != nil && req.StartLng != nil {
+		startPoint = fmt.Sprintf("SRID=4326;POINT(%f %f)", *req.StartLng, *req.StartLat)
+	}
+	if req.EndLat != nil && req.EndLng != nil {
+		endPoint = fmt.Sprintf("SRID=4326;POINT(%f %f)", *req.EndLng, *req.EndLat)
+	}
+
 	var reachID string
 	err := h.db.QueryRow(ctx, `
 		INSERT INTO reaches (
 			slug, name, common_name, river_name,
 			class_min, class_max,
 			start_comid, end_comid, anchor_comid,
+			start_point, end_point,
 			centerline_source,
 			description, permit_required, multi_day_days
 		) VALUES (
 			$1, $2, NULLIF($3,''), NULLIF($4,''),
 			$5, $6,
 			$7, $8, $7,
+			$9::geography, $10::geography,
 			'nldi',
-			NULLIF($9,''), $10, $11
+			NULLIF($11,''), $12, $13
 		)
 		RETURNING id
 	`, slug, req.Name, req.CommonName, req.RiverName,
 		req.ClassMin, req.ClassMax,
 		req.UpComID, req.DownComID,
+		startPoint, endPoint,
 		req.Description, req.PermitRequired, days,
 	).Scan(&reachID)
 	if err != nil {
@@ -261,6 +276,7 @@ func (h *NLDIHandler) UpdateReachMeta(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	var req struct {
 		Name           string   `json:"name"`
+		NewSlug        string   `json:"new_slug"`
 		CommonName     string   `json:"common_name"`
 		RiverName      string   `json:"river_name"`
 		ClassMin       *float64 `json:"class_min"`
@@ -280,23 +296,32 @@ func (h *NLDIHandler) UpdateReachMeta(w http.ResponseWriter, r *http.Request) {
 	if days < 1 {
 		days = 1
 	}
+	newSlug := slug
+	if s := strings.TrimSpace(req.NewSlug); s != "" {
+		newSlug = s
+	}
 	ctx := r.Context()
 	tag, err := h.db.Exec(ctx, `
 		UPDATE reaches SET
-			name            = $1,
-			common_name     = NULLIF($2, ''),
-			river_name      = NULLIF($3, ''),
-			class_min       = $4,
-			class_max       = $5,
-			permit_required = $6,
-			multi_day_days  = $7
-		WHERE slug = $8
-	`, req.Name, req.CommonName, req.RiverName,
+			slug            = $1,
+			name            = $2,
+			common_name     = NULLIF($3, ''),
+			river_name      = NULLIF($4, ''),
+			class_min       = $5,
+			class_max       = $6,
+			permit_required = $7,
+			multi_day_days  = $8
+		WHERE slug = $9
+	`, newSlug, req.Name, req.CommonName, req.RiverName,
 		req.ClassMin, req.ClassMax,
 		req.PermitRequired, days,
 		slug,
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			errorResponse(w, http.StatusConflict, fmt.Sprintf("slug %q already exists", newSlug))
+			return
+		}
 		errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("update: %v", err))
 		return
 	}
@@ -304,7 +329,7 @@ func (h *NLDIHandler) UpdateReachMeta(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, http.StatusNotFound, fmt.Sprintf("reach %q not found", slug))
 		return
 	}
-	jsonResponse(w, http.StatusOK, map[string]any{"slug": slug})
+	jsonResponse(w, http.StatusOK, map[string]any{"slug": newSlug})
 }
 
 // UpstreamTributaries handles GET /api/v1/admin/nldi/upstream-tributaries
@@ -399,6 +424,41 @@ func (h *NLDIHandler) DownstreamMainstem(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// RiverName handles GET /api/v1/admin/nldi/river-name?comid=<comid>
+//
+// Returns the stream/river name for a given NHD ComID by fetching a small
+// upstream slice and extracting the GNIS_Name from the first matching feature.
+// Used by the admin reach editor's "Fetch river name from NLDI" button.
+func (h *NLDIHandler) RiverName(w http.ResponseWriter, r *http.Request) {
+	comid := strings.TrimSpace(r.URL.Query().Get("comid"))
+	if comid == "" {
+		errorResponse(w, http.StatusBadRequest, "comid is required")
+		return
+	}
+	ctx := r.Context()
+	c := nldi.New()
+	// A 1 km upstream slice is enough to read the stream name from.
+	features, err := c.UpstreamFlowlines(ctx, comid, 1)
+	if err != nil {
+		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("nldi lookup: %v", err))
+		return
+	}
+	var name string
+	if features != nil {
+		for _, f := range features.Features {
+			if f.Props.GnisName != nil && *f.Props.GnisName != "" {
+				name = *f.Props.GnisName
+				break
+			}
+			if f.Props.Name != "" {
+				name = f.Props.Name
+				break
+			}
+		}
+	}
+	jsonResponse(w, http.StatusOK, map[string]any{"river_name": name})
+}
+
 type updateReachCenterlineRequest struct {
 	PutIn   latLng `json:"put_in"`
 	TakeOut latLng `json:"take_out"`
@@ -467,17 +527,23 @@ func (h *NLDIHandler) UpdateReachCenterline(w http.ResponseWriter, r *http.Reque
 
 // UpdateReachCenterlineByComID handles POST /api/v1/admin/reaches/{slug}/nldi-centerline-by-comid
 //
-// Re-traces the reach's centerline from the supplied upstream/downstream ComIDs
-// while keeping the existing put_in/take_out access point coordinates intact.
-// The access points are looked up from the reaches row and used solely for
-// trimming the merged mainstem to the exact reach extent.
+// Re-traces the reach's centerline from the supplied upstream/downstream ComIDs.
+// Trim coordinates come from (in priority order):
+//  1. start_lat/start_lng/end_lat/end_lng in the request body (from map click)
+//  2. start_point/end_point already stored on the reach row
+//
+// When body coordinates are provided they are also written to start_point/end_point.
 func (h *NLDIHandler) UpdateReachCenterlineByComID(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
 	var req struct {
-		UpComID   string `json:"up_comid"`
-		DownComID string `json:"down_comid"`
-		DryRun    bool   `json:"dry_run"`
+		UpComID   string   `json:"up_comid"`
+		DownComID string   `json:"down_comid"`
+		StartLat  *float64 `json:"start_lat"`
+		StartLng  *float64 `json:"start_lng"`
+		EndLat    *float64 `json:"end_lat"`
+		EndLng    *float64 `json:"end_lng"`
+		DryRun    bool     `json:"dry_run"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		errorResponse(w, http.StatusBadRequest, "invalid JSON")
@@ -497,27 +563,44 @@ func (h *NLDIHandler) UpdateReachCenterlineByComID(w http.ResponseWriter, r *htt
 	ctx := r.Context()
 
 	var (
-		reachID                                   string
-		putInLng, putInLat, takeOutLng, takeOutLat *float64
+		reachID                                    string
+		dbStartLng, dbStartLat, dbEndLng, dbEndLat *float64
 	)
 	err := h.db.QueryRow(ctx, `
 		SELECT id,
-		       ST_X(start_point::geometry),  ST_Y(start_point::geometry),
-		       ST_X(end_point::geometry),    ST_Y(end_point::geometry)
+		       ST_X(start_point::geometry), ST_Y(start_point::geometry),
+		       ST_X(end_point::geometry),   ST_Y(end_point::geometry)
 		FROM reaches WHERE slug = $1
-	`, slug).Scan(&reachID, &putInLng, &putInLat, &takeOutLng, &takeOutLat)
+	`, slug).Scan(&reachID, &dbStartLng, &dbStartLat, &dbEndLng, &dbEndLat)
 	if err != nil {
 		errorResponse(w, http.StatusNotFound, fmt.Sprintf("reach %q not found", slug))
 		return
 	}
-	if putInLat == nil || putInLng == nil || takeOutLat == nil || takeOutLng == nil {
-		errorResponse(w, http.StatusBadRequest, "reach is missing start or end point")
+
+	// Prefer body-supplied coordinates; fall back to stored start/end point.
+	startLng := first(req.StartLng, dbStartLng)
+	startLat := first(req.StartLat, dbStartLat)
+	endLng   := first(req.EndLng,   dbEndLng)
+	endLat   := first(req.EndLat,   dbEndLat)
+
+	if startLat == nil || startLng == nil || endLat == nil || endLng == nil {
+		errorResponse(w, http.StatusBadRequest, "start and end coordinates are required (provide start_lat/start_lng/end_lat/end_lng or set start_point/end_point on the reach first)")
 		return
+	}
+
+	// Persist body-supplied coordinates to start_point/end_point if provided.
+	if req.StartLat != nil && req.StartLng != nil && req.EndLat != nil && req.EndLng != nil && !req.DryRun {
+		_, _ = h.db.Exec(ctx, `
+			UPDATE reaches
+			SET start_point = ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography,
+			    end_point   = ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography
+			WHERE id = $1
+		`, reachID, *req.StartLng, *req.StartLat, *req.EndLng, *req.EndLat)
 	}
 
 	if err := kmlimport.SyncCenterlineNLDIByComID(ctx, h.db, slug,
 		req.UpComID, req.DownComID,
-		*putInLng, *putInLat, *takeOutLng, *takeOutLat,
+		*startLng, *startLat, *endLng, *endLat,
 		req.DryRun); err != nil {
 		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("nldi centerline: %v", err))
 		return
@@ -529,17 +612,25 @@ func (h *NLDIHandler) UpdateReachCenterlineByComID(w http.ResponseWriter, r *htt
 	}
 
 	var lengthMi *float64
-	var putInComID, takeOutComID *string
+	var startComID, endComID *string
 	_ = h.db.QueryRow(ctx, `
 		SELECT length_mi, start_comid, end_comid FROM reaches WHERE id = $1
-	`, reachID).Scan(&lengthMi, &putInComID, &takeOutComID)
+	`, reachID).Scan(&lengthMi, &startComID, &endComID)
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"slug":        slug,
 		"length_mi":   lengthMi,
-		"start_comid": putInComID,
-		"end_comid":   takeOutComID,
+		"start_comid": startComID,
+		"end_comid":   endComID,
 	})
+}
+
+// first returns the first non-nil *float64 pointer.
+func first(a, b *float64) *float64 {
+	if a != nil {
+		return a
+	}
+	return b
 }
 
 // GenerateDescription handles POST /api/v1/admin/reaches/{slug}/generate-description
