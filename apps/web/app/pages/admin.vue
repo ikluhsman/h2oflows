@@ -288,6 +288,9 @@
                 :comid-select-slot="authorComIDSlot"
                 :selected-up-comid="authorUpComID"
                 :selected-down-comid="authorDownComID"
+                :put-in-pin="authorPutInPin"
+                :take-out-pin="authorTakeOutPin"
+                :disable-auto-fit="true"
                 @pick="onAuthorAnchorPick"
                 @comid-select="onAuthorComIDSelect"
               />
@@ -1090,6 +1093,17 @@ const authorFlowBands = [
   { key: 'very_high', label: 'Very High', dot: '#ef4444', showMin: true,  showMax: false },
 ] as const
 
+const authorPutInPin = computed(() =>
+  authorStartLat.value != null && authorStartLng.value != null
+    ? { lat: authorStartLat.value, lng: authorStartLng.value, label: 'Start' }
+    : null
+)
+const authorTakeOutPin = computed(() =>
+  authorEndLat.value != null && authorEndLng.value != null
+    ? { lat: authorEndLat.value, lng: authorEndLng.value, label: 'End' }
+    : null
+)
+
 const authorComputedSlug = computed(() => {
   const river = authorForm.value.riverName.trim()
   const name  = authorForm.value.name.trim()
@@ -1604,21 +1618,22 @@ async function submitAuthorReach() {
     const ranges = f.flowRanges
     const hasRanges = Object.values(ranges).some(b => b.min != null || b.max != null)
     if (hasRanges) {
-      const bands = [
-        { label: 'too_low',  min: null,        max: ranges.too_low.max  },
-        { label: 'running',  min: ranges.running.min,  max: ranges.running.max  },
-        { label: 'high',     min: ranges.high.min,     max: ranges.high.max     },
-        { label: 'very_high', min: ranges.very_high.min, max: null               },
-      ].filter(b => b.min != null || b.max != null)
-        .map(b => ({ label: b.label, min_cfs: b.min, max_cfs: b.max }))
       await fetch(`${apiBase}/api/v1/reaches/${slug}/flow-ranges`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ranges: bands }),
+        body: JSON.stringify({
+          too_low:   { min_cfs: null,                  max_cfs: ranges.too_low.max   },
+          running:   { min_cfs: ranges.running.min,    max_cfs: ranges.running.max   },
+          high:      { min_cfs: ranges.high.min,       max_cfs: ranges.high.max      },
+          very_high: { min_cfs: ranges.very_high.min,  max_cfs: null                 },
+        }),
       })
     }
 
-    authorSuccess.value = `Saved! Slug: ${slug}. Import a KML with a slug placemark to add access points.`
+    // Redirect to Load Reach with the newly created reach already loaded.
+    setNHDMode('repin')
+    repinSlug.value = slug
+    await loadRepinReach()
   } catch (e: any) {
     authorError.value = e.message ?? 'Unknown error'
   } finally {

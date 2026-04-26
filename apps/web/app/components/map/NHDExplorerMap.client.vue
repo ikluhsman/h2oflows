@@ -78,6 +78,8 @@ const props = defineProps<{
   comidSelectSlot?:    'up' | 'down' | null
   selectedUpComID?:    string | null
   selectedDownComID?:  string | null
+  // Suppresses all auto-fit behaviour — user controls the viewport entirely.
+  disableAutoFit?:     boolean
 }>()
 
 const emit = defineEmits<{
@@ -221,6 +223,7 @@ function fitToData() {
   if (props.putInPin)   allCoords.push([props.putInPin.lng,   props.putInPin.lat])
   if (props.takeOutPin) allCoords.push([props.takeOutPin.lng, props.takeOutPin.lat])
   if (allCoords.length < 2) return
+  if (props.disableAutoFit) return
   if (!shouldFit()) return
   const bounds = allCoords.reduce(
     (b, [lng, lat]) => b.extend([lng, lat] as [number, number]),
@@ -262,9 +265,9 @@ function addLayers() {
     type: 'line',
     source: 'nhd-upstream',
     paint: {
-      'line-color': '#93c5fd',
-      'line-width': 1.5,
-      'line-opacity': 0.7,
+      'line-color': '#60a5fa',
+      'line-width': 2.5,
+      'line-opacity': 0.8,
     },
   })
 
