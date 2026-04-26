@@ -193,6 +193,16 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auto-link to a river record when river_name matches an existing entry.
+	// Best-effort — failure is silent so the reach is still usable.
+	if req.RiverName != "" {
+		h.db.Exec(ctx, `
+			UPDATE reaches
+			SET river_id = (SELECT id FROM rivers WHERE LOWER(name) = LOWER($1) LIMIT 1)
+			WHERE id = $2 AND river_id IS NULL
+		`, req.RiverName, reachID)
+	}
+
 	jsonResponse(w, http.StatusCreated, map[string]any{
 		"slug": slug,
 		"id":   reachID,
@@ -209,6 +219,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 
 	var (
 		id, name, riverName, commonName string
+		riverID                         *string
 		classMin, classMax              *float64
 		description                     *string
 		permitRequired                  bool
@@ -220,6 +231,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 	err := h.db.QueryRow(ctx, `
 		SELECT
 			id, name, COALESCE(river_name,''), COALESCE(common_name,''),
+			river_id,
 			class_min, class_max, description,
 			COALESCE(permit_required, false), COALESCE(multi_day_days, 1),
 			start_comid, end_comid,
@@ -228,6 +240,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 		FROM reaches WHERE slug = $1
 	`, slug).Scan(
 		&id, &name, &riverName, &commonName,
+		&riverID,
 		&classMin, &classMax, &description,
 		&permitRequired, &multiDayDays,
 		&putInComID, &takeOutComID,
@@ -255,6 +268,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 		"slug":            slug,
 		"name":            name,
 		"river_name":      riverName,
+		"river_id":        riverID,
 		"common_name":     commonName,
 		"class_min":       classMin,
 		"class_max":       classMax,

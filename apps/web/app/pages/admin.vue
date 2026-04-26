@@ -39,7 +39,7 @@
         <!-- Rivers tab -->
         <div v-if="activeTab === 'rivers'">
           <div class="flex items-center justify-between mb-4">
-            <p class="text-sm text-gray-500">{{ rivers.length }} rivers</p>
+            <p class="text-sm text-gray-500">{{ rivers.length }} rivers<template v-if="unassignedReaches.length"> · <span class="text-amber-500">{{ unassignedReaches.length }} unassigned</span></template></p>
             <UButton size="xs" icon="i-heroicons-plus" @click="createRiverOpen = true">New river</UButton>
           </div>
 
@@ -109,6 +109,49 @@
               </div>
             </template>
             <div v-if="rivers.length === 0" class="px-4 py-8 text-center text-sm text-gray-400">No rivers yet</div>
+
+            <!-- Unassigned reaches group -->
+            <template v-if="unassignedReaches.length">
+              <div
+                class="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/30 cursor-pointer transition-colors border-t border-gray-100 dark:border-gray-800"
+                @click="unassignedExpanded = !unassignedExpanded"
+              >
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-amber-800 dark:text-amber-300">Unassigned</p>
+                  <p class="text-xs text-amber-600 dark:text-amber-500">No river association — assign from Load Reach editor</p>
+                </div>
+                <span class="text-xs text-amber-600 dark:text-amber-400 shrink-0">{{ unassignedReaches.length }} reach{{ unassignedReaches.length !== 1 ? 'es' : '' }}</span>
+                <svg class="w-4 h-4 text-amber-400 shrink-0 transition-transform" :class="unassignedExpanded ? 'rotate-90' : ''" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+              <div v-if="unassignedExpanded" class="bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800">
+                <div
+                  v-for="reach in unassignedReaches" :key="reach.id"
+                  class="flex items-center gap-3 px-6 py-2.5 bg-white dark:bg-gray-900/60"
+                >
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate">{{ reach.common_name ?? reach.name }}</p>
+                    <p class="text-xs text-gray-400 truncate">
+                      {{ reach.slug }}
+                      <span v-if="reach.river_name" class="text-amber-500"> · {{ reach.river_name }}</span>
+                    </p>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                    <span
+                      class="text-xs px-1.5 py-0.5 rounded"
+                      :class="reach.has_centerline
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
+                    >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
+                    <span v-if="centerlineErrors.get(reach.slug)" class="text-xs text-red-400">{{ centerlineErrors.get(reach.slug) }}</span>
+                    <UButton size="xs" variant="outline" color="neutral" :loading="fetchingCenterlines.has(reach.slug)" @click="fetchCenterline(reach.slug)">Fetch line</UButton>
+                    <UButton size="xs" variant="outline" color="error" @click="deleteReach(reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
+                    <button class="text-xs text-blue-500 hover:underline" @click="openReachInEditor(reach.slug)">Edit</button>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -464,6 +507,20 @@
                     </div>
                   </div>
                   <div>
+                    <label class="block text-xs text-gray-500 mb-1">River association</label>
+                    <div class="flex gap-2 items-center">
+                      <select
+                        v-model="repinRiverId"
+                        class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
+                      >
+                        <option value="">— Unassigned —</option>
+                        <option v-for="rv in rivers" :key="rv.id" :value="rv.id">{{ rv.name }}</option>
+                      </select>
+                      <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverAssigning" @click="assignRepinRiver">Assign</UButton>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-0.5">Links this reach to a river record (controls Rivers tab grouping).</p>
+                  </div>
+                  <div>
                     <label class="block text-xs text-gray-500 mb-1">Slug</label>
                     <input v-model="repinForm.slug" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-xs font-mono" />
                     <p class="text-xs text-gray-400 mt-0.5">Changing the slug will break existing links.</p>
@@ -754,6 +811,8 @@ interface RiverDetail extends River {
 const rivers = ref<River[]>([])
 const riversLoading = ref(false)
 const expandedRiverId = ref<string | null>(null)
+const unassignedReaches = ref<{ id: string; slug: string; name: string; common_name: string | null; river_name: string | null; has_centerline: boolean }[]>([])
+const unassignedExpanded = ref(false)
 const selectedRiver = ref<RiverDetail | null>(null)
 const riverDetailLoading = ref(false)
 
@@ -762,10 +821,12 @@ async function loadRivers() {
   const token = await getToken()
   if (!token) { riversLoading.value = false; return }
   try {
-    const res = await fetch(`${apiBase}/api/v1/admin/rivers`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (res.ok) rivers.value = await res.json()
+    const [rRes, uRes] = await Promise.all([
+      fetch(`${apiBase}/api/v1/admin/rivers`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${apiBase}/api/v1/admin/reaches/unassigned`, { headers: { Authorization: `Bearer ${token}` } }),
+    ])
+    if (rRes.ok) rivers.value = await rRes.json()
+    if (uRes.ok) unassignedReaches.value = await uRes.json()
   } finally {
     riversLoading.value = false
   }
@@ -1222,6 +1283,8 @@ const repinForm = ref({
 const repinMetaSaving        = ref(false)
 const repinMetaMsg           = ref('')
 const repinRiverNameFetching = ref(false)
+const repinRiverId           = ref('')
+const repinRiverAssigning    = ref(false)
 const repinFlowBands = ref({
   too_low:   { min: null as number | null, max: null as number | null },
   running:   { min: null as number | null, max: null as number | null },
@@ -1288,6 +1351,8 @@ function resetRepin() {
   }
   repinFlowBandsSaving.value = false
   repinFlowBandsMsg.value = ''
+  repinRiverId.value = ''
+  repinRiverAssigning.value = false
 }
 
 function resetRepinComIDs() {
@@ -1325,6 +1390,7 @@ async function loadRepinReach() {
       start_comid: data.start_comid ?? null,
       end_comid:   data.end_comid   ?? null,
     }
+    repinRiverId.value = data.river_id ?? ''
     repinForm.value = {
       name:           data.name ?? '',
       commonName:     data.common_name ?? '',
@@ -1496,6 +1562,23 @@ async function fetchRepinRiverName() {
     }
   } catch { /* non-fatal */ }
   finally { repinRiverNameFetching.value = false }
+}
+
+async function assignRepinRiver() {
+  if (!repinReach.value) return
+  repinRiverAssigning.value = true
+  try {
+    const token = await getToken()
+    await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/river`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ river_id: repinRiverId.value || null }),
+    })
+    // Refresh unassigned list so the assigned reach disappears from it
+    loadRivers()
+  } finally {
+    repinRiverAssigning.value = false
+  }
 }
 
 async function submitRepinByComID() {
