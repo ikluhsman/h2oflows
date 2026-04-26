@@ -1302,7 +1302,6 @@ function onAuthorComIDSelect(comid: string, lat: number, lng: number) {
   if (authorComIDSlot.value === 'up') {
     authorUpComID.value = comid
     authorStartLat.value = lat; authorStartLng.value = lng
-    if (!authorDownComID.value) authorComIDSlot.value = 'down'
   } else {
     authorDownComID.value = comid
     authorEndLat.value = lat; authorEndLng.value = lng

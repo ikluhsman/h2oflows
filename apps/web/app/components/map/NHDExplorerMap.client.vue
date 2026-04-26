@@ -361,6 +361,7 @@ function addLayers() {
     const comid = e.features?.[0]?.properties?.nhdplus_comid as string | undefined
     if (comid) {
       e.preventDefault()
+      e.stopPropagation()
       emit('comid-select', comid, e.lngLat.lat, e.lngLat.lng)
     }
   }
