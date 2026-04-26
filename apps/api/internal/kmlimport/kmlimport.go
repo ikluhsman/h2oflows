@@ -243,18 +243,10 @@ func kmlCoordsToLineStringGeoJSON(raw string) (string, error) {
 
 // ── Importer ──────────────────────────────────────────────────────────────────
 
-type reachInfo struct {
-	id       string
-	slug     string
-	name     string
-	keywords []string
-}
-
 // Importer runs KML imports against a live database pool.
 type Importer struct {
 	pool    *pgxpool.Pool
 	DryRun  bool
-	reaches []reachInfo   // cached for category-map mode
 	cleared map[string]bool // reaches whose import data has been cleared this run
 }
 
@@ -264,6 +256,11 @@ func New(pool *pgxpool.Pool, dryRun bool) *Importer {
 }
 
 // Import processes all placemarks in doc and writes reach features to the DB.
+//
+// Each KML folder must contain a coordinate-less "slug" placemark whose
+// description matches an existing reach slug. Folders without a slug placemark
+// are skipped. Centerlines and river associations set via the admin NLDI flow
+// are never overwritten — this function is metadata-only.
 func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 	res := &Result{
 		MapName: doc.Name,
@@ -278,269 +275,203 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		folderName string
 	}
 	var pins []assignment
-	enrichedSlugs := map[string]bool{}
 
-	if IsCategoryMap(doc.Folders) {
-		res.Log = append(res.Log, "category-organized map — inferring reach from pin names + geography")
+	type reachFlowRange struct {
+		reachID   string
+		reachName string
+		label     string
+		minCFS    *float64
+		maxCFS    *float64
+	}
+	type gaugeAssoc struct {
+		reachID    string
+		reachName  string
+		externalID string
+	}
+	var flowRanges []reachFlowRange
+	var gaugeAssocs []gaugeAssoc
 
-		type pendingPin struct {
-			pm         KMLPlacemark
-			folderName string
-			lon, lat   float64
-			matched    bool
+	// Extract document-level basin from description (e.g. "Basin: South Platte").
+	// Per-folder metadata placemarks take precedence; this is just the default.
+	var docBasin string
+	for _, line := range strings.Split(doc.Description, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(strings.ToLower(line), "basin:") {
+			docBasin = strings.TrimSpace(line[len("basin:"):])
+			break
 		}
-		var pending []pendingPin
-		for _, folder := range doc.Folders {
-			for _, pm := range folder.Placemarks {
-				if pm.Point == nil {
-					continue
-				}
-				lon, lat, ok := ParseCoords(pm.Point.Coordinates)
-				if !ok {
-					continue
-				}
-				pending = append(pending, pendingPin{pm: pm, folderName: folder.Name, lon: lon, lat: lat})
-			}
-		}
+	}
+	if docBasin != "" {
+		res.Log = append(res.Log, fmt.Sprintf("~ document basin: %q", docBasin))
+	}
 
-		type geoAnchor struct {
-			id, slug, name string
-			lon, lat       float64
-		}
-		var anchors []geoAnchor
+	for _, folder := range doc.Folders {
+		var (
+			folderSlug     string
+			commonName     string
+			reachDesc      string
+			classMin       *float64
+			classMax       *float64
+			gaugeExtID     string
+			basinGroup     = docBasin
+			permitRequired *bool
+			multiDayDays   *int
+		)
+		var folderFlowRanges []reachFlowRange
+		var folderPins []KMLPlacemark
 
-		// Pass 1: name-based matching.
-		for i := range pending {
-			pp := &pending[i]
-			rid, rslug, rname, err := imp.inferReachFromText(ctx, pp.pm.Name+" "+pp.pm.Description)
-			if err != nil {
+		for _, pm := range folder.Placemarks {
+			// Ignore LineString geometry — centerlines are sourced from NLDI, not KML.
+			if pm.LineString != nil {
 				continue
 			}
-			pp.matched = true
-			pins = append(pins, assignment{rid, rslug, rname, pp.pm, pp.folderName})
-			anchors = append(anchors, geoAnchor{rid, rslug, rname, pp.lon, pp.lat})
-		}
-
-		// Pass 2: proximity-based fallback.
-		for i := range pending {
-			pp := &pending[i]
-			if pp.matched || len(anchors) == 0 {
-				if !pp.matched {
-					res.Log = append(res.Log, fmt.Sprintf("⚠  %q — no anchors, skipping", pp.pm.Name))
-				}
-				continue
-			}
-			best := anchors[0]
-			bestDist := sq(anchors[0].lon-pp.lon) + sq(anchors[0].lat-pp.lat)
-			for _, a := range anchors[1:] {
-				if d := sq(a.lon-pp.lon) + sq(a.lat-pp.lat); d < bestDist {
-					bestDist = d
-					best = a
-				}
-			}
-			res.Log = append(res.Log, fmt.Sprintf("~ %q → %s (by proximity)", pp.pm.Name, best.name))
-			pins = append(pins, assignment{best.id, best.slug, best.name, pp.pm, pp.folderName})
-		}
-	} else {
-		type reachFlowRange struct {
-			reachID   string
-			reachName string
-			label     string
-			minCFS    *float64
-			maxCFS    *float64
-		}
-		type gaugeAssoc struct {
-			reachID    string
-			reachName  string
-			externalID string
-		}
-		var flowRanges []reachFlowRange
-		var gaugeAssocs []gaugeAssoc
-
-		// Extract document-level basin from description (e.g. "Basin: South Platte").
-		// Per-folder metadata placemarks take precedence; this is just the default.
-		var docBasin string
-		for _, line := range strings.Split(doc.Description, "\n") {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(strings.ToLower(line), "basin:") {
-				docBasin = strings.TrimSpace(line[len("basin:"):])
-				break
-			}
-		}
-		if docBasin != "" {
-			res.Log = append(res.Log, fmt.Sprintf("~ document basin: %q", docBasin))
-		}
-
-		for _, folder := range doc.Folders {
-			// Pre-scan metadata placemarks (no coordinates) to extract reach
-			// properties. The slug placemark is required — import fails per-reach
-			// if absent or if it doesn't match an existing reach in the DB.
-			var (
-				folderSlug     string
-				commonName     string
-				reachDesc      string
-				classMin       *float64
-				classMax       *float64
-				gaugeExtID     string
-				basinGroup     = docBasin // inherit document-level basin; folder metadata can override
-				permitRequired *bool
-				multiDayDays   *int
-			)
-			var folderFlowRanges []reachFlowRange
-			var folderPins []KMLPlacemark
-
-			for _, pm := range folder.Placemarks {
-				// Ignore LineString geometry — centerlines are sourced from NLDI, not KML.
-				if pm.LineString != nil {
-					continue
-				}
-				if pm.Point == nil {
-					key := strings.ToLower(strings.TrimSpace(pm.Name))
-					val := strings.TrimSpace(pm.Description)
-					switch key {
-					case "slug":
-						folderSlug = val
-					case "common_name":
-						commonName = val
-					case "description":
-						reachDesc = val
-					case "min_class":
-						if v, err2 := strconv.ParseFloat(val, 64); err2 == nil {
-							classMin = &v
-						}
-					case "max_class":
-						if v, err2 := strconv.ParseFloat(val, 64); err2 == nil {
-							classMax = &v
-						}
-					case "gauge":
-						gaugeExtID = val
-					case "basin":
-						basinGroup = val
-					case "permit_required":
-						b := strings.ToLower(val) == "true"
-						permitRequired = &b
-					case "multi_day":
-						if v, err2 := strconv.Atoi(val); err2 == nil {
-							multiDayDays = &v
-						}
-					default:
-						if label, minCFS, maxCFS, ok := parseFlowRangePM(pm.Name, pm.Description); ok {
-							folderFlowRanges = append(folderFlowRanges, reachFlowRange{"", "", label, minCFS, maxCFS})
-						}
+			if pm.Point == nil {
+				key := strings.ToLower(strings.TrimSpace(pm.Name))
+				val := strings.TrimSpace(pm.Description)
+				switch key {
+				case "slug":
+					folderSlug = val
+				case "common_name":
+					commonName = val
+				case "description":
+					reachDesc = val
+				case "min_class":
+					if v, err2 := strconv.ParseFloat(val, 64); err2 == nil {
+						classMin = &v
 					}
-					continue
-				}
-				folderPins = append(folderPins, pm)
-			}
-
-			// Slug is required — fail this folder (not the whole import) if missing.
-			if folderSlug == "" {
-				res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — missing slug placemark; create the reach in admin first (skipping)", folder.Name))
-				continue
-			}
-			var rid, rslug, rname string
-			if err := imp.pool.QueryRow(ctx,
-				`SELECT id, slug, name FROM reaches WHERE slug = $1`, folderSlug,
-			).Scan(&rid, &rslug, &rname); err != nil {
-				res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — reach %q not found in database; create it in admin first (skipping)", folder.Name, folderSlug))
-				continue
-			}
-			res.Log = append(res.Log, fmt.Sprintf("~ folder %q → matched reach %q (%s)", folder.Name, rname, rslug))
-			enrichedSlugs[rslug] = true
-
-			// Apply any metadata overrides the KML provides.
-			if !imp.DryRun {
-				_, _ = imp.pool.Exec(ctx, `
-					UPDATE reaches SET
-						common_name = COALESCE(NULLIF($2, ''), common_name),
-						class_min   = COALESCE($3::numeric, class_min),
-						class_max   = COALESCE($4::numeric, class_max)
-					WHERE id = $1
-				`, rid, commonName, classMin, classMax)
-			}
-
-			// Overwrite description when KML provides one.
-			if reachDesc != "" {
-				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET description = $1 WHERE id = $2`, reachDesc, rid); err != nil {
-					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] description update failed: %v", rname, err))
-				} else {
-					res.Log = append(res.Log, fmt.Sprintf("~ [%s] description updated", rname))
-				}
-			}
-			// Upsert river and link the reach to it.
-			// Basin belongs on the river, not the reach.
-			// Include basin in the slug so same-named rivers in different basins
-			// (e.g. "Clear Creek" South Platte vs Arkansas) stay as distinct rows.
-			if doc.Name != "" {
-				riverSlug := slugify(doc.Name)
-				if basinGroup != "" {
-					riverSlug = riverSlug + "-" + slugify(basinGroup)
-				}
-				var riverID string
-				err := imp.pool.QueryRow(ctx, `
-					INSERT INTO rivers (slug, name, basin)
-					VALUES ($1, $2, NULLIF($3, ''))
-					ON CONFLICT (slug) DO UPDATE
-						SET basin = COALESCE(NULLIF(EXCLUDED.basin, ''), rivers.basin)
-					RETURNING id
-				`, riverSlug, doc.Name, basinGroup).Scan(&riverID)
-				if err != nil {
-					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] river upsert failed: %v", rname, err))
-				} else {
-					if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET river_id = $1 WHERE id = $2`, riverID, rid); err != nil {
-						res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] river_id link failed: %v", rname, err))
+				case "max_class":
+					if v, err2 := strconv.ParseFloat(val, 64); err2 == nil {
+						classMax = &v
 					}
-					// Propagate basin to reach watershed_name for basin-grouping UI.
-					if basinGroup != "" {
-						if _, err := imp.pool.Exec(ctx,
-							`UPDATE reaches SET watershed_name = $1 WHERE id = $2 AND watershed_name IS NULL`,
-							basinGroup, rid,
-						); err != nil {
-							res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] watershed_name update failed: %v", rname, err))
-						}
+				case "gauge":
+					gaugeExtID = val
+				case "basin":
+					basinGroup = val
+				case "permit_required":
+					b := strings.ToLower(val) == "true"
+					permitRequired = &b
+				case "multi_day":
+					if v, err2 := strconv.Atoi(val); err2 == nil {
+						multiDayDays = &v
+					}
+				default:
+					if label, minCFS, maxCFS, ok := parseFlowRangePM(pm.Name, pm.Description); ok {
+						folderFlowRanges = append(folderFlowRanges, reachFlowRange{"", "", label, minCFS, maxCFS})
 					}
 				}
+				continue
 			}
-			if permitRequired != nil {
-				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET permit_required = $1 WHERE id = $2`, *permitRequired, rid); err != nil {
-					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] permit_required update failed: %v", rname, err))
-				}
-			}
-			if multiDayDays != nil {
-				if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET multi_day_days = $1 WHERE id = $2`, *multiDayDays, rid); err != nil {
-					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] multi_day_days update failed: %v", rname, err))
-				}
-			}
-
-			for _, fr := range folderFlowRanges {
-				fr.reachID = rid
-				fr.reachName = rname
-				flowRanges = append(flowRanges, fr)
-				res.Log = append(res.Log, fmt.Sprintf("~ [%s] flow range %s", rname, fr.label))
-			}
-			if gaugeExtID != "" {
-				gaugeAssocs = append(gaugeAssocs, gaugeAssoc{rid, rname, gaugeExtID})
-				res.Log = append(res.Log, fmt.Sprintf("~ [%s] gauge %s", rname, gaugeExtID))
-			}
-			for _, pm := range folderPins {
-				pins = append(pins, assignment{rid, rslug, rname, pm, ""})
-			}
+			folderPins = append(folderPins, pm)
 		}
 
-		// Upsert flow ranges after reach matching so reach IDs are known.
-		for _, fr := range flowRanges {
-			if err := imp.upsertFlowRange(ctx, fr.reachID, fr.label, fr.minCFS, fr.maxCFS); err != nil {
-				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] flow range %s: %v", fr.reachName, fr.label, err))
-			}
+		// Slug is required — fail this folder (not the whole import) if missing.
+		if folderSlug == "" {
+			res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — missing slug placemark; create the reach in admin first (skipping)", folder.Name))
+			continue
+		}
+		var rid, rslug, rname string
+		if err := imp.pool.QueryRow(ctx,
+			`SELECT id, slug, name FROM reaches WHERE slug = $1`, folderSlug,
+		).Scan(&rid, &rslug, &rname); err != nil {
+			res.Log = append(res.Log, fmt.Sprintf("⚠  folder %q — reach %q not found in database; create it in admin first (skipping)", folder.Name, folderSlug))
+			continue
+		}
+		res.Log = append(res.Log, fmt.Sprintf("~ folder %q → matched reach %q (%s)", folder.Name, rname, rslug))
+
+		// Apply metadata overrides the KML provides.
+		if !imp.DryRun {
+			_, _ = imp.pool.Exec(ctx, `
+				UPDATE reaches SET
+					common_name = COALESCE(NULLIF($2, ''), common_name),
+					class_min   = COALESCE($3::numeric, class_min),
+					class_max   = COALESCE($4::numeric, class_max)
+				WHERE id = $1
+			`, rid, commonName, classMin, classMax)
 		}
 
-		// Associate gauges by USGS/DWR external ID.
-		for _, ga := range gaugeAssocs {
-			if err := imp.setReachGauge(ctx, ga.reachID, ga.externalID); err != nil {
-				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] gauge %s: %v", ga.reachName, ga.externalID, err))
+		// Overwrite description when KML provides one.
+		if reachDesc != "" {
+			if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET description = $1 WHERE id = $2`, reachDesc, rid); err != nil {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] description update failed: %v", rname, err))
 			} else {
-				res.Log = append(res.Log, fmt.Sprintf("✓ [%s] linked gauge %s", ga.reachName, ga.externalID))
+				res.Log = append(res.Log, fmt.Sprintf("~ [%s] description updated", rname))
 			}
+		}
+
+		// Upsert the river from the KML document name and link only if the reach
+		// has no existing river association — preserves admin-set river links.
+		if doc.Name != "" && !imp.DryRun {
+			riverSlug := slugify(doc.Name)
+			if basinGroup != "" {
+				riverSlug = riverSlug + "-" + slugify(basinGroup)
+			}
+			var riverID string
+			err := imp.pool.QueryRow(ctx, `
+				INSERT INTO rivers (slug, name, basin)
+				VALUES ($1, $2, NULLIF($3, ''))
+				ON CONFLICT (slug) DO UPDATE
+					SET basin = COALESCE(NULLIF(EXCLUDED.basin, ''), rivers.basin)
+				RETURNING id
+			`, riverSlug, doc.Name, basinGroup).Scan(&riverID)
+			if err != nil {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] river upsert failed: %v", rname, err))
+			} else {
+				if _, err := imp.pool.Exec(ctx,
+					`UPDATE reaches SET river_id = $1 WHERE id = $2 AND river_id IS NULL`,
+					riverID, rid,
+				); err != nil {
+					res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] river_id link failed: %v", rname, err))
+				}
+				if basinGroup != "" {
+					if _, err := imp.pool.Exec(ctx,
+						`UPDATE reaches SET watershed_name = $1 WHERE id = $2 AND watershed_name IS NULL`,
+						basinGroup, rid,
+					); err != nil {
+						res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] watershed_name update failed: %v", rname, err))
+					}
+				}
+			}
+		}
+
+		if permitRequired != nil {
+			if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET permit_required = $1 WHERE id = $2`, *permitRequired, rid); err != nil {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] permit_required update failed: %v", rname, err))
+			}
+		}
+		if multiDayDays != nil {
+			if _, err := imp.pool.Exec(ctx, `UPDATE reaches SET multi_day_days = $1 WHERE id = $2`, *multiDayDays, rid); err != nil {
+				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] multi_day_days update failed: %v", rname, err))
+			}
+		}
+
+		for _, fr := range folderFlowRanges {
+			fr.reachID = rid
+			fr.reachName = rname
+			flowRanges = append(flowRanges, fr)
+			res.Log = append(res.Log, fmt.Sprintf("~ [%s] flow range %s", rname, fr.label))
+		}
+		if gaugeExtID != "" {
+			gaugeAssocs = append(gaugeAssocs, gaugeAssoc{rid, rname, gaugeExtID})
+			res.Log = append(res.Log, fmt.Sprintf("~ [%s] gauge %s", rname, gaugeExtID))
+		}
+		for _, pm := range folderPins {
+			pins = append(pins, assignment{rid, rslug, rname, pm, ""})
+		}
+	}
+
+	// Upsert flow ranges after reach matching so reach IDs are known.
+	for _, fr := range flowRanges {
+		if err := imp.upsertFlowRange(ctx, fr.reachID, fr.label, fr.minCFS, fr.maxCFS); err != nil {
+			res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] flow range %s: %v", fr.reachName, fr.label, err))
+		}
+	}
+
+	// Associate gauges by USGS/DWR external ID.
+	for _, ga := range gaugeAssocs {
+		if err := imp.setReachGauge(ctx, ga.reachID, ga.externalID); err != nil {
+			res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] gauge %s: %v", ga.reachName, ga.externalID, err))
+		} else {
+			res.Log = append(res.Log, fmt.Sprintf("✓ [%s] linked gauge %s", ga.reachName, ga.externalID))
 		}
 	}
 
@@ -643,25 +574,6 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		}
 	}
 
-	// For each enriched reach that has start_comid set, finalize the NLDI
-	// centerline now that access points have been written by KML import.
-	// SyncCenterline reads start/end coords from reach_access, so this
-	// works without any extra data being passed here.
-	if !imp.DryRun {
-		for slug := range enrichedSlugs {
-			var putInComID *string
-			_ = imp.pool.QueryRow(ctx, `SELECT start_comid FROM reaches WHERE slug = $1`, slug).Scan(&putInComID)
-			if putInComID == nil {
-				continue
-			}
-			if err := SyncCenterline(ctx, imp.pool, slug, CenterlineNLDI, false); err != nil {
-				res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] NLDI centerline sync: %v", slug, err))
-			} else {
-				res.Log = append(res.Log, fmt.Sprintf("✓ [%s] NLDI centerline finalized from access points", slug))
-			}
-		}
-	}
-
 	return res, nil
 }
 
@@ -673,90 +585,6 @@ func (res *Result) reachStats(slug, name string) *ReachResult {
 	return res.Reaches[slug]
 }
 
-// ── Reach matching / creation ─────────────────────────────────────────────────
-
-// folderMeta holds the parsed components of a KML folder name.
-//
-// Format: "Display Name (CommonName,classMin,classMax)"
-// Example: "Buffalo Creek to South Platte Hotel (Foxton,3,4)"
-// matchOrCreateReach finds an existing reach by folder name or creates a new
-// stub reach so the KML can be imported without pre-seeding in Go code.
-//
-// folderName: plain display name from the KML folder (no parenthetical).
-// riverName:  KML document name, stored as river_name on new reaches.
-// commonName: from the "common_name" metadata placemark (may be empty).
-// classMin/classMax: from "min_class"/"max_class" metadata placemarks (may be nil).
-//
-// Slug: slugify(riverName) + "-" + slugify(commonName)  when commonName is set,
-//       slugify(riverName) + "-" + slugify(folderName)   otherwise.
-//
-// The returned created flag is true when a new row was inserted.
-func (imp *Importer) matchOrCreateReach(ctx context.Context, folderName, riverName, commonName string, classMin, classMax *float64) (id, slug, name string, created bool, err error) {
-	// Build candidate search terms in priority order.
-	candidates := []string{folderName}
-	if commonName != "" {
-		candidates = append([]string{commonName}, candidates...)
-	}
-
-	// Try to match existing reach by any candidate.
-	for _, term := range candidates {
-		matchErr := imp.pool.QueryRow(ctx, `
-			SELECT id, slug, name FROM reaches
-			WHERE  LOWER(name)        = LOWER($1)
-			    OR LOWER(slug)        = LOWER($1)
-			    OR LOWER(common_name) = LOWER($1)
-			ORDER BY
-				CASE WHEN LOWER(name)        = LOWER($1) THEN 0
-				     WHEN LOWER(slug)        = LOWER($1) THEN 1
-				     WHEN LOWER(common_name) = LOWER($1) THEN 2
-				     ELSE 3 END
-			LIMIT 1
-		`, term).Scan(&id, &slug, &name)
-		if matchErr == nil {
-			// Match found — apply any metadata the KML provides.
-			if !imp.DryRun {
-				_, _ = imp.pool.Exec(ctx, `
-					UPDATE reaches SET
-						name        = COALESCE(NULLIF($2, ''), name),
-						common_name = COALESCE(NULLIF($3, ''), common_name),
-						river_name  = COALESCE(NULLIF($4, ''), river_name),
-						class_min   = COALESCE($5::numeric, class_min),
-						class_max   = COALESCE($6::numeric, class_max)
-					WHERE id = $1
-				`, id, folderName, commonName, riverName, classMin, classMax)
-			}
-			return id, slug, name, false, nil
-		}
-	}
-
-	// No match — build slug from riverName + commonName (or folderName).
-	identifier := folderName
-	if commonName != "" {
-		identifier = commonName
-	}
-	newSlug := slugify(riverName) + "-" + slugify(identifier)
-
-	commonNameVal := commonName
-	if commonNameVal == "" {
-		commonNameVal = folderName
-	}
-
-	err = imp.pool.QueryRow(ctx, `
-		INSERT INTO reaches (slug, name, common_name, river_name, class_min, class_max)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (slug) DO UPDATE
-			SET name        = COALESCE(NULLIF(EXCLUDED.name,        ''), reaches.name),
-			    common_name = COALESCE(NULLIF(EXCLUDED.common_name, ''), reaches.common_name),
-			    river_name  = COALESCE(NULLIF(EXCLUDED.river_name,  ''), reaches.river_name),
-			    class_min   = COALESCE(EXCLUDED.class_min, reaches.class_min),
-			    class_max   = COALESCE(EXCLUDED.class_max, reaches.class_max)
-		RETURNING id, slug, name
-	`, newSlug, folderName, commonNameVal, riverName, classMin, classMax).Scan(&id, &slug, &name)
-	if err != nil {
-		return "", "", "", false, fmt.Errorf("create reach %q: %w", folderName, err)
-	}
-	return id, slug, name, true, nil
-}
 
 // updateReachNaming derives put_in_name / take_out_name from the imported access
 // points and updates name = "<put_in_name> to <take_out_name>" on the reach.
@@ -791,14 +619,12 @@ func (imp *Importer) updateReachNaming(ctx context.Context, reachID string) erro
 	if putInName == nil || takeOutName == nil {
 		return nil
 	}
-	derivedName := *putInName + " to " + *takeOutName
 	_, err = imp.pool.Exec(ctx, `
 		UPDATE reaches
-		SET name        = $2,
-		    put_in_name  = $3,
-		    take_out_name = $4
+		SET put_in_name   = $2,
+		    take_out_name = $3
 		WHERE id = $1
-	`, reachID, derivedName, *putInName, *takeOutName)
+	`, reachID, *putInName, *takeOutName)
 	return err
 }
 
@@ -823,60 +649,6 @@ func slugify(s string) string {
 	return strings.TrimRight(b.String(), "-")
 }
 
-// genericGeoWords are words that appear in many reach names but shouldn't
-// be used alone to identify a specific reach (prevents false-positive matches).
-var genericGeoWords = map[string]bool{
-	"river": true, "creek": true, "canyon": true, "falls": true,
-	"lake": true, "park": true, "south": true, "north": true,
-	"upper": true, "lower": true, "east": true, "west": true,
-	"fork": true, "run": true, "gorge": true, "section": true,
-	"whitewater": true, "town": true, "platte": true, "arkansas": true,
-	"rapids": true, "reach": true, "class": true, "buena": true,
-	"vista": true, "brown": true, "royal": true, "chutes": true,
-	"slide": true, "wave": true, "hole": true, "drop": true,
-}
-
-func (imp *Importer) loadReaches(ctx context.Context) ([]reachInfo, error) {
-	rows, err := imp.pool.Query(ctx, `SELECT id, slug, name FROM reaches ORDER BY LENGTH(name) DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []reachInfo
-	for rows.Next() {
-		var r reachInfo
-		if err := rows.Scan(&r.id, &r.slug, &r.name); err != nil {
-			return nil, err
-		}
-		lower := strings.ToLower(r.name)
-		r.keywords = []string{lower}
-		for _, w := range strings.Fields(lower) {
-			if len(w) >= 4 && !genericGeoWords[w] {
-				r.keywords = append(r.keywords, w)
-			}
-		}
-		out = append(out, r)
-	}
-	return out, rows.Err()
-}
-
-func (imp *Importer) inferReachFromText(ctx context.Context, text string) (id, slug, name string, err error) {
-	if imp.reaches == nil {
-		imp.reaches, err = imp.loadReaches(ctx)
-		if err != nil {
-			return "", "", "", err
-		}
-	}
-	lower := strings.ToLower(text)
-	for _, r := range imp.reaches {
-		for _, kw := range r.keywords {
-			if strings.Contains(lower, kw) {
-				return r.id, r.slug, r.name, nil
-			}
-		}
-	}
-	return "", "", "", fmt.Errorf("no reach match found in %q", text)
-}
 
 // ── Flow range parsing ────────────────────────────────────────────────────────
 
@@ -1171,25 +943,6 @@ func (imp *Importer) clearImportData(ctx context.Context, reachID string) error 
 }
 
 // ── Parsing helpers ───────────────────────────────────────────────────────────
-
-// IsCategoryMap returns true when all folders have generic type names
-// ("Access Points", "Rivers", "Rapids") rather than reach-specific names.
-func IsCategoryMap(folders []KMLFolder) bool {
-	typeNames := map[string]bool{
-		"access points": true, "access": true,
-		"rivers": true, "waterways": true, "river lines": true,
-		"rapids": true, "features": true,
-	}
-	if len(folders) == 0 {
-		return false
-	}
-	for _, f := range folders {
-		if !typeNames[strings.ToLower(f.Name)] {
-			return false
-		}
-	}
-	return true
-}
 
 // SplitPrefixWithHint wraps SplitPrefix with folder-name and description hints.
 func SplitPrefixWithHint(name, description, folderHint string) (prefix, rest string) {
