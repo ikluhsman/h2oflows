@@ -48,14 +48,14 @@ func TestSmokeSyncCenterlineNLDI(t *testing.T) {
 		SELECT centerline_source,
 		       COALESCE(ST_NPoints(centerline::geometry), 0),
 		       length_mi,
-		       put_in_comid,
-		       take_out_comid
+		       start_comid,
+		       end_comid
 		FROM reaches WHERE slug=$1`, slug).Scan(
 		&beforeSource, &beforePts, &beforeMi, &beforePutInCom, &beforeTakeOutCom)
 	if err != nil {
 		t.Fatalf("read before: %v", err)
 	}
-	t.Logf("BEFORE: source=%v pts=%d length_mi=%v put_in_comid=%v take_out_comid=%v",
+	t.Logf("BEFORE: source=%v pts=%d length_mi=%v start_comid=%v end_comid=%v",
 		deref(beforeSource), beforePts, derefF(beforeMi),
 		deref(beforePutInCom), deref(beforeTakeOutCom))
 
@@ -75,8 +75,8 @@ func TestSmokeSyncCenterlineNLDI(t *testing.T) {
 		SELECT centerline_source,
 		       COALESCE(ST_NPoints(centerline::geometry), 0),
 		       length_mi,
-		       put_in_comid,
-		       take_out_comid,
+		       start_comid,
+		       end_comid,
 		       reachcode,
 		       totdasqkm
 		FROM reaches WHERE slug=$1`, slug).Scan(
@@ -85,7 +85,7 @@ func TestSmokeSyncCenterlineNLDI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read after: %v", err)
 	}
-	t.Logf("AFTER:  source=%v pts=%d length_mi=%v put_in_comid=%v take_out_comid=%v reachcode=%v totdasqkm=%v",
+	t.Logf("AFTER:  source=%v pts=%d length_mi=%v start_comid=%v end_comid=%v reachcode=%v totdasqkm=%v",
 		deref(afterSource), afterPts, derefF(afterMi),
 		deref(afterPutInCom), deref(afterTakeOutCom),
 		deref(afterReachCode), derefF(afterTotDA))
@@ -94,10 +94,10 @@ func TestSmokeSyncCenterlineNLDI(t *testing.T) {
 		t.Errorf("centerline_source should be 'nldi', got %v", deref(afterSource))
 	}
 	if afterPutInCom == nil || *afterPutInCom == "" {
-		t.Errorf("put_in_comid should be populated")
+		t.Errorf("start_comid should be populated")
 	}
 	if afterTakeOutCom == nil || *afterTakeOutCom == "" {
-		t.Errorf("take_out_comid should be populated")
+		t.Errorf("end_comid should be populated")
 	}
 	if afterPts < 10 {
 		t.Errorf("centerline suspiciously short (%d points)", afterPts)

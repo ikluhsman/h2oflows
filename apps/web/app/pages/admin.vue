@@ -962,7 +962,7 @@ interface RepinReach {
   permit_required: boolean; multi_day_days: number
   put_in: { lat: number; lng: number } | null
   take_out: { lat: number; lng: number } | null
-  put_in_comid: string | null; take_out_comid: string | null
+  start_comid: string | null; end_comid: string | null
 }
 
 // ---- Shared ----
@@ -1230,8 +1230,8 @@ async function loadRepinReach() {
       multi_day_days: data.multi_day_days ?? 1,
       put_in: data.put_in ?? null,
       take_out: data.take_out ?? null,
-      put_in_comid: data.put_in_comid ?? null,
-      take_out_comid: data.take_out_comid ?? null,
+      start_comid: data.start_comid ?? null,
+      end_comid:   data.end_comid   ?? null,
     }
     repinForm.value = {
       name:           data.name ?? '',
@@ -1244,13 +1244,13 @@ async function loadRepinReach() {
     }
     repinDescEdit.value = data.description ?? ''
 
-    repinUpComID.value       = data.put_in_comid ?? null
-    repinDownComID.value     = data.take_out_comid ?? null
-    repinOrigUpComID.value   = data.put_in_comid ?? null
-    repinOrigDownComID.value = data.take_out_comid ?? null
+    repinUpComID.value       = data.start_comid ?? null
+    repinDownComID.value     = data.end_comid   ?? null
+    repinOrigUpComID.value   = data.start_comid ?? null
+    repinOrigDownComID.value = data.end_comid   ?? null
 
-    if (data.put_in_comid) {
-      await fetchRepinFlowlines(data.put_in_comid)
+    if (data.start_comid) {
+      await fetchRepinFlowlines(data.start_comid)
     }
   } catch (e: any) {
     repinLoadError.value = e.message ?? 'Unknown error'
@@ -1349,8 +1349,8 @@ async function submitRepinByComID() {
     repinOrigUpComID.value = repinUpComID.value
     repinOrigDownComID.value = repinDownComID.value
     if (repinReach.value) {
-      repinReach.value.put_in_comid = repinUpComID.value
-      repinReach.value.take_out_comid = repinDownComID.value
+      repinReach.value.start_comid = repinUpComID.value
+      repinReach.value.end_comid   = repinDownComID.value
     }
   } catch (e: any) {
     repinError.value = e.message ?? 'Unknown error'
