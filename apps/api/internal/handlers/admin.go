@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/h2oflow/h2oflow/apps/api/internal/auth"
+	"github.com/h2oflow/h2oflow/apps/api/internal/kmlimport"
 )
 
 type AdminHandler struct {
@@ -229,6 +232,75 @@ func (h *AdminHandler) UpdateRiver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// AutoAssignRiver upserts a river by GNIS ID (preferred) or name, then links
+// the reach to it. Called after the admin fetches the river name from NLDI.
+// POST /api/v1/admin/reaches/{slug}/auto-river
+func (h *AdminHandler) AutoAssignRiver(w http.ResponseWriter, r *http.Request) {
+	reachSlug := chi.URLParam(r, "slug")
+	var body struct {
+		RiverName string `json:"river_name"`
+		GnisID    string `json:"gnis_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	body.RiverName = strings.TrimSpace(body.RiverName)
+	body.GnisID = strings.TrimSpace(body.GnisID)
+	if body.RiverName == "" {
+		errorResponse(w, http.StatusBadRequest, "river_name is required")
+		return
+	}
+
+	ctx := r.Context()
+	riverSlug := kmlimport.Slugify(body.RiverName)
+
+	var riverID, riverName, riverSlugOut string
+	var riverGnisID *string
+
+	if body.GnisID != "" {
+		// Upsert by gnis_id (globally unique per named stream).
+		err := h.db.QueryRow(ctx, `
+			INSERT INTO rivers (slug, name, gnis_id)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (gnis_id) DO UPDATE SET name = EXCLUDED.name
+			RETURNING id, name, slug, gnis_id
+		`, riverSlug, body.RiverName, body.GnisID).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID)
+		if err != nil {
+			errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("upsert river: %v", err))
+			return
+		}
+	} else {
+		// Upsert by name+basin (no GNIS ID available).
+		err := h.db.QueryRow(ctx, `
+			INSERT INTO rivers (slug, name)
+			VALUES ($1, $2)
+			ON CONFLICT (lower(name), COALESCE(lower(basin), '')) DO UPDATE SET name = EXCLUDED.name
+			RETURNING id, name, slug, gnis_id
+		`, riverSlug, body.RiverName).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID)
+		if err != nil {
+			errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("upsert river: %v", err))
+			return
+		}
+	}
+
+	// Link the reach and keep river_name text in sync.
+	_, err := h.db.Exec(ctx, `
+		UPDATE reaches SET river_id = $1, river_name = $2 WHERE slug = $3
+	`, riverID, riverName, reachSlug)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "assign river failed")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"river_id":   riverID,
+		"river_name": riverName,
+		"river_slug": riverSlugOut,
+		"gnis_id":    riverGnisID,
+	})
 }
 
 // ListUnassignedReaches returns reaches that have no river association.

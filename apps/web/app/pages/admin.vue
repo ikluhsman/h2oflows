@@ -534,25 +534,29 @@
                     <input v-model="repinForm.commonName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
                   </div>
                   <div>
-                    <label class="block text-xs text-gray-500 mb-1">River name</label>
-                    <div class="flex gap-2">
-                      <input v-model="repinForm.riverName" class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
-                      <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorSnap && !repinAnchorComID" @click="fetchRepinRiverName">Fetch from NLDI</UButton>
+                    <label class="block text-xs text-gray-500 mb-1">River</label>
+                    <div class="space-y-2">
+                      <!-- Current association badge -->
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span v-if="repinRiverId" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200">
+                          <span class="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
+                          {{ rivers.find(r => r.id === repinRiverId)?.name ?? repinForm.riverName }}
+                        </span>
+                        <span v-else class="text-xs text-amber-500">Unassigned</span>
+                        <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorSnap && !repinAnchorComID" @click="fetchRepinRiverName">Auto-assign from NLDI</UButton>
+                      </div>
+                      <!-- Manual override dropdown -->
+                      <div class="flex gap-2 items-center">
+                        <select
+                          v-model="repinRiverId"
+                          class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
+                        >
+                          <option value="">— Unassigned —</option>
+                          <option v-for="rv in rivers" :key="rv.id" :value="rv.id">{{ rv.name }}</option>
+                        </select>
+                        <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverAssigning" @click="assignRepinRiver">Assign</UButton>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <label class="block text-xs text-gray-500 mb-1">River association</label>
-                    <div class="flex gap-2 items-center">
-                      <select
-                        v-model="repinRiverId"
-                        class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
-                      >
-                        <option value="">— Unassigned —</option>
-                        <option v-for="rv in rivers" :key="rv.id" :value="rv.id">{{ rv.name }}</option>
-                      </select>
-                      <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverAssigning" @click="assignRepinRiver">Assign</UButton>
-                    </div>
-                    <p class="text-xs text-gray-400 mt-0.5">Links this reach to a river record (controls Rivers tab grouping).</p>
                   </div>
                   <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -1819,17 +1823,33 @@ async function saveRepinFlowBands() {
 
 async function fetchRepinRiverName() {
   const comid = repinUpComID.value ?? repinAnchorSnap.value?.comid ?? repinAnchorComID.value
-  if (!comid) return
+  if (!comid || !repinReach.value) return
   repinRiverNameFetching.value = true
   try {
     const token = await getToken()
-    const res = await fetch(`${apiBase}/api/v1/admin/nldi/river-name?comid=${comid}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    if (!token) return
+
+    // Step 1: look up river name + GNIS ID from NHD ArcGIS via the API.
+    const nameRes = await fetch(`${apiBase}/api/v1/admin/nldi/river-name?comid=${comid}`, {
+      headers: { Authorization: `Bearer ${token}` },
     })
-    if (res.ok) {
-      const d = await res.json()
-      if (d.river_name) repinForm.value.riverName = d.river_name
-    }
+    if (!nameRes.ok) return
+    const nameData = await nameRes.json()
+    if (!nameData.river_name) return
+
+    // Step 2: upsert the river in the rivers table and link this reach.
+    const assignRes = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/auto-river`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ river_name: nameData.river_name, gnis_id: nameData.gnis_id ?? '' }),
+    })
+    if (!assignRes.ok) return
+    const assignData = await assignRes.json()
+
+    repinForm.value.riverName = assignData.river_name
+    repinRiverId.value = assignData.river_id
+    // Reload rivers list so the Rivers tab reflects the new/updated river.
+    loadRivers()
   } catch { /* non-fatal */ }
   finally { repinRiverNameFetching.value = false }
 }
