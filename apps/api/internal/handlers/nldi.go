@@ -740,8 +740,9 @@ func (h *NLDIHandler) PatchReach(w http.ResponseWriter, r *http.Request) {
 }
 
 // PreviewCenterline handles GET /api/v1/admin/nldi/preview-centerline
-// Returns the raw GeoJSON LineString between two NHD ComIDs without writing
-// to the database, so the admin can visualise the reach before committing.
+// Returns the GeoJSON LineString between two NHD ComIDs without writing to the
+// database. When start_lat/start_lng/end_lat/end_lng are provided the line is
+// trimmed via PostGIS ST_LineSubstring to match the exact reach extent.
 func (h *NLDIHandler) PreviewCenterline(w http.ResponseWriter, r *http.Request) {
 	upComID   := r.URL.Query().Get("up_comid")
 	downComID := r.URL.Query().Get("down_comid")
@@ -754,7 +755,46 @@ func (h *NLDIHandler) PreviewCenterline(w http.ResponseWriter, r *http.Request) 
 		errorResponse(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
+
+	// Apply trim if coordinates supplied.
+	q := r.URL.Query()
+	if q.Get("start_lat") != "" && q.Get("end_lat") != "" {
+		startLat, e1 := strconv.ParseFloat(q.Get("start_lat"), 64)
+		startLng, e2 := strconv.ParseFloat(q.Get("start_lng"), 64)
+		endLat,   e3 := strconv.ParseFloat(q.Get("end_lat"),   64)
+		endLng,   e4 := strconv.ParseFloat(q.Get("end_lng"),   64)
+		if e1 == nil && e2 == nil && e3 == nil && e4 == nil {
+			if trimmed, err := trimLineGeoJSON(r.Context(), h.db, geojson, startLng, startLat, endLng, endLat); err == nil {
+				geojson = trimmed
+			}
+		}
+	}
+
 	jsonResponse(w, http.StatusOK, map[string]any{"geojson": json.RawMessage(geojson)})
+}
+
+// trimLineGeoJSON applies PostGIS ST_LineSubstring to trim the raw GeoJSON line
+// to the closest points on the line to putIn and takeOut coordinates.
+func trimLineGeoJSON(ctx context.Context, db *pgxpool.Pool, geojson string, putInLon, putInLat, takeOutLon, takeOutLat float64) (string, error) {
+	var result string
+	err := db.QueryRow(ctx, `
+		SELECT ST_AsGeoJSON(
+			ST_LineSubstring(
+				line,
+				LEAST(ST_LineLocatePoint(line, put_pt), ST_LineLocatePoint(line, take_pt)),
+				GREATEST(ST_LineLocatePoint(line, put_pt), ST_LineLocatePoint(line, take_pt))
+			)
+		)
+		FROM (
+			SELECT
+				ST_GeomFromGeoJSON($1)                                      AS line,
+				ST_ClosestPoint(ST_GeomFromGeoJSON($1),
+				    ST_SetSRID(ST_MakePoint($2, $3), 4326))                 AS put_pt,
+				ST_ClosestPoint(ST_GeomFromGeoJSON($1),
+				    ST_SetSRID(ST_MakePoint($4, $5), 4326))                 AS take_pt
+		) sub
+	`, geojson, putInLon, putInLat, takeOutLon, takeOutLat).Scan(&result)
+	return result, err
 }
 
 // buildSlug produces a URL-safe slug from river name + reach name,

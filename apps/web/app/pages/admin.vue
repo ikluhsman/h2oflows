@@ -702,8 +702,8 @@
                     <UButton v-if="repinUpComID && repinDownComID" size="xs" variant="outline" color="neutral" :loading="repinPreviewLoading" @click="previewRepinCenterline">
                       {{ repinPreviewCenterline ? 'Refresh preview' : 'Preview centerline' }}
                     </UButton>
-                    <UButton size="sm" variant="outline" color="neutral" @click="resetRepinComIDs" v-if="repinComIDsDirty">Revert</UButton>
-                    <UButton size="sm" :loading="repinSaving" :disabled="!repinComIDsDirty || !repinUpComID || !repinDownComID" @click="submitRepinByComID">Save flow lines</UButton>
+                    <UButton size="sm" variant="outline" color="neutral" @click="resetRepinComIDs" v-if="repinFlowlinesDirty">Revert</UButton>
+                    <UButton size="sm" :loading="repinSaving" :disabled="!repinFlowlinesDirty || !repinUpComID || !repinDownComID" @click="submitRepinByComID">Save flow lines</UButton>
                   </div>
                 </div>
               </div>
@@ -1479,10 +1479,7 @@ const repinStartLng       = ref<number | null>(null)
 const repinEndLat         = ref<number | null>(null)
 const repinEndLng         = ref<number | null>(null)
 
-const repinComIDsDirty = computed(() =>
-  repinUpComID.value !== repinOrigUpComID.value ||
-  repinDownComID.value !== repinOrigDownComID.value
-)
+const repinFlowlinesDirty = ref(false)
 
 const repinPutInPin = computed(() => {
   if (repinStartLat.value != null && repinStartLng.value != null)
@@ -1512,6 +1509,7 @@ function resetRepin() {
   repinComIDEditMode.value = null
   repinStartLat.value = null; repinStartLng.value = null
   repinEndLat.value = null;   repinEndLng.value = null
+  repinFlowlinesDirty.value = false
   repinForm.value = {
     name: '', commonName: '', riverName: '', slug: '',
     classMin: null, classMax: null,
@@ -1538,6 +1536,9 @@ function resetRepinComIDs() {
   repinUpComID.value = repinOrigUpComID.value
   repinDownComID.value = repinOrigDownComID.value
   repinComIDEditMode.value = null
+  repinStartLat.value = null; repinStartLng.value = null
+  repinEndLat.value = null;   repinEndLng.value = null
+  repinFlowlinesDirty.value = false
   repinError.value = ''; repinSuccess.value = ''
 }
 
@@ -1664,6 +1665,7 @@ function onRepinComIDSelect(comid: string, lat: number, lng: number) {
     repinDownComID.value = comid
     repinEndLat.value = lat; repinEndLng.value = lng
   }
+  repinFlowlinesDirty.value = true
   repinPreviewCenterline.value = null
 }
 
@@ -1710,7 +1712,13 @@ async function previewRepinCenterline() {
   repinPreviewCenterline.value = null
   try {
     const token = await getToken()
-    const url = `${apiBase}/api/v1/admin/nldi/preview-centerline?up_comid=${repinUpComID.value}&down_comid=${repinDownComID.value}`
+    const startLat = repinStartLat.value ?? repinReach.value?.put_in?.lat
+    const startLng = repinStartLng.value ?? repinReach.value?.put_in?.lng
+    const endLat   = repinEndLat.value   ?? repinReach.value?.take_out?.lat
+    const endLng   = repinEndLng.value   ?? repinReach.value?.take_out?.lng
+    let url = `${apiBase}/api/v1/admin/nldi/preview-centerline?up_comid=${repinUpComID.value}&down_comid=${repinDownComID.value}`
+    if (startLat != null && startLng != null && endLat != null && endLng != null)
+      url += `&start_lat=${startLat}&start_lng=${startLng}&end_lat=${endLat}&end_lng=${endLng}`
     const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
     if (res.ok) {
       const data = await res.json()
@@ -1726,7 +1734,9 @@ async function previewAuthorCenterline() {
   authorPreviewCenterline.value = null
   try {
     const token = await getToken()
-    const url = `${apiBase}/api/v1/admin/nldi/preview-centerline?up_comid=${authorUpComID.value}&down_comid=${authorDownComID.value}`
+    let url = `${apiBase}/api/v1/admin/nldi/preview-centerline?up_comid=${authorUpComID.value}&down_comid=${authorDownComID.value}`
+    if (authorStartLat.value != null && authorStartLng.value != null && authorEndLat.value != null && authorEndLng.value != null)
+      url += `&start_lat=${authorStartLat.value}&start_lng=${authorStartLng.value}&end_lat=${authorEndLat.value}&end_lng=${authorEndLng.value}`
     const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
     if (res.ok) {
       const data = await res.json()
@@ -1868,6 +1878,7 @@ async function submitRepinByComID() {
     repinSuccess.value = `Flow lines saved${lengthStr}`
     repinOrigUpComID.value = repinUpComID.value
     repinOrigDownComID.value = repinDownComID.value
+    repinFlowlinesDirty.value = false
     if (repinReach.value) {
       repinReach.value.start_comid = repinUpComID.value
       repinReach.value.end_comid   = repinDownComID.value
