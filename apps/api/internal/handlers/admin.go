@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/h2oflow/h2oflow/apps/api/internal/auth"
 	"github.com/h2oflow/h2oflow/apps/api/internal/kmlimport"
+	"github.com/h2oflow/h2oflow/apps/api/internal/nldi"
 )
 
 type AdminHandler struct {
@@ -492,5 +494,54 @@ func (h *AdminHandler) GetMyRoles(w http.ResponseWriter, r *http.Request) {
 		"is_site_admin": isSiteAdmin,
 		"is_data_admin": auth.IsDataAdminFromContext(r.Context()),
 		"roles":         result,
+	})
+}
+
+// AutoFillRiverMeta returns suggested state and basin for a river by querying
+// external geo services at the upstream-most reach coordinate.
+// GET /api/v1/admin/rivers/{riverSlug}/auto-fill
+func (h *AdminHandler) AutoFillRiverMeta(w http.ResponseWriter, r *http.Request) {
+	riverSlug := chi.URLParam(r, "riverSlug")
+	ctx := r.Context()
+
+	var lat, lng float64
+	err := h.db.QueryRow(ctx, `
+		SELECT COALESCE(start_lat, ST_Y(ST_StartPoint(centerline::geometry))),
+		       COALESCE(start_lng, ST_X(ST_StartPoint(centerline::geometry)))
+		FROM reaches
+		WHERE river_id = (SELECT id FROM rivers WHERE slug = $1)
+		  AND (start_lat IS NOT NULL OR centerline IS NOT NULL)
+		ORDER BY COALESCE(start_lat, ST_Y(ST_StartPoint(centerline::geometry))) DESC NULLS LAST
+		LIMIT 1
+	`, riverSlug).Scan(&lat, &lng)
+	if err != nil {
+		errorResponse(w, http.StatusNotFound, "no reach coordinates found for river")
+		return
+	}
+
+	type lookupResult struct {
+		val string
+		err error
+	}
+	stateCh := make(chan lookupResult, 1)
+	basinCh := make(chan lookupResult, 1)
+	go func() { v, e := nldi.StateAt(ctx, lat, lng); stateCh <- lookupResult{v, e} }()
+	go func() { v, e := nldi.BasinAt(ctx, lat, lng); basinCh <- lookupResult{v, e} }()
+
+	stateRes := <-stateCh
+	basinRes := <-basinCh
+
+	if stateRes.err != nil {
+		log.Printf("auto-fill river %s: state lookup: %v", riverSlug, stateRes.err)
+	}
+	if basinRes.err != nil {
+		log.Printf("auto-fill river %s: basin lookup: %v", riverSlug, basinRes.err)
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"state_abbr": stateRes.val,
+		"basin":      basinRes.val,
+		"lat":        lat,
+		"lng":        lng,
 	})
 }

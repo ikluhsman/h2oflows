@@ -38,80 +38,93 @@
 
         <!-- Rivers tab -->
         <div v-if="activeTab === 'rivers'">
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center justify-between mb-3">
             <p class="text-sm text-gray-500">{{ rivers.length }} rivers<template v-if="unassignedReaches.length"> · <span class="text-amber-500">{{ unassignedReaches.length }} unassigned</span></template></p>
-            <UButton size="xs" icon="i-heroicons-plus" @click="createRiverOpen = true">New river</UButton>
           </div>
+
+          <UInput v-model="riverSearch" icon="i-heroicons-magnifying-glass" placeholder="Search rivers…" class="mb-3" />
 
           <div v-if="riversLoading" class="space-y-2">
             <div v-for="i in 5" :key="i" class="h-12 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
           </div>
 
           <div v-else class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <template v-for="river in rivers" :key="river.id">
-              <!-- River row -->
-              <div
-                class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
-                @click="toggleRiver(river)"
-              >
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.name }}</p>
-                  <p class="text-xs text-gray-400 truncate flex items-center gap-1">
-                    <span>{{ river.slug }}</span>
-                    <span v-if="river.gnis_id" class="text-gray-300">· gnis {{ river.gnis_id }}</span>
-                  </p>
-                </div>
-                <span class="text-xs text-gray-400 shrink-0">{{ river.reach_count }} reach{{ river.reach_count !== 1 ? 'es' : '' }}</span>
-                <svg
-                  class="w-4 h-4 text-gray-400 shrink-0 transition-transform"
-                  :class="expandedRiverId === river.id ? 'rotate-90' : ''"
-                  viewBox="0 0 20 20" fill="currentColor"
-                >
-                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
-                </svg>
+            <template v-for="stateGroup in groupedRivers" :key="stateGroup.state">
+              <!-- State header -->
+              <div class="px-4 py-1.5 bg-gray-100 dark:bg-gray-800/80 border-t border-gray-200 dark:border-gray-700 first:border-t-0">
+                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{{ stateGroup.state === '—' ? 'No state' : stateGroup.state }}</p>
               </div>
 
-              <!-- Expanded reaches -->
-              <div v-if="expandedRiverId === river.id" class="bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
-                <div v-if="riverDetailLoading" class="px-6 py-4 text-xs text-gray-400 animate-pulse">Loading reaches…</div>
-                <template v-else-if="selectedRiver">
-                  <!-- River actions bar -->
-                  <div class="flex items-center justify-between px-6 py-2 border-b border-gray-100 dark:border-gray-800">
-                    <span class="text-xs text-gray-400">{{ selectedRiver.reaches?.length ?? 0 }} reaches</span>
-                    <div class="flex items-center gap-2">
-                      <UButton size="xs" variant="ghost" color="neutral" @click="openEditRiver(selectedRiver)">Edit</UButton>
-                      <UButton size="xs" variant="ghost" color="error" @click="deleteRiver(selectedRiver.slug, selectedRiver.name)">Delete river</UButton>
+              <template v-for="basinGroup in stateGroup.basins" :key="basinGroup.basin">
+                <!-- Basin sub-header (only when basin is named) -->
+                <div v-if="basinGroup.basin !== '—'" class="px-6 py-1 bg-gray-50 dark:bg-gray-900/60 border-t border-gray-100 dark:border-gray-800">
+                  <p class="text-xs text-gray-400 italic">{{ basinGroup.basin }}</p>
+                </div>
+
+                <template v-for="river in basinGroup.rivers" :key="river.id">
+                  <!-- River row -->
+                  <div
+                    class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
+                    @click="toggleRiver(river)"
+                  >
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.name }}</p>
+                      <p class="text-xs text-gray-400 truncate flex items-center gap-1">
+                        <span>{{ river.slug }}</span>
+                        <span v-if="river.gnis_id" class="text-gray-300">· gnis {{ river.gnis_id }}</span>
+                      </p>
                     </div>
-                  </div>
-                  <!-- Reach rows -->
-                  <div class="divide-y divide-gray-100 dark:divide-gray-800">
-                    <div
-                      v-for="reach in selectedRiver.reaches" :key="reach.id"
-                      class="flex items-center gap-3 px-6 py-2.5 bg-white dark:bg-gray-900/60"
+                    <span class="text-xs text-gray-400 shrink-0">{{ river.reach_count }} reach{{ river.reach_count !== 1 ? 'es' : '' }}</span>
+                    <svg
+                      class="w-4 h-4 text-gray-400 shrink-0 transition-transform"
+                      :class="expandedRiverId === river.id ? 'rotate-90' : ''"
+                      viewBox="0 0 20 20" fill="currentColor"
                     >
-                      <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium truncate">{{ reach.common_name ?? reach.name }}</p>
-                        <p class="text-xs text-gray-400 truncate">{{ reach.slug }}</p>
+                      <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+                    </svg>
+                  </div>
+
+                  <!-- Expanded reaches -->
+                  <div v-if="expandedRiverId === river.id" class="bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
+                    <div v-if="riverDetailLoading" class="px-6 py-4 text-xs text-gray-400 animate-pulse">Loading reaches…</div>
+                    <template v-else-if="selectedRiver">
+                      <!-- River actions bar -->
+                      <div class="flex items-center justify-between px-6 py-2 border-b border-gray-100 dark:border-gray-800">
+                        <span class="text-xs text-gray-400">{{ selectedRiver.reaches?.length ?? 0 }} reaches</span>
+                        <div class="flex items-center gap-2">
+                          <UButton size="xs" variant="ghost" color="neutral" @click="openEditRiver(selectedRiver)">Edit</UButton>
+                          <UButton size="xs" variant="ghost" color="error" @click="deleteRiver(selectedRiver.slug, selectedRiver.name)">Delete river</UButton>
+                        </div>
                       </div>
-                      <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                        <span
-                          class="text-xs px-1.5 py-0.5 rounded"
-                          :class="reach.has_centerline
-                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
-                        >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
-                        <span v-if="centerlineErrors.get(reach.slug)" class="text-xs text-red-400">{{ centerlineErrors.get(reach.slug) }}</span>
-                        <UButton size="xs" variant="outline" color="neutral" :loading="fetchingCenterlines.has(reach.slug)" @click="fetchCenterline(reach.slug)">Fetch line</UButton>
-                        <UButton size="xs" variant="outline" color="error" @click="deleteReach(reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
-                        <button class="text-xs text-blue-500 hover:underline" @click="openReachInEditor(reach.slug)">Edit</button>
+                      <!-- Reach rows -->
+                      <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <div
+                          v-for="reach in selectedRiver.reaches" :key="reach.id"
+                          class="flex items-center gap-3 px-6 py-2.5 bg-white dark:bg-gray-900/60"
+                        >
+                          <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium truncate">{{ reach.common_name ?? reach.name }}</p>
+                            <p class="text-xs text-gray-400 truncate">{{ reach.slug }}</p>
+                          </div>
+                          <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                            <span
+                              class="text-xs px-1.5 py-0.5 rounded"
+                              :class="reach.has_centerline
+                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
+                            >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
+                            <UButton size="xs" variant="outline" color="error" @click="deleteReach(reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
+                            <button class="text-xs text-blue-500 hover:underline" @click="openReachInEditor(reach.slug)">Edit</button>
+                          </div>
+                        </div>
+                        <div v-if="!selectedRiver.reaches?.length" class="px-6 py-4 text-center text-sm text-gray-400">No reaches linked to this river</div>
                       </div>
-                    </div>
-                    <div v-if="!selectedRiver.reaches?.length" class="px-6 py-4 text-center text-sm text-gray-400">No reaches linked to this river</div>
+                    </template>
                   </div>
                 </template>
-              </div>
+              </template>
             </template>
-            <div v-if="rivers.length === 0" class="px-4 py-8 text-center text-sm text-gray-400">No rivers yet</div>
+            <div v-if="groupedRivers.length === 0 && !riversLoading" class="px-4 py-8 text-center text-sm text-gray-400">{{ riverSearch ? 'No rivers match your search' : 'No rivers yet' }}</div>
 
             <!-- Unassigned reaches group -->
             <template v-if="unassignedReaches.length">
@@ -147,8 +160,6 @@
                         ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
                     >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
-                    <span v-if="centerlineErrors.get(reach.slug)" class="text-xs text-red-400">{{ centerlineErrors.get(reach.slug) }}</span>
-                    <UButton size="xs" variant="outline" color="neutral" :loading="fetchingCenterlines.has(reach.slug)" @click="fetchCenterline(reach.slug)">Fetch line</UButton>
                     <UButton size="xs" variant="outline" color="error" @click="deleteReach(reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
                     <button class="text-xs text-blue-500 hover:underline" @click="openReachInEditor(reach.slug)">Edit</button>
                   </div>
@@ -537,13 +548,14 @@
                     <label class="block text-xs text-gray-500 mb-1">River</label>
                     <div class="space-y-2">
                       <div class="flex items-center gap-2 flex-wrap">
-                        <select
-                          v-model="repinRiverId"
-                          class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
-                        >
-                          <option value="">— Unassigned —</option>
-                          <option v-for="rv in rivers" :key="rv.id" :value="rv.id">{{ rv.name }}</option>
-                        </select>
+                        <USelectMenu
+                          v-model="repinRiverSelectItem"
+                          :items="riverSelectItems"
+                          searchable
+                          searchable-placeholder="Search rivers…"
+                          placeholder="— Unassigned —"
+                          class="flex-1"
+                        />
                         <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorSnap && !repinAnchorComID" @click="fetchRepinRiverName">Auto-assign from NLDI</UButton>
                       </div>
                     </div>
@@ -782,12 +794,21 @@
           <UFormField label="Name">
             <UInput v-model="editingRiver.name" />
           </UFormField>
-          <UFormField label="Basin (optional)">
-            <UInput v-model="editingRiver.basin" placeholder="Arkansas River Basin" />
+          <UFormField label="Basin">
+            <div class="flex items-center gap-2">
+              <UInput v-model="editingRiver.basin" placeholder="South Platte" class="flex-1" :disabled="editingRiver.basin_locked" />
+              <span v-if="editingRiver.basin_locked" class="text-xs text-gray-400 shrink-0">locked</span>
+            </div>
           </UFormField>
-          <UFormField label="State (optional)">
+          <UFormField label="State *">
             <UInput v-model="editingRiver.state_abbr" placeholder="CO" class="max-w-20" />
           </UFormField>
+          <UButton
+            size="xs" variant="outline" color="neutral"
+            :loading="autoFillLoading"
+            @click="autoFillRiverMeta"
+          >Auto-lookup basin &amp; state from NLDI</UButton>
+          <p v-if="autoFillError" class="text-xs text-red-500">{{ autoFillError }}</p>
           <UFormField label="GNIS ID (optional)">
             <UInput v-model="editingRiver.gnis_id" placeholder="00179365" class="max-w-40" />
           </UFormField>
@@ -796,7 +817,7 @@
       <template #footer>
         <div class="flex justify-end gap-2">
           <UButton variant="ghost" color="neutral" @click="editRiverOpen = false">Cancel</UButton>
-          <UButton :loading="editRiverLoading" @click="saveEditRiver">Save</UButton>
+          <UButton :loading="editRiverLoading" :disabled="!editingRiver?.state_abbr" @click="saveEditRiver">Save</UButton>
         </div>
       </template>
     </UModal>
@@ -881,7 +902,66 @@ interface RiverDetail extends River {
 
 const rivers = ref<River[]>([])
 const riversLoading = ref(false)
+const riverSearch = ref('')
 const expandedRiverId = ref<string | null>(null)
+
+const groupedRivers = computed(() => {
+  const q = riverSearch.value.toLowerCase()
+  const filtered = q
+    ? rivers.value.filter(rv =>
+        rv.name.toLowerCase().includes(q) ||
+        (rv.state_abbr ?? '').toLowerCase().includes(q) ||
+        (rv.basin ?? '').toLowerCase().includes(q)
+      )
+    : rivers.value
+
+  const stateMap = new Map<string, Map<string, River[]>>()
+  for (const rv of filtered) {
+    const state = rv.state_abbr ?? '—'
+    const basin = rv.basin ?? '—'
+    if (!stateMap.has(state)) stateMap.set(state, new Map())
+    const basinMap = stateMap.get(state)!
+    if (!basinMap.has(basin)) basinMap.set(basin, [])
+    basinMap.get(basin)!.push(rv)
+  }
+
+  return [...stateMap.entries()]
+    .sort(([a], [b]) => a === '—' ? 1 : b === '—' ? -1 : a.localeCompare(b))
+    .map(([state, basinMap]) => ({
+      state,
+      basins: [...basinMap.entries()]
+        .sort(([a], [b]) => a === '—' ? 1 : b === '—' ? -1 : a.localeCompare(b))
+        .map(([basin, rvs]) => ({
+          basin,
+          rivers: [...rvs].sort((a, b) => a.name.localeCompare(b.name)),
+        })),
+    }))
+})
+
+const riverSelectItems = computed(() => {
+  const groups = new Map<string, River[]>()
+  const noState: River[] = []
+  for (const rv of rivers.value) {
+    const s = rv.state_abbr
+    if (!s) { noState.push(rv); continue }
+    if (!groups.has(s)) groups.set(s, [])
+    groups.get(s)!.push(rv)
+  }
+  const result: any[] = [{ label: '— Unassigned —', value: '' }]
+  for (const [state, rvs] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+    result.push({
+      label: state,
+      items: [...rvs].sort((a, b) => a.name.localeCompare(b.name)).map(rv => ({ label: rv.name, value: rv.id })),
+    })
+  }
+  if (noState.length) {
+    result.push({
+      label: 'No state',
+      items: [...noState].sort((a, b) => a.name.localeCompare(b.name)).map(rv => ({ label: rv.name, value: rv.id })),
+    })
+  }
+  return result
+})
 const unassignedReaches = ref<{ id: string; slug: string; name: string; common_name: string | null; river_name: string | null; has_centerline: boolean }[]>([])
 const unassignedExpanded = ref(false)
 const selectedRiver = ref<RiverDetail | null>(null)
@@ -1026,17 +1106,45 @@ async function createRiver() {
 // Edit river
 const editRiverOpen = ref(false)
 const editRiverLoading = ref(false)
-const editingRiver = ref<{ slug: string; name: string; basin: string; state_abbr: string; gnis_id: string } | null>(null)
+const autoFillLoading = ref(false)
+const autoFillError = ref('')
+const editingRiver = ref<{ slug: string; name: string; basin: string; basin_locked: boolean; state_abbr: string; gnis_id: string } | null>(null)
 
 function openEditRiver(river: RiverDetail) {
   editingRiver.value = {
     slug: river.slug,
     name: river.name,
     basin: river.basin ?? '',
+    basin_locked: river.basin_locked,
     state_abbr: river.state_abbr ?? '',
     gnis_id: river.gnis_id ?? '',
   }
+  autoFillError.value = ''
   editRiverOpen.value = true
+}
+
+async function autoFillRiverMeta() {
+  if (!editingRiver.value) return
+  autoFillLoading.value = true
+  autoFillError.value = ''
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/rivers/${editingRiver.value.slug}/auto-fill`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      autoFillError.value = body.error ?? `Error ${res.status}`
+      return
+    }
+    const data = await res.json()
+    if (data.state_abbr) editingRiver.value.state_abbr = data.state_abbr
+    if (data.basin && !editingRiver.value.basin_locked) editingRiver.value.basin = data.basin
+  } catch (err: any) {
+    autoFillError.value = err?.message ?? 'Lookup failed'
+  } finally {
+    autoFillLoading.value = false
+  }
 }
 
 async function saveEditRiver() {
@@ -1427,6 +1535,18 @@ const repinMetaSaving        = ref(false)
 const repinMetaMsg           = ref('')
 const repinRiverNameFetching = ref(false)
 const repinRiverId           = ref('')
+
+const repinRiverSelectItem = computed({
+  get() {
+    if (!repinRiverId.value) return { label: '— Unassigned —', value: '' }
+    const rv = rivers.value.find(r => r.id === repinRiverId.value)
+    return rv ? { label: rv.name, value: rv.id } : { label: '— Unassigned —', value: '' }
+  },
+  set(item: { label: string; value: string } | null) {
+    repinRiverId.value = item?.value ?? ''
+  },
+})
+
 const repinFlowBands = ref({
   too_low:   { min: null as number | null, max: null as number | null },
   running:   { min: null as number | null, max: null as number | null },
