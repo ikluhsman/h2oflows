@@ -19,6 +19,7 @@ import (
 type NLDIHandler struct {
 	db           *pgxpool.Pool
 	anthropicKey string
+	cacheWarmer  func()
 }
 
 func NewNLDIHandler(db *pgxpool.Pool) *NLDIHandler { return &NLDIHandler{db: db} }
@@ -26,6 +27,17 @@ func NewNLDIHandler(db *pgxpool.Pool) *NLDIHandler { return &NLDIHandler{db: db}
 func (h *NLDIHandler) WithAnthropicKey(key string) *NLDIHandler {
 	h.anthropicKey = key
 	return h
+}
+
+func (h *NLDIHandler) WithCacheWarmer(fn func()) *NLDIHandler {
+	h.cacheWarmer = fn
+	return h
+}
+
+func (h *NLDIHandler) warmCache() {
+	if h.cacheWarmer != nil {
+		go h.cacheWarmer()
+	}
 }
 
 // WatershedExplorer handles GET /api/v1/admin/nldi/watershed
@@ -360,6 +372,7 @@ func (h *NLDIHandler) UpdateReachMeta(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, http.StatusNotFound, fmt.Sprintf("reach %q not found", slug))
 		return
 	}
+	h.warmCache()
 	jsonResponse(w, http.StatusOK, map[string]any{"slug": newSlug})
 }
 
@@ -661,6 +674,7 @@ func (h *NLDIHandler) UpdateReachCenterlineByComID(w http.ResponseWriter, r *htt
 		SELECT length_mi, start_comid, end_comid FROM reaches WHERE id = $1
 	`, reachID).Scan(&lengthMi, &startComID, &endComID)
 
+	h.warmCache()
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"slug":        slug,
 		"length_mi":   lengthMi,

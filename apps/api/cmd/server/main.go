@@ -100,7 +100,7 @@ func main() {
 	reaches   := handlers.NewReachHandler(pool, asker).WithPoller(p)
 	watchlist := handlers.NewWatchlistHandler(pool)
 	admin     := handlers.NewAdminHandler(pool)
-	nldiH    := handlers.NewNLDIHandler(pool).WithAnthropicKey(cfg.AnthropicAPIKey)
+	nldiH    := handlers.NewNLDIHandler(pool).WithAnthropicKey(cfg.AnthropicAPIKey).WithCacheWarmer(func() { reaches.WarmCache(context.Background()) })
 	// Warm the reach map cache immediately, then refresh every poll cycle.
 	reaches.WarmCache(context.Background())
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
