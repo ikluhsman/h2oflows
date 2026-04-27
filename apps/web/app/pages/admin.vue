@@ -1666,6 +1666,8 @@ function onRepinComIDSelect(comid: string, lat: number, lng: number) {
   if (repinComIDEditMode.value === 'up') {
     repinUpComID.value = comid
     repinStartLat.value = lat; repinStartLng.value = lng
+    // Auto-advance to downstream slot so the next click sets the take-out.
+    repinComIDEditMode.value = 'down'
   } else {
     repinDownComID.value = comid
     repinEndLat.value = lat; repinEndLng.value = lng

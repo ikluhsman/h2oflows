@@ -455,9 +455,11 @@ func (h *NLDIHandler) DownstreamMainstem(w http.ResponseWriter, r *http.Request)
 
 // RiverName handles GET /api/v1/admin/nldi/river-name?comid=<comid>
 //
-// Returns the stream/river name for a given NHD ComID by fetching a small
-// upstream slice and extracting the GNIS_Name from the first matching feature.
-// Used by the admin reach editor's "Fetch river name from NLDI" button.
+// Returns the GNIS stream name for a ComID. NLDI flowline navigation does NOT
+// include gnis_name in feature properties, so we:
+//  1. Fetch a small upstream slice to get flowline geometry.
+//  2. Extract a representative coordinate.
+//  3. Spatial-query the National Map NHD ArcGIS service, which does carry GNIS names.
 func (h *NLDIHandler) RiverName(w http.ResponseWriter, r *http.Request) {
 	comid := strings.TrimSpace(r.URL.Query().Get("comid"))
 	if comid == "" {
@@ -468,38 +470,35 @@ func (h *NLDIHandler) RiverName(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	c := nldi.New()
 
-	extractName := func(fc *nldi.Collection) string {
-		if fc == nil {
-			return ""
-		}
-		for _, f := range fc.Features {
-			if f.Props.GnisName != nil && *f.Props.GnisName != "" {
-				return *f.Props.GnisName
-			}
-		}
-		for _, f := range fc.Features {
-			if f.Props.Name != "" {
-				return f.Props.Name
-			}
-		}
-		return ""
+	// Fetch a small upstream slice to obtain at least one flowline geometry.
+	up, err := c.UpstreamFlowlines(ctx, comid, 10)
+	if err != nil || up == nil || len(up.Features) == 0 {
+		// Try downstream as a fallback source of geometry.
+		up, _ = c.DownstreamFlowlines(ctx, comid, 5)
 	}
 
-	// 10 km is enough to find the GNIS name without fetching a huge flowline set.
-	up, err := c.UpstreamFlowlines(ctx, comid, 10)
-	if err != nil {
-		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("nldi lookup: %v", err))
+	// Extract the first coordinate from the first available flowline geometry.
+	var lat, lng float64
+	if up != nil {
+		for _, f := range up.Features {
+			if pt := nldi.FirstCoord(f.Geometry); pt != nil {
+				lat, lng = pt[1], pt[0] // GeoJSON is [lng, lat]
+				break
+			}
+		}
+	}
+	if lat == 0 && lng == 0 {
+		jsonResponse(w, http.StatusOK, map[string]any{"river_name": ""})
 		return
 	}
-	name := extractName(up)
 
-	// Fall back to downstream mainstem if upstream had no GNIS name.
-	if name == "" {
-		down, _ := c.DownstreamFlowlines(ctx, comid, 5)
-		name = extractName(down)
+	name, gnisID, err := nldi.NHDStreamNameAt(ctx, lat, lng)
+	if err != nil {
+		// Non-fatal: return empty rather than a 502.
+		jsonResponse(w, http.StatusOK, map[string]any{"river_name": ""})
+		return
 	}
-
-	jsonResponse(w, http.StatusOK, map[string]any{"river_name": name})
+	jsonResponse(w, http.StatusOK, map[string]any{"river_name": name, "gnis_id": gnisID})
 }
 
 type updateReachCenterlineRequest struct {
