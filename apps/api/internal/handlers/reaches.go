@@ -367,7 +367,8 @@ func (h *ReachHandler) queryAllFeatures(ctx context.Context) ([]Feature, error) 
 		)
 		SELECT
 			r.id, r.name, r.slug,
-			r.river_name, r.common_name, r.put_in_name, r.take_out_name,
+			COALESCE(r.river_name, rv.name) AS river_name,
+			r.common_name, r.put_in_name, r.take_out_name,
 			r.class_min,
 			COALESCE(
 				(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL),
@@ -395,6 +396,7 @@ func (h *ReachHandler) queryAllFeatures(ctx context.Context) ([]Feature, error) 
 				ELSE                                            'unknown'
 			END AS flow_status
 		FROM reaches r
+		LEFT JOIN rivers rv ON rv.id = r.river_id
 		LEFT JOIN gauges g ON g.id = r.primary_gauge_id
 		LEFT JOIN latest_reading lr ON lr.gauge_id = g.id
 		LEFT JOIN LATERAL (
