@@ -537,7 +537,7 @@
                     <label class="block text-xs text-gray-500 mb-1">River name</label>
                     <div class="flex gap-2">
                       <input v-model="repinForm.riverName" class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
-                      <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorComID" @click="fetchRepinRiverName">Fetch from NLDI</UButton>
+                      <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorSnap && !repinAnchorComID" @click="fetchRepinRiverName">Fetch from NLDI</UButton>
                     </div>
                   </div>
                   <div>
@@ -1491,16 +1491,20 @@ const repinComIDsDirty = computed(() =>
   repinDownComID.value !== repinOrigDownComID.value
 )
 
-const repinPutInPin = computed(() =>
-  repinReach.value?.put_in
+const repinPutInPin = computed(() => {
+  if (repinStartLat.value != null && repinStartLng.value != null)
+    return { lat: repinStartLat.value, lng: repinStartLng.value, label: 'Put-in' }
+  return repinReach.value?.put_in
     ? { lat: repinReach.value.put_in.lat, lng: repinReach.value.put_in.lng, label: 'Put-in' }
     : null
-)
-const repinTakeOutPin = computed(() =>
-  repinReach.value?.take_out
+})
+const repinTakeOutPin = computed(() => {
+  if (repinEndLat.value != null && repinEndLng.value != null)
+    return { lat: repinEndLat.value, lng: repinEndLng.value, label: 'Take-out' }
+  return repinReach.value?.take_out
     ? { lat: repinReach.value.take_out.lat, lng: repinReach.value.take_out.lng, label: 'Take-out' }
     : null
-)
+})
 
 function resetRepin() {
   repinReach.value = null
@@ -1623,6 +1627,10 @@ async function loadRepinReach() {
       if (data.put_in?.lat != null && data.put_in?.lng != null) {
         fetchRepinTributaries(data.put_in.lat, data.put_in.lng)
       }
+    } else if (data.put_in?.lat != null && data.put_in?.lng != null) {
+      // KML-imported reach: auto-snap to NHD using put-in coords so the map
+      // loads with clickable flowlines without requiring a manual re-anchor.
+      onRepinAnchorPick(data.put_in.lat, data.put_in.lng)
     }
   } catch (e: any) {
     repinLoadError.value = e.message ?? 'Unknown error'
@@ -1808,7 +1816,7 @@ async function saveRepinFlowBands() {
 }
 
 async function fetchRepinRiverName() {
-  const comid = repinUpComID.value ?? repinAnchorComID.value
+  const comid = repinUpComID.value ?? repinAnchorSnap.value?.comid ?? repinAnchorComID.value
   if (!comid) return
   repinRiverNameFetching.value = true
   try {
