@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 )
@@ -23,17 +24,23 @@ type DWRStation struct {
 	Lng        float64
 }
 
-// DWRNearby queries the Colorado DWR telemetry stations API for discharge
-// gauges within distanceKm of the given coordinate. Returns an empty slice
-// (not an error) when no stations are found or the point is outside Colorado.
+func haversineKm(lat1, lng1, lat2, lng2 float64) float64 {
+	const r = 6371.0
+	dLat := (lat2 - lat1) * math.Pi / 180
+	dLng := (lng2 - lng1) * math.Pi / 180
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180)*math.Cos(lat2*math.Pi/180)*
+			math.Sin(dLng/2)*math.Sin(dLng/2)
+	return r * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+}
+
+// DWRNearby fetches all Colorado DWR discharge telemetry stations and filters
+// client-side to those within distanceKm. The DWR API does not support
+// server-side radius filtering, so we fetch the full list (~600 stations).
 func DWRNearby(ctx context.Context, lat, lng float64, distanceKm int) ([]DWRStation, error) {
 	params := url.Values{
-		"measType":  {"DISCHRG"},
-		"latitude":  {fmt.Sprintf("%f", lat)},
-		"longitude": {fmt.Sprintf("%f", lng)},
-		"radius":    {fmt.Sprintf("%d", distanceKm)},
-		"units":     {"kilometers"},
-		"format":    {"json"},
+		"measType": {"DISCHRG"},
+		"format":   {"json"},
 	}
 	endpoint := fmt.Sprintf("%s/telemetrystations/telemetrystations/?%s", dwrAPIBase, params.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
@@ -61,9 +68,12 @@ func DWRNearby(ctx context.Context, lat, lng float64, distanceKm int) ([]DWRStat
 		return nil, fmt.Errorf("dwr nearby parse: %w", err)
 	}
 
-	out := make([]DWRStation, 0, len(result.ResultList))
+	out := make([]DWRStation, 0)
 	for _, st := range result.ResultList {
 		if st.Abbrev == "" || (st.Latitude == 0 && st.Longitude == 0) {
+			continue
+		}
+		if haversineKm(lat, lng, st.Latitude, st.Longitude) > float64(distanceKm) {
 			continue
 		}
 		out = append(out, DWRStation{
