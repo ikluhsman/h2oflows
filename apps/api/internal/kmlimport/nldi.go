@@ -126,6 +126,17 @@ func fetchNLDIRiverLineByComIDWithClient(ctx context.Context, c *nldi.Client, up
 	}, nil
 }
 
+// FetchCenterlinePreview returns the raw GeoJSON LineString between two NHD
+// ComIDs without writing anything to the database. Used by the admin UI to
+// let the user visualise the reach centerline before committing.
+func FetchCenterlinePreview(ctx context.Context, upComID, downComID string) (string, error) {
+	cl, err := fetchNLDIRiverLineByComID(ctx, upComID, downComID)
+	if err != nil {
+		return "", err
+	}
+	return cl.GeoJSON, nil
+}
+
 // SnapReachComIDs snaps the reach's existing start/end access points to
 // NHD ComIDs and stores them. It only writes when start_comid is NULL, so it
 // won't overwrite data set by the NLDI centerline path. Designed to be called
