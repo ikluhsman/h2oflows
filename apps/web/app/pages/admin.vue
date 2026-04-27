@@ -334,10 +334,17 @@
                 :put-in-pin="authorPutInPin"
                 :take-out-pin="authorTakeOutPin"
                 :disable-auto-fit="true"
+                :preview-centerline="authorPreviewCenterline"
                 @pick="onAuthorAnchorPick"
                 @comid-select="onAuthorComIDSelect"
               />
               <p v-if="authorDownstreamLoading" class="text-xs text-blue-500 dark:text-blue-400 mt-1 animate-pulse">Loading downstream mainstem…</p>
+              <div v-if="authorUpComID && authorDownComID" class="flex items-center gap-2 mt-1">
+                <UButton size="xs" variant="outline" color="neutral" :loading="authorPreviewLoading" @click="previewAuthorCenterline">
+                  {{ authorPreviewCenterline ? 'Refresh preview' : 'Preview centerline' }}
+                </UButton>
+                <span v-if="authorPreviewCenterline" class="text-xs text-blue-600 dark:text-blue-400">Dashed line shows trimmed reach</span>
+              </div>
 
               <!-- Reach form — shown once both ComIDs selected -->
               <div v-if="authorUpComID && authorDownComID" class="mt-4 space-y-3 rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
@@ -630,48 +637,64 @@
                 <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-3">
                   <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow lines</p>
 
-                  <div class="grid grid-cols-2 gap-2 text-xs">
-                    <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
-                      <span class="w-2 h-2 rounded-full bg-green-600 shrink-0" />
-                      <div class="min-w-0 flex-1">
-                        <div class="font-medium text-green-800 dark:text-green-200">Put-In</div>
-                        <div class="text-green-600 dark:text-green-400 font-mono truncate">{{ repinUpComID || '—' }}</div>
-                      </div>
-                      <UButton size="xs"
-                        :variant="repinComIDEditMode === 'up' ? 'solid' : 'outline'"
-                        :color="repinComIDEditMode === 'up' ? 'primary' : 'neutral'"
-                        @click="repinComIDEditMode = repinComIDEditMode === 'up' ? null : 'up'"
-                      >{{ repinComIDEditMode === 'up' ? 'Cancel' : 'Set Put-In Flow Line' }}</UButton>
-                    </div>
-                    <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800">
-                      <span class="w-2 h-2 rounded-full bg-red-600 shrink-0" />
-                      <div class="min-w-0 flex-1">
-                        <div class="font-medium text-red-800 dark:text-red-200">Take-Out</div>
-                        <div class="text-red-600 dark:text-red-400 font-mono truncate">{{ repinDownComID || '—' }}</div>
-                      </div>
-                      <UButton size="xs"
-                        :variant="repinComIDEditMode === 'down' ? 'solid' : 'outline'"
-                        :color="repinComIDEditMode === 'down' ? 'primary' : 'neutral'"
-                        @click="repinComIDEditMode = repinComIDEditMode === 'down' ? null : 'down'"
-                      >{{ repinComIDEditMode === 'down' ? 'Cancel' : 'Set Take-Out Flow Line' }}</UButton>
-                    </div>
+                  <!-- Anchor controls -->
+                  <div class="flex flex-wrap items-center gap-2">
+                    <UButton
+                      size="xs"
+                      :color="repinPickMode ? 'primary' : 'neutral'"
+                      :variant="repinPickMode ? 'solid' : 'outline'"
+                      @click="repinPickMode = !repinPickMode"
+                    >{{ repinPickMode ? 'Cancel' : 'Re-anchor' }}</UButton>
+                    <span v-if="repinAnchorSnapping" class="text-xs text-blue-600 dark:text-blue-400 animate-pulse">Snapping to NHD…</span>
+                    <span v-if="repinAnchorError" class="text-xs text-red-500">{{ repinAnchorError }}</span>
+                  </div>
+
+                  <!-- Anchor badge -->
+                  <div v-if="repinAnchorSnap" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+                    <span class="font-medium text-blue-800 dark:text-blue-200">Anchor ComID {{ repinAnchorSnap.comid }}</span>
+                    <span v-if="repinAnchorSnap.name" class="text-blue-600 dark:text-blue-300">{{ repinAnchorSnap.name }}</span>
+                  </div>
+
+                  <!-- Slot tabs -->
+                  <div v-if="repinAnchorSnap || repinDownstream" class="flex items-center gap-3 text-xs">
+                    <span class="text-gray-500 shrink-0">Click flowline for:</span>
+                    <button
+                      class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
+                      :class="repinComIDEditMode === 'up' ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                      @click="repinComIDEditMode = 'up'"
+                    >
+                      <span class="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                      Upstream<template v-if="repinUpComID"> · <span class="font-mono">{{ repinUpComID }}</span></template>
+                    </button>
+                    <button
+                      class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
+                      :class="repinComIDEditMode === 'down' ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                      @click="repinComIDEditMode = 'down'"
+                    >
+                      <span class="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                      Downstream<template v-if="repinDownComID"> · <span class="font-mono">{{ repinDownComID }}</span></template>
+                    </button>
                   </div>
 
                   <p v-if="repinFlowlinesLoading" class="text-xs text-blue-500 animate-pulse">Loading downstream mainstem…</p>
-                  <p v-if="repinComIDEditMode" class="text-xs text-blue-600 dark:text-blue-400">Click any flowline segment on the map to set the {{ repinComIDEditMode === 'up' ? 'put-in' : 'take-out' }} flow line.</p>
 
                   <NHDExplorerMap
-                    :upstream-flowlines="null"
+                    :upstream-flowlines="repinTributaries"
                     :downstream-flowlines="repinDownstream"
                     :upstream-gauges="null"
                     :snap-lat="null"
                     :snap-lng="null"
+                    :pick-mode="repinPickMode"
                     :put-in-pin="repinPutInPin"
                     :take-out-pin="repinTakeOutPin"
-                    :comid-select-mode="!!repinComIDEditMode"
+                    :comid-select-mode="!!repinAnchorSnap && !repinPickMode"
                     :comid-select-slot="repinComIDEditMode"
                     :selected-up-comid="repinUpComID"
                     :selected-down-comid="repinDownComID"
+                    :disable-auto-fit="true"
+                    :preview-centerline="repinPreviewCenterline"
+                    @pick="onRepinAnchorPick"
                     @comid-select="onRepinComIDSelect"
                   />
 
@@ -679,6 +702,9 @@
                     <span v-if="repinError" class="text-xs text-red-500">{{ repinError }}</span>
                     <span v-if="repinSuccess" class="text-xs text-green-600 dark:text-green-400">{{ repinSuccess }}</span>
                     <div class="flex-1" />
+                    <UButton v-if="repinUpComID && repinDownComID" size="xs" variant="outline" color="neutral" :loading="repinPreviewLoading" @click="previewRepinCenterline">
+                      {{ repinPreviewCenterline ? 'Refresh preview' : 'Preview centerline' }}
+                    </UButton>
                     <UButton size="sm" variant="outline" color="neutral" @click="resetRepinComIDs" v-if="repinComIDsDirty">Revert</UButton>
                     <UButton size="sm" :loading="repinSaving" :disabled="!repinComIDsDirty || !repinUpComID || !repinDownComID" @click="submitRepinByComID">Save flow lines</UButton>
                   </div>
@@ -1372,6 +1398,15 @@ const repinDownComID      = ref<string | null>(null)
 const repinOrigUpComID    = ref<string | null>(null)
 const repinOrigDownComID  = ref<string | null>(null)
 const repinComIDEditMode  = ref<'up' | 'down' | null>(null)
+const repinPickMode       = ref(false)
+const repinAnchorSnap     = ref<{ comid: string; name: string } | null>(null)
+const repinAnchorSnapping = ref(false)
+const repinTributaries    = ref<NHDFC | null>(null)
+const repinAnchorError    = ref('')
+const repinPreviewCenterline = ref<object | null>(null)
+const repinPreviewLoading = ref(false)
+const authorPreviewCenterline = ref<object | null>(null)
+const authorPreviewLoading = ref(false)
 const repinStartLat       = ref<number | null>(null)
 const repinStartLng       = ref<number | null>(null)
 const repinEndLat         = ref<number | null>(null)
@@ -1421,6 +1456,11 @@ function resetRepin() {
   repinRiverId.value = ''
   repinRiverAssigning.value = false
   repinSlugAvailable.value = null
+  repinPickMode.value = false
+  repinAnchorSnap.value = null
+  repinTributaries.value = null
+  repinAnchorError.value = ''
+  repinPreviewCenterline.value = null
 }
 
 function resetRepinComIDs() {
@@ -1500,7 +1540,12 @@ async function loadRepinReach() {
     } catch { /* non-fatal */ }
 
     if (data.start_comid) {
+      repinAnchorSnap.value = { comid: data.start_comid, name: data.river_name ?? '' }
+      repinComIDEditMode.value = 'up'
       await fetchRepinFlowlines(data.start_comid)
+      if (data.put_in?.lat != null && data.put_in?.lng != null) {
+        fetchRepinTributaries(data.put_in.lat, data.put_in.lng)
+      }
     }
   } catch (e: any) {
     repinLoadError.value = e.message ?? 'Unknown error'
@@ -1540,7 +1585,76 @@ function onRepinComIDSelect(comid: string, lat: number, lng: number) {
     repinDownComID.value = comid
     repinEndLat.value = lat; repinEndLng.value = lng
   }
-  repinComIDEditMode.value = null
+  repinPreviewCenterline.value = null
+}
+
+async function fetchRepinTributaries(lat: number, lng: number) {
+  try {
+    const token = await getToken()
+    const url = `${apiBase}/api/v1/admin/nldi/upstream-tributaries?lat=${lat}&lng=${lng}&distance=50`
+    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    if (res.ok) {
+      const data = await res.json()
+      repinTributaries.value = data.tributaries
+    }
+  } catch { /* non-fatal */ }
+}
+
+async function onRepinAnchorPick(lat: number, lng: number) {
+  repinPickMode.value = false
+  repinAnchorSnapping.value = true
+  repinAnchorSnap.value = null
+  repinTributaries.value = null
+  repinAnchorError.value = ''
+  repinPreviewCenterline.value = null
+  try {
+    const token = await getToken()
+    if (!token) return
+    const url = `${apiBase}/api/v1/admin/nldi/upstream-tributaries?lat=${lat}&lng=${lng}&distance=50`
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!res.ok) { repinAnchorError.value = `Snap failed: HTTP ${res.status}`; return }
+    const data = await res.json()
+    repinAnchorSnap.value = { comid: data.snap.comid, name: data.snap.name ?? '' }
+    repinTributaries.value = data.tributaries
+    repinComIDEditMode.value = 'up'
+    await fetchRepinFlowlines(data.snap.comid)
+  } catch (e: any) {
+    repinAnchorError.value = e.message ?? 'Snap failed'
+  } finally {
+    repinAnchorSnapping.value = false
+  }
+}
+
+async function previewRepinCenterline() {
+  if (!repinUpComID.value || !repinDownComID.value) return
+  repinPreviewLoading.value = true
+  repinPreviewCenterline.value = null
+  try {
+    const token = await getToken()
+    const url = `${apiBase}/api/v1/admin/nldi/preview-centerline?up_comid=${repinUpComID.value}&down_comid=${repinDownComID.value}`
+    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    if (res.ok) {
+      const data = await res.json()
+      repinPreviewCenterline.value = data.geojson
+    }
+  } catch { /* non-fatal */ }
+  finally { repinPreviewLoading.value = false }
+}
+
+async function previewAuthorCenterline() {
+  if (!authorUpComID.value || !authorDownComID.value) return
+  authorPreviewLoading.value = true
+  authorPreviewCenterline.value = null
+  try {
+    const token = await getToken()
+    const url = `${apiBase}/api/v1/admin/nldi/preview-centerline?up_comid=${authorUpComID.value}&down_comid=${authorDownComID.value}`
+    const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    if (res.ok) {
+      const data = await res.json()
+      authorPreviewCenterline.value = data.geojson
+    }
+  } catch { /* non-fatal */ }
+  finally { authorPreviewLoading.value = false }
 }
 
 async function saveRepinMeta() {

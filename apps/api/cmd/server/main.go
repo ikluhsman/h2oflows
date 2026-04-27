@@ -186,6 +186,7 @@ func main() {
 			r.Get("/admin/nldi/upstream-tributaries", nldiH.UpstreamTributaries)
 			r.Get("/admin/nldi/downstream", nldiH.DownstreamMainstem)
 			r.Get("/admin/nldi/river-name", nldiH.RiverName)
+			r.Get("/admin/nldi/preview-centerline", nldiH.PreviewCenterline)
 			r.Post("/admin/reaches", nldiH.CreateReach)
 			r.Get("/admin/reaches/{slug}", nldiH.GetAdminReach)
 			r.Post("/admin/reaches/{slug}/generate-description", nldiH.GenerateDescription)

@@ -726,6 +726,24 @@ func (h *NLDIHandler) PatchReach(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]any{"slug": slug})
 }
 
+// PreviewCenterline handles GET /api/v1/admin/nldi/preview-centerline
+// Returns the raw GeoJSON LineString between two NHD ComIDs without writing
+// to the database, so the admin can visualise the reach before committing.
+func (h *NLDIHandler) PreviewCenterline(w http.ResponseWriter, r *http.Request) {
+	upComID   := r.URL.Query().Get("up_comid")
+	downComID := r.URL.Query().Get("down_comid")
+	if upComID == "" || downComID == "" {
+		errorResponse(w, http.StatusBadRequest, "up_comid and down_comid are required")
+		return
+	}
+	geojson, err := kmlimport.FetchCenterlinePreview(r.Context(), upComID, downComID)
+	if err != nil {
+		errorResponse(w, http.StatusUnprocessableEntity, err.Error())
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]any{"geojson": json.RawMessage(geojson)})
+}
+
 // buildSlug produces a URL-safe slug from river name + reach name,
 // matching the KML importer convention.
 func buildSlug(riverName, reachName string) string {

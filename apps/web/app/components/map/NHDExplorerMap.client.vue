@@ -80,6 +80,8 @@ const props = defineProps<{
   selectedDownComID?:  string | null
   // Suppresses all auto-fit behaviour — user controls the viewport entirely.
   disableAutoFit?:     boolean
+  // Preview centerline GeoJSON — shown as a dashed highlight without storing.
+  previewCenterline?:  object | null
 }>()
 
 const emit = defineEmits<{
@@ -159,6 +161,15 @@ function updateData() {
   updateSnapMarker()
   updateAuthoringPins()
   fitToData()
+}
+
+function updatePreview() {
+  if (!map || !mapReady.value) return
+  const src = map.getSource('nhd-preview') as maplibregl.GeoJSONSource | undefined
+  if (!src) return
+  src.setData(props.previewCenterline
+    ? { type: 'Feature', geometry: props.previewCenterline as GeoJSON.Geometry, properties: {} }
+    : empty())
 }
 
 function updateSnapMarker() {
@@ -353,6 +364,36 @@ function addLayers() {
   map.on('mouseenter', 'nhd-gauges-circle', () => { if (map) map.getCanvas().style.cursor = 'pointer' })
   map.on('mouseleave', 'nhd-gauges-circle', () => { if (map) map.getCanvas().style.cursor = props.pickMode ? 'crosshair' : '' })
 
+  // ── Preview centerline — dashed white/blue highlight ─────────────────
+  map.addSource('nhd-preview', {
+    type: 'geojson',
+    data: props.previewCenterline
+      ? { type: 'Feature', geometry: props.previewCenterline, properties: {} }
+      : empty(),
+  })
+  map.addLayer({
+    id: 'nhd-preview-line',
+    type: 'line',
+    source: 'nhd-preview',
+    paint: {
+      'line-color': '#ffffff',
+      'line-width': 5,
+      'line-opacity': 0.95,
+      'line-dasharray': [2, 2],
+    },
+  })
+  map.addLayer({
+    id: 'nhd-preview-line-inner',
+    type: 'line',
+    source: 'nhd-preview',
+    paint: {
+      'line-color': '#2563eb',
+      'line-width': 2.5,
+      'line-opacity': 1,
+      'line-dasharray': [2, 2],
+    },
+  })
+
   // ── ComID selection: click on any flowline segment ────────────────────
   // Hit-target layers are transparent + 14px wide so small flowlines stay
   // clickable. Visible layers stay clickable too as a fallback.
@@ -458,6 +499,7 @@ watch(() => props.comidSelectMode, () => {
 })
 
 watch([() => props.selectedUpComID, () => props.selectedDownComID], updateComIDFilters)
+watch(() => props.previewCenterline, () => { if (mapReady.value) updatePreview() }, { deep: true })
 
 watch(
   () => [props.upstreamFlowlines, props.downstreamFlowlines, props.upstreamGauges,
