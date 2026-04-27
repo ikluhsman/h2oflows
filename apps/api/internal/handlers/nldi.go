@@ -253,17 +253,25 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 		anchorComID                     *string
 		putInLng, putInLat              *float64
 		takeOutLng, takeOutLat          *float64
+		primaryGaugeID                  *string
+		primaryGaugeExtID               *string
+		primaryGaugeName                *string
 	)
 	err := h.db.QueryRow(ctx, `
 		SELECT
-			id, name, COALESCE(river_name,''), COALESCE(common_name,''),
-			river_id,
-			class_min, class_max, description,
-			COALESCE(permit_required, false), COALESCE(multi_day_days, 1),
-			start_comid, end_comid, anchor_comid,
-			ST_X(start_point::geometry),  ST_Y(start_point::geometry),
-			ST_X(end_point::geometry),    ST_Y(end_point::geometry)
-		FROM reaches WHERE slug = $1
+			r.id, r.name, COALESCE(r.river_name,''), COALESCE(r.common_name,''),
+			r.river_id,
+			r.class_min, r.class_max, r.description,
+			COALESCE(r.permit_required, false), COALESCE(r.multi_day_days, 1),
+			r.start_comid, r.end_comid, r.anchor_comid,
+			ST_X(r.start_point::geometry),  ST_Y(r.start_point::geometry),
+			ST_X(r.end_point::geometry),    ST_Y(r.end_point::geometry),
+			r.primary_gauge_id::text,
+			g.external_id,
+			g.name
+		FROM reaches r
+		LEFT JOIN gauges g ON g.id = r.primary_gauge_id
+		WHERE r.slug = $1
 	`, slug).Scan(
 		&id, &name, &riverName, &commonName,
 		&riverID,
@@ -271,6 +279,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 		&permitRequired, &multiDayDays,
 		&putInComID, &takeOutComID, &anchorComID,
 		&putInLng, &putInLat, &takeOutLng, &takeOutLat,
+		&primaryGaugeID, &primaryGaugeExtID, &primaryGaugeName,
 	)
 	if err != nil {
 		errorResponse(w, http.StatusNotFound, fmt.Sprintf("reach %q not found", slug))
@@ -290,22 +299,130 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"id":              id,
-		"slug":            slug,
-		"name":            name,
-		"river_name":      riverName,
-		"river_id":        riverID,
-		"common_name":     commonName,
-		"class_min":       classMin,
-		"class_max":       classMax,
-		"description":     description,
-		"permit_required": permitRequired,
-		"multi_day_days":  multiDayDays,
-		"start_comid":     putInComID,
-		"end_comid":       takeOutComID,
-		"anchor_comid":    anchorComID,
-		"put_in":          putIn,
-		"take_out":        takeOut,
+		"id":                       id,
+		"slug":                     slug,
+		"name":                     name,
+		"river_name":               riverName,
+		"river_id":                 riverID,
+		"common_name":              commonName,
+		"class_min":                classMin,
+		"class_max":                classMax,
+		"description":              description,
+		"permit_required":          permitRequired,
+		"multi_day_days":           multiDayDays,
+		"start_comid":              putInComID,
+		"end_comid":                takeOutComID,
+		"anchor_comid":             anchorComID,
+		"put_in":                   putIn,
+		"take_out":                 takeOut,
+		"primary_gauge_id":         primaryGaugeID,
+		"primary_gauge_external_id": primaryGaugeExtID,
+		"primary_gauge_name":       primaryGaugeName,
+	})
+}
+
+// NearbyGauges handles GET /api/v1/admin/nldi/nearby-gauges
+// Returns upstream + downstream USGS gauge sites near a given ComID.
+// Query params: comid (required), distance (km, default 150, max 500)
+func (h *NLDIHandler) NearbyGauges(w http.ResponseWriter, r *http.Request) {
+	comid := r.URL.Query().Get("comid")
+	if comid == "" {
+		errorResponse(w, http.StatusBadRequest, "comid is required")
+		return
+	}
+	distanceKm := 150
+	if d := r.URL.Query().Get("distance"); d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= 500 {
+			distanceKm = v
+		}
+	}
+
+	ctx := r.Context()
+	c := nldi.New()
+
+	upGauges, _ := c.UpstreamGauges(ctx, comid, distanceKm)
+	downKm := distanceKm
+	if downKm > 50 {
+		downKm = 50
+	}
+	downGauges, _ := c.DownstreamGauges(ctx, comid, downKm)
+
+	seen := map[string]bool{}
+	features := make([]nldi.Feature, 0)
+	for _, coll := range []*nldi.Collection{upGauges, downGauges} {
+		if coll == nil {
+			continue
+		}
+		for _, f := range coll.Features {
+			if seen[f.Props.Identifier] {
+				continue
+			}
+			seen[f.Props.Identifier] = true
+			features = append(features, f)
+		}
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"type":     "FeatureCollection",
+		"features": features,
+	})
+}
+
+// SetPrimaryGauge handles PUT /api/v1/admin/reaches/{slug}/primary-gauge
+// Upserts the gauge by (external_id, source) and sets reaches.primary_gauge_id.
+func (h *NLDIHandler) SetPrimaryGauge(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	var body struct {
+		ExternalID string  `json:"external_id"`
+		Source     string  `json:"source"`
+		Name       string  `json:"name"`
+		Lat        float64 `json:"lat"`
+		Lng        float64 `json:"lng"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		errorResponse(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if body.ExternalID == "" {
+		errorResponse(w, http.StatusBadRequest, "external_id required")
+		return
+	}
+	if body.Source == "" {
+		body.Source = "usgs"
+	}
+
+	ctx := r.Context()
+
+	var gaugeID string
+	err := h.db.QueryRow(ctx, `
+		INSERT INTO gauges (external_id, source, name, location)
+		VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326))
+		ON CONFLICT (external_id, source) DO UPDATE
+			SET name = EXCLUDED.name
+		RETURNING id
+	`, body.ExternalID, body.Source, body.Name, body.Lng, body.Lat).Scan(&gaugeID)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("upsert gauge: %v", err))
+		return
+	}
+
+	var reachID string
+	if err := h.db.QueryRow(ctx, `
+		UPDATE reaches SET primary_gauge_id = $1 WHERE slug = $2 RETURNING id
+	`, gaugeID, slug).Scan(&reachID); err != nil {
+		errorResponse(w, http.StatusNotFound, "reach not found")
+		return
+	}
+
+	// Link gauge to reach if it has no reach association yet.
+	h.db.Exec(ctx, `UPDATE gauges SET reach_id = $1 WHERE id = $2 AND reach_id IS NULL`, reachID, gaugeID)
+
+	h.warmCache()
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"gauge_id":    gaugeID,
+		"external_id": body.ExternalID,
+		"name":        body.Name,
 	})
 }
 

@@ -560,6 +560,25 @@
                       </div>
                     </div>
                   </div>
+                  <div>
+                    <label class="block text-xs text-gray-500 mb-1">Flow gauge</label>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span v-if="repinPrimaryGauge" class="text-sm text-gray-800 dark:text-gray-200 flex-1 truncate">
+                        {{ repinPrimaryGauge.name || repinPrimaryGauge.external_id }}
+                        <span class="text-xs text-gray-400 ml-1 font-mono">{{ repinPrimaryGauge.external_id }}</span>
+                      </span>
+                      <span v-else class="text-sm text-gray-400 flex-1">— None assigned —</span>
+                      <UButton
+                        size="xs" variant="outline"
+                        :color="repinGaugeSelectMode ? 'primary' : 'neutral'"
+                        :loading="repinGaugeSaving"
+                        :disabled="!repinGauges && !repinUpComID"
+                        @click="repinGaugeSelectMode = !repinGaugeSelectMode"
+                      >{{ repinGaugeSelectMode ? 'Cancel' : 'Select gauge' }}</UButton>
+                    </div>
+                    <p v-if="repinGaugeError" class="text-xs text-red-500 mt-1">{{ repinGaugeError }}</p>
+                    <p v-if="repinGaugeSelectMode" class="text-xs text-amber-600 dark:text-amber-400 mt-1">Click an amber dot on the map to assign a primary gauge.</p>
+                  </div>
                   <div class="grid grid-cols-2 gap-3">
                     <div>
                       <label class="block text-xs text-gray-500 mb-1">Class min</label>
@@ -691,20 +710,22 @@
                   <NHDExplorerMap
                     :upstream-flowlines="repinTributaries"
                     :downstream-flowlines="repinDownstream"
-                    :upstream-gauges="null"
+                    :upstream-gauges="repinGauges"
                     :snap-lat="null"
                     :snap-lng="null"
                     :pick-mode="repinPickMode"
                     :put-in-pin="repinPutInPin"
                     :take-out-pin="repinTakeOutPin"
-                    :comid-select-mode="!!repinAnchorSnap && !repinPickMode"
+                    :comid-select-mode="!!repinAnchorSnap && !repinPickMode && !repinGaugeSelectMode"
                     :comid-select-slot="repinComIDEditMode"
                     :selected-up-comid="repinUpComID"
                     :selected-down-comid="repinDownComID"
                     :disable-auto-fit="true"
                     :preview-centerline="repinPreviewCenterline"
+                    :gauge-select-mode="repinGaugeSelectMode"
                     @pick="onRepinAnchorPick"
                     @comid-select="onRepinComIDSelect"
+                    @gauge-select="onRepinGaugeSelect"
                   />
 
                   <div class="flex items-center gap-3 pt-1">
@@ -1518,6 +1539,11 @@ const repinLoadError        = ref('')
 const repinReach            = ref<RepinReach | null>(null)
 const repinDownstream       = ref<NHDFC | null>(null)
 const repinFlowlinesLoading = ref(false)
+const repinGauges           = ref<NHDFC | null>(null)
+const repinGaugeSelectMode  = ref(false)
+const repinGaugeSaving      = ref(false)
+const repinGaugeError       = ref('')
+const repinPrimaryGauge     = ref<{ id: string; external_id: string; name: string } | null>(null)
 const repinError            = ref('')
 const repinSuccess          = ref('')
 const repinSaving           = ref(false)
@@ -1691,6 +1717,12 @@ async function loadRepinReach() {
       end_comid:   data.end_comid   ?? null,
     }
     repinRiverId.value = data.river_id ?? ''
+    repinPrimaryGauge.value = data.primary_gauge_id
+      ? { id: data.primary_gauge_id, external_id: data.primary_gauge_external_id ?? '', name: data.primary_gauge_name ?? data.primary_gauge_external_id ?? '' }
+      : null
+    repinGauges.value = null
+    repinGaugeSelectMode.value = false
+    repinGaugeError.value = ''
     repinForm.value = {
       name:           data.name ?? '',
       commonName:     data.common_name ?? '',
@@ -1737,6 +1769,7 @@ async function loadRepinReach() {
       repinAnchorSnap.value = { comid: data.start_comid, name: data.river_name ?? '' }
       repinComIDEditMode.value = 'up'
       await fetchRepinFlowlines(data.start_comid)
+      fetchRepinNearbyGauges(data.start_comid)
       if (data.put_in?.lat != null && data.put_in?.lng != null) {
         fetchRepinTributaries(data.put_in.lat, data.put_in.lng)
       }
@@ -1772,6 +1805,42 @@ async function fetchRepinFlowlines(comid: string) {
     }
   } catch { /* non-fatal */ }
   finally { repinFlowlinesLoading.value = false }
+}
+
+async function fetchRepinNearbyGauges(comid: string) {
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/nldi/nearby-gauges?comid=${comid}&distance=150`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (res.ok) repinGauges.value = await res.json()
+  } catch { /* non-fatal */ }
+}
+
+async function onRepinGaugeSelect(externalId: string, name: string, lat: number, lng: number) {
+  if (!repinReach.value) return
+  repinGaugeSelectMode.value = false
+  repinGaugeSaving.value = true
+  repinGaugeError.value = ''
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/primary-gauge`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ external_id: externalId, source: 'usgs', name, lat, lng }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      repinGaugeError.value = body.error ?? `Error ${res.status}`
+      return
+    }
+    const data = await res.json()
+    repinPrimaryGauge.value = { id: data.gauge_id, external_id: externalId, name: name || externalId }
+  } catch (e: any) {
+    repinGaugeError.value = e?.message ?? 'Failed to set gauge'
+  } finally {
+    repinGaugeSaving.value = false
+  }
 }
 
 function onRepinComIDSelect(comid: string, lat: number, lng: number) {

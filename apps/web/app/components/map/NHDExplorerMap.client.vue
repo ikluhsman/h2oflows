@@ -12,8 +12,13 @@
       Click the map to snap to NHD
     </div>
 
+    <!-- Gauge select mode hint -->
+    <div v-if="mapReady && gaugeSelectMode" class="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-amber-500 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow pointer-events-none">
+      Click a gauge (amber dot) to select it
+    </div>
+
     <!-- ComID select mode hint -->
-    <div v-if="mapReady && comidSelectMode" class="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex gap-1.5 pointer-events-none">
+    <div v-if="mapReady && comidSelectMode && !gaugeSelectMode" class="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex gap-1.5 pointer-events-none">
       <span v-if="comidSelectSlot === 'up'" class="bg-green-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
         Click a flow line to set the reach start
       </span>
@@ -82,11 +87,14 @@ const props = defineProps<{
   disableAutoFit?:     boolean
   // Preview centerline GeoJSON — shown as a dashed highlight without storing.
   previewCenterline?:  object | null
+  // Gauge selection mode: clicking a gauge circle emits gauge-select instead of a popup.
+  gaugeSelectMode?:    boolean
 }>()
 
 const emit = defineEmits<{
   pick:           [lat: number, lng: number]
   'comid-select': [comid: string, lat: number, lng: number]
+  'gauge-select': [externalId: string, name: string, lat: number, lng: number]
 }>()
 
 const BASEMAP_OPTIONS = [
@@ -346,12 +354,16 @@ function addLayers() {
     },
   })
 
-  // ── Gauge popups ──────────────────────────────────────────────────────
+  // ── Gauge popups / selection ──────────────────────────────────────────
   map.on('click', 'nhd-gauges-circle', (e) => {
     const f = e.features?.[0]
     if (!f || !map) return
     const p = f.properties ?? {}
     const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number]
+    if (props.gaugeSelectMode) {
+      emit('gauge-select', p.identifier ?? '', p.name ?? '', coords[1], coords[0])
+      return
+    }
     new maplibregl.Popup({ closeButton: false, maxWidth: '220px' })
       .setLngLat(coords)
       .setHTML(`<div style="font-size:12px;line-height:1.5">
