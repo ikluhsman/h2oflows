@@ -322,44 +322,72 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 }
 
 // NearbyGauges handles GET /api/v1/admin/nldi/nearby-gauges
-// Returns upstream + downstream USGS gauge sites near a given ComID.
-// Query params: comid (required), distance (km, default 150, max 500)
+// Returns all active gauges (USGS, DWR, etc.) within a radius of a coordinate,
+// queried from the local DB so all seeded sources are included.
+// Query params: lat, lng (required), distance (km, default 100, max 500)
 func (h *NLDIHandler) NearbyGauges(w http.ResponseWriter, r *http.Request) {
-	comid := r.URL.Query().Get("comid")
-	if comid == "" {
-		errorResponse(w, http.StatusBadRequest, "comid is required")
+	lat, lng, err := parseLatLng(r)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	distanceKm := 150
+	distanceKm := 100
 	if d := r.URL.Query().Get("distance"); d != "" {
 		if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= 500 {
 			distanceKm = v
 		}
 	}
 
-	ctx := r.Context()
-	c := nldi.New()
-
-	upGauges, _ := c.UpstreamGauges(ctx, comid, distanceKm)
-	downKm := distanceKm
-	if downKm > 50 {
-		downKm = 50
+	rows, err := h.db.Query(r.Context(), `
+		SELECT external_id, source, name,
+		       ST_Y(location::geometry) AS lat,
+		       ST_X(location::geometry) AS lng
+		FROM gauges
+		WHERE status = 'active'
+		  AND location IS NOT NULL
+		  AND ST_DWithin(
+		        location,
+		        ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+		        $3
+		      )
+		ORDER BY location <-> ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+		LIMIT 50
+	`, lng, lat, distanceKm*1000)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "query failed")
+		return
 	}
-	downGauges, _ := c.DownstreamGauges(ctx, comid, downKm)
+	defer rows.Close()
 
-	seen := map[string]bool{}
-	features := make([]nldi.Feature, 0)
-	for _, coll := range []*nldi.Collection{upGauges, downGauges} {
-		if coll == nil {
+	type gaugeFeature struct {
+		Type       string `json:"type"`
+		Geometry   any    `json:"geometry"`
+		Properties any    `json:"properties"`
+	}
+	features := make([]gaugeFeature, 0)
+	for rows.Next() {
+		var extID, source string
+		var name *string
+		var gLat, gLng float64
+		if err := rows.Scan(&extID, &source, &name, &gLat, &gLng); err != nil {
 			continue
 		}
-		for _, f := range coll.Features {
-			if seen[f.Props.Identifier] {
-				continue
-			}
-			seen[f.Props.Identifier] = true
-			features = append(features, f)
+		n := ""
+		if name != nil {
+			n = *name
 		}
+		features = append(features, gaugeFeature{
+			Type: "Feature",
+			Geometry: map[string]any{
+				"type":        "Point",
+				"coordinates": []float64{gLng, gLat},
+			},
+			Properties: map[string]any{
+				"identifier": extID,
+				"source":     source,
+				"name":       n,
+			},
+		})
 	}
 
 	jsonResponse(w, http.StatusOK, map[string]any{

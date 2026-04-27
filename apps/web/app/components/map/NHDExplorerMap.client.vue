@@ -94,7 +94,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   pick:           [lat: number, lng: number]
   'comid-select': [comid: string, lat: number, lng: number]
-  'gauge-select': [externalId: string, name: string, lat: number, lng: number]
+  'gauge-select': [externalId: string, source: string, name: string, lat: number, lng: number]
 }>()
 
 const BASEMAP_OPTIONS = [
@@ -361,7 +361,7 @@ function addLayers() {
     const p = f.properties ?? {}
     const coords = (f.geometry as GeoJSON.Point).coordinates as [number, number]
     if (props.gaugeSelectMode) {
-      emit('gauge-select', p.identifier ?? '', p.name ?? '', coords[1], coords[0])
+      emit('gauge-select', p.identifier ?? '', p.source ?? 'usgs', p.name ?? '', coords[1], coords[0])
       return
     }
     new maplibregl.Popup({ closeButton: false, maxWidth: '220px' })

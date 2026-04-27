@@ -1769,13 +1769,15 @@ async function loadRepinReach() {
       repinAnchorSnap.value = { comid: data.start_comid, name: data.river_name ?? '' }
       repinComIDEditMode.value = 'up'
       await fetchRepinFlowlines(data.start_comid)
-      fetchRepinNearbyGauges(data.start_comid)
       if (data.put_in?.lat != null && data.put_in?.lng != null) {
+        fetchRepinNearbyGauges(data.put_in.lat, data.put_in.lng)
         fetchRepinTributaries(data.put_in.lat, data.put_in.lng)
       }
+
     } else if (data.put_in?.lat != null && data.put_in?.lng != null) {
       // KML-imported reach: auto-snap to NHD using put-in coords so the map
       // loads with clickable flowlines without requiring a manual re-anchor.
+      fetchRepinNearbyGauges(data.put_in.lat, data.put_in.lng)
       onRepinAnchorPick(data.put_in.lat, data.put_in.lng)
     }
   } catch (e: any) {
@@ -1807,17 +1809,17 @@ async function fetchRepinFlowlines(comid: string) {
   finally { repinFlowlinesLoading.value = false }
 }
 
-async function fetchRepinNearbyGauges(comid: string) {
+async function fetchRepinNearbyGauges(lat: number, lng: number) {
   try {
     const token = await getToken()
-    const res = await fetch(`${apiBase}/api/v1/admin/nldi/nearby-gauges?comid=${comid}&distance=150`, {
+    const res = await fetch(`${apiBase}/api/v1/admin/nldi/nearby-gauges?lat=${lat}&lng=${lng}&distance=100`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     if (res.ok) repinGauges.value = await res.json()
   } catch { /* non-fatal */ }
 }
 
-async function onRepinGaugeSelect(externalId: string, name: string, lat: number, lng: number) {
+async function onRepinGaugeSelect(externalId: string, source: string, name: string, lat: number, lng: number) {
   if (!repinReach.value) return
   repinGaugeSelectMode.value = false
   repinGaugeSaving.value = true
@@ -1827,7 +1829,7 @@ async function onRepinGaugeSelect(externalId: string, name: string, lat: number,
     const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/primary-gauge`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ external_id: externalId, source: 'usgs', name, lat, lng }),
+      body: JSON.stringify({ external_id: externalId, source, name, lat, lng }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
