@@ -238,6 +238,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 		permitRequired                  bool
 		multiDayDays                    int
 		putInComID, takeOutComID        *string
+		anchorComID                     *string
 		putInLng, putInLat              *float64
 		takeOutLng, takeOutLat          *float64
 	)
@@ -247,7 +248,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 			river_id,
 			class_min, class_max, description,
 			COALESCE(permit_required, false), COALESCE(multi_day_days, 1),
-			start_comid, end_comid,
+			start_comid, end_comid, anchor_comid,
 			ST_X(start_point::geometry),  ST_Y(start_point::geometry),
 			ST_X(end_point::geometry),    ST_Y(end_point::geometry)
 		FROM reaches WHERE slug = $1
@@ -256,7 +257,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 		&riverID,
 		&classMin, &classMax, &description,
 		&permitRequired, &multiDayDays,
-		&putInComID, &takeOutComID,
+		&putInComID, &takeOutComID, &anchorComID,
 		&putInLng, &putInLat, &takeOutLng, &takeOutLat,
 	)
 	if err != nil {
@@ -290,6 +291,7 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 		"multi_day_days":  multiDayDays,
 		"start_comid":     putInComID,
 		"end_comid":       takeOutComID,
+		"anchor_comid":    anchorComID,
 		"put_in":          putIn,
 		"take_out":        takeOut,
 	})

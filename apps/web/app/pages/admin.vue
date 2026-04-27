@@ -537,7 +537,7 @@
                     <label class="block text-xs text-gray-500 mb-1">River name</label>
                     <div class="flex gap-2">
                       <input v-model="repinForm.riverName" class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
-                      <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID" @click="fetchRepinRiverName">Fetch from NLDI</UButton>
+                      <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorComID" @click="fetchRepinRiverName">Fetch from NLDI</UButton>
                     </div>
                   </div>
                   <div>
@@ -1470,6 +1470,7 @@ const repinUpComID        = ref<string | null>(null)
 const repinDownComID      = ref<string | null>(null)
 const repinOrigUpComID    = ref<string | null>(null)
 const repinOrigDownComID  = ref<string | null>(null)
+const repinAnchorComID    = ref<string | null>(null)
 const repinComIDEditMode  = ref<'up' | 'down' | null>(null)
 const repinPickMode       = ref(false)
 const repinAnchorSnap     = ref<{ comid: string; name: string } | null>(null)
@@ -1510,6 +1511,7 @@ function resetRepin() {
   repinMetaMsg.value = ''
   repinUpComID.value = null; repinDownComID.value = null
   repinOrigUpComID.value = null; repinOrigDownComID.value = null
+  repinAnchorComID.value = null
   repinComIDEditMode.value = null
   repinStartLat.value = null; repinStartLng.value = null
   repinEndLat.value = null;   repinEndLng.value = null
@@ -1588,6 +1590,8 @@ async function loadRepinReach() {
     repinDownComID.value     = data.end_comid   ?? null
     repinOrigUpComID.value   = data.start_comid ?? null
     repinOrigDownComID.value = data.end_comid   ?? null
+    // anchor_comid is the best available single ComID for reaches without start/end ComIDs
+    repinAnchorComID.value   = data.anchor_comid ?? null
 
     // Load existing flow bands
     try {
@@ -1804,11 +1808,12 @@ async function saveRepinFlowBands() {
 }
 
 async function fetchRepinRiverName() {
-  if (!repinUpComID.value) return
+  const comid = repinUpComID.value ?? repinAnchorComID.value
+  if (!comid) return
   repinRiverNameFetching.value = true
   try {
     const token = await getToken()
-    const res = await fetch(`${apiBase}/api/v1/admin/nldi/river-name?comid=${repinUpComID.value}`, {
+    const res = await fetch(`${apiBase}/api/v1/admin/nldi/river-name?comid=${comid}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     if (res.ok) {
