@@ -1829,7 +1829,12 @@ async function fetchRepinRiverName() {
     if (!token) return
 
     // Step 1: look up river name + GNIS ID from NHD ArcGIS via the API.
-    const nameRes = await fetch(`${apiBase}/api/v1/admin/nldi/river-name?comid=${comid}`, {
+    // Pass the clicked lat/lng so the backend queries NHD at the exact point
+    // rather than navigating upstream (which can land on a tributary).
+    const lat = repinStartLat.value ?? repinReach.value?.put_in?.lat
+    const lng = repinStartLng.value ?? repinReach.value?.put_in?.lng
+    const coordParams = lat != null && lng != null ? `&lat=${lat}&lng=${lng}` : ''
+    const nameRes = await fetch(`${apiBase}/api/v1/admin/nldi/river-name?comid=${comid}${coordParams}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (!nameRes.ok) return

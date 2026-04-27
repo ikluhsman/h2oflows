@@ -468,13 +468,14 @@ func (h *NLDIHandler) DownstreamMainstem(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-// RiverName handles GET /api/v1/admin/nldi/river-name?comid=<comid>
+// RiverName handles GET /api/v1/admin/nldi/river-name?comid=<comid>[&lat=<lat>&lng=<lng>]
 //
-// Returns the GNIS stream name for a ComID. NLDI flowline navigation does NOT
-// include gnis_name in feature properties, so we:
-//  1. Fetch a small upstream slice to get flowline geometry.
-//  2. Extract a representative coordinate.
-//  3. Spatial-query the National Map NHD ArcGIS service, which does carry GNIS names.
+// Returns the GNIS stream name at the given location. When lat/lng are provided
+// (the exact point the user clicked on the flowline) we query the National Map
+// NHD ArcGIS service directly at that coordinate — no NLDI navigation needed,
+// and the result is the feature the user actually clicked, not a random tributary.
+// When only comid is provided we fall back to fetching a short upstream slice to
+// extract a coordinate (legacy path, less reliable for large rivers).
 func (h *NLDIHandler) RiverName(w http.ResponseWriter, r *http.Request) {
 	comid := strings.TrimSpace(r.URL.Query().Get("comid"))
 	if comid == "" {
@@ -483,25 +484,32 @@ func (h *NLDIHandler) RiverName(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
-	c := nldi.New()
 
-	// Fetch a small upstream slice to obtain at least one flowline geometry.
-	up, err := c.UpstreamFlowlines(ctx, comid, 10)
-	if err != nil || up == nil || len(up.Features) == 0 {
-		// Try downstream as a fallback source of geometry.
-		up, _ = c.DownstreamFlowlines(ctx, comid, 5)
+	var lat, lng float64
+
+	// Prefer caller-supplied coordinates (the exact map click point).
+	if latStr := r.URL.Query().Get("lat"); latStr != "" {
+		lat, _ = strconv.ParseFloat(latStr, 64)
+		lng, _ = strconv.ParseFloat(r.URL.Query().Get("lng"), 64)
 	}
 
-	// Extract the first coordinate from the first available flowline geometry.
-	var lat, lng float64
-	if up != nil {
-		for _, f := range up.Features {
-			if pt := nldi.FirstCoord(f.Geometry); pt != nil {
-				lat, lng = pt[1], pt[0] // GeoJSON is [lng, lat]
-				break
+	// Fall back: navigate a short upstream slice to extract a coordinate.
+	if lat == 0 && lng == 0 {
+		c := nldi.New()
+		up, err := c.UpstreamFlowlines(ctx, comid, 10)
+		if err != nil || up == nil || len(up.Features) == 0 {
+			up, _ = c.DownstreamFlowlines(ctx, comid, 5)
+		}
+		if up != nil {
+			for _, f := range up.Features {
+				if pt := nldi.FirstCoord(f.Geometry); pt != nil {
+					lat, lng = pt[1], pt[0]
+					break
+				}
 			}
 		}
 	}
+
 	if lat == 0 && lng == 0 {
 		jsonResponse(w, http.StatusOK, map[string]any{"river_name": ""})
 		return
