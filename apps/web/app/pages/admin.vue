@@ -1770,14 +1770,14 @@ async function loadRepinReach() {
       repinComIDEditMode.value = 'up'
       await fetchRepinFlowlines(data.start_comid)
       if (data.put_in?.lat != null && data.put_in?.lng != null) {
-        fetchRepinNearbyGauges(data.put_in.lat, data.put_in.lng)
+        fetchRepinNearbyGauges(data.put_in.lat, data.put_in.lng, data.start_comid)
         fetchRepinTributaries(data.put_in.lat, data.put_in.lng)
       }
 
     } else if (data.put_in?.lat != null && data.put_in?.lng != null) {
       // KML-imported reach: auto-snap to NHD using put-in coords so the map
       // loads with clickable flowlines without requiring a manual re-anchor.
-      fetchRepinNearbyGauges(data.put_in.lat, data.put_in.lng)
+      fetchRepinNearbyGauges(data.put_in.lat, data.put_in.lng, null)
       onRepinAnchorPick(data.put_in.lat, data.put_in.lng)
     }
   } catch (e: any) {
@@ -1809,10 +1809,11 @@ async function fetchRepinFlowlines(comid: string) {
   finally { repinFlowlinesLoading.value = false }
 }
 
-async function fetchRepinNearbyGauges(lat: number, lng: number) {
+async function fetchRepinNearbyGauges(lat: number, lng: number, comid?: string | null) {
   try {
     const token = await getToken()
-    const res = await fetch(`${apiBase}/api/v1/admin/nldi/nearby-gauges?lat=${lat}&lng=${lng}&distance=100`, {
+    const comidParam = comid ? `&comid=${comid}` : ''
+    const res = await fetch(`${apiBase}/api/v1/admin/nldi/nearby-gauges?lat=${lat}&lng=${lng}&distance=100${comidParam}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
     if (res.ok) repinGauges.value = await res.json()

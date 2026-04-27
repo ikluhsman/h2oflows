@@ -10,9 +10,71 @@ import (
 )
 
 const (
-	tigerweb = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/0/query"
-	wbdHUC4  = "https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/4/query"
+	tigerweb   = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/0/query"
+	wbdHUC4    = "https://hydro.nationalmap.gov/arcgis/rest/services/wbd/MapServer/4/query"
+	dwrAPIBase = "https://dwr.state.co.us/Rest/GET/api/v2"
 )
+
+// DWRStation is a nearby DWR discharge station.
+type DWRStation struct {
+	ExternalID string
+	Name       string
+	Lat        float64
+	Lng        float64
+}
+
+// DWRNearby queries the Colorado DWR telemetry stations API for discharge
+// gauges within distanceKm of the given coordinate. Returns an empty slice
+// (not an error) when no stations are found or the point is outside Colorado.
+func DWRNearby(ctx context.Context, lat, lng float64, distanceKm int) ([]DWRStation, error) {
+	params := url.Values{
+		"measType":  {"DISCHRG"},
+		"latitude":  {fmt.Sprintf("%f", lat)},
+		"longitude": {fmt.Sprintf("%f", lng)},
+		"radius":    {fmt.Sprintf("%d", distanceKm)},
+		"units":     {"kilometers"},
+		"format":    {"json"},
+	}
+	endpoint := fmt.Sprintf("%s/telemetrystations/telemetrystations/?%s", dwrAPIBase, params.Encode())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "h2oflows/1.0 (https://h2oflows.org)")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("dwr nearby: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var result struct {
+		ResultList []struct {
+			Abbrev      string  `json:"abbrev"`
+			StationName string  `json:"stationName"`
+			Latitude    float64 `json:"latitude"`
+			Longitude   float64 `json:"longitude"`
+		} `json:"ResultList"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("dwr nearby parse: %w", err)
+	}
+
+	out := make([]DWRStation, 0, len(result.ResultList))
+	for _, st := range result.ResultList {
+		if st.Abbrev == "" || (st.Latitude == 0 && st.Longitude == 0) {
+			continue
+		}
+		out = append(out, DWRStation{
+			ExternalID: st.Abbrev,
+			Name:       st.StationName,
+			Lat:        st.Latitude,
+			Lng:        st.Longitude,
+		})
+	}
+	return out, nil
+}
 
 // StateAt queries the TIGERweb Census service for the US state abbreviation at
 // the given coordinate. Returns ("", nil) when the point falls outside all

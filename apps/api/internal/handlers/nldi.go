@@ -322,15 +322,20 @@ func (h *NLDIHandler) GetAdminReach(w http.ResponseWriter, r *http.Request) {
 }
 
 // NearbyGauges handles GET /api/v1/admin/nldi/nearby-gauges
-// Returns all active gauges (USGS, DWR, etc.) within a radius of a coordinate,
-// queried from the local DB so all seeded sources are included.
-// Query params: lat, lng (required), distance (km, default 100, max 500)
+// Returns active gauges from three sources in parallel:
+//   - Local DB PostGIS radius (all seeded sources)
+//   - Colorado DWR API live query (catches unseeded DWR stations)
+//   - NLDI flow-network gauges (optional, requires comid param; catches
+//     upstream USGS gauges far along the network)
+//
+// Query params: lat, lng (required), comid (optional), distance (km, default 100, max 500)
 func (h *NLDIHandler) NearbyGauges(w http.ResponseWriter, r *http.Request) {
 	lat, lng, err := parseLatLng(r)
 	if err != nil {
 		errorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	comid := r.URL.Query().Get("comid")
 	distanceKm := 100
 	if d := r.URL.Query().Get("distance"); d != "" {
 		if v, err := strconv.Atoi(d); err == nil && v > 0 && v <= 500 {
@@ -338,56 +343,131 @@ func (h *NLDIHandler) NearbyGauges(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rows, err := h.db.Query(r.Context(), `
-		SELECT external_id, source, name,
-		       ST_Y(location::geometry) AS lat,
-		       ST_X(location::geometry) AS lng
-		FROM gauges
-		WHERE status = 'active'
-		  AND location IS NOT NULL
-		  AND ST_DWithin(
-		        location,
-		        ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
-		        $3
-		      )
-		ORDER BY location <-> ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
-		LIMIT 50
-	`, lng, lat, distanceKm*1000)
-	if err != nil {
-		errorResponse(w, http.StatusInternalServerError, "query failed")
-		return
-	}
-	defer rows.Close()
+	ctx := r.Context()
 
 	type gaugeFeature struct {
 		Type       string `json:"type"`
 		Geometry   any    `json:"geometry"`
 		Properties any    `json:"properties"`
 	}
+
+	// Channel for collecting all gauge features from parallel sources.
+	type result struct {
+		features []gaugeFeature
+		err      error
+	}
+	dbCh   := make(chan result, 1)
+	dwrCh  := make(chan result, 1)
+	nldiCh := make(chan result, 1)
+
+	// 1. Local DB — all seeded gauges within radius.
+	go func() {
+		rows, err := h.db.Query(ctx, `
+			SELECT external_id, source, name,
+			       ST_Y(location::geometry),
+			       ST_X(location::geometry)
+			FROM gauges
+			WHERE status = 'active'
+			  AND location IS NOT NULL
+			  AND ST_DWithin(
+			        location,
+			        ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography,
+			        $3
+			      )
+			ORDER BY location <-> ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
+			LIMIT 60
+		`, lng, lat, distanceKm*1000)
+		if err != nil {
+			dbCh <- result{err: err}
+			return
+		}
+		defer rows.Close()
+		var feats []gaugeFeature
+		for rows.Next() {
+			var extID, source string
+			var name *string
+			var gLat, gLng float64
+			if rows.Scan(&extID, &source, &name, &gLat, &gLng) != nil {
+				continue
+			}
+			n := ""
+			if name != nil {
+				n = *name
+			}
+			feats = append(feats, gaugeFeature{
+				Type:       "Feature",
+				Geometry:   map[string]any{"type": "Point", "coordinates": []float64{gLng, gLat}},
+				Properties: map[string]any{"identifier": extID, "source": source, "name": n},
+			})
+		}
+		dbCh <- result{features: feats}
+	}()
+
+	// 2. DWR live API — discharge stations within radius.
+	go func() {
+		stations, err := nldi.DWRNearby(ctx, lat, lng, distanceKm)
+		if err != nil {
+			dwrCh <- result{err: err}
+			return
+		}
+		feats := make([]gaugeFeature, 0, len(stations))
+		for _, st := range stations {
+			feats = append(feats, gaugeFeature{
+				Type:       "Feature",
+				Geometry:   map[string]any{"type": "Point", "coordinates": []float64{st.Lng, st.Lat}},
+				Properties: map[string]any{"identifier": st.ExternalID, "source": "dwr", "name": st.Name},
+			})
+		}
+		dwrCh <- result{features: feats}
+	}()
+
+	// 3. NLDI flow-network gauges — upstream + short downstream if comid given.
+	go func() {
+		if comid == "" {
+			nldiCh <- result{}
+			return
+		}
+		c := nldi.New()
+		upGauges, _ := c.UpstreamGauges(ctx, comid, distanceKm)
+		downKm := distanceKm
+		if downKm > 50 {
+			downKm = 50
+		}
+		downGauges, _ := c.DownstreamGauges(ctx, comid, downKm)
+		var feats []gaugeFeature
+		for _, coll := range []*nldi.Collection{upGauges, downGauges} {
+			if coll == nil {
+				continue
+			}
+			for _, f := range coll.Features {
+				raw, _ := json.Marshal(f.Geometry.Coordinates)
+				var coords []float64
+				if json.Unmarshal(raw, &coords) != nil || len(coords) < 2 {
+					continue
+				}
+				feats = append(feats, gaugeFeature{
+					Type:       "Feature",
+					Geometry:   map[string]any{"type": "Point", "coordinates": coords},
+					Properties: map[string]any{"identifier": f.Props.Identifier, "source": "usgs", "name": f.Props.Name},
+				})
+			}
+		}
+		nldiCh <- result{features: feats}
+	}()
+
+	// Merge — deduplicate by (source, identifier).
+	seen := map[string]bool{}
 	features := make([]gaugeFeature, 0)
-	for rows.Next() {
-		var extID, source string
-		var name *string
-		var gLat, gLng float64
-		if err := rows.Scan(&extID, &source, &name, &gLat, &gLng); err != nil {
-			continue
+	for _, res := range []result{<-dbCh, <-dwrCh, <-nldiCh} {
+		for _, f := range res.features {
+			p, _ := f.Properties.(map[string]any)
+			key := fmt.Sprintf("%v|%v", p["source"], p["identifier"])
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			features = append(features, f)
 		}
-		n := ""
-		if name != nil {
-			n = *name
-		}
-		features = append(features, gaugeFeature{
-			Type: "Feature",
-			Geometry: map[string]any{
-				"type":        "Point",
-				"coordinates": []float64{gLng, gLat},
-			},
-			Properties: map[string]any{
-				"identifier": extID,
-				"source":     source,
-				"name":       n,
-			},
-		})
 	}
 
 	jsonResponse(w, http.StatusOK, map[string]any{
