@@ -75,10 +75,13 @@
               <div v-if="expandedRiverId === river.id" class="bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
                 <div v-if="riverDetailLoading" class="px-6 py-4 text-xs text-gray-400 animate-pulse">Loading reaches…</div>
                 <template v-else-if="selectedRiver">
-                  <!-- Delete river -->
+                  <!-- River actions bar -->
                   <div class="flex items-center justify-between px-6 py-2 border-b border-gray-100 dark:border-gray-800">
                     <span class="text-xs text-gray-400">{{ selectedRiver.reaches?.length ?? 0 }} reaches</span>
-                    <UButton size="xs" variant="ghost" color="error" @click="deleteRiver(selectedRiver.slug, selectedRiver.name)">Delete river</UButton>
+                    <div class="flex items-center gap-2">
+                      <UButton size="xs" variant="ghost" color="neutral" @click="openEditRiver(selectedRiver)">Edit</UButton>
+                      <UButton size="xs" variant="ghost" color="error" @click="deleteRiver(selectedRiver.slug, selectedRiver.name)">Delete river</UButton>
+                    </div>
                   </div>
                   <!-- Reach rows -->
                   <div class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -765,12 +768,41 @@
           <UFormField label="State (optional)">
             <UInput v-model="newRiver.state_abbr" placeholder="CO" class="max-w-20" />
           </UFormField>
+          <UFormField label="GNIS ID (optional)">
+            <UInput v-model="newRiver.gnis_id" placeholder="00179365" class="max-w-40" />
+          </UFormField>
         </div>
       </template>
       <template #footer>
         <div class="flex justify-end gap-2">
           <UButton variant="ghost" color="neutral" @click="createRiverOpen = false">Cancel</UButton>
           <UButton :loading="createLoading" @click="createRiver">Create</UButton>
+        </div>
+      </template>
+    </UModal>
+
+    <!-- Edit river modal -->
+    <UModal v-model:open="editRiverOpen" title="Edit river">
+      <template #body>
+        <div v-if="editingRiver" class="space-y-3">
+          <UFormField label="Name">
+            <UInput v-model="editingRiver.name" />
+          </UFormField>
+          <UFormField label="Basin (optional)">
+            <UInput v-model="editingRiver.basin" placeholder="Arkansas River Basin" />
+          </UFormField>
+          <UFormField label="State (optional)">
+            <UInput v-model="editingRiver.state_abbr" placeholder="CO" class="max-w-20" />
+          </UFormField>
+          <UFormField label="GNIS ID (optional)">
+            <UInput v-model="editingRiver.gnis_id" placeholder="00179365" class="max-w-40" />
+          </UFormField>
+        </div>
+      </template>
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <UButton variant="ghost" color="neutral" @click="editRiverOpen = false">Cancel</UButton>
+          <UButton :loading="editRiverLoading" @click="saveEditRiver">Save</UButton>
         </div>
       </template>
     </UModal>
@@ -965,7 +997,7 @@ async function deleteRiver(riverSlug: string, riverName: string) {
 // Create river
 const createRiverOpen = ref(false)
 const createLoading = ref(false)
-const newRiver = ref({ name: '', slug: '', basin: '', state_abbr: '' })
+const newRiver = ref({ name: '', slug: '', basin: '', state_abbr: '', gnis_id: '' })
 
 function autoSlug() {
   newRiver.value.slug = newRiver.value.name
@@ -984,15 +1016,56 @@ async function createRiver() {
         name: newRiver.value.name,
         basin: newRiver.value.basin || null,
         state_abbr: newRiver.value.state_abbr || null,
+        gnis_id: newRiver.value.gnis_id || null,
       }),
     })
     if (res.ok) {
       createRiverOpen.value = false
-      newRiver.value = { name: '', slug: '', basin: '', state_abbr: '' }
+      newRiver.value = { name: '', slug: '', basin: '', state_abbr: '', gnis_id: '' }
       loadRivers()
     }
   } finally {
     createLoading.value = false
+  }
+}
+
+// Edit river
+const editRiverOpen = ref(false)
+const editRiverLoading = ref(false)
+const editingRiver = ref<{ slug: string; name: string; basin: string; state_abbr: string; gnis_id: string } | null>(null)
+
+function openEditRiver(river: RiverDetail) {
+  editingRiver.value = {
+    slug: river.slug,
+    name: river.name,
+    basin: river.basin ?? '',
+    state_abbr: river.state_abbr ?? '',
+    gnis_id: river.gnis_id ?? '',
+  }
+  editRiverOpen.value = true
+}
+
+async function saveEditRiver() {
+  if (!editingRiver.value) return
+  editRiverLoading.value = true
+  const token = await getToken()
+  try {
+    const res = await fetch(`${apiBase}/api/v1/admin/rivers/${editingRiver.value.slug}`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: editingRiver.value.name || null,
+        basin: editingRiver.value.basin || null,
+        state_abbr: editingRiver.value.state_abbr || null,
+        gnis_id: editingRiver.value.gnis_id || null,
+      }),
+    })
+    if (res.ok) {
+      editRiverOpen.value = false
+      loadRivers()
+    }
+  } finally {
+    editRiverLoading.value = false
   }
 }
 

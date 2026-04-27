@@ -145,6 +145,7 @@ func (h *AdminHandler) CreateRiver(w http.ResponseWriter, r *http.Request) {
 		Name      string  `json:"name"`
 		Basin     *string `json:"basin"`
 		StateAbbr *string `json:"state_abbr"`
+		GnisID    *string `json:"gnis_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		errorResponse(w, http.StatusBadRequest, "invalid JSON")
@@ -157,10 +158,10 @@ func (h *AdminHandler) CreateRiver(w http.ResponseWriter, r *http.Request) {
 
 	var id string
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO rivers (slug, name, basin, state_abbr)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO rivers (slug, name, basin, state_abbr, gnis_id)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id
-	`, body.Slug, body.Name, body.Basin, body.StateAbbr).Scan(&id)
+	`, body.Slug, body.Name, body.Basin, body.StateAbbr, body.GnisID).Scan(&id)
 	if err != nil {
 		errorResponse(w, http.StatusConflict, "river already exists or invalid data")
 		return
@@ -207,6 +208,7 @@ func (h *AdminHandler) UpdateRiver(w http.ResponseWriter, r *http.Request) {
 		Basin       *string `json:"basin"`
 		BasinLocked *bool   `json:"basin_locked"`
 		StateAbbr   *string `json:"state_abbr"`
+		GnisID      *string `json:"gnis_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		errorResponse(w, http.StatusBadRequest, "invalid JSON")
@@ -218,9 +220,10 @@ func (h *AdminHandler) UpdateRiver(w http.ResponseWriter, r *http.Request) {
 		SET name         = COALESCE($2, name),
 		    basin        = COALESCE($3, basin),
 		    basin_locked = COALESCE($4, basin_locked),
-		    state_abbr   = COALESCE($5, state_abbr)
+		    state_abbr   = COALESCE($5, state_abbr),
+		    gnis_id      = COALESCE($6, gnis_id)
 		WHERE slug = $1
-	`, slug, body.Name, body.Basin, body.BasinLocked, body.StateAbbr)
+	`, slug, body.Name, body.Basin, body.BasinLocked, body.StateAbbr, body.GnisID)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "update failed")
 		return
