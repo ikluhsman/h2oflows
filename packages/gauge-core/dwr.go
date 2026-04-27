@@ -132,10 +132,10 @@ func (s *DWRSource) FetchHistory(ctx context.Context, externalID string, since t
 // ignored; BoundingBox filtering is applied client-side after fetching.
 func (s *DWRSource) DiscoverSites(ctx context.Context, opts DiscoverOptions) ([]*SiteMetadata, error) {
 	params := url.Values{
-		"measType": {"DISCHRG"}, // discharge stations only
-		"format":   {"json"},
+		"stationType": {"Stream Gage"}, // discharge stream gages only
+		"format":      {"json"},
 	}
-	endpoint := fmt.Sprintf("%s/telemetrystations/telemetrystations/?%s", s.apiBase, params.Encode())
+	endpoint := fmt.Sprintf("%s/telemetrystations/telemetrystation/?%s", s.apiBase, params.Encode())
 
 	resp, err := s.get(ctx, endpoint)
 	if err != nil {

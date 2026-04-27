@@ -34,15 +34,15 @@ func haversineKm(lat1, lng1, lat2, lng2 float64) float64 {
 	return r * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
 }
 
-// DWRNearby fetches all Colorado DWR discharge telemetry stations and filters
-// client-side to those within distanceKm. The DWR API does not support
-// server-side radius filtering, so we fetch the full list (~600 stations).
+// DWRNearby fetches all Colorado DWR stream-gage telemetry stations and
+// filters client-side to those within distanceKm. The DWR API does not support
+// server-side radius filtering, so we fetch the full list (~550 stations).
 func DWRNearby(ctx context.Context, lat, lng float64, distanceKm int) ([]DWRStation, error) {
 	params := url.Values{
-		"measType": {"DISCHRG"},
-		"format":   {"json"},
+		"stationType": {"Stream Gage"},
+		"format":      {"json"},
 	}
-	endpoint := fmt.Sprintf("%s/telemetrystations/telemetrystations/?%s", dwrAPIBase, params.Encode())
+	endpoint := fmt.Sprintf("%s/telemetrystations/telemetrystation/?%s", dwrAPIBase, params.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
