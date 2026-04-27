@@ -197,14 +197,21 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Auto-link to a river record when river_name matches an existing entry.
-	// Best-effort — failure is silent so the reach is still usable.
+	// Auto-upsert a river record when river_name is provided, then link the reach.
+	// Uses the name+basin unique index to avoid duplicates. Best-effort — a
+	// failure here is silent so the reach is still usable.
 	if req.RiverName != "" {
-		h.db.Exec(ctx, `
-			UPDATE reaches
-			SET river_id = (SELECT id FROM rivers WHERE LOWER(name) = LOWER($1) LIMIT 1)
-			WHERE id = $2 AND river_id IS NULL
-		`, req.RiverName, reachID)
+		riverSlug := kmlimport.Slugify(req.RiverName)
+		var riverID string
+		_ = h.db.QueryRow(ctx, `
+			INSERT INTO rivers (slug, name)
+			VALUES ($1, $2)
+			ON CONFLICT (lower(name), COALESCE(lower(basin), '')) DO UPDATE SET name = EXCLUDED.name
+			RETURNING id
+		`, riverSlug, req.RiverName).Scan(&riverID)
+		if riverID != "" {
+			h.db.Exec(ctx, `UPDATE reaches SET river_id = $1 WHERE id = $2`, riverID, reachID)
+		}
 	}
 
 	jsonResponse(w, http.StatusCreated, map[string]any{
