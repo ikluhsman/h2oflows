@@ -260,28 +260,37 @@ func (h *AdminHandler) AutoAssignRiver(w http.ResponseWriter, r *http.Request) {
 	var riverID, riverName, riverSlugOut string
 	var riverGnisID *string
 
+	// Look up existing river: prefer gnis_id match, fall back to name match.
+	// This avoids INSERT conflicts when the river already exists under either key.
 	if body.GnisID != "" {
-		// Upsert by gnis_id (globally unique per named stream).
-		err := h.db.QueryRow(ctx, `
-			INSERT INTO rivers (slug, name, gnis_id)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (gnis_id) DO UPDATE SET name = EXCLUDED.name
-			RETURNING id, name, slug, gnis_id
-		`, riverSlug, body.RiverName, body.GnisID).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID)
-		if err != nil {
-			errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("upsert river: %v", err))
-			return
+		_ = h.db.QueryRow(ctx,
+			`SELECT id, name, slug, gnis_id FROM rivers WHERE gnis_id = $1`,
+			body.GnisID).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID)
+	}
+	if riverID == "" {
+		_ = h.db.QueryRow(ctx,
+			`SELECT id, name, slug, gnis_id FROM rivers WHERE lower(name) = lower($1) LIMIT 1`,
+			body.RiverName).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID)
+	}
+	if riverID != "" {
+		// River exists — backfill gnis_id if we now have one and it was missing.
+		if body.GnisID != "" && riverGnisID == nil {
+			_, _ = h.db.Exec(ctx, `UPDATE rivers SET gnis_id = $1 WHERE id = $2`, body.GnisID, riverID)
+			g := body.GnisID
+			riverGnisID = &g
 		}
 	} else {
-		// Upsert by name+basin (no GNIS ID available).
-		err := h.db.QueryRow(ctx, `
-			INSERT INTO rivers (slug, name)
-			VALUES ($1, $2)
-			ON CONFLICT (lower(name), COALESCE(lower(basin), '')) DO UPDATE SET name = EXCLUDED.name
+		// Insert a new river.
+		var gnisParam interface{}
+		if body.GnisID != "" {
+			gnisParam = body.GnisID
+		}
+		if err := h.db.QueryRow(ctx, `
+			INSERT INTO rivers (slug, name, gnis_id)
+			VALUES ($1, $2, $3)
 			RETURNING id, name, slug, gnis_id
-		`, riverSlug, body.RiverName).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID)
-		if err != nil {
-			errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("upsert river: %v", err))
+		`, riverSlug, body.RiverName, gnisParam).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID); err != nil {
+			errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("insert river: %v", err))
 			return
 		}
 	}

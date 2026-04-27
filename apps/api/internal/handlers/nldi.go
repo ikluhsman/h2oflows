@@ -308,6 +308,7 @@ func (h *NLDIHandler) UpdateReachMeta(w http.ResponseWriter, r *http.Request) {
 		NewSlug        string   `json:"new_slug"`
 		CommonName     string   `json:"common_name"`
 		RiverName      string   `json:"river_name"`
+		RiverID        *string  `json:"river_id"`
 		ClassMin       *float64 `json:"class_min"`
 		ClassMax       *float64 `json:"class_max"`
 		PermitRequired bool     `json:"permit_required"`
@@ -339,12 +340,13 @@ func (h *NLDIHandler) UpdateReachMeta(w http.ResponseWriter, r *http.Request) {
 			class_min       = $5,
 			class_max       = $6,
 			permit_required = $7,
-			multi_day_days  = $8
+			multi_day_days  = $8,
+			river_id        = $10
 		WHERE slug = $9
 	`, newSlug, req.Name, req.CommonName, req.RiverName,
 		req.ClassMin, req.ClassMax,
 		req.PermitRequired, days,
-		slug,
+		slug, req.RiverID,
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {

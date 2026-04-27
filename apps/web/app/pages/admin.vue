@@ -536,17 +536,7 @@
                   <div>
                     <label class="block text-xs text-gray-500 mb-1">River</label>
                     <div class="space-y-2">
-                      <!-- Current association badge -->
                       <div class="flex items-center gap-2 flex-wrap">
-                        <span v-if="repinRiverId" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200">
-                          <span class="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
-                          {{ rivers.find(r => r.id === repinRiverId)?.name ?? repinForm.riverName }}
-                        </span>
-                        <span v-else class="text-xs text-amber-500">Unassigned</span>
-                        <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorSnap && !repinAnchorComID" @click="fetchRepinRiverName">Auto-assign from NLDI</UButton>
-                      </div>
-                      <!-- Manual override dropdown -->
-                      <div class="flex gap-2 items-center">
                         <select
                           v-model="repinRiverId"
                           class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
@@ -554,7 +544,7 @@
                           <option value="">— Unassigned —</option>
                           <option v-for="rv in rivers" :key="rv.id" :value="rv.id">{{ rv.name }}</option>
                         </select>
-                        <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverAssigning" @click="assignRepinRiver">Assign</UButton>
+                        <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorSnap && !repinAnchorComID" @click="fetchRepinRiverName">Auto-assign from NLDI</UButton>
                       </div>
                     </div>
                   </div>
@@ -1437,7 +1427,6 @@ const repinMetaSaving        = ref(false)
 const repinMetaMsg           = ref('')
 const repinRiverNameFetching = ref(false)
 const repinRiverId           = ref('')
-const repinRiverAssigning    = ref(false)
 const repinFlowBands = ref({
   too_low:   { min: null as number | null, max: null as number | null },
   running:   { min: null as number | null, max: null as number | null },
@@ -1537,7 +1526,6 @@ function resetRepin() {
   repinFlowBandsSaving.value = false
   repinFlowBandsMsg.value = ''
   repinRiverId.value = ''
-  repinRiverAssigning.value = false
   repinSlugAvailable.value = null
   repinPickMode.value = false
   repinAnchorSnap.value = null
@@ -1766,6 +1754,7 @@ async function saveRepinMeta() {
         new_slug:        newSlug !== repinReach.value.slug ? newSlug : undefined,
         common_name:     f.commonName.trim(),
         river_name:      f.riverName.trim(),
+        river_id:        repinRiverId.value || null,
         class_min:       f.classMin,
         class_max:       f.classMax,
         permit_required: f.permitRequired,
@@ -1852,23 +1841,6 @@ async function fetchRepinRiverName() {
     loadRivers()
   } catch { /* non-fatal */ }
   finally { repinRiverNameFetching.value = false }
-}
-
-async function assignRepinRiver() {
-  if (!repinReach.value) return
-  repinRiverAssigning.value = true
-  try {
-    const token = await getToken()
-    await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/river`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ river_id: repinRiverId.value || null }),
-    })
-    // Refresh unassigned list so the assigned reach disappears from it
-    loadRivers()
-  } finally {
-    repinRiverAssigning.value = false
-  }
 }
 
 async function submitRepinByComID() {
