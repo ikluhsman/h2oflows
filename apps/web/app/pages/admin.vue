@@ -1316,27 +1316,10 @@ watch(() => authorForm.value.slug, (val) => {
   }, 400)
 })
 
-// Slug availability check — repin form
+// Slug availability check — repin form (refs declared here; watch is below, after repinForm)
 const repinSlugAvailable = ref<boolean | null>(null)
 const repinSlugChecking  = ref(false)
 let   repinSlugTimer: ReturnType<typeof setTimeout> | null = null
-
-watch(() => repinForm.value.slug, (val) => {
-  repinSlugAvailable.value = null
-  if (repinSlugTimer) clearTimeout(repinSlugTimer)
-  if (!val) return
-  // If slug unchanged from loaded value, it's trivially available (it IS this reach)
-  if (val === repinReach.value?.slug) { repinSlugAvailable.value = true; return }
-  repinSlugChecking.value = true
-  repinSlugTimer = setTimeout(async () => {
-    try {
-      const exclude = encodeURIComponent(repinReach.value?.slug ?? '')
-      const d = await $fetch<{ available: boolean }>(`${apiBase}/api/v1/admin/slug-check?slug=${encodeURIComponent(val)}&exclude=${exclude}`)
-      repinSlugAvailable.value = d.available
-    } catch { repinSlugAvailable.value = null }
-    finally { repinSlugChecking.value = false }
-  }, 400)
-})
 
 function resetAuthor() {
   authorPickMode.value = false
@@ -1464,6 +1447,23 @@ const repinFlowBandsDef = [
   { key: 'very_high', label: 'Very High', dot: '#ef4444', showMin: true,  showMax: false },
 ] as const
 const repinFlowBandsSaving = ref(false)
+
+// Must be after repinForm (line above) — watch getter accesses repinForm.value
+watch(() => repinForm.value.slug, (val) => {
+  repinSlugAvailable.value = null
+  if (repinSlugTimer) clearTimeout(repinSlugTimer)
+  if (!val) return
+  if (val === repinReach.value?.slug) { repinSlugAvailable.value = true; return }
+  repinSlugChecking.value = true
+  repinSlugTimer = setTimeout(async () => {
+    try {
+      const exclude = encodeURIComponent(repinReach.value?.slug ?? '')
+      const d = await $fetch<{ available: boolean }>(`${apiBase}/api/v1/admin/slug-check?slug=${encodeURIComponent(val)}&exclude=${exclude}`)
+      repinSlugAvailable.value = d.available
+    } catch { repinSlugAvailable.value = null }
+    finally { repinSlugChecking.value = false }
+  }, 400)
+})
 const repinFlowBandsMsg    = ref('')
 
 const repinUpComID        = ref<string | null>(null)

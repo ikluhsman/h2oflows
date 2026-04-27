@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -460,7 +462,8 @@ func (h *NLDIHandler) RiverName(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, http.StatusBadRequest, "comid is required")
 		return
 	}
-	ctx := r.Context()
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
 	c := nldi.New()
 
 	extractName := func(fc *nldi.Collection) string {
@@ -480,8 +483,8 @@ func (h *NLDIHandler) RiverName(w http.ResponseWriter, r *http.Request) {
 		return ""
 	}
 
-	// Try upstream first with a generous distance so named tributaries appear.
-	up, err := c.UpstreamFlowlines(ctx, comid, 50)
+	// 10 km is enough to find the GNIS name without fetching a huge flowline set.
+	up, err := c.UpstreamFlowlines(ctx, comid, 10)
 	if err != nil {
 		errorResponse(w, http.StatusBadGateway, fmt.Sprintf("nldi lookup: %v", err))
 		return
