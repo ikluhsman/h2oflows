@@ -531,7 +531,7 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 		)
 		SELECT
 			r.slug,
-			r.river_name,
+			COALESCE(r.river_name, rv.name) AS river_name,
 			r.common_name,
 			r.put_in_name,
 			r.take_out_name,
@@ -647,7 +647,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			r.watershed_name,
 			r.permit_required,
 			r.multi_day_days,
-			r.river_name,
+			COALESCE(r.river_name, rv.name) AS river_name,
 			r.common_name,
 			r.put_in_name,
 			r.take_out_name,
@@ -676,6 +676,7 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			END AS flow_status,
 			fr.label AS flow_band_label
 		FROM reaches r
+		LEFT JOIN rivers rv ON rv.id = r.river_id
 		LEFT JOIN gauges g ON g.id = r.primary_gauge_id
 		LEFT JOIN LATERAL (
 			SELECT value, timestamp FROM gauge_readings
