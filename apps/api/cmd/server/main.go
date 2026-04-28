@@ -184,6 +184,7 @@ func main() {
 			r.Put("/admin/rivers/{riverSlug}", admin.UpdateRiver)
 			r.Delete("/admin/rivers/{riverSlug}", admin.DeleteRiver)
 			r.Get("/admin/rivers/{riverSlug}/auto-fill", admin.AutoFillRiverMeta)
+			r.Get("/admin/rivers/gnis-lookup", admin.GNISLookup)
 			r.Get("/admin/nldi/watershed", nldiH.WatershedExplorer)
 			r.Get("/admin/nldi/upstream-tributaries", nldiH.UpstreamTributaries)
 			r.Get("/admin/nldi/downstream", nldiH.DownstreamMainstem)

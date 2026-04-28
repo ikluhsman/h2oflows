@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS rivers_huc8_idx;
+ALTER TABLE rivers DROP COLUMN IF EXISTS huc8;

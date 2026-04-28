@@ -53,25 +53,6 @@
             </div>
           </div>
         </div>
-        <div>
-          <label class="block text-xs text-gray-500 mb-1">Flow gauge</label>
-          <div class="flex items-center gap-2 flex-wrap">
-            <span v-if="repinPrimaryGauge" class="text-sm text-gray-800 dark:text-gray-200 flex-1 truncate">
-              {{ repinPrimaryGauge.name || repinPrimaryGauge.external_id }}
-              <span class="text-xs text-gray-400 ml-1 font-mono">{{ repinPrimaryGauge.external_id }}</span>
-            </span>
-            <span v-else class="text-sm text-gray-400 flex-1">— None assigned —</span>
-            <UButton
-              size="xs" variant="outline"
-              :color="repinGaugeSelectMode ? 'primary' : 'neutral'"
-              :loading="repinGaugeSaving"
-              :disabled="!repinGauges && !repinUpComID"
-              @click="repinGaugeSelectMode = !repinGaugeSelectMode"
-            >{{ repinGaugeSelectMode ? 'Cancel' : 'Select gauge' }}</UButton>
-          </div>
-          <p v-if="repinGaugeError" class="text-xs text-red-500 mt-1">{{ repinGaugeError }}</p>
-          <p v-if="repinGaugeSelectMode" class="text-xs text-amber-600 dark:text-amber-400 mt-1">Click an amber dot on the map to assign a primary gauge.</p>
-        </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs text-gray-500 mb-1">Class min</label>
@@ -154,9 +135,9 @@
         </div>
       </div>
 
-      <!-- Flow lines / ComIDs -->
+      <!-- Flow lines & gauge -->
       <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-3">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow lines</p>
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow Lines &amp; Gauge</p>
 
         <div class="flex flex-wrap items-center gap-2">
           <UButton
@@ -175,25 +156,40 @@
           <span v-if="repinAnchorSnap.name" class="text-blue-600 dark:text-blue-300">{{ repinAnchorSnap.name }}</span>
         </div>
 
-        <div v-if="repinAnchorSnap || repinDownstream" class="flex items-center gap-3 text-xs">
-          <span class="text-gray-500 shrink-0">Click flowline for:</span>
+        <div v-if="repinAnchorSnap || repinDownstream" class="flex items-center gap-2 text-xs flex-wrap">
+          <span class="text-gray-500 shrink-0">Click map for:</span>
           <button
             class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
-            :class="repinComIDEditMode === 'up' ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
-            @click="repinComIDEditMode = 'up'"
+            :class="repinComIDEditMode === 'up' && !repinGaugeSelectMode ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+            @click="repinGaugeSelectMode = false; repinComIDEditMode = 'up'"
           >
             <span class="w-2 h-2 rounded-full bg-green-500 shrink-0" />
             Upstream<template v-if="repinUpComID"> · <span class="font-mono">{{ repinUpComID }}</span></template>
           </button>
           <button
             class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
-            :class="repinComIDEditMode === 'down' ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
-            @click="repinComIDEditMode = 'down'"
+            :class="repinComIDEditMode === 'down' && !repinGaugeSelectMode ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+            @click="repinGaugeSelectMode = false; repinComIDEditMode = 'down'"
           >
             <span class="w-2 h-2 rounded-full bg-red-500 shrink-0" />
             Downstream<template v-if="repinDownComID"> · <span class="font-mono">{{ repinDownComID }}</span></template>
           </button>
+          <button
+            class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            :class="repinGaugeSelectMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+            :disabled="!repinGauges && !repinUpComID"
+            @click="repinGaugeSelectMode = !repinGaugeSelectMode"
+          >
+            <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+            <template v-if="repinGaugeSaving">Saving…</template>
+            <template v-else-if="repinGaugeSelectMode">Cancel gauge</template>
+            <template v-else-if="repinPrimaryGauge">Gauge · <span class="font-mono">{{ repinPrimaryGauge.external_id }}</span></template>
+            <template v-else>Select gauge</template>
+          </button>
         </div>
+
+        <p v-if="repinGaugeError" class="text-xs text-red-500">{{ repinGaugeError }}</p>
+        <p v-if="repinGaugeSelectMode" class="text-xs text-amber-600 dark:text-amber-400">Click an amber dot on the map to assign a primary gauge.</p>
 
         <p v-if="repinFlowlinesLoading" class="text-xs text-blue-500 animate-pulse">Loading downstream mainstem…</p>
 
@@ -210,7 +206,6 @@
           :comid-select-slot="repinComIDEditMode"
           :selected-up-comid="repinUpComID"
           :selected-down-comid="repinDownComID"
-          :disable-auto-fit="true"
           :preview-centerline="repinPreviewCenterline"
           :gauge-select-mode="repinGaugeSelectMode"
           @pick="onAnchorPick"
@@ -517,6 +512,7 @@ async function loadReach() {
         fetchNearbyGauges(data.put_in.lat, data.put_in.lng, data.start_comid)
         fetchTributaries(data.put_in.lat, data.put_in.lng)
       }
+      if (data.end_comid) previewCenterline()
     } else if (data.put_in?.lat != null && data.put_in?.lng != null) {
       fetchNearbyGauges(data.put_in.lat, data.put_in.lng, null)
       onAnchorPick(data.put_in.lat, data.put_in.lng)

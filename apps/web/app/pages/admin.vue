@@ -69,9 +69,10 @@
                   >
                     <div class="flex-1 min-w-0">
                       <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.name }}</p>
-                      <p class="text-xs text-gray-400 truncate flex items-center gap-1">
+                      <p class="text-xs text-gray-400 truncate flex items-center gap-1 flex-wrap">
                         <span>{{ river.slug }}</span>
                         <span v-if="river.gnis_id" class="text-gray-300">· gnis {{ river.gnis_id }}</span>
+                        <span v-if="(river as any).huc8" class="text-gray-300">· huc8 {{ (river as any).huc8 }}</span>
                       </p>
                     </div>
                     <span class="text-xs text-gray-400 shrink-0">{{ river.reach_count }} reach{{ river.reach_count !== 1 ? 'es' : '' }}</span>
@@ -220,7 +221,11 @@
             <UInput v-model="newRiver.state_abbr" placeholder="CO" class="max-w-20" />
           </UFormField>
           <UFormField label="GNIS ID (optional)">
-            <UInput v-model="newRiver.gnis_id" placeholder="00179365" class="max-w-40" />
+            <div class="flex items-center gap-2">
+              <UInput v-model="newRiver.gnis_id" placeholder="00179365" class="max-w-40" @blur="lookupGNIS(newRiver.gnis_id, newRiver)" />
+              <span v-if="gnisLookupLoading" class="text-xs text-gray-400 animate-pulse">Looking up…</span>
+              <span v-else-if="gnisLookupMsg" class="text-xs text-gray-500">{{ gnisLookupMsg }}</span>
+            </div>
           </UFormField>
         </div>
       </template>
@@ -255,7 +260,11 @@
           >Auto-lookup basin &amp; state from NLDI</UButton>
           <p v-if="autoFillError" class="text-xs text-red-500">{{ autoFillError }}</p>
           <UFormField label="GNIS ID (optional)">
-            <UInput v-model="editingRiver.gnis_id" placeholder="00179365" class="max-w-40" />
+            <div class="flex items-center gap-2">
+              <UInput v-model="editingRiver.gnis_id" placeholder="00179365" class="max-w-40" @blur="lookupGNIS(editingRiver!.gnis_id, editingRiver!)" />
+              <span v-if="gnisLookupLoading" class="text-xs text-gray-400 animate-pulse">Looking up…</span>
+              <span v-else-if="gnisLookupMsg" class="text-xs text-gray-500">{{ gnisLookupMsg }}</span>
+            </div>
           </UFormField>
         </div>
       </template>
@@ -336,7 +345,7 @@ const visibleTabs = computed(() => {
 })
 
 // ── Rivers ────────────────────────────────────────────────────────────────────
-interface River { id: string; slug: string; name: string; gnis_id: string | null; basin: string | null; basin_locked: boolean; state_abbr: string | null; reach_count: number }
+interface River { id: string; slug: string; name: string; gnis_id: string | null; basin: string | null; basin_locked: boolean; state_abbr: string | null; huc8: string | null; reach_count: number }
 interface RiverDetail extends River {
   reaches: { id: string; slug: string; name: string; common_name: string | null; has_centerline: boolean }[]
 }
@@ -488,11 +497,35 @@ async function deleteRiver(riverSlug: string, riverName: string) {
 // Create river
 const createRiverOpen = ref(false)
 const createLoading = ref(false)
-const newRiver = ref({ name: '', slug: '', basin: '', state_abbr: '', gnis_id: '' })
+const newRiver = ref({ name: '', slug: '', basin: '', state_abbr: '', gnis_id: '', huc8: '' })
+const gnisLookupLoading = ref(false)
+const gnisLookupMsg = ref('')
 
 function autoSlug() {
   newRiver.value.slug = newRiver.value.name
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+}
+
+async function lookupGNIS(gnisId: string, target: { state_abbr: string; basin: string; huc8: string }) {
+  if (!gnisId.trim()) return
+  gnisLookupLoading.value = true
+  gnisLookupMsg.value = ''
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/rivers/gnis-lookup?gnis_id=${encodeURIComponent(gnisId.trim())}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const data = await res.json()
+    if (!res.ok) { gnisLookupMsg.value = data.error ?? `Error ${res.status}`; return }
+    if (data.state_abbr && !target.state_abbr) target.state_abbr = data.state_abbr
+    if (data.basin && !target.basin) target.basin = data.basin
+    if (data.huc8) target.huc8 = data.huc8
+    gnisLookupMsg.value = `Found: ${data.states ?? data.state_abbr}${data.huc8 ? ' · HUC8 ' + data.huc8 : ''}`
+  } catch (err: any) {
+    gnisLookupMsg.value = err?.message ?? 'Lookup failed'
+  } finally {
+    gnisLookupLoading.value = false
+  }
 }
 
 async function createRiver() {
@@ -508,11 +541,12 @@ async function createRiver() {
         basin: newRiver.value.basin || null,
         state_abbr: newRiver.value.state_abbr || null,
         gnis_id: newRiver.value.gnis_id || null,
+        huc8: newRiver.value.huc8 || null,
       }),
     })
     if (res.ok) {
       createRiverOpen.value = false
-      newRiver.value = { name: '', slug: '', basin: '', state_abbr: '', gnis_id: '' }
+      newRiver.value = { name: '', slug: '', basin: '', state_abbr: '', gnis_id: '', huc8: '' }
       loadRivers()
     }
   } finally {
@@ -525,7 +559,7 @@ const editRiverOpen = ref(false)
 const editRiverLoading = ref(false)
 const autoFillLoading = ref(false)
 const autoFillError = ref('')
-const editingRiver = ref<{ slug: string; name: string; basin: string; basin_locked: boolean; state_abbr: string; gnis_id: string } | null>(null)
+const editingRiver = ref<{ slug: string; name: string; basin: string; basin_locked: boolean; state_abbr: string; gnis_id: string; huc8: string } | null>(null)
 
 function openEditRiver(river: RiverDetail) {
   editingRiver.value = {
@@ -535,6 +569,7 @@ function openEditRiver(river: RiverDetail) {
     basin_locked: river.basin_locked,
     state_abbr: river.state_abbr ?? '',
     gnis_id: river.gnis_id ?? '',
+    huc8: (river as any).huc8 ?? '',
   }
   autoFillError.value = ''
   editRiverOpen.value = true
@@ -577,6 +612,7 @@ async function saveEditRiver() {
         basin: editingRiver.value.basin || null,
         state_abbr: editingRiver.value.state_abbr || null,
         gnis_id: editingRiver.value.gnis_id || null,
+        huc8: editingRiver.value.huc8 || null,
       }),
     })
     if (res.ok) {

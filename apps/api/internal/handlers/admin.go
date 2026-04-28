@@ -214,6 +214,7 @@ func (h *AdminHandler) UpdateRiver(w http.ResponseWriter, r *http.Request) {
 		BasinLocked *bool   `json:"basin_locked"`
 		StateAbbr   *string `json:"state_abbr"`
 		GnisID      *string `json:"gnis_id"`
+		HUC8        *string `json:"huc8"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		errorResponse(w, http.StatusBadRequest, "invalid JSON")
@@ -226,9 +227,10 @@ func (h *AdminHandler) UpdateRiver(w http.ResponseWriter, r *http.Request) {
 		    basin        = COALESCE($3, basin),
 		    basin_locked = COALESCE($4, basin_locked),
 		    state_abbr   = COALESCE($5, state_abbr),
-		    gnis_id      = COALESCE($6, gnis_id)
+		    gnis_id      = COALESCE($6, gnis_id),
+		    huc8         = COALESCE($7, huc8)
 		WHERE slug = $1
-	`, slug, body.Name, body.Basin, body.BasinLocked, body.StateAbbr, body.GnisID)
+	`, slug, body.Name, body.Basin, body.BasinLocked, body.StateAbbr, body.GnisID, body.HUC8)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "update failed")
 		return
@@ -519,14 +521,18 @@ func (h *AdminHandler) AutoFillRiverMeta(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	type lookupResult struct {
+	type stateResult struct {
 		val string
 		err error
 	}
-	stateCh := make(chan lookupResult, 1)
-	basinCh := make(chan lookupResult, 1)
-	go func() { v, e := nldi.StateAt(ctx, lat, lng); stateCh <- lookupResult{v, e} }()
-	go func() { v, e := nldi.BasinAt(ctx, lat, lng); basinCh <- lookupResult{v, e} }()
+	type basinResult struct {
+		info nldi.BasinInfo
+		err  error
+	}
+	stateCh := make(chan stateResult, 1)
+	basinCh := make(chan basinResult, 1)
+	go func() { v, e := nldi.StateAt(ctx, lat, lng); stateCh <- stateResult{v, e} }()
+	go func() { v, e := nldi.BasinAt(ctx, lat, lng); basinCh <- basinResult{v, e} }()
 
 	stateRes := <-stateCh
 	basinRes := <-basinCh
@@ -538,10 +544,69 @@ func (h *AdminHandler) AutoFillRiverMeta(w http.ResponseWriter, r *http.Request)
 		log.Printf("auto-fill river %s: basin lookup: %v", riverSlug, basinRes.err)
 	}
 
+	// Prefer state from TIGERweb; fall back to first state in WBD states field.
+	stateAbbr := stateRes.val
+	if stateAbbr == "" && basinRes.info.States != "" {
+		stateAbbr = strings.SplitN(basinRes.info.States, ",", 2)[0]
+	}
+
 	jsonResponse(w, http.StatusOK, map[string]any{
-		"state_abbr": stateRes.val,
-		"basin":      basinRes.val,
+		"state_abbr": stateAbbr,
+		"basin":      basinRes.info.Name,
+		"huc8":       basinRes.info.HUC8,
+		"states":     basinRes.info.States,
 		"lat":        lat,
 		"lng":        lng,
+	})
+}
+
+// GNISLookup handles GET /api/v1/admin/rivers/gnis-lookup?gnis_id=X
+//
+// Resolves a GNIS stream ID to state, basin name, and HUC8. Uses the NHD
+// ArcGIS flowline layer to get a representative coordinate, then calls
+// TIGERweb for state and WBD for basin info. Returns 404 when the GNIS ID
+// has no NHD features.
+func (h *AdminHandler) GNISLookup(w http.ResponseWriter, r *http.Request) {
+	gnisID := strings.TrimSpace(r.URL.Query().Get("gnis_id"))
+	if gnisID == "" {
+		errorResponse(w, http.StatusBadRequest, "gnis_id is required")
+		return
+	}
+	ctx := r.Context()
+
+	coord, err := nldi.NHDCoordByGNISID(ctx, gnisID)
+	if err != nil {
+		errorResponse(w, http.StatusNotFound, fmt.Sprintf("GNIS lookup: %v", err))
+		return
+	}
+
+	type stateResult struct {
+		val string
+		err error
+	}
+	type basinResult struct {
+		info nldi.BasinInfo
+		err  error
+	}
+	stateCh := make(chan stateResult, 1)
+	basinCh := make(chan basinResult, 1)
+	go func() { v, e := nldi.StateAt(ctx, coord.Lat, coord.Lng); stateCh <- stateResult{v, e} }()
+	go func() { v, e := nldi.BasinAt(ctx, coord.Lat, coord.Lng); basinCh <- basinResult{v, e} }()
+
+	stateRes := <-stateCh
+	basinRes := <-basinCh
+
+	stateAbbr := stateRes.val
+	if stateAbbr == "" && basinRes.info.States != "" {
+		stateAbbr = strings.SplitN(basinRes.info.States, ",", 2)[0]
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"state_abbr": stateAbbr,
+		"basin":      basinRes.info.Name,
+		"huc8":       basinRes.info.HUC8,
+		"states":     basinRes.info.States,
+		"lat":        coord.Lat,
+		"lng":        coord.Lng,
 	})
 }

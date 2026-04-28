@@ -127,26 +127,34 @@ func StateAt(ctx context.Context, lat, lng float64) (abbr string, err error) {
 	return "", nil
 }
 
-// BasinAt queries the USGS WBD HUC4 sub-region layer for the basin name at the
-// given coordinate. Returns ("", nil) when no HUC4 polygon covers the point.
-func BasinAt(ctx context.Context, lat, lng float64) (name string, err error) {
+// BasinInfo holds the WBD watershed metadata for a coordinate.
+type BasinInfo struct {
+	Name   string // WBD HUC8 watershed name (e.g. "Upper South Platte")
+	HUC8   string // 8-digit hydrologic unit code (e.g. "10190002")
+	States string // comma-separated state abbreviations (e.g. "CO" or "CO,WY")
+}
+
+// BasinAt queries the USGS WBD HUC8 layer for the watershed at the given
+// coordinate. Returns an empty BasinInfo without error when no polygon covers
+// the point.
+func BasinAt(ctx context.Context, lat, lng float64) (BasinInfo, error) {
 	params := url.Values{
 		"geometry":     {fmt.Sprintf("%f,%f", lng, lat)},
 		"geometryType": {"esriGeometryPoint"},
 		"spatialRel":   {"esriSpatialRelIntersects"},
-		"outFields":    {"name"},
+		"outFields":    {"name,huc8,states"},
 		"inSR":         {"4326"},
 		"f":            {"json"},
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, wbdHUC4+"?"+params.Encode(), nil)
 	if err != nil {
-		return "", err
+		return BasinInfo{}, err
 	}
 	req.Header.Set("User-Agent", "h2oflows/1.0 (https://h2oflows.org)")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("wbd basin: %w", err)
+		return BasinInfo{}, fmt.Errorf("wbd basin: %w", err)
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
@@ -154,15 +162,18 @@ func BasinAt(ctx context.Context, lat, lng float64) (name string, err error) {
 	var result struct {
 		Features []struct {
 			Attributes struct {
-				Name string `json:"name"`
+				Name   string `json:"name"`
+				HUC8   string `json:"huc8"`
+				States string `json:"states"`
 			} `json:"attributes"`
 		} `json:"features"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("wbd basin parse: %w", err)
+		return BasinInfo{}, fmt.Errorf("wbd basin parse: %w", err)
 	}
 	if len(result.Features) > 0 {
-		return result.Features[0].Attributes.Name, nil
+		a := result.Features[0].Attributes
+		return BasinInfo{Name: a.Name, HUC8: a.HUC8, States: a.States}, nil
 	}
-	return "", nil
+	return BasinInfo{}, nil
 }
