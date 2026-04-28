@@ -67,7 +67,7 @@ func huc4Watershed(huc4 string) string {
 	case "1402":
 		return "Gunnison River"
 	case "1403":
-		return "White-Yampa Rivers"
+		return "San Miguel-Dolores Rivers"
 	case "1404":
 		return "Lower Green River"
 	case "1405":
@@ -77,7 +77,7 @@ func huc4Watershed(huc4 string) string {
 	case "1407":
 		return "Glen Canyon / Colorado"
 	case "1408":
-		return "Little Colorado River"
+		return "San Juan River"
 
 	// ----- Lower Colorado Basin (HUC2 = 15) ----------------------------------
 	case "1501":
@@ -114,9 +114,9 @@ func huc4Watershed(huc4 string) string {
 	// ----- Missouri River Basin (HUC2 = 10) ----------------------------------
 	// South Platte and North Platte are in the Missouri system
 	case "1018":
-		return "South Platte River"
+		return "North Platte Headwaters"
 	case "1019":
-		return "Cache La Poudre River" // HUC4 1019 = Cache la Poudre subregion (South Platte tributary)
+		return "Upper South Platte" // HUC4 1019 = Upper South Platte; Cache la Poudre is a tributary within it
 	case "1023":
 		return "North Platte River"
 	case "1024":
@@ -165,9 +165,9 @@ func CanonicalBasin(huc8 string) string {
 	if huc2 == "10" {
 		switch huc4 {
 		case "1018":
-			return "South Platte"
+			return "North Platte"
 		case "1019":
-			return "South Platte" // Cache La Poudre drains into South Platte, not North Platte
+			return "South Platte"
 		case "1023":
 			return "North Platte"
 		default:
