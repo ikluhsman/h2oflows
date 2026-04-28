@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -152,6 +153,7 @@ func (h *AdminHandler) CreateRiver(w http.ResponseWriter, r *http.Request) {
 		Basin     *string `json:"basin"`
 		StateAbbr *string `json:"state_abbr"`
 		GnisID    *string `json:"gnis_id"`
+		HUC8      *string `json:"huc8"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		errorResponse(w, http.StatusBadRequest, "invalid JSON")
@@ -162,12 +164,26 @@ func (h *AdminHandler) CreateRiver(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Auto-fill geo meta from GNIS ID when basin/state are not explicitly provided.
+	if body.GnisID != nil && *body.GnisID != "" && body.Basin == nil && body.StateAbbr == nil {
+		stateAbbr, basin, huc8 := riverMetaFromGNIS(r.Context(), *body.GnisID)
+		if stateAbbr != "" {
+			body.StateAbbr = &stateAbbr
+		}
+		if basin != "" {
+			body.Basin = &basin
+		}
+		if huc8 != "" {
+			body.HUC8 = &huc8
+		}
+	}
+
 	var id string
 	err := h.db.QueryRow(r.Context(), `
-		INSERT INTO rivers (slug, name, basin, state_abbr, gnis_id)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO rivers (slug, name, basin, state_abbr, gnis_id, huc8)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id
-	`, body.Slug, body.Name, body.Basin, body.StateAbbr, body.GnisID).Scan(&id)
+	`, body.Slug, body.Name, body.Basin, body.StateAbbr, body.GnisID, body.HUC8).Scan(&id)
 	if err != nil {
 		errorResponse(w, http.StatusConflict, "river already exists or invalid data")
 		return
@@ -239,6 +255,39 @@ func (h *AdminHandler) UpdateRiver(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// riverMetaFromGNIS resolves a GNIS stream ID to state abbreviation, canonical
+// basin label, and HUC8 by querying NHD → TIGERweb + WBD. Returns zero values
+// without error when the lookup fails — callers treat this as best-effort.
+func riverMetaFromGNIS(ctx context.Context, gnisID string) (stateAbbr, basin, huc8 string) {
+	coord, err := nldi.NHDCoordByGNISID(ctx, gnisID)
+	if err != nil {
+		log.Printf("riverMetaFromGNIS %s: nhd: %v", gnisID, err)
+		return
+	}
+	type stateResult struct {
+		val string
+		err error
+	}
+	type basinResult struct {
+		info nldi.BasinInfo
+		err  error
+	}
+	stateCh := make(chan stateResult, 1)
+	basinCh := make(chan basinResult, 1)
+	go func() { v, e := nldi.StateAt(ctx, coord.Lat, coord.Lng); stateCh <- stateResult{v, e} }()
+	go func() { v, e := nldi.BasinAt(ctx, coord.Lat, coord.Lng); basinCh <- basinResult{v, e} }()
+	stateRes := <-stateCh
+	basinRes := <-basinCh
+
+	stateAbbr = stateRes.val
+	if stateAbbr == "" && basinRes.info.States != "" {
+		stateAbbr = strings.SplitN(basinRes.info.States, ",", 2)[0]
+	}
+	basin = gauge.CanonicalBasin(basinRes.info.HUC8)
+	huc8 = basinRes.info.HUC8
+	return
+}
+
 // AutoAssignRiver upserts a river by GNIS ID (preferred) or name, then links
 // the reach to it. Called after the admin fetches the river name from NLDI.
 // POST /api/v1/admin/reaches/{slug}/auto-river
@@ -285,16 +334,18 @@ func (h *AdminHandler) AutoAssignRiver(w http.ResponseWriter, r *http.Request) {
 			riverGnisID = &g
 		}
 	} else {
-		// Insert a new river.
+		// Insert a new river, auto-filling geo meta from GNIS ID when present.
 		var gnisParam interface{}
+		var stateAbbr, basin, huc8 string
 		if body.GnisID != "" {
 			gnisParam = body.GnisID
+			stateAbbr, basin, huc8 = riverMetaFromGNIS(ctx, body.GnisID)
 		}
 		if err := h.db.QueryRow(ctx, `
-			INSERT INTO rivers (slug, name, gnis_id)
-			VALUES ($1, $2, $3)
+			INSERT INTO rivers (slug, name, gnis_id, state_abbr, basin, huc8)
+			VALUES ($1, $2, $3, NULLIF($4,''), NULLIF($5,''), NULLIF($6,''))
 			RETURNING id, name, slug, gnis_id
-		`, riverSlug, body.RiverName, gnisParam).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID); err != nil {
+		`, riverSlug, body.RiverName, gnisParam, stateAbbr, basin, huc8).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID); err != nil {
 			errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("insert river: %v", err))
 			return
 		}
