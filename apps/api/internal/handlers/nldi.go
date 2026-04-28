@@ -14,6 +14,7 @@ import (
 	"github.com/h2oflow/h2oflow/apps/api/internal/ai"
 	"github.com/h2oflow/h2oflow/apps/api/internal/kmlimport"
 	"github.com/h2oflow/h2oflow/apps/api/internal/nldi"
+	"log"
 )
 
 type NLDIHandler struct {
@@ -209,6 +210,11 @@ func (h *NLDIHandler) CreateReach(w http.ResponseWriter, r *http.Request) {
 		}
 		errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("create reach: %v", err))
 		return
+	}
+
+	// Auto-populate state from put-in coordinates.
+	if req.StartLat != nil && req.StartLng != nil {
+		fillReachState(ctx, h.db, slug, *req.StartLat, *req.StartLng)
 	}
 
 	// Auto-upsert a river record when river_name is provided, then link the reach.
@@ -801,6 +807,8 @@ func (h *NLDIHandler) UpdateReachCenterline(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	fillReachState(ctx, h.db, slug, req.PutIn.Lat, req.PutIn.Lng)
+
 	var lengthMi *float64
 	var putInComID, takeOutComID *string
 	_ = h.db.QueryRow(ctx, `
@@ -886,6 +894,7 @@ func (h *NLDIHandler) UpdateReachCenterlineByComID(w http.ResponseWriter, r *htt
 			    end_point   = ST_SetSRID(ST_MakePoint($4, $5), 4326)::geography
 			WHERE id = $1
 		`, reachID, *req.StartLng, *req.StartLat, *req.EndLng, *req.EndLat)
+		fillReachState(ctx, h.db, slug, *req.StartLat, *req.StartLng)
 	}
 
 	if err := kmlimport.SyncCenterlineNLDIByComID(ctx, h.db, slug,
@@ -965,15 +974,34 @@ func (h *NLDIHandler) PatchReach(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 	var req struct {
 		Description *string `json:"description"`
+		RiverOrder  *int16  `json:"river_order"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		errorResponse(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 	ctx := r.Context()
+	var setClauses []string
+	var args []any
+	n := 1
+	if req.Description != nil {
+		setClauses = append(setClauses, fmt.Sprintf("description = $%d", n))
+		args = append(args, req.Description)
+		n++
+	}
+	if req.RiverOrder != nil {
+		setClauses = append(setClauses, fmt.Sprintf("river_order = $%d", n))
+		args = append(args, *req.RiverOrder)
+		n++
+	}
+	if len(setClauses) == 0 {
+		jsonResponse(w, http.StatusOK, map[string]any{"slug": slug})
+		return
+	}
+	args = append(args, slug)
 	tag, err := h.db.Exec(ctx,
-		`UPDATE reaches SET description = $1 WHERE slug = $2`,
-		req.Description, slug,
+		fmt.Sprintf("UPDATE reaches SET %s WHERE slug = $%d", strings.Join(setClauses, ", "), n),
+		args...,
 	)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("update: %v", err))
@@ -1056,6 +1084,22 @@ func buildSlug(riverName, reachName string) string {
 		return r
 	}
 	return r + "-" + n
+}
+
+// fillReachState queries TIGERweb for the US state at the given coordinate and
+// updates reaches.state_abbr. Best-effort — failures are logged and not fatal.
+func fillReachState(ctx context.Context, db *pgxpool.Pool, reachSlug string, lat, lng float64) {
+	stateAbbr, err := nldi.StateAt(ctx, lat, lng)
+	if err != nil {
+		log.Printf("fillReachState %s: %v", reachSlug, err)
+		return
+	}
+	if stateAbbr == "" {
+		return
+	}
+	if _, err := db.Exec(ctx, `UPDATE reaches SET state_abbr = $1 WHERE slug = $2`, stateAbbr, reachSlug); err != nil {
+		log.Printf("fillReachState %s: update: %v", reachSlug, err)
+	}
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────

@@ -1,0 +1,2 @@
+ALTER TABLE reaches DROP COLUMN IF EXISTS river_order;
+ALTER TABLE reaches DROP COLUMN IF EXISTS state_abbr;

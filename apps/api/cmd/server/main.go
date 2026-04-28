@@ -176,6 +176,7 @@ func main() {
 			r.Delete("/reaches/{slug}/centerline", reaches.ClearCenterline)
 			r.Post("/import/kmz", imports.ImportKMZ)
 			r.Get("/admin/reaches/unassigned", admin.ListUnassignedReaches)
+			r.Get("/admin/reaches/grouped", admin.GroupedReaches)
 			r.Post("/admin/reaches/{slug}/auto-river", admin.AutoAssignRiver)
 			r.Put("/admin/reaches/{slug}/river", admin.AssignReachToRiver)
 			r.Get("/admin/rivers", admin.ListRivers)

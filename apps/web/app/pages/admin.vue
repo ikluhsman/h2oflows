@@ -39,93 +39,109 @@
         <!-- Rivers tab -->
         <div v-if="activeTab === 'rivers'">
           <div class="flex items-center justify-between mb-3">
-            <p class="text-sm text-gray-500">{{ rivers.length }} rivers<template v-if="unassignedReaches.length"> · <span class="text-amber-500">{{ unassignedReaches.length }} unassigned</span></template></p>
+            <p class="text-sm text-gray-500">
+              {{ rivers.length }} rivers
+              <template v-if="unassignedReaches.length"> · <span class="text-amber-500">{{ unassignedReaches.length }} unassigned</span></template>
+            </p>
+            <UButton size="xs" icon="i-heroicons-plus" @click="createRiverOpen = true">New river</UButton>
           </div>
 
-          <UInput v-model="riverSearch" icon="i-heroicons-magnifying-glass" placeholder="Search rivers…" class="mb-3" />
+          <UInput v-model="riverSearch" icon="i-heroicons-magnifying-glass" placeholder="Search reaches…" class="mb-3" />
 
           <div v-if="riversLoading" class="space-y-2">
             <div v-for="i in 5" :key="i" class="h-12 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
           </div>
 
           <div v-else class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <template v-for="stateGroup in groupedRivers" :key="stateGroup.state">
+            <template v-for="stateGroup in filteredGroupedReaches" :key="stateGroup.state">
               <!-- State header -->
               <div class="px-4 py-1.5 bg-gray-100 dark:bg-gray-800/80 border-t border-gray-200 dark:border-gray-700 first:border-t-0">
-                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{{ stateGroup.state === '—' ? 'No state' : stateGroup.state }}</p>
+                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  {{ stateGroup.state === '—' ? 'No state' : stateGroup.state }}
+                </p>
               </div>
 
-              <template v-for="basinGroup in stateGroup.basins" :key="basinGroup.basin">
-                <!-- Basin sub-header (only when basin is named) -->
-                <div v-if="basinGroup.basin !== '—'" class="px-6 py-1 bg-gray-50 dark:bg-gray-900/60 border-t border-gray-100 dark:border-gray-800">
-                  <p class="text-xs text-gray-400 italic">{{ basinGroup.basin }}</p>
+              <template v-for="river in stateGroup.rivers" :key="river.river_id + stateGroup.state">
+                <!-- River row -->
+                <div
+                  class="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
+                  @click="toggleRiverGroup(stateGroup.state, river.river_id)"
+                >
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.river_name }}</p>
+                    <p class="text-xs text-gray-400">
+                      {{ river.reaches.length }} reach{{ river.reaches.length !== 1 ? 'es' : '' }}<template v-if="river.river_basin"> · {{ river.river_basin }}</template>
+                    </p>
+                  </div>
+                  <svg
+                    class="w-4 h-4 text-gray-400 shrink-0 transition-transform"
+                    :class="isRiverExpanded(stateGroup.state, river.river_id) ? 'rotate-90' : ''"
+                    viewBox="0 0 20 20" fill="currentColor"
+                  >
+                    <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+                  </svg>
                 </div>
 
-                <template v-for="river in basinGroup.rivers" :key="river.id">
-                  <!-- River row -->
-                  <div
-                    class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
-                    @click="toggleRiver(river)"
-                  >
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.name }}</p>
-                      <p class="text-xs text-gray-400 truncate flex items-center gap-1 flex-wrap">
-                        <span>{{ river.slug }}</span>
-                        <span v-if="river.gnis_id" class="text-gray-300">· gnis {{ river.gnis_id }}</span>
-                        <span v-if="(river as any).huc8" class="text-gray-300">· huc8 {{ (river as any).huc8 }}</span>
-                      </p>
+                <!-- Expanded reaches -->
+                <div v-if="isRiverExpanded(stateGroup.state, river.river_id)" class="bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
+                  <!-- River actions bar -->
+                  <div class="flex items-center justify-between px-6 py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span class="text-xs text-gray-400 font-mono">{{ river.river_slug }}</span>
+                    <div class="flex items-center gap-2">
+                      <UButton size="xs" variant="ghost" color="neutral" @click.stop="openEditRiverBySlug(river.river_slug)">Edit</UButton>
+                      <UButton size="xs" variant="ghost" color="error" @click.stop="deleteRiver(river.river_slug, river.river_name)">Delete river</UButton>
                     </div>
-                    <span class="text-xs text-gray-400 shrink-0">{{ river.reach_count }} reach{{ river.reach_count !== 1 ? 'es' : '' }}</span>
-                    <svg
-                      class="w-4 h-4 text-gray-400 shrink-0 transition-transform"
-                      :class="expandedRiverId === river.id ? 'rotate-90' : ''"
-                      viewBox="0 0 20 20" fill="currentColor"
+                  </div>
+                  <!-- Reach rows -->
+                  <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                    <div
+                      v-for="(reach, reachIdx) in river.reaches" :key="reach.id"
+                      class="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-gray-900/60"
                     >
-                      <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
-                    </svg>
-                  </div>
-
-                  <!-- Expanded reaches -->
-                  <div v-if="expandedRiverId === river.id" class="bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
-                    <div v-if="riverDetailLoading" class="px-6 py-4 text-xs text-gray-400 animate-pulse">Loading reaches…</div>
-                    <template v-else-if="selectedRiver">
-                      <!-- River actions bar -->
-                      <div class="flex items-center justify-between px-6 py-2 border-b border-gray-100 dark:border-gray-800">
-                        <span class="text-xs text-gray-400">{{ selectedRiver.reaches?.length ?? 0 }} reaches</span>
-                        <div class="flex items-center gap-2">
-                          <UButton size="xs" variant="ghost" color="neutral" @click="openEditRiver(selectedRiver)">Edit</UButton>
-                          <UButton size="xs" variant="ghost" color="error" @click="deleteRiver(selectedRiver.slug, selectedRiver.name)">Delete river</UButton>
-                        </div>
-                      </div>
-                      <!-- Reach rows -->
-                      <div class="divide-y divide-gray-100 dark:divide-gray-800">
-                        <div
-                          v-for="reach in selectedRiver.reaches" :key="reach.id"
-                          class="flex items-center gap-3 px-6 py-2.5 bg-white dark:bg-gray-900/60"
+                      <!-- Up/down order buttons -->
+                      <div class="flex flex-col gap-0.5 shrink-0">
+                        <button
+                          class="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-20 disabled:cursor-default"
+                          :disabled="reachIdx === 0"
+                          @click.stop="moveReach(stateGroup.state, river.river_id, reachIdx, -1)"
                         >
-                          <div class="flex-1 min-w-0">
-                            <p class="text-sm font-medium truncate">{{ reach.common_name ?? reach.name }}</p>
-                            <p class="text-xs text-gray-400 truncate">{{ reach.slug }}</p>
-                          </div>
-                          <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                            <span
-                              class="text-xs px-1.5 py-0.5 rounded"
-                              :class="reach.has_centerline
-                                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
-                                : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
-                            >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
-                            <UButton size="xs" variant="outline" color="error" @click="deleteReach(reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
-                            <NuxtLink :to="`/reaches/${reach.slug}/edit`" class="text-xs text-blue-500 hover:underline">Edit</NuxtLink>
-                          </div>
-                        </div>
-                        <div v-if="!selectedRiver.reaches?.length" class="px-6 py-4 text-center text-sm text-gray-400">No reaches linked to this river</div>
+                          <svg viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3"><path d="M8 4l-5 5h10z"/></svg>
+                        </button>
+                        <button
+                          class="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-20 disabled:cursor-default"
+                          :disabled="reachIdx === river.reaches.length - 1"
+                          @click.stop="moveReach(stateGroup.state, river.river_id, reachIdx, 1)"
+                        >
+                          <svg viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3"><path d="M8 12l5-5H3z"/></svg>
+                        </button>
                       </div>
-                    </template>
+
+                      <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium truncate">{{ reach.common_name ?? reach.name }}</p>
+                        <p class="text-xs text-gray-400 truncate">{{ reach.slug }}</p>
+                      </div>
+
+                      <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                        <span v-if="reach.state_abbr" class="text-xs font-mono px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">{{ reach.state_abbr }}</span>
+                        <span
+                          class="text-xs px-1.5 py-0.5 rounded"
+                          :class="reach.has_centerline
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
+                        >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
+                        <UButton size="xs" variant="outline" color="error" @click.stop="deleteReachFromGroup(stateGroup.state, river.river_id, reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
+                        <NuxtLink :to="`/reaches/${reach.slug}/edit`" class="text-xs text-blue-500 hover:underline">Edit</NuxtLink>
+                      </div>
+                    </div>
+                    <div v-if="river.reaches.length === 0" class="px-6 py-4 text-center text-sm text-gray-400">No reaches in this state</div>
                   </div>
-                </template>
+                </div>
               </template>
             </template>
-            <div v-if="groupedRivers.length === 0 && !riversLoading" class="px-4 py-8 text-center text-sm text-gray-400">{{ riverSearch ? 'No rivers match your search' : 'No rivers yet' }}</div>
+
+            <div v-if="filteredGroupedReaches.length === 0 && !riversLoading" class="px-4 py-8 text-center text-sm text-gray-400">
+              {{ riverSearch ? 'No reaches match your search' : 'No reaches yet' }}
+            </div>
 
             <!-- Unassigned reaches group -->
             <template v-if="unassignedReaches.length">
@@ -161,7 +177,7 @@
                         ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
                     >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
-                    <UButton size="xs" variant="outline" color="error" @click="deleteReach(reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
+                    <UButton size="xs" variant="outline" color="error" @click="deleteReachFromGroup('', '', reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
                     <NuxtLink :to="`/reaches/${reach.slug}/edit`" class="text-xs text-blue-500 hover:underline">Edit</NuxtLink>
                   </div>
                 </div>
@@ -347,122 +363,113 @@ const visibleTabs = computed(() => {
 // ── Rivers ────────────────────────────────────────────────────────────────────
 interface River { id: string; slug: string; name: string; gnis_id: string | null; basin: string | null; basin_locked: boolean; state_abbr: string | null; huc8: string | null; reach_count: number }
 interface RiverDetail extends River {
-  reaches: { id: string; slug: string; name: string; common_name: string | null; has_centerline: boolean }[]
+  reaches: { id: string; slug: string; name: string; common_name: string | null; has_centerline: boolean; state_abbr: string | null; river_order: number | null }[]
 }
+interface GroupedReach { id: string; slug: string; name: string; common_name: string | null; river_order: number | null; state_abbr: string; has_centerline: boolean }
+interface GroupedRiver { river_id: string; river_slug: string; river_name: string; river_basin: string; reaches: GroupedReach[] }
+interface GroupedState { state: string; rivers: GroupedRiver[] }
 
 const rivers = ref<River[]>([])
+const groupedReaches = ref<GroupedState[]>([])
 const riversLoading = ref(false)
 const riverSearch = ref('')
-const expandedRiverId = ref<string | null>(null)
+const expandedRiverKeys = ref<Set<string>>(new Set())
 
-const groupedRivers = computed(() => {
+function riverKey(state: string, riverId: string) { return `${state}::${riverId}` }
+function isRiverExpanded(state: string, riverId: string) { return expandedRiverKeys.value.has(riverKey(state, riverId)) }
+function toggleRiverGroup(state: string, riverId: string) {
+  const key = riverKey(state, riverId)
+  const next = new Set(expandedRiverKeys.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  expandedRiverKeys.value = next
+}
+
+const filteredGroupedReaches = computed(() => {
   const q = riverSearch.value.toLowerCase()
-  const filtered = q
-    ? rivers.value.filter(rv =>
-        rv.name.toLowerCase().includes(q) ||
-        (rv.state_abbr ?? '').toLowerCase().includes(q) ||
-        (rv.basin ?? '').toLowerCase().includes(q)
-      )
-    : rivers.value
-
-  const stateMap = new Map<string, Map<string, River[]>>()
-  for (const rv of filtered) {
-    const state = rv.state_abbr ?? '—'
-    const basin = rv.basin ?? '—'
-    if (!stateMap.has(state)) stateMap.set(state, new Map())
-    const basinMap = stateMap.get(state)!
-    if (!basinMap.has(basin)) basinMap.set(basin, [])
-    basinMap.get(basin)!.push(rv)
-  }
-
-  return [...stateMap.entries()]
-    .sort(([a], [b]) => a === '—' ? 1 : b === '—' ? -1 : a.localeCompare(b))
-    .map(([state, basinMap]) => ({
-      state,
-      basins: [...basinMap.entries()]
-        .sort(([a], [b]) => a === '—' ? 1 : b === '—' ? -1 : a.localeCompare(b))
-        .map(([basin, rvs]) => ({
-          basin,
-          rivers: [...rvs].sort((a, b) => a.name.localeCompare(b.name)),
-        })),
+  if (!q) return groupedReaches.value
+  return groupedReaches.value
+    .map(sg => ({
+      ...sg,
+      rivers: sg.rivers
+        .map(rv => ({
+          ...rv,
+          reaches: rv.reaches.filter(re =>
+            re.name.toLowerCase().includes(q) ||
+            (re.common_name ?? '').toLowerCase().includes(q) ||
+            rv.river_name.toLowerCase().includes(q) ||
+            re.state_abbr.toLowerCase().includes(q)
+          ),
+        }))
+        .filter(rv => rv.reaches.length > 0),
     }))
+    .filter(sg => sg.rivers.length > 0)
 })
 
 const unassignedReaches = ref<{ id: string; slug: string; name: string; common_name: string | null; river_name: string | null; has_centerline: boolean }[]>([])
 const unassignedExpanded = ref(false)
-const selectedRiver = ref<RiverDetail | null>(null)
-const riverDetailLoading = ref(false)
 
 async function loadRivers() {
   riversLoading.value = true
   const token = await getToken()
   if (!token) { riversLoading.value = false; return }
   try {
-    const [rRes, uRes] = await Promise.all([
+    const [rRes, uRes, gRes] = await Promise.all([
       fetch(`${apiBase}/api/v1/admin/rivers`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`${apiBase}/api/v1/admin/reaches/unassigned`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${apiBase}/api/v1/admin/reaches/grouped`, { headers: { Authorization: `Bearer ${token}` } }),
     ])
     if (rRes.ok) rivers.value = await rRes.json()
     if (uRes.ok) unassignedReaches.value = await uRes.json()
+    if (gRes.ok) groupedReaches.value = await gRes.json()
   } finally {
     riversLoading.value = false
   }
 }
 
-async function toggleRiver(river: River) {
-  if (expandedRiverId.value === river.id) {
-    expandedRiverId.value = null
-    selectedRiver.value = null
-    return
-  }
-  expandedRiverId.value = river.id
-  selectedRiver.value = null
-  riverDetailLoading.value = true
-  try {
-    const token = await getToken()
-    const res = await fetch(`${apiBase}/api/v1/admin/rivers/${river.slug}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (res.ok) selectedRiver.value = await res.json()
-  } finally {
-    riverDetailLoading.value = false
+async function openEditRiverBySlug(slug: string) {
+  const token = await getToken()
+  const res = await fetch(`${apiBase}/api/v1/admin/rivers/${slug}`, { headers: { Authorization: `Bearer ${token}` } })
+  if (res.ok) {
+    const rv: RiverDetail = await res.json()
+    openEditRiver(rv)
   }
 }
 
-const fetchingCenterlines = ref<Set<string>>(new Set())
-const centerlineErrors = ref<Map<string, string>>(new Map())
+async function moveReach(state: string, riverId: string, reachIdx: number, direction: 1 | -1) {
+  const sg = groupedReaches.value.find(s => s.state === state)
+  if (!sg) return
+  const rv = sg.rivers.find(r => r.river_id === riverId)
+  if (!rv) return
+  const swapIdx = reachIdx + direction
+  if (swapIdx < 0 || swapIdx >= rv.reaches.length) return
 
-async function fetchCenterline(reachSlug: string) {
-  fetchingCenterlines.value = new Set([...fetchingCenterlines.value, reachSlug])
-  centerlineErrors.value = new Map([...centerlineErrors.value].filter(([k]) => k !== reachSlug))
-  try {
-    const token = await getToken()
-    const res = await fetch(`${apiBase}/api/v1/reaches/${reachSlug}/fetch-centerline`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}))
-      const msg = body.error ?? `Error ${res.status}`
-      centerlineErrors.value = new Map([...centerlineErrors.value, [reachSlug, msg]])
-    } else if (selectedRiver.value) {
-      // Refresh expanded detail
-      const token2 = await getToken()
-      const r2 = await fetch(`${apiBase}/api/v1/admin/rivers/${selectedRiver.value.slug}`, {
-        headers: { Authorization: `Bearer ${token2}` },
-      })
-      if (r2.ok) selectedRiver.value = await r2.json()
-    }
-  } catch (err: any) {
-    centerlineErrors.value = new Map([...centerlineErrors.value, [reachSlug, err?.message ?? 'Failed']])
-  } finally {
-    const s = new Set(fetchingCenterlines.value)
-    s.delete(reachSlug)
-    fetchingCenterlines.value = s
-  }
+  const a = rv.reaches[reachIdx]
+  const b = rv.reaches[swapIdx]
+  const orderA = a.river_order ?? (reachIdx + 1)
+  const orderB = b.river_order ?? (swapIdx + 1)
+
+  // Optimistic update
+  rv.reaches[reachIdx] = { ...b, river_order: orderA }
+  rv.reaches[swapIdx] = { ...a, river_order: orderB }
+  groupedReaches.value = [...groupedReaches.value]
+
+  const token = await getToken()
+  await Promise.all([
+    fetch(`${apiBase}/api/v1/admin/reaches/${a.slug}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ river_order: orderB }),
+    }),
+    fetch(`${apiBase}/api/v1/admin/reaches/${b.slug}`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ river_order: orderA }),
+    }),
+  ])
 }
 
-async function deleteReach(reachSlug: string, displayName: string) {
+async function deleteReachFromGroup(state: string, riverId: string, reachSlug: string, displayName: string) {
   if (!confirm(`Permanently delete "${displayName}"?\n\nThis removes all rapids, access points, and features. Gauges are unlinked but kept.`)) return
   const token = await getToken()
   const res = await fetch(`${apiBase}/api/v1/reaches/${reachSlug}`, {
@@ -470,13 +477,12 @@ async function deleteReach(reachSlug: string, displayName: string) {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) { alert(`Delete failed: ${res.status}`); return }
-  // Refresh expanded river detail
-  if (selectedRiver.value) {
-    const token2 = await getToken()
-    const r2 = await fetch(`${apiBase}/api/v1/admin/rivers/${selectedRiver.value.slug}`, {
-      headers: { Authorization: `Bearer ${token2}` },
-    })
-    if (r2.ok) selectedRiver.value = await r2.json()
+  // Remove optimistically from grouped state, then full refresh
+  const sg = groupedReaches.value.find(s => s.state === state)
+  if (sg) {
+    const rv = sg.rivers.find(r => r.river_id === riverId)
+    if (rv) rv.reaches = rv.reaches.filter(r => r.slug !== reachSlug)
+    groupedReaches.value = [...groupedReaches.value]
   }
   loadRivers()
 }
@@ -489,8 +495,6 @@ async function deleteRiver(riverSlug: string, riverName: string) {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (!res.ok) { alert(`Delete failed: ${res.status}`); return }
-  expandedRiverId.value = null
-  selectedRiver.value = null
   loadRivers()
 }
 

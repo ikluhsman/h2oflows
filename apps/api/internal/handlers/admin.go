@@ -90,13 +90,15 @@ func (h *AdminHandler) GetRiver(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "riverSlug")
 
 	type Reach struct {
-		ID         string  `json:"id"`
-		Slug       string  `json:"slug"`
-		Name       string  `json:"name"`
-		CommonName *string `json:"common_name"`
-		ClassMin   *float64 `json:"class_min"`
-		ClassMax   *float64 `json:"class_max"`
-		HasCenterline bool  `json:"has_centerline"`
+		ID            string   `json:"id"`
+		Slug          string   `json:"slug"`
+		Name          string   `json:"name"`
+		CommonName    *string  `json:"common_name"`
+		ClassMin      *float64 `json:"class_min"`
+		ClassMax      *float64 `json:"class_max"`
+		HasCenterline bool     `json:"has_centerline"`
+		StateAbbr     *string  `json:"state_abbr"`
+		RiverOrder    *int16   `json:"river_order"`
 	}
 	type RiverDetail struct {
 		ID          string  `json:"id"`
@@ -122,10 +124,10 @@ func (h *AdminHandler) GetRiver(w http.ResponseWriter, r *http.Request) {
 	// This lets the admin compare the system-derived value against the stored one.
 	rows, err := h.db.Query(r.Context(), `
 		SELECT id, slug, name, common_name, class_min, class_max,
-		       (centerline IS NOT NULL) AS has_centerline
+		       (centerline IS NOT NULL) AS has_centerline, state_abbr, river_order
 		FROM reaches
 		WHERE river_id = $1
-		ORDER BY name
+		ORDER BY river_order NULLS LAST, name
 	`, rv.ID)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "query failed")
@@ -136,7 +138,7 @@ func (h *AdminHandler) GetRiver(w http.ResponseWriter, r *http.Request) {
 	rv.Reaches = make([]Reach, 0)
 	for rows.Next() {
 		var re Reach
-		if err := rows.Scan(&re.ID, &re.Slug, &re.Name, &re.CommonName, &re.ClassMin, &re.ClassMax, &re.HasCenterline); err != nil {
+		if err := rows.Scan(&re.ID, &re.Slug, &re.Name, &re.CommonName, &re.ClassMin, &re.ClassMax, &re.HasCenterline, &re.StateAbbr, &re.RiverOrder); err != nil {
 			continue
 		}
 		rv.Reaches = append(rv.Reaches, re)
@@ -405,6 +407,100 @@ func (h *AdminHandler) ListUnassignedReaches(w http.ResponseWriter, r *http.Requ
 		reaches = append(reaches, re)
 	}
 	jsonResponse(w, http.StatusOK, reaches)
+}
+
+// GroupedReaches returns all assigned reaches grouped by reach state → river,
+// sorted by river_order NULLS LAST then name. Designed for the admin list view.
+// GET /api/v1/admin/reaches/grouped
+func (h *AdminHandler) GroupedReaches(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.db.Query(r.Context(), `
+		SELECT
+			re.id, re.slug, re.name, re.common_name, re.river_order,
+			COALESCE(re.state_abbr, '') AS state_abbr,
+			(re.centerline IS NOT NULL) AS has_centerline,
+			rv.id AS river_id, rv.slug AS river_slug, rv.name AS river_name, COALESCE(rv.basin, '') AS river_basin
+		FROM reaches re
+		JOIN rivers rv ON rv.id = re.river_id
+		ORDER BY
+			COALESCE(re.state_abbr, 'ZZZ') ASC,
+			rv.name ASC,
+			re.river_order NULLS LAST,
+			re.name ASC
+	`)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "query failed")
+		return
+	}
+	defer rows.Close()
+
+	type ReachRow struct {
+		ID            string  `json:"id"`
+		Slug          string  `json:"slug"`
+		Name          string  `json:"name"`
+		CommonName    *string `json:"common_name"`
+		RiverOrder    *int16  `json:"river_order"`
+		StateAbbr     string  `json:"state_abbr"`
+		HasCenterline bool    `json:"has_centerline"`
+	}
+	type RiverGroup struct {
+		RiverID   string     `json:"river_id"`
+		RiverSlug string     `json:"river_slug"`
+		RiverName string     `json:"river_name"`
+		RiverBasin string    `json:"river_basin"`
+		Reaches   []ReachRow `json:"reaches"`
+	}
+	type StateGroup struct {
+		State  string       `json:"state"`
+		Rivers []RiverGroup `json:"rivers"`
+	}
+
+	// Preserve insertion order while deduping state and river keys.
+	var stateOrder []string
+	stateIndex := map[string]int{}
+	riverIndex := map[string]map[string]int{} // state → riverID → index
+	var groups []StateGroup
+
+	for rows.Next() {
+		var re ReachRow
+		var riverID, riverSlug, riverName, riverBasin string
+		if err := rows.Scan(&re.ID, &re.Slug, &re.Name, &re.CommonName, &re.RiverOrder,
+			&re.StateAbbr, &re.HasCenterline,
+			&riverID, &riverSlug, &riverName, &riverBasin); err != nil {
+			continue
+		}
+
+		state := re.StateAbbr
+		if state == "" {
+			state = "—"
+		}
+
+		si, ok := stateIndex[state]
+		if !ok {
+			si = len(groups)
+			stateIndex[state] = si
+			stateOrder = append(stateOrder, state)
+			groups = append(groups, StateGroup{State: state, Rivers: []RiverGroup{}})
+			riverIndex[state] = map[string]int{}
+		}
+
+		ri, ok := riverIndex[state][riverID]
+		if !ok {
+			ri = len(groups[si].Rivers)
+			riverIndex[state][riverID] = ri
+			groups[si].Rivers = append(groups[si].Rivers, RiverGroup{
+				RiverID:   riverID,
+				RiverSlug: riverSlug,
+				RiverName: riverName,
+				RiverBasin: riverBasin,
+				Reaches:   []ReachRow{},
+			})
+		}
+
+		groups[si].Rivers[ri].Reaches = append(groups[si].Rivers[ri].Reaches, re)
+	}
+
+	_ = stateOrder
+	jsonResponse(w, http.StatusOK, groups)
 }
 
 // AssignReachToRiver sets reaches.river_id.
