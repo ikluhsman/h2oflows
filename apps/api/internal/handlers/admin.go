@@ -13,6 +13,7 @@ import (
 	"github.com/h2oflow/h2oflow/apps/api/internal/auth"
 	"github.com/h2oflow/h2oflow/apps/api/internal/kmlimport"
 	"github.com/h2oflow/h2oflow/apps/api/internal/nldi"
+	gauge "github.com/h2oflow/h2oflow/packages/gauge-core"
 )
 
 type AdminHandler struct {
@@ -562,7 +563,7 @@ func (h *AdminHandler) AutoFillRiverMeta(w http.ResponseWriter, r *http.Request)
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"state_abbr": stateAbbr,
-		"basin":      basinRes.info.Name,
+		"basin":      gauge.CanonicalBasin(basinRes.info.HUC8),
 		"huc8":       basinRes.info.HUC8,
 		"states":     basinRes.info.States,
 		"lat":        lat,
@@ -613,7 +614,7 @@ func (h *AdminHandler) GNISLookup(w http.ResponseWriter, r *http.Request) {
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"state_abbr": stateAbbr,
-		"basin":      basinRes.info.Name,
+		"basin":      gauge.CanonicalBasin(basinRes.info.HUC8),
 		"huc8":       basinRes.info.HUC8,
 		"states":     basinRes.info.States,
 		"lat":        coord.Lat,
