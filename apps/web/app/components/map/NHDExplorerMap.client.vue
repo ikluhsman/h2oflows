@@ -227,23 +227,29 @@ function shouldFit(): boolean {
 
 function fitToData() {
   if (!map) return
-  const allCoords: [number, number][] = []
-  for (const fc of [props.upstreamFlowlines, props.downstreamFlowlines]) {
-    if (!fc) continue
-    for (const f of fc.features) {
-      const geom = f.geometry
-      if (!geom) continue
-      if (geom.type === 'LineString') allCoords.push(...geom.coordinates)
-      else if (geom.type === 'MultiLineString') allCoords.push(...geom.coordinates.flat())
-    }
-  }
-  // Include authoring pins so re-pin mode zooms to existing access points
-  // even before any flowlines are loaded.
-  if (props.putInPin)   allCoords.push([props.putInPin.lng,   props.putInPin.lat])
-  if (props.takeOutPin) allCoords.push([props.takeOutPin.lng, props.takeOutPin.lat])
-  if (allCoords.length < 2) return
   if (props.disableAutoFit) return
   if (!shouldFit()) return
+
+  // When both reach pins are known, fit to just the reach extent — flowlines can
+  // extend hundreds of km and would zoom way out on initial edit-page load.
+  const allCoords: [number, number][] = []
+  if (props.putInPin && props.takeOutPin) {
+    allCoords.push([props.putInPin.lng,   props.putInPin.lat])
+    allCoords.push([props.takeOutPin.lng, props.takeOutPin.lat])
+  } else {
+    for (const fc of [props.upstreamFlowlines, props.downstreamFlowlines]) {
+      if (!fc) continue
+      for (const f of fc.features) {
+        const geom = f.geometry
+        if (!geom) continue
+        if (geom.type === 'LineString') allCoords.push(...geom.coordinates)
+        else if (geom.type === 'MultiLineString') allCoords.push(...geom.coordinates.flat())
+      }
+    }
+    if (props.putInPin)   allCoords.push([props.putInPin.lng,   props.putInPin.lat])
+    if (props.takeOutPin) allCoords.push([props.takeOutPin.lng, props.takeOutPin.lat])
+  }
+  if (allCoords.length < 2) return
   const bounds = allCoords.reduce(
     (b, [lng, lat]) => b.extend([lng, lat] as [number, number]),
     new maplibregl.LngLatBounds(allCoords[0], allCoords[0]),

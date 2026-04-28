@@ -178,14 +178,22 @@
             class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             :class="repinGaugeSelectMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
             :disabled="!repinGauges && !repinUpComID"
-            @click="repinGaugeSelectMode = !repinGaugeSelectMode"
+            @click="repinGaugeSelectMode = !repinGaugeSelectMode; if (!repinGaugeSelectMode) repinPendingGauge = null"
           >
             <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-            <template v-if="repinGaugeSaving">Saving…</template>
-            <template v-else-if="repinGaugeSelectMode">Cancel gauge</template>
+            <template v-if="repinGaugeSelectMode">Cancel</template>
             <template v-else-if="repinPrimaryGauge">Gauge · <span class="font-mono">{{ repinPrimaryGauge.external_id }}</span></template>
             <template v-else>Select gauge</template>
           </button>
+        </div>
+
+        <!-- Pending gauge — awaiting save confirmation -->
+        <div v-if="repinPendingGauge" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs">
+          <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+          <span class="flex-1 truncate font-medium text-amber-800 dark:text-amber-200">{{ repinPendingGauge.name || repinPendingGauge.externalId }}</span>
+          <span class="font-mono text-amber-600 dark:text-amber-400 shrink-0">{{ repinPendingGauge.externalId }}</span>
+          <UButton size="xs" :loading="repinGaugeSaving" @click="saveGauge">Save gauge</UButton>
+          <button class="text-amber-400 hover:text-amber-600 dark:hover:text-amber-300 shrink-0 px-1" @click="repinPendingGauge = null">✕</button>
         </div>
 
         <p v-if="repinGaugeError" class="text-xs text-red-500">{{ repinGaugeError }}</p>
@@ -268,6 +276,7 @@ const repinGaugeSelectMode  = ref(false)
 const repinGaugeSaving      = ref(false)
 const repinGaugeError       = ref('')
 const repinPrimaryGauge     = ref<{ id: string; external_id: string; name: string } | null>(null)
+const repinPendingGauge     = ref<{ externalId: string; source: string; name: string; lat: number; lng: number } | null>(null)
 const repinError            = ref('')
 const repinSuccess          = ref('')
 const repinSaving           = ref(false)
@@ -424,7 +433,7 @@ function resetState() {
   repinTributaries.value = null
   repinAnchorError.value = ''
   repinPreviewCenterline.value = null
-  repinGauges.value = null; repinGaugeSelectMode.value = false; repinGaugeError.value = ''
+  repinGauges.value = null; repinGaugeSelectMode.value = false; repinGaugeError.value = ''; repinPendingGauge.value = null
 }
 
 function resetComIDs() {
@@ -598,11 +607,17 @@ function onComIDSelect(comid: string, lat: number, lng: number) {
   repinPreviewCenterline.value = null
 }
 
-async function onGaugeSelect(externalId: string, source: string, name: string, lat: number, lng: number) {
-  if (!repinReach.value) return
+function onGaugeSelect(externalId: string, source: string, name: string, lat: number, lng: number) {
   repinGaugeSelectMode.value = false
+  repinGaugeError.value = ''
+  repinPendingGauge.value = { externalId, source, name, lat, lng }
+}
+
+async function saveGauge() {
+  if (!repinReach.value || !repinPendingGauge.value) return
   repinGaugeSaving.value = true
   repinGaugeError.value = ''
+  const { externalId, source, name, lat, lng } = repinPendingGauge.value
   try {
     const token = await getToken()
     const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/primary-gauge`, {
@@ -617,6 +632,7 @@ async function onGaugeSelect(externalId: string, source: string, name: string, l
     }
     const data = await res.json()
     repinPrimaryGauge.value = { id: data.gauge_id, external_id: externalId, name: name || externalId }
+    repinPendingGauge.value = null
   } catch (e: any) {
     repinGaugeError.value = e?.message ?? 'Failed to set gauge'
   } finally {
