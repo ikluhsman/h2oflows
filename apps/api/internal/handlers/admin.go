@@ -508,17 +508,27 @@ func (h *AdminHandler) AutoFillRiverMeta(w http.ResponseWriter, r *http.Request)
 
 	var lat, lng float64
 	err := h.db.QueryRow(ctx, `
-		SELECT COALESCE(start_lat, ST_Y(ST_StartPoint(centerline::geometry))),
-		       COALESCE(start_lng, ST_X(ST_StartPoint(centerline::geometry)))
+		SELECT COALESCE(ST_Y(start_point::geometry), ST_Y(ST_StartPoint(centerline::geometry))),
+		       COALESCE(ST_X(start_point::geometry), ST_X(ST_StartPoint(centerline::geometry)))
 		FROM reaches
 		WHERE river_id = (SELECT id FROM rivers WHERE slug = $1)
-		  AND (start_lat IS NOT NULL OR centerline IS NOT NULL)
-		ORDER BY COALESCE(start_lat, ST_Y(ST_StartPoint(centerline::geometry))) DESC NULLS LAST
+		  AND (start_point IS NOT NULL OR centerline IS NOT NULL)
 		LIMIT 1
 	`, riverSlug).Scan(&lat, &lng)
 	if err != nil {
-		errorResponse(w, http.StatusNotFound, "no reach coordinates found for river")
-		return
+		// No reach coordinates — fall back to GNIS ID if the river has one.
+		var gnisID *string
+		_ = h.db.QueryRow(ctx, `SELECT gnis_id FROM rivers WHERE slug = $1`, riverSlug).Scan(&gnisID)
+		if gnisID == nil || *gnisID == "" {
+			errorResponse(w, http.StatusNotFound, "no reach coordinates or GNIS ID found for river — add a GNIS ID first")
+			return
+		}
+		coord, gErr := nldi.NHDCoordByGNISID(ctx, *gnisID)
+		if gErr != nil {
+			errorResponse(w, http.StatusNotFound, fmt.Sprintf("no reach coordinates found and GNIS lookup failed: %v", gErr))
+			return
+		}
+		lat, lng = coord.Lat, coord.Lng
 	}
 
 	type stateResult struct {
