@@ -7,6 +7,16 @@
         <span class="text-sm font-medium truncate text-gray-700 dark:text-gray-200">{{ reach.common_name ?? reach.name }}</span>
       </template>
       <template #actions>
+        <NuxtLink
+          v-if="isDataAdmin"
+          :to="`/reaches/${route.params.slug}/edit`"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 text-xs font-medium transition-colors shrink-0"
+        >
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+          Edit
+        </NuxtLink>
         <button
           class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors shrink-0"
           @click="openShareForm"
@@ -352,6 +362,7 @@ import {
 
 const route  = useRoute()
 const config = useRuntimeConfig()
+const { isDataAdmin } = useAuth()
 const store  = useWatchlistStore()
 const { addAndSync, removeAndSync } = useWatchlistSync()
 
