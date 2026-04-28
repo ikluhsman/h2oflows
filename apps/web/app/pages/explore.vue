@@ -30,6 +30,17 @@
             placeholder="Search reaches, rivers, basins…"
             class="flex-1 text-sm bg-gray-100 dark:bg-gray-900 rounded-md px-3 py-1.5 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           />
+          <!-- New reach button (admin only) -->
+          <button
+            v-if="isDataAdmin"
+            class="shrink-0 flex items-center gap-1 p-1.5 rounded-md text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+            title="New reach"
+            @click="authorModalOpen = true"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <circle cx="10" cy="10" r="8"/><line x1="10" y1="6" x2="10" y2="14"/><line x1="6" y1="10" x2="14" y2="10"/>
+            </svg>
+          </button>
           <!-- Back to map (mobile only, shown when list is visible) -->
           <button
             class="sm:hidden shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
@@ -200,6 +211,40 @@
     :gauge="detailGauge"
     mode="reach"
   />
+
+  <!-- New reach modal (admin only) -->
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition-opacity duration-150"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity duration-100"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="authorModalOpen"
+        class="fixed inset-0 z-50 flex flex-col bg-gray-50 dark:bg-gray-950 overflow-y-auto"
+      >
+        <!-- Modal header -->
+        <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+          <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100">New reach</h2>
+          <button
+            class="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            @click="authorModalOpen = false"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M6 6l8 8M14 6l-8 8"/>
+            </svg>
+          </button>
+        </div>
+        <!-- Author component -->
+        <div class="flex-1 max-w-5xl w-full mx-auto px-4 py-6">
+          <ReachAuthor @created="onAuthorCreated" @cancel="authorModalOpen = false" />
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -212,8 +257,18 @@ import { useWatchlistStore } from '~/stores/watchlist'
 definePageMeta({ ssr: false })
 
 const { apiBase } = useRuntimeConfig().public
+const router = useRouter()
 const watchlistStore = useWatchlistStore()
 const { addAndSync, removeAndSync } = useWatchlistSync()
+const { isDataAdmin } = useAuth()
+
+// ── New reach modal (admin only) ──────────────────────────────────────────────
+const authorModalOpen = ref(false)
+
+function onAuthorCreated(slug: string) {
+  authorModalOpen.value = false
+  router.push(`/reaches/${slug}/edit`)
+}
 
 // ── Demo banner ───────────────────────────────────────────────────────────────
 const showDemoBanner = ref(false)
