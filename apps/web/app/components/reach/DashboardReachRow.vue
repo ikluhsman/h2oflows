@@ -14,7 +14,7 @@
           </div>
           <NuxtLink
             :to="`/reaches/${gauge.contextReachSlug}`"
-            class="shrink-0 p-1 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
             aria-label="View reach detail"
             @click.stop
           >
@@ -24,14 +24,14 @@
           </NuxtLink>
         </div>
         <!-- Sparkline: fixed width, desktop only, pointer-events-none so card click passes through -->
-        <div class="w-24 shrink-0 hidden sm:block h-5 opacity-50 pointer-events-none">
+        <div class="w-36 shrink-0 hidden sm:block h-6 opacity-60 pointer-events-none">
           <GaugeSparkline :gauge-id="gauge.id" flow-status="unknown" :color="sparklineColor" compact @latest-cfs="liveCfs = $event" />
         </div>
         <!-- Fixed-width badge slot keeps CFS column aligned across cards -->
         <div class="shrink-0 w-20 flex justify-end">
           <span
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
-            :class="['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+            :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
         </div>
         <span class="text-sm font-bold tabular-nums shrink-0 w-16 text-right" :class="cfsColorClass">
@@ -66,7 +66,7 @@
             </div>
             <NuxtLink
               :to="`/reaches/${gauge.contextReachSlug}`"
-              class="shrink-0 p-1 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+              class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
               aria-label="View reach detail"
               @click.stop
             >
@@ -77,7 +77,7 @@
           </div>
           <span
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
-            :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+            :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
           <span class="text-lg font-bold tabular-nums shrink-0" :class="cfsColorClass">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
@@ -121,7 +121,7 @@
             </div>
             <NuxtLink
               :to="`/reaches/${gauge.contextReachSlug}`"
-              class="shrink-0 p-1 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+              class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
               aria-label="View reach detail"
               @click.stop
             >
@@ -132,7 +132,7 @@
           </div>
           <span
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
-            :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+            :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
           <span class="text-[22px] font-bold tabular-nums shrink-0 leading-none" :class="cfsColorClass">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}

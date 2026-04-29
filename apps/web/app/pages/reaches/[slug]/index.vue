@@ -857,6 +857,9 @@ function addToDashboard(g: any) {
     contextReachCommonName: r?.common_name ?? r?.name ?? null,
     contextReachFullName:   putIn && takeOut ? `${putIn} to ${takeOut}` : null,
     contextReachRiverName:  r?.river_name ?? null,
+    contextReachBasinGroup: null,
+    contextReachCenterLng:  null,
+    contextReachRiverOrder: null,
     reachId:                r?.id ?? null,
     reachName:              r?.common_name ?? r?.name ?? null,
     reachNames:             [],
@@ -922,6 +925,7 @@ function openGaugeModal(g: any) {
     lastReadingAt:          g.last_reading_at ?? null,
     contextReachBasinGroup:     null,
     contextReachCenterLng:      null,
+    contextReachRiverOrder:     null,
     contextReachPermitRequired: r?.permit_required ?? false,
     contextReachMultiDayDays:   r?.multi_day_days ?? 1,
   }

@@ -52,3 +52,4 @@ apps/web/*.kml
 
 # Project decisions log — local only
 DECISIONS.md
+.mcp.json

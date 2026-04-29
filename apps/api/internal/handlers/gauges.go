@@ -714,7 +714,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			g.last_reading_at,
 			ST_X(g.location::geometry)       AS lng,
 			ST_Y(g.location::geometry)       AS lat,
-			g.state_abbr,
+			COALESCE(ctx_reach.state_abbr, g.state_abbr) AS state_abbr,
 			g.basin_name,
 			g.watershed_name,
 			ctx_reach.common_name            AS context_reach_common_name,
@@ -722,6 +722,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			ctx_reach.river_name             AS context_reach_river_name,
 			ctx_reach.basin_group            AS context_reach_basin_group,
 			ctx_reach.center_lng             AS context_reach_center_lng,
+			ctx_reach.river_order            AS context_reach_river_order,
 			g.current_cfs,
 			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
 			fr_band.label                    AS flow_band_label
@@ -746,7 +747,9 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				       AND ra.access_type = 'put_in'
 				       AND ra.location IS NOT NULL),
 				    ST_X(ST_Centroid(rctx.centerline::geometry))
-				) AS center_lng
+				) AS center_lng,
+				COALESCE(rctx.state_abbr, rctx_rv.state_abbr) AS state_abbr,
+				rctx.river_order
 			FROM reaches rctx
 			LEFT JOIN rivers rctx_rv ON rctx_rv.id = rctx.river_id
 			WHERE rctx.primary_gauge_id = g.id
@@ -811,6 +814,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			contextReachRiverName   *string
 			contextReachBasinGroup  *string
 			contextReachCenterLng   *float64
+			contextReachRiverOrder  *int16
 			currentCFS              *float64
 			flowStatus             string
 			flowBandLabel          *string
@@ -821,7 +825,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 			&reachNamesRaw, &reachSlugsRaw, &reachCommonNamesRaw,
 			&reachRelationship, &lastReadingAt,
 			&lng, &lat, &stateAbbr, &basinName, &watershedName,
-			&contextReachCommonName, &contextReachFullName, &contextReachRiverName, &contextReachBasinGroup, &contextReachCenterLng,
+			&contextReachCommonName, &contextReachFullName, &contextReachRiverName, &contextReachBasinGroup, &contextReachCenterLng, &contextReachRiverOrder,
 			&currentCFS, &flowStatus, &flowBandLabel,
 		); err != nil {
 			continue
@@ -858,6 +862,7 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 				"context_reach_river_name":    contextReachRiverName,
 				"context_reach_basin_group":   contextReachBasinGroup,
 				"context_reach_center_lng":    contextReachCenterLng,
+				"context_reach_river_order":   contextReachRiverOrder,
 				"current_cfs":                 currentCFS,
 				"flow_status":                 flowStatus,
 				"flow_band_label":             flowBandLabel,

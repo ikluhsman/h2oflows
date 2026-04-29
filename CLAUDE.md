@@ -2,7 +2,6 @@
 
 ## Project docs
 
-- [PROJECT.md](PROJECT.md) — vision, user goals, build order, open questions
 - [ARCHITECTURE.md](ARCHITECTURE.md) — tech stack, data model, guiding principles
 - [DECISIONS.md](DECISIONS.md) — ADR log for non-obvious decisions
 

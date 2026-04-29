@@ -768,3 +768,70 @@ func (h *AdminHandler) GNISLookup(w http.ResponseWriter, r *http.Request) {
 		"lng":        coord.Lng,
 	})
 }
+
+// ReorderReachesForRiver handles POST /api/v1/admin/rivers/{riverSlug}/reorder-reaches
+//
+// Assigns river_order 1..N to all reaches on the river, sorted by start_point
+// longitude ascending (westernmost = most upstream for CO rivers flowing W→E).
+// Reaches with no start_point are pushed to the end, sorted by name.
+func (h *AdminHandler) ReorderReachesForRiver(w http.ResponseWriter, r *http.Request) {
+	riverSlug := chi.URLParam(r, "riverSlug")
+	if riverSlug == "" {
+		errorResponse(w, http.StatusBadRequest, "riverSlug required")
+		return
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT re.id
+		FROM reaches re
+		JOIN rivers rv ON rv.id = re.river_id
+		WHERE rv.slug = $1
+		ORDER BY
+			ST_X(re.start_point::geometry) ASC NULLS LAST,
+			re.name ASC
+	`, riverSlug)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "query failed")
+		return
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		errorResponse(w, http.StatusInternalServerError, "scan failed")
+		return
+	}
+	if len(ids) == 0 {
+		jsonResponse(w, http.StatusOK, map[string]any{"updated": 0})
+		return
+	}
+
+	tx, err := h.db.Begin(r.Context())
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "tx failed")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	for i, id := range ids {
+		if _, err := tx.Exec(r.Context(),
+			`UPDATE reaches SET river_order = $1 WHERE id = $2`,
+			i+1, id,
+		); err != nil {
+			errorResponse(w, http.StatusInternalServerError, "update failed")
+			return
+		}
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		errorResponse(w, http.StatusInternalServerError, "commit failed")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]any{"updated": len(ids)})
+}

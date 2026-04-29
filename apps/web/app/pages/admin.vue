@@ -92,6 +92,7 @@
                     <span class="text-xs text-gray-400 font-mono">{{ river.river_slug }}</span>
                     <div class="flex items-center gap-2">
                       <UButton size="xs" variant="ghost" color="neutral" @click.stop="openEditRiverBySlug(river.river_slug)">Edit</UButton>
+                      <UButton size="xs" variant="ghost" color="neutral" icon="i-heroicons-arrows-up-down" :loading="reorderingRiver === river.river_slug" @click.stop="reorderReaches(river.river_slug)">Re-order</UButton>
                       <UButton size="xs" variant="ghost" color="error" @click.stop="deleteRiver(river.river_slug, river.river_name)">Delete river</UButton>
                     </div>
                   </div>
@@ -529,6 +530,22 @@ async function deleteReachFromGroup(state: string, riverId: string, reachSlug: s
     groupedReaches.value = [...groupedReaches.value]
   }
   loadRivers()
+}
+
+const reorderingRiver = ref<string | null>(null)
+async function reorderReaches(riverSlug: string) {
+  reorderingRiver.value = riverSlug
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/rivers/${riverSlug}/reorder-reaches`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) { alert(`Reorder failed: ${res.status}`); return }
+    loadRivers()
+  } finally {
+    reorderingRiver.value = null
+  }
 }
 
 async function deleteRiver(riverSlug: string, riverName: string) {

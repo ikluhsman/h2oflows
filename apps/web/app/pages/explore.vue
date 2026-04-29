@@ -475,6 +475,7 @@ function buildWatchedGauge(reach: ReachListItem): WatchedGauge {
     contextReachRiverName: reach.river_name ?? null,
     contextReachBasinGroup: reach.basin ?? null,
     contextReachCenterLng: null,
+    contextReachRiverOrder: null,
     contextReachPermitRequired: false,
     contextReachMultiDayDays: 0,
     reachId: null, reachName: null, reachNames: [],

@@ -47,19 +47,19 @@
           <!-- Group by gauge toggle — only shown when shared gauges exist -->
           <button
             v-if="hasSharedGauges"
-            class="p-1.5 rounded-md transition-colors"
+            class="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors"
             :class="groupByGauge
-              ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-              : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+              ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 shadow-sm'
+              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
             title="Group by gauge"
             @click="groupByGauge = !groupByGauge"
           >
-            <!-- Link/merge icon: two cards linked into one -->
-            <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="1" y="5" width="5" height="6" rx="1"/>
               <rect x="10" y="5" width="5" height="6" rx="1"/>
               <line x1="6" y1="8" x2="10" y2="8"/>
             </svg>
+            <span class="hidden sm:inline">Group gauge</span>
           </button>
           <!-- Expand / Collapse all -->
           <button
@@ -89,31 +89,41 @@
 
           <template v-if="!collapsedStates.has(stateGroup.name)">
             <div v-for="basin in stateGroup.basins" :key="basin.name" class="mb-4 pl-2">
-              <!-- Basin header: prominent -->
-              <div class="flex items-center gap-2 mb-3">
-                <svg class="w-4 h-4 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-                  <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
-                  <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
+              <!-- Basin header: collapsible -->
+              <button class="flex items-center gap-2 w-full text-left mb-3" @click="toggleBasin(stateGroup.name, basin.name)">
+                <svg
+                  class="w-3 h-3 text-gray-400 dark:text-gray-500 shrink-0 transition-transform duration-150"
+                  :class="{ 'rotate-90': !collapsedBasins.has(basinKey(stateGroup.name, basin.name)) }"
+                  viewBox="0 0 20 20" fill="currentColor"
+                >
+                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
                 </svg>
                 <h2 class="text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">{{ basin.name }} Basin</h2>
                 <span class="text-xs text-gray-400">({{ basin.reachCount }})</span>
                 <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700/60" />
-              </div>
+              </button>
 
+              <template v-if="!collapsedBasins.has(basinKey(stateGroup.name, basin.name))">
               <!-- Reaches grouped by river -->
               <div class="mb-2">
                 <template v-for="river in basin.rivers" :key="river.name">
                   <!-- River section divider -->
                   <div class="flex items-center gap-2 mt-4 first:mt-0 mb-2">
-                    <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                    <svg class="w-4 h-4 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                      <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                      <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
+                    </svg>
                     <span class="text-base font-semibold text-blue-600 dark:text-blue-400 shrink-0">{{ river.name }}</span>
+                    <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
                   </div>
                   <!-- Cards wrapper -->
-                  <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
-                    <template v-if="groupByGauge">
-                      <template v-for="group in groupReaches(river.reaches)" :key="group.lead.id">
+                  <template v-if="groupByGauge">
+                    <!-- Multi-reach gauge groups -->
+                    <template v-if="groupReaches(river.reaches).some(g => g.all.length > 1)">
+                      <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
                         <GaugeReachGroup
-                          v-if="group.all.length > 1"
+                          v-for="group in groupReaches(river.reaches).filter(g => g.all.length > 1)"
+                          :key="group.lead.id"
                           :lead-gauge="group.lead"
                           :reach-items="group.all"
                           :density="viewMode"
@@ -121,17 +131,32 @@
                           @open="(g, mode) => openGauge(g, mode)"
                           @remove-group="group.all.forEach(g => removeAndSync(g.id, g.contextReachSlug))"
                         />
+                      </div>
+                    </template>
+                    <!-- Single-gauge reaches — visually distinct if groups also exist -->
+                    <template v-if="groupReaches(river.reaches).some(g => g.all.length === 1)">
+                      <div
+                        v-if="groupReaches(river.reaches).some(g => g.all.length > 1)"
+                        class="flex items-center gap-2 mt-3 mb-1"
+                      >
+                        <span class="text-xs text-gray-400 font-medium">Individual reaches</span>
+                        <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                      </div>
+                      <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
                         <DashboardReachRow
-                          v-else
+                          v-for="group in groupReaches(river.reaches).filter(g => g.all.length === 1)"
+                          :key="group.lead.id"
                           :gauge="group.lead"
                           :view="rowView"
                           :hide-river-name="true"
                           @open-gauge="openGauge($event, 'reach')"
                           @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
                         />
-                      </template>
+                      </div>
                     </template>
-                    <template v-else>
+                  </template>
+                  <template v-else>
+                    <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
                       <DashboardReachRow
                         v-for="reach in river.reaches"
                         :key="`${reach.id}::${reach.contextReachSlug}`"
@@ -141,9 +166,9 @@
                         @open-gauge="openGauge($event, 'reach')"
                         @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
                       />
-                    </template>
-                  </div>
-                </template>
+                    </div>
+                  </template>
+                </template><!-- end v-for river -->
               </div>
 
               <!-- Standalone gauges (no reach context) -->
@@ -184,6 +209,7 @@
                   </div>
                 </div>
               </div>
+              </template><!-- end basin v-if -->
             </div>
           </template>
         </section>
@@ -313,6 +339,12 @@ const byStateTree = computed<StateGroup[]>(() => {
             .map(([rName, reaches]) => ({
               name: rName,
               reaches: [...reaches].sort((a, b) => {
+                // river_order (stored, admin-set) preferred; fall back to center longitude
+                const ao = a.contextReachRiverOrder
+                const bo = b.contextReachRiverOrder
+                if (ao != null && bo != null) return ao - bo
+                if (ao != null) return -1
+                if (bo != null) return 1
                 const al = a.contextReachCenterLng ?? a.lng
                 const bl = b.contextReachCenterLng ?? b.lng
                 if (al == null && bl == null) return 0
@@ -330,13 +362,17 @@ const byStateTree = computed<StateGroup[]>(() => {
 })
 
 // ── Collapsible sections ────────────────────────────────────────────────────
-const COLLAPSED_KEY = 'h2oflow_dashboard_collapsed_states'
+const COLLAPSED_STATES_KEY = 'h2oflow_dashboard_collapsed_states'
+const COLLAPSED_BASINS_KEY = 'h2oflow_dashboard_collapsed_basins'
 const collapsedStates = ref<Set<string>>(new Set())
+const collapsedBasins = ref<Set<string>>(new Set())
 
 onMounted(() => {
   try {
-    const saved = localStorage.getItem(COLLAPSED_KEY)
-    if (saved) collapsedStates.value = new Set(JSON.parse(saved))
+    const s = localStorage.getItem(COLLAPSED_STATES_KEY)
+    if (s) collapsedStates.value = new Set(JSON.parse(s))
+    const b = localStorage.getItem(COLLAPSED_BASINS_KEY)
+    if (b) collapsedBasins.value = new Set(JSON.parse(b))
   } catch {}
 })
 
@@ -344,22 +380,35 @@ function toggleState(state: string) {
   const s = new Set(collapsedStates.value)
   if (s.has(state)) s.delete(state); else s.add(state)
   collapsedStates.value = s
-  localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...s]))
+  localStorage.setItem(COLLAPSED_STATES_KEY, JSON.stringify([...s]))
+}
+
+function basinKey(stateName: string, basinName: string) { return `${stateName}::${basinName}` }
+
+function toggleBasin(stateName: string, basinName: string) {
+  const key = basinKey(stateName, basinName)
+  const s = new Set(collapsedBasins.value)
+  if (s.has(key)) s.delete(key); else s.add(key)
+  collapsedBasins.value = s
+  localStorage.setItem(COLLAPSED_BASINS_KEY, JSON.stringify([...s]))
 }
 
 // ── Expand / collapse all ────────────────────────────────────────────────────
-const allExpanded = computed(() => collapsedStates.value.size === 0)
+const allExpanded = computed(() => collapsedStates.value.size === 0 && collapsedBasins.value.size === 0)
 
 function toggleAllSections() {
   if (allExpanded.value) {
     const states = new Set(byStateTree.value.map(s => s.name))
     collapsedStates.value = states
-    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...states]))
+    localStorage.setItem(COLLAPSED_STATES_KEY, JSON.stringify([...states]))
   } else {
     collapsedStates.value = new Set()
-    localStorage.setItem(COLLAPSED_KEY, '[]')
+    collapsedBasins.value = new Set()
+    localStorage.setItem(COLLAPSED_STATES_KEY, '[]')
+    localStorage.setItem(COLLAPSED_BASINS_KEY, '[]')
   }
 }
+
 
 // ── View mode ────────────────────────────────────────────────────────────────
 const VIEW_MODE_KEY = 'h2oflow_dashboard_view_mode'
