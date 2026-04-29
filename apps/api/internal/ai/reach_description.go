@@ -10,9 +10,9 @@ import (
 )
 
 // GenerateReachDescription asks Claude to write a 1-2 paragraph description
-// for a whitewater reach using its training knowledge. If Claude has no
-// reliable information about the reach it says so — the admin can then edit
-// or replace the text before saving.
+// for a whitewater reach. Claude is given the web_search tool so it can look
+// up current information from paddling forums, American Whitewater, and
+// guidebook sites rather than relying solely on training knowledge.
 func GenerateReachDescription(ctx context.Context, apiKey, name, riverName, commonName string, classMin, classMax *float64) (string, error) {
 	client := anthropic.NewClient(option.WithAPIKey(apiKey))
 
@@ -45,16 +45,24 @@ func GenerateReachDescription(ctx context.Context, apiKey, name, riverName, comm
 
 %s
 
+Use web search to find current, accurate information from American Whitewater (americanwhitewater.org), paddling forums, or guidebook sites. Search for the reach name and river name together.
+
 Guidelines:
 - Write in third person, present tense ("The run offers...", "Paddlers will find...")
-- Describe character of the river, key rapids or features if known, typical flow season, and access if known
-- Keep it factual — if you don't have reliable information about this specific reach, write one sentence noting that the description needs manual editing, then stop
+- Describe character of the river, key rapids or features if known, typical flow season, and access notes if known
+- If you found real information online, incorporate it naturally — do not mention that you searched
+- If you genuinely can't find reliable information about this specific reach, write one sentence noting the description needs manual editing, then stop
 - Do not invent rapid names, distances, or flow stats you're not confident about
-- 100-200 words total`, sb.String())
+- 100-250 words total`, sb.String())
 
 	msg, err := client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.ModelClaudeHaiku4_5,
-		MaxTokens: 400,
+		MaxTokens: 600,
+		Tools: []anthropic.ToolUnionParam{
+			{OfWebSearchTool20250305: &anthropic.WebSearchTool20250305Param{
+				MaxUses: anthropic.Int(3),
+			}},
+		},
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
 		},
@@ -62,8 +70,15 @@ Guidelines:
 	if err != nil {
 		return "", fmt.Errorf("claude: %w", err)
 	}
-	if len(msg.Content) == 0 {
+
+	var parts []string
+	for _, block := range msg.Content {
+		if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
+			parts = append(parts, strings.TrimSpace(block.Text))
+		}
+	}
+	if len(parts) == 0 {
 		return "", fmt.Errorf("claude returned empty response")
 	}
-	return strings.TrimSpace(msg.Content[0].Text), nil
+	return strings.Join(parts, "\n\n"), nil
 }

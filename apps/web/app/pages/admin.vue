@@ -43,7 +43,10 @@
               {{ rivers.length }} rivers
               <template v-if="unassignedReaches.length"> · <span class="text-amber-500">{{ unassignedReaches.length }} unassigned</span></template>
             </p>
-            <UButton size="xs" icon="i-heroicons-plus" @click="createRiverOpen = true">New river</UButton>
+            <div class="flex items-center gap-2">
+              <UButton size="xs" variant="outline" color="neutral" icon="i-heroicons-plus" @click="authorModalOpen = true">New reach</UButton>
+              <UButton size="xs" icon="i-heroicons-plus" @click="createRiverOpen = true">New river</UButton>
+            </div>
           </div>
 
           <UInput v-model="riverSearch" icon="i-heroicons-magnifying-glass" placeholder="Search reaches…" class="mb-3" />
@@ -292,6 +295,38 @@
       </template>
     </UModal>
 
+    <!-- New reach modal -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition-opacity duration-150"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-100"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="authorModalOpen"
+          class="fixed inset-0 z-50 flex flex-col bg-gray-50 dark:bg-gray-950 overflow-y-auto"
+        >
+          <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+            <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100">New reach</h2>
+            <button
+              class="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              @click="authorModalOpen = false"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M6 6l8 8M14 6l-8 8"/>
+              </svg>
+            </button>
+          </div>
+          <div class="flex-1 max-w-5xl w-full mx-auto px-4 py-6">
+            <ReachAuthor @created="onAuthorCreated" @cancel="authorModalOpen = false" />
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Assign role modal -->
     <UModal v-model:open="assignRoleOpen" title="Assign role">
       <template #body>
@@ -330,6 +365,15 @@ definePageMeta({ ssr: false })
 
 const { isAdmin, isDataAdmin, loadAdminRoles, getToken } = useAuth()
 const { apiBase } = useRuntimeConfig().public
+const router = useRouter()
+
+// ── New reach modal ───────────────────────────────────────────────────────────
+const authorModalOpen = ref(false)
+
+function onAuthorCreated(slug: string) {
+  authorModalOpen.value = false
+  router.push(`/reaches/${slug}/edit`)
+}
 
 // Auth readiness — wait for roles to load before showing gated UI
 const authReady = ref(false)

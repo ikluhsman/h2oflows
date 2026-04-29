@@ -507,6 +507,7 @@ type reachListItem struct {
 	PutInName       *string  `json:"put_in_name"`
 	TakeOutName     *string  `json:"take_out_name"`
 	Basin           *string  `json:"basin"`
+	StateAbbr       *string  `json:"state_abbr"`
 	ClassMin        *float64 `json:"class_min"`
 	ClassMax        *float64 `json:"class_max"`
 	CurrentCFS      *float64 `json:"current_cfs"`
@@ -536,6 +537,7 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 			r.put_in_name,
 			r.take_out_name,
 			rv.basin,
+			r.state_abbr,
 			r.class_min,
 			COALESCE(
 				(SELECT MAX(class_rating) FROM rapids WHERE reach_id = r.id AND class_rating IS NOT NULL),
@@ -583,7 +585,7 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 		if err := rows.Scan(
 			&item.Slug,
 			&item.RiverName, &item.CommonName, &item.PutInName, &item.TakeOutName,
-			&item.Basin,
+			&item.Basin, &item.StateAbbr,
 			&item.ClassMin, &item.ClassMax,
 			&item.CurrentCFS, &item.FlowLabel, &item.GaugeID,
 			&item.GaugeExternalID, &item.GaugeSource, &item.GaugeName,

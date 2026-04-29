@@ -65,6 +65,7 @@ export interface ReachListItem {
   put_in_name: string | null
   take_out_name: string | null
   basin: string | null
+  state_abbr: string | null
   class_min: number | null
   class_max: number | null
   current_cfs: number | null
