@@ -3,7 +3,6 @@
 ## Project docs
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — tech stack, data model, guiding principles
-- [DECISIONS.md](DECISIONS.md) — ADR log for non-obvious decisions
 
 ## Repo layout
 
@@ -27,7 +26,7 @@ apps/web/          Nuxt 4 frontend (Nuxt UI Pro, MapLibre, uPlot)
 packages/
   gauge-core/      GaugeSource interface + USGS/DWR adapters
 
-.claude/memory/    persistent AI memory (committed for project/* types)
+.claude/memory/    persistent AI memory (gitignored, local only)
 ```
 
 ## Stack notes
