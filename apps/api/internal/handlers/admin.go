@@ -772,8 +772,10 @@ func (h *AdminHandler) GNISLookup(w http.ResponseWriter, r *http.Request) {
 // ReorderReachesForRiver handles POST /api/v1/admin/rivers/{riverSlug}/reorder-reaches
 //
 // Assigns river_order 1..N to all reaches on the river, sorted by start_point
-// longitude ascending (westernmost = most upstream for CO rivers flowing W→E).
-// Reaches with no start_point are pushed to the end, sorted by name.
+// longitude. Direction is auto-detected: if the sum of (end_lng - start_lng) across
+// all reaches with both points is positive, the river flows W→E (ASC); otherwise
+// E→W (DESC, e.g. Colorado River flowing toward Utah). Falls back to ASC when
+// no reaches have both endpoints set.
 func (h *AdminHandler) ReorderReachesForRiver(w http.ResponseWriter, r *http.Request) {
 	riverSlug := chi.URLParam(r, "riverSlug")
 	if riverSlug == "" {
@@ -781,15 +783,33 @@ func (h *AdminHandler) ReorderReachesForRiver(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	rows, err := h.db.Query(r.Context(), `
+	// Detect flow direction: sum (end_lng - start_lng) across reaches with both points.
+	var lngDelta float64
+	_ = h.db.QueryRow(r.Context(), `
+		SELECT COALESCE(SUM(
+			ST_X(re.end_point::geometry) - ST_X(re.start_point::geometry)
+		), 0)
+		FROM reaches re
+		JOIN rivers rv ON rv.id = re.river_id
+		WHERE rv.slug = $1
+		  AND re.start_point IS NOT NULL
+		  AND re.end_point IS NOT NULL
+	`, riverSlug).Scan(&lngDelta)
+
+	orderDir := "ASC"
+	if lngDelta < 0 {
+		orderDir = "DESC"
+	}
+
+	rows, err := h.db.Query(r.Context(), fmt.Sprintf(`
 		SELECT re.id
 		FROM reaches re
 		JOIN rivers rv ON rv.id = re.river_id
 		WHERE rv.slug = $1
 		ORDER BY
-			ST_X(re.start_point::geometry) ASC NULLS LAST,
+			ST_X(re.start_point::geometry) %s NULLS LAST,
 			re.name ASC
-	`, riverSlug)
+	`, orderDir), riverSlug)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "query failed")
 		return
