@@ -82,10 +82,11 @@
       @gauge-select="onGaugeSelect"
     />
     <p v-if="authorDownstreamLoading" class="text-xs text-blue-500 dark:text-blue-400 mt-1 animate-pulse">Loading downstream mainstem…</p>
-    <div v-if="authorUpComID && authorDownComID" class="flex items-center gap-2 mt-1">
+    <div v-if="authorUpComID && authorDownComID" class="flex items-center gap-2 mt-1 flex-wrap">
       <UButton size="xs" variant="outline" color="neutral" :loading="authorPreviewLoading" @click="previewCenterline">
         {{ authorPreviewCenterline ? 'Refresh preview' : 'Preview centerline' }}
       </UButton>
+      <UButton size="xs" :loading="authorRiverNameFetching" :disabled="!authorUpComID" @click="fetchRiverName">Save flow lines</UButton>
       <span v-if="authorPreviewCenterline" class="text-xs text-blue-600 dark:text-blue-400">Dashed line shows trimmed reach</span>
     </div>
 
@@ -280,11 +281,12 @@ const authorSlugChecking        = ref(false)
 let   authorSlugTimer: ReturnType<typeof setTimeout> | null = null
 
 const authorGaugeSelectMode     = ref(false)
-const authorGauges              = ref<object | null>(null)
+const authorGauges              = ref<NHDFC | null>(null)
 const authorPendingGauge        = ref<{ externalId: string; source: string; name: string; lat: number; lng: number } | null>(null)
 const authorGaugeSaving         = ref(false)
 const authorGaugeError          = ref('')
 const authorRiverNameFetching   = ref(false)
+const authorGnisId              = ref('')
 
 const authorForm = ref({
   name: '', commonName: '', riverName: '', slug: '',
@@ -398,6 +400,7 @@ function reset() {
   authorGaugeSaving.value = false
   authorGaugeError.value = ''
   authorRiverNameFetching.value = false
+  authorGnisId.value = ''
 }
 
 async function fetchNearbyGauges(lat: number, lng: number, comid?: string | null) {
@@ -429,6 +432,7 @@ async function fetchRiverName() {
     if (data.river_name && !authorRiverNameOverride.value) {
       authorForm.value.riverName = data.river_name
     }
+    if (data.gnis_id) authorGnisId.value = data.gnis_id
   } catch { /* non-fatal */ }
   finally { authorRiverNameFetching.value = false }
 }
@@ -549,6 +553,14 @@ async function submit() {
           very_high: { min_cfs: ranges.very_high.min, max_cfs: null                 },
         }),
       })
+    }
+
+    if (f.riverName.trim()) {
+      await fetch(`${apiBase}/api/v1/admin/reaches/${slug}/auto-river`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ river_name: f.riverName.trim(), gnis_id: authorGnisId.value }),
+      }).catch(() => { /* non-fatal */ })
     }
 
     await fetch(`${apiBase}/api/v1/admin/reaches/${slug}/nldi-centerline-by-comid`, {

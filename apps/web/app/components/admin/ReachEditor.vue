@@ -785,6 +785,7 @@ async function saveFlowLines() {
       repinReach.value.start_comid = repinUpComID.value
       repinReach.value.end_comid   = repinDownComID.value
     }
+    fetchRiverName()
   } catch (e: any) {
     repinError.value = e.message ?? 'Unknown error'
   } finally {
