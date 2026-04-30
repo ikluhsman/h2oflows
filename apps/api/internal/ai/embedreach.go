@@ -133,6 +133,8 @@ type embedRapidRow struct {
 	name        string
 	classRating *float64
 	riverMile   *float64
+	lat         *float64
+	lng         *float64
 	description *string
 	portageDesc *string
 }
@@ -173,7 +175,9 @@ func loadEmbedReach(ctx context.Context, pool *pgxpool.Pool, id string) (embedRe
 
 	// Rapids — include all, even those without description text.
 	rapRows, err := pool.Query(ctx, `
-		SELECT id, name, class_rating, river_mile, description, portage_description
+		SELECT id, name, class_rating, river_mile,
+		       ST_Y(location::geometry), ST_X(location::geometry),
+		       description, portage_description
 		FROM rapids WHERE reach_id = $1 ORDER BY river_mile NULLS LAST, name
 	`, id)
 	if err != nil {
@@ -182,7 +186,7 @@ func loadEmbedReach(ctx context.Context, pool *pgxpool.Pool, id string) (embedRe
 	defer rapRows.Close()
 	for rapRows.Next() {
 		var rr embedRapidRow
-		if err := rapRows.Scan(&rr.id, &rr.name, &rr.classRating, &rr.riverMile, &rr.description, &rr.portageDesc); err != nil {
+		if err := rapRows.Scan(&rr.id, &rr.name, &rr.classRating, &rr.riverMile, &rr.lat, &rr.lng, &rr.description, &rr.portageDesc); err != nil {
 			return r, err
 		}
 		r.rapids = append(r.rapids, rr)
@@ -324,9 +328,18 @@ func buildRapidChunk(reachName string, rr embedRapidRow) string {
 		if rr.riverMile != nil {
 			fmt.Fprintf(&sb, ", mile %.1f", *rr.riverMile)
 		}
+		if rr.lat != nil && rr.lng != nil {
+			fmt.Fprintf(&sb, ", %.5f,%.5f", *rr.lat, *rr.lng)
+		}
 		sb.WriteByte(')')
 	} else if rr.riverMile != nil {
-		fmt.Fprintf(&sb, " (mile %.1f)", *rr.riverMile)
+		if rr.lat != nil && rr.lng != nil {
+			fmt.Fprintf(&sb, " (mile %.1f, %.5f,%.5f)", *rr.riverMile, *rr.lat, *rr.lng)
+		} else {
+			fmt.Fprintf(&sb, " (mile %.1f)", *rr.riverMile)
+		}
+	} else if rr.lat != nil && rr.lng != nil {
+		fmt.Fprintf(&sb, " (%.5f,%.5f)", *rr.lat, *rr.lng)
 	}
 	if rr.description != nil && *rr.description != "" {
 		fmt.Fprintf(&sb, "\n%s", *rr.description)
