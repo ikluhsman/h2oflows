@@ -140,6 +140,7 @@
                         v-if="split.ungrouped.length > 0"
                         :reaches="split.ungrouped"
                         :density="viewMode"
+                        :class="split.gaugeGroups.length > 0 ? 'mt-3' : ''"
                         @open="(g, mode) => openGauge(g, mode)"
                         @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
                       />
