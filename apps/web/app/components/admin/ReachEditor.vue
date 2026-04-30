@@ -687,6 +687,7 @@ async function saveMeta() {
     repinMetaMsg.value = 'Saved'
     repinReach.value.name = f.name.trim()
     repinReach.value.river_name = f.riverName.trim() || null
+    emit('rivers-updated')
     if (savedSlug !== repinReach.value.slug) {
       repinReach.value.slug = savedSlug
       repinForm.value.slug = savedSlug
