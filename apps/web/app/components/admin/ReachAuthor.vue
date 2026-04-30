@@ -473,6 +473,7 @@ function onComIDSelect(comid: string, lat: number, lng: number) {
   if (authorComIDSlot.value === 'up') {
     authorUpComID.value = comid
     authorStartLat.value = lat; authorStartLng.value = lng
+    authorComIDSlot.value = 'down'
   } else {
     authorDownComID.value = comid
     authorEndLat.value = lat; authorEndLng.value = lng
@@ -549,6 +550,19 @@ async function submit() {
         }),
       })
     }
+
+    await fetch(`${apiBase}/api/v1/admin/reaches/${slug}/nldi-centerline-by-comid`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        up_comid:   authorUpComID.value,
+        down_comid: authorDownComID.value,
+        start_lat:  authorStartLat.value,
+        start_lng:  authorStartLng.value,
+        end_lat:    authorEndLat.value,
+        end_lng:    authorEndLng.value,
+      }),
+    }).catch(() => { /* non-fatal */ })
 
     if (authorPendingGauge.value) {
       const { externalId, source, name: gaugeName, lat: gLat, lng: gLng } = authorPendingGauge.value

@@ -251,7 +251,7 @@
             {{ repinPreviewCenterline ? 'Refresh preview' : 'Preview centerline' }}
           </UButton>
           <UButton v-if="repinFlowlinesDirty" size="sm" variant="outline" color="neutral" @click="resetComIDs">Revert</UButton>
-          <UButton size="sm" :loading="repinSaving" :disabled="!repinFlowlinesDirty || !repinUpComID || !repinDownComID" @click="saveFlowLines">Save flow lines</UButton>
+          <UButton size="sm" :loading="repinSaving" :disabled="!repinUpComID || !repinDownComID" @click="saveFlowLines">Save flow lines</UButton>
         </div>
       </div>
     </div>
