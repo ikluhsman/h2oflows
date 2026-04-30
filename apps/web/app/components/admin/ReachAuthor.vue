@@ -22,12 +22,12 @@
     </div>
 
     <!-- ComID slot selector -->
-    <div v-if="authorTributaries" class="flex items-center gap-3 mb-3 text-xs">
+    <div v-if="authorTributaries" class="flex items-center gap-3 mb-3 text-xs flex-wrap">
       <span class="text-gray-500 shrink-0">Click flowline for:</span>
       <button
         class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
         :class="authorComIDSlot === 'up' ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
-        @click="authorComIDSlot = 'up'"
+        @click="authorComIDSlot = 'up'; authorGaugeSelectMode = false"
       >
         <span class="w-2 h-2 rounded-full bg-green-500 shrink-0" />
         Upstream<template v-if="authorUpComID"> · <span class="font-mono">{{ authorUpComID }}</span></template>
@@ -35,30 +35,51 @@
       <button
         class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
         :class="authorComIDSlot === 'down' ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
-        @click="authorComIDSlot = 'down'"
+        @click="authorComIDSlot = 'down'; authorGaugeSelectMode = false"
       >
         <span class="w-2 h-2 rounded-full bg-red-500 shrink-0" />
         Downstream<template v-if="authorDownComID"> · <span class="font-mono">{{ authorDownComID }}</span></template>
       </button>
+      <button
+        class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        :class="authorGaugeSelectMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+        :disabled="!authorGauges && !authorAnchorSnap"
+        @click="authorGaugeSelectMode = !authorGaugeSelectMode; if (!authorGaugeSelectMode) authorPendingGauge = null"
+      >
+        <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+        <template v-if="authorGaugeSelectMode">Cancel</template>
+        <template v-else-if="authorPendingGauge">Gauge · <span class="font-mono">{{ authorPendingGauge.externalId }}</span></template>
+        <template v-else>Select gauge</template>
+      </button>
     </div>
+
+    <!-- Pending gauge card -->
+    <div v-if="authorPendingGauge" class="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs">
+      <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+      <span class="flex-1 truncate font-medium text-amber-800 dark:text-amber-200">{{ authorPendingGauge.name || authorPendingGauge.externalId }}</span>
+      <span class="font-mono text-amber-600 dark:text-amber-400 shrink-0">{{ authorPendingGauge.externalId }}</span>
+      <button class="text-amber-400 hover:text-amber-600 dark:hover:text-amber-300 shrink-0 px-1" @click="authorPendingGauge = null">✕</button>
+    </div>
+    <p v-if="authorGaugeError" class="text-xs text-red-500 mb-3">{{ authorGaugeError }}</p>
 
     <NHDExplorerMap
       :upstream-flowlines="authorTributaries"
       :downstream-flowlines="authorDownstreamFlowlines"
-      :upstream-gauges="null"
+      :upstream-gauges="authorGauges"
       :snap-lat="null"
       :snap-lng="null"
       :pick-mode="authorPickMode"
-      :comid-select-mode="!!authorAnchorSnap && !authorPickMode"
+      :comid-select-mode="!!authorAnchorSnap && !authorPickMode && !authorGaugeSelectMode"
       :comid-select-slot="authorComIDSlot"
       :selected-up-comid="authorUpComID"
       :selected-down-comid="authorDownComID"
       :put-in-pin="authorPutInPin"
       :take-out-pin="authorTakeOutPin"
-      :disable-auto-fit="true"
       :preview-centerline="authorPreviewCenterline"
+      :gauge-select-mode="authorGaugeSelectMode"
       @pick="onAnchorPick"
       @comid-select="onComIDSelect"
+      @gauge-select="onGaugeSelect"
     />
     <p v-if="authorDownstreamLoading" class="text-xs text-blue-500 dark:text-blue-400 mt-1 animate-pulse">Loading downstream mainstem…</p>
     <div v-if="authorUpComID && authorDownComID" class="flex items-center gap-2 mt-1">
@@ -101,6 +122,14 @@
             :class="authorRiverNameOverride ? '' : 'text-gray-400 dark:text-gray-500 cursor-default'"
             placeholder="Auto-filled from anchor snap"
           />
+          <UButton
+            size="xs"
+            variant="outline"
+            color="neutral"
+            :loading="authorRiverNameFetching"
+            :disabled="!authorAnchorSnap && !authorUpComID"
+            @click="fetchRiverName"
+          >Lookup from NLDI</UButton>
           <button class="text-xs text-blue-500 hover:text-blue-400 shrink-0" @click="authorRiverNameOverride = !authorRiverNameOverride">
             {{ authorRiverNameOverride ? 'Lock' : 'Override' }}
           </button>
@@ -250,6 +279,13 @@ const authorSlugAvailable       = ref<boolean | null>(null)
 const authorSlugChecking        = ref(false)
 let   authorSlugTimer: ReturnType<typeof setTimeout> | null = null
 
+const authorGaugeSelectMode     = ref(false)
+const authorGauges              = ref<object | null>(null)
+const authorPendingGauge        = ref<{ externalId: string; source: string; name: string; lat: number; lng: number } | null>(null)
+const authorGaugeSaving         = ref(false)
+const authorGaugeError          = ref('')
+const authorRiverNameFetching   = ref(false)
+
 const authorForm = ref({
   name: '', commonName: '', riverName: '', slug: '',
   classMin: null as number | null, classMax: null as number | null,
@@ -356,6 +392,50 @@ function reset() {
   }
   authorSlugManual.value = false
   authorSlugAvailable.value = null
+  authorGaugeSelectMode.value = false
+  authorGauges.value = null
+  authorPendingGauge.value = null
+  authorGaugeSaving.value = false
+  authorGaugeError.value = ''
+  authorRiverNameFetching.value = false
+}
+
+async function fetchNearbyGauges(lat: number, lng: number, comid?: string | null) {
+  try {
+    const token = await getToken()
+    const comidParam = comid ? `&comid=${comid}` : ''
+    const res = await fetch(`${apiBase}/api/v1/admin/nldi/nearby-gauges?lat=${lat}&lng=${lng}&distance=100${comidParam}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (res.ok) authorGauges.value = await res.json()
+  } catch { /* non-fatal */ }
+}
+
+async function fetchRiverName() {
+  const comid = authorUpComID.value ?? authorAnchorSnap.value?.comid
+  if (!comid) return
+  authorRiverNameFetching.value = true
+  try {
+    const token = await getToken()
+    if (!token) return
+    const lat = authorStartLat.value
+    const lng = authorStartLng.value
+    const coordParams = lat != null && lng != null ? `&lat=${lat}&lng=${lng}` : ''
+    const res = await fetch(`${apiBase}/api/v1/admin/nldi/river-name?comid=${comid}${coordParams}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    if (data.river_name && !authorRiverNameOverride.value) {
+      authorForm.value.riverName = data.river_name
+    }
+  } catch { /* non-fatal */ }
+  finally { authorRiverNameFetching.value = false }
+}
+
+function onGaugeSelect(externalId: string, source: string, name: string, lat: number, lng: number) {
+  authorGaugeSelectMode.value = false
+  authorPendingGauge.value = { externalId, source, name, lat, lng }
 }
 
 function onCancel() {
@@ -381,6 +461,7 @@ async function onAnchorPick(lat: number, lng: number) {
     if (!authorRiverNameOverride.value && data.snap.name) {
       authorForm.value.riverName = data.snap.name
     }
+    await fetchNearbyGauges(lat, lng, data.snap.comid)
   } catch (e: any) {
     authorError.value = e.message ?? 'Snap failed'
   } finally {
@@ -467,6 +548,19 @@ async function submit() {
           very_high: { min_cfs: ranges.very_high.min, max_cfs: null                 },
         }),
       })
+    }
+
+    if (authorPendingGauge.value) {
+      const { externalId, source, name: gaugeName, lat: gLat, lng: gLng } = authorPendingGauge.value
+      try {
+        await fetch(`${apiBase}/api/v1/admin/reaches/${slug}/primary-gauge`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ external_id: externalId, source, name: gaugeName, lat: gLat, lng: gLng }),
+        })
+      } catch (e: any) {
+        console.error('Failed to save gauge:', e)
+      }
     }
 
     emit('created', slug)
