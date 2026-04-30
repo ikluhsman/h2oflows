@@ -123,19 +123,27 @@
                   </div>
                   <!-- Cards wrapper -->
                   <template v-if="groupByGauge">
-                    <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
-                      <GaugeReachGroup
-                        v-for="group in groupReaches(river.reaches)"
-                        :key="group.lead.id"
-                        :lead-gauge="group.lead"
-                        :reach-items="group.all"
+                    <template v-for="split in [splitReachGroups(river.reaches)]" :key="'split'">
+                      <div v-if="split.gaugeGroups.length > 0" :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
+                        <GaugeReachGroup
+                          v-for="group in split.gaugeGroups"
+                          :key="group.lead.id"
+                          :lead-gauge="group.lead"
+                          :reach-items="group.all"
+                          :density="viewMode"
+                          :hide-river-name="true"
+                          @open="(g, mode) => openGauge(g, mode)"
+                          @remove-group="group.all.forEach(g => removeAndSync(g.id, g.contextReachSlug))"
+                        />
+                      </div>
+                      <DashboardReachGroup
+                        v-if="split.ungrouped.length > 0"
+                        :reaches="split.ungrouped"
                         :density="viewMode"
-                        :hide-river-name="true"
-                        :hide-gauge-header="group.all.length === 1"
                         @open="(g, mode) => openGauge(g, mode)"
-                        @remove-group="group.all.forEach(g => removeAndSync(g.id, g.contextReachSlug))"
+                        @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
                       />
-                    </div>
+                    </template>
                   </template>
                   <template v-else>
                     <DashboardReachGroup
@@ -428,13 +436,20 @@ const hasSharedGauges = computed(() => {
 })
 
 interface GaugeGroup { lead: WatchedGauge; all: WatchedGauge[] }
-function groupReaches(reaches: WatchedGauge[]): GaugeGroup[] {
+interface SplitGroups { gaugeGroups: GaugeGroup[]; ungrouped: WatchedGauge[] }
+function splitReachGroups(reaches: WatchedGauge[]): SplitGroups {
   const map = new Map<string, WatchedGauge[]>()
   for (const r of reaches) {
     if (!map.has(r.id)) map.set(r.id, [])
     map.get(r.id)!.push(r)
   }
-  return [...map.values()].map(all => ({ lead: all[0]!, all }))
+  const gaugeGroups: GaugeGroup[] = []
+  const ungrouped: WatchedGauge[] = []
+  for (const all of map.values()) {
+    if (all.length > 1) gaugeGroups.push({ lead: all[0]!, all })
+    else ungrouped.push(all[0]!)
+  }
+  return { gaugeGroups, ungrouped }
 }
 
 // Container class: 2-col grid for comfortable + full
