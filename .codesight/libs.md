@@ -1,0 +1,143 @@
+# Libraries
+
+- `apps/api/internal/ai/asker.go`
+  - function NewReachAsker: (pool *pgxpool.Pool, voyageKey, anthropicKey string) *ReachAsker
+  - class ReachAsker
+  - class IdentifyResult
+- `apps/api/internal/ai/describer.go`
+  - function NewTripDescriber: (pool *pgxpool.Pool, anthropicKey string) *TripDescriber
+  - class TripDescriber
+  - class DescribeResult
+  - class TripDetails
+- `apps/api/internal/ai/discoverer.go`
+  - function NewReachDiscoverer: (apiKey string) *ReachDiscoverer
+  - class DiscoveredReach
+  - class ReachDiscoverer
+- `apps/api/internal/ai/embedder.go`
+  - function NewEmbedder: (apiKey string) *Embedder
+  - function FormatVector: (v []float32) string
+  - class Embedder
+- `apps/api/internal/ai/embedreach.go` — function EmbedReachesAll: (ctx context.Context, pool *pgxpool.Pool, embedder *Embedder, reembed bool) (embedded, skipped int, err error), function EmbedReaches: (ctx context.Context, pool *pgxpool.Pool, embedder *Embedder, ids []string, rateLimit bool) (embedded, skipped int, err error)
+- `apps/api/internal/ai/flowranges.go`
+  - function NewFlowRangeSeeder: (apiKey string) *FlowRangeSeeder
+  - class FlowRangeSeed
+  - class FlowRangeContext
+  - class FlowRangeSeeder
+  - class WebSearchResult
+  - interface WebSearcher
+- `apps/api/internal/ai/reach_description.go` — function GenerateReachDescription: (ctx context.Context, apiKey, name, riverName, commonName string, classMin, classMax *float64) (string, error)
+- `apps/api/internal/ai/search.go`
+  - function NewSearchEnricher: (apiKey string) *SearchEnricher
+  - class SearchEnrichment
+  - class SearchEnricher
+- `apps/api/internal/ai/seeder.go`
+  - function NewReachSeeder: (apiKey string) *ReachSeeder
+  - class ReachSeed
+  - class RapidSeed
+  - class AccessSeed
+  - class WaypointSeed
+  - class ReachSeeder
+  - _...2 more_
+- `apps/api/internal/ai/tracks.go`
+  - function NewTrackAnalyzer: (apiKey string) *TrackAnalyzer
+  - function PrepareTrack: (points []TrackPoint, putIn, takeOut *[2]float64) []TrackPoint
+  - class TrackPoint
+  - class TrackContext
+  - class KnownFeature
+  - class TrackSuggestion
+  - _...2 more_
+- `apps/api/internal/alerts/alerts.go` — function New: (db *pgxpool.Pool) *Dispatcher, class Dispatcher
+- `apps/api/internal/auth/context.go`
+  - function WithUser: (ctx context.Context, userID, email, role string) context.Context
+  - function WithAppRoles: (ctx context.Context, roles []string) context.Context
+  - function AppRolesFromContext: (ctx context.Context) []string
+  - function UserIDFromContext: (ctx context.Context) (string, bool)
+  - function EmailFromContext: (ctx context.Context) (string, bool)
+  - function IsSiteAdminFromContext: (ctx context.Context) bool
+  - _...2 more_
+- `apps/api/internal/auth/middleware.go`
+  - function Optional: (v *Verifier) func(http.Handler) http.Handler
+  - function Required: (v *Verifier) func(http.Handler) http.Handler
+  - function RequireAdmin: (next http.Handler) http.Handler
+  - function LoadAppRoles: (querier func(r *http.Request, userID string) ([]string, error)) func(http.Handler) http.Handler
+  - function RequireDataAdmin: (next http.Handler) http.Handler
+- `apps/api/internal/auth/verifier.go`
+  - function NewVerifier: (ctx context.Context, jwksURL string) (*Verifier, error)
+  - class Verifier
+  - class Claims
+- `apps/api/internal/config/config.go`
+  - function Load: () Config
+  - class Config
+  - class PollIntervals
+- `apps/api/internal/db/db.go` — function Connect: (ctx context.Context, dsn string) (*pgxpool.Pool, error)
+- `apps/api/internal/elevation/elevation.go` — function QueryElevation: (ctx context.Context, lng, lat float64) (float64, error)
+- `apps/api/internal/handlers/admin.go` — function NewAdminHandler: (db *pgxpool.Pool) *AdminHandler, class AdminHandler
+- `apps/api/internal/handlers/contributions.go` — function NewContributionHandler: (db *pgxpool.Pool) *ContributionHandler, class ContributionHandler
+- `apps/api/internal/handlers/gauges.go` — function NewGaugeHandler: (db *pgxpool.Pool, enricher *ai.SearchEnricher, poller toucher) *GaugeHandler, class GaugeHandler
+- `apps/api/internal/handlers/import.go` — class Import
+- `apps/api/internal/handlers/nldi.go` — function NewNLDIHandler: (db *pgxpool.Pool) *NLDIHandler, class NLDIHandler
+- `apps/api/internal/handlers/reaches.go` — function NewReachHandler: (db *pgxpool.Pool, asker *ai.ReachAsker) *ReachHandler, class ReachHandler
+- `apps/api/internal/handlers/respond.go`
+  - class FeatureCollection
+  - class Feature
+  - class PointGeometry
+- `apps/api/internal/handlers/trips.go` — function NewTripHandler: (db *pgxpool.Pool, describer *ai.TripDescriber) *TripHandler, class TripHandler
+- `apps/api/internal/handlers/watchlist.go` — function NewWatchlistHandler: (db *pgxpool.Pool) *WatchlistHandler, class WatchlistHandler
+- `apps/api/internal/kmlimport/kmlimport.go`
+  - function ParseKMLBytes: (data []byte) (*KMLDoc, error)
+  - function New: (pool *pgxpool.Pool, dryRun bool) *Importer
+  - function Slugify: (s string) string
+  - function SplitPrefixWithHint: (name, description, folderHint string) (prefix, rest string)
+  - function SplitPrefix: (name string) (prefix, rest string)
+  - function ParseCoords: (raw string) (lon, lat float64, ok bool)
+  - _...13 more_
+- `apps/api/internal/kmlimport/nldi.go` — function FetchCenterlinePreview: (ctx context.Context, upComID, downComID string) (string, error), function SnapReachComIDs: (ctx context.Context, pool *pgxpool.Pool, slug string) error
+- `apps/api/internal/models/gauge.go`
+  - class Gauge
+  - class GaugeReading
+  - class FlowRange
+- `apps/api/internal/models/reach.go`
+  - class Reach
+  - class ReachCondition
+  - class Hazard
+- `apps/api/internal/nldi/client.go`
+  - function New: () *Client
+  - function NewWithBase: (base string, hc *http.Client) *Client
+  - class Client
+- `apps/api/internal/nldi/geo.go`
+  - function DWRNearby: (ctx context.Context, lat, lng float64, distanceKm int) ([]DWRStation, error)
+  - function StateAt: (ctx context.Context, lat, lng float64) (abbr string, err error)
+  - function BasinAt: (ctx context.Context, lat, lng float64) (BasinInfo, error)
+  - class DWRStation
+  - class BasinInfo
+- `apps/api/internal/nldi/mainstem.go` — function MergeMainstem: (features []Feature, targetComID string) ([]Coord, error), function ToGeoJSONLineString: (coords []Coord) string
+- `apps/api/internal/nldi/nhd.go`
+  - function FirstCoord: (g Geometry) []float64
+  - function NHDStreamNameAt: (ctx context.Context, lat, lng float64) (name, gnisID string, err error)
+  - function NHDCoordByGNISID: (ctx context.Context, gnisID string) (*GNISLookupResult, error)
+  - class GNISLookupResult
+- `apps/api/internal/nldi/types.go`
+  - class Feature
+  - class Geometry
+  - class FeatureProps
+  - class Collection
+  - class SnapResult
+- `apps/api/internal/osm/osm.go`
+  - function FetchReachLine: (ctx context.Context, minLon, minLat, maxLon, maxLat, startLng, startLat, endLng, endLat float64, preferredName string, intermediatePoints []coord) (string, error)
+  - function FetchRiverLine: (ctx context.Context, minLon, minLat, maxLon, maxLat float64) (string, error)
+  - function OverpassQuery: (ctx context.Context, query string) ([]byte, error)
+- `apps/api/internal/poller/poller.go` — function New: (db *pgxpool.Pool) *Poller, class Poller
+- `packages/gauge-core/dwr.go` — function NewDWRSource: () *DWRSource, class DWRSource
+- `packages/gauge-core/huc.go`
+  - function HUCNames: (huc8 string) (basinName, watershedName string)
+  - function CanonicalBasin: (huc8 string) string
+  - function CanonicalBasinFromDWRDivision: (div int) string
+- `packages/gauge-core/interface.go`
+  - class LatLng
+  - class BoundingBox
+  - class Reading
+  - class SiteMetadata
+  - class DiscoverOptions
+  - interface GaugeSource
+  - _...1 more_
+- `packages/gauge-core/usgs.go` — function NewUSGSSource: (apiKey string) *USGSSource, class USGSSource

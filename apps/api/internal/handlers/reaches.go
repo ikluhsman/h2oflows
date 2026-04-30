@@ -1674,9 +1674,12 @@ func (h *ReachHandler) GlobalAsk(w http.ResponseWriter, r *http.Request) {
 
 	// Step 2 — answer each matched reach in parallel (up to 3).
 	type reachResult struct {
-		Answer    string `json:"answer"`
-		ReachSlug string `json:"reach_slug"`
-		ReachName string `json:"reach_name"`
+		Answer         string   `json:"answer"`
+		ReachSlug      string   `json:"reach_slug"`
+		ReachName      string   `json:"reach_name"`
+		PutInLat       *float64 `json:"put_in_lat"`
+		PutInLng       *float64 `json:"put_in_lng"`
+		PrimaryGaugeID *string  `json:"primary_gauge_id"`
 	}
 	results := make([]reachResult, len(identified.Slugs))
 	var wg sync.WaitGroup
@@ -1685,7 +1688,15 @@ func (h *ReachHandler) GlobalAsk(w http.ResponseWriter, r *http.Request) {
 		go func(i int, slug string) {
 			defer wg.Done()
 			var reachID, reachName string
-			if err := h.db.QueryRow(askCtx, `SELECT id, name FROM reaches WHERE slug = $1`, slug).Scan(&reachID, &reachName); err != nil {
+			var putInLat, putInLng *float64
+			var primaryGaugeID *string
+			if err := h.db.QueryRow(askCtx, `
+				SELECT id, name,
+				       ST_Y(put_in::geometry) AS put_in_lat,
+				       ST_X(put_in::geometry) AS put_in_lng,
+				       primary_gauge_id
+				FROM reaches WHERE slug = $1
+			`, slug).Scan(&reachID, &reachName, &putInLat, &putInLng, &primaryGaugeID); err != nil {
 				log.Printf("global ask: reach not found for slug %q: %v", slug, err)
 				return
 			}
@@ -1694,7 +1705,14 @@ func (h *ReachHandler) GlobalAsk(w http.ResponseWriter, r *http.Request) {
 				log.Printf("global ask answer [%s]: %v", slug, err)
 				return
 			}
-			results[i] = reachResult{Answer: answer, ReachSlug: slug, ReachName: reachName}
+			results[i] = reachResult{
+				Answer:         answer,
+				ReachSlug:      slug,
+				ReachName:      reachName,
+				PutInLat:       putInLat,
+				PutInLng:       putInLng,
+				PrimaryGaugeID: primaryGaugeID,
+			}
 		}(i, slug)
 	}
 	wg.Wait()
@@ -1757,6 +1775,19 @@ func (h *ReachHandler) Ask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusOK, map[string]string{"answer": answer})
+}
+
+// Stats handles GET /api/v1/stats
+//
+// Returns total reach and river counts from the DB.
+func (h *ReachHandler) Stats(w http.ResponseWriter, r *http.Request) {
+	var reachCount, riverCount int
+	h.db.QueryRow(r.Context(), `SELECT COUNT(*) FROM reaches`).Scan(&reachCount)
+	h.db.QueryRow(r.Context(), `SELECT COUNT(*) FROM rivers`).Scan(&riverCount)
+	jsonResponse(w, http.StatusOK, map[string]any{
+		"reaches": reachCount,
+		"rivers":  riverCount,
+	})
 }
 
 // Required for the reach map endpoint — without a viewport bound the result

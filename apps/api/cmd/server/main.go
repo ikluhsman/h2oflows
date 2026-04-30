@@ -157,6 +157,7 @@ func main() {
 		r.Get("/reaches/{slug}/flow-ranges", reaches.GetFlowRanges)
 		r.Post("/reaches/{slug}/ask", reaches.Ask)
 		r.Post("/ask", reaches.GlobalAsk)
+		r.Get("/stats", reaches.Stats)
 		r.Get("/admin/slug-check", admin.SlugCheck)
 
 		// Authenticated user routes — require a valid Supabase JWT.

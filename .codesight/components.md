@@ -1,0 +1,44 @@
+# Components
+
+- **app** [client] — `apps/web/app/app.vue`
+- **AppHeader** [client] — `apps/web/app/components/AppHeader.vue`
+- **MobileTabBar** [client] — `apps/web/app/components/MobileTabBar.vue`
+- **SiteDisclaimerBanner** [client] — `apps/web/app/components/SiteDisclaimerBanner.vue`
+- **KmlImportPanel** [client] — `apps/web/app/components/admin/KmlImportPanel.vue`
+- **ReachAuthor** [client] — `apps/web/app/components/admin/ReachAuthor.vue`
+- **ReachEditor** [client] — props: slug, rivers — `apps/web/app/components/admin/ReachEditor.vue`
+- **AggregateGraph** [client] — props: gauges — `apps/web/app/components/gauge/AggregateGraph.vue`
+- **GaugeCard** [client] — props: gauge, hideReachSubtitle, density, sharedWith — `apps/web/app/components/gauge/GaugeCard.vue`
+- **GaugeDetailModal** [client] — props: gauge, mode — `apps/web/app/components/gauge/GaugeDetailModal.vue`
+- **GaugeGraph** [client] — props: gaugeId, reachSlug, currentCfs, noRanges, color — `apps/web/app/components/gauge/GaugeGraph.vue`
+- **GaugeReachGroup** [client] — props: leadGauge, reachItems, density, hideRiverName, hideGaugeHeader — `apps/web/app/components/gauge/GaugeReachGroup.vue`
+- **GaugeSearchMiniMap** [client] — props: gauges, highlightId — `apps/web/app/components/gauge/GaugeSearchMiniMap.vue`
+- **GaugeSearchModal** [client] — `apps/web/app/components/gauge/GaugeSearchModal.vue`
+- **GaugeSeasonalBanner** [client] — props: gaugeId, currentCfs — `apps/web/app/components/gauge/GaugeSeasonalBanner.vue`
+- **GaugeSparkline** [client] — props: gaugeId, flowStatus, flowBandLabel, reachSlug, compact, color — `apps/web/app/components/gauge/GaugeSparkline.vue`
+- **TrendArrow** [client] — props: gaugeId — `apps/web/app/components/gauge/TrendArrow.vue`
+- **IconPlay** [client] — `apps/web/app/components/icons/IconPlay.vue`
+- **IconRecord** [client] — `apps/web/app/components/icons/IconRecord.vue`
+- **IconStop** [client] — `apps/web/app/components/icons/IconStop.vue`
+- **DashboardMap** [client] — props: gauges — `apps/web/app/components/map/DashboardMap.vue`
+- **NHDExplorerMap.client** [client] — props: upstreamFlowlines, downstreamFlowlines, upstreamGauges, snapLat, snapLng, pickMode, putInPin, takeOutPin, comidSelectMode, comidSelectSlot — `apps/web/app/components/map/NHDExplorerMap.client.vue`
+- **ReachMap** [client] — props: name, classMax, centerline, rapids, access, slug, riverName, gaugeLng, gaugeLat, gauges — `apps/web/app/components/map/ReachMap.vue`
+- **ReachesMap** [client] — props: hoveredSlug — `apps/web/app/components/map/ReachesMap.vue`
+- **DashboardReachGroup** [client] — props: reaches, density — `apps/web/app/components/reach/DashboardReachGroup.vue`
+- **DashboardReachRow** [client] — props: gauge, view, hideRiverName — `apps/web/app/components/reach/DashboardReachRow.vue`
+- **ReachBrowseRow** [client] — props: reach — `apps/web/app/components/reach/ReachBrowseRow.vue`
+- **ShareModal** [client] — props: reachSlug, reachName, currentCfs, flowStatus — `apps/web/app/components/reach/ShareModal.vue`
+- **TripCard** [client] — props: trip — `apps/web/app/components/trip/TripCard.vue`
+- **TripDetailModal** [client] — props: tripId — `apps/web/app/components/trip/TripDetailModal.vue`
+- **admin** [client] — `apps/web/app/pages/admin.vue`
+- **confirm** [client] — `apps/web/app/pages/confirm.vue`
+- **dashboard** [client] — `apps/web/app/pages/dashboard.vue`
+- **explore** [client] — `apps/web/app/pages/explore.vue`
+- **index** [client] — `apps/web/app/pages/index.vue`
+- **login** [client] — `apps/web/app/pages/login.vue`
+- **map** [client] — `apps/web/app/pages/map.vue`
+- **edit** [client] — `apps/web/app/pages/reaches/[slug]/edit.vue`
+- **index** [client] — `apps/web/app/pages/reaches/[slug]/index.vue`
+- **rivers** [client] — `apps/web/app/pages/rivers.vue`
+- **[slug]** [client] — `apps/web/app/pages/trips/[slug].vue`
+- **trips** [client] — `apps/web/app/pages/trips.vue`

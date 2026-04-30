@@ -51,6 +51,19 @@
           <span>Flow Insights</span>
         </div>
 
+        <!-- DB stats -->
+        <div v-if="dbStats" class="flex items-center gap-4 mb-6 text-sm text-gray-500 dark:text-gray-400">
+          <span class="flex items-center gap-1.5">
+            <span class="font-semibold text-gray-800 dark:text-gray-200">{{ dbStats.reaches.toLocaleString() }}</span>
+            reaches
+          </span>
+          <span class="text-gray-300 dark:text-gray-700">·</span>
+          <span class="flex items-center gap-1.5">
+            <span class="font-semibold text-gray-800 dark:text-gray-200">{{ dbStats.rivers.toLocaleString() }}</span>
+            rivers
+          </span>
+        </div>
+
         <!-- Primary nav buttons -->
         <div class="flex items-center gap-3 mb-8">
           <NuxtLink
@@ -120,7 +133,24 @@
                 <span class="text-xs font-semibold uppercase tracking-wide text-blue-500">{{ result.reach_name }}</span>
                 <NuxtLink :to="`/reaches/${result.reach_slug}`" class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0">View reach →</NuxtLink>
               </div>
-              <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{{ result.answer }}</p>
+              <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap mb-3">{{ result.answer }}</p>
+              <div class="flex items-center gap-2 flex-wrap">
+                <NuxtLink
+                  :to="`/reaches/${result.reach_slug}`"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+                >
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                  Navigate there now
+                </NuxtLink>
+                <button
+                  v-if="result.primary_gauge_id"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold transition-colors"
+                  @click="addGaugeById(result.primary_gauge_id!)"
+                >
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                  Add to dashboard
+                </button>
+              </div>
             </div>
           </div>
           <p v-else-if="searchResult && searchResult.answer" class="mb-3 text-sm text-gray-500 dark:text-gray-400">{{ searchResult.answer }}</p>
@@ -203,6 +233,14 @@ import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
 const waveRef = ref<SVGSVGElement | null>(null)
 const searchInputRef = ref<HTMLInputElement | null>(null)
 
+// ── DB stats ──────────────────────────────────────────────────────────────────
+
+const { data: dbStats } = await useAsyncData<{ reaches: number; rivers: number }>(
+  'db-stats',
+  () => $fetch(`${useRuntimeConfig().public.apiBase}/api/v1/stats`),
+  { default: () => null as any, server: false }
+)
+
 function focusAsk() {
   searchInputRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   searchInputRef.value?.focus({ preventScroll: true })
@@ -268,7 +306,17 @@ async function addGaugeById(gaugeId: string) {
 
 // ── AI search ─────────────────────────────────────────────────────────────────
 
-type AskResult = { results: { answer: string; reach_slug: string; reach_name: string }[]; answer?: string }
+type AskResult = {
+  results: {
+    answer: string
+    reach_slug: string
+    reach_name: string
+    put_in_lat: number | null
+    put_in_lng: number | null
+    primary_gauge_id: string | null
+  }[]
+  answer?: string
+}
 
 const searchQuery      = ref('')
 const searching        = ref(false)
