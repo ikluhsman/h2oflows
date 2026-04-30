@@ -26,7 +26,7 @@
         </NuxtLink>
       </div>
       <div class="w-36 shrink-0 hidden sm:block h-6 opacity-60 pointer-events-none">
-        <GaugeSparkline :gauge-id="reach.id" flow-status="unknown" :color="sparklineColor(reach)" compact @latest-cfs="(v) => setLiveCfs(reach, v)" @live-flow-band="(b) => setLiveFlowBand(reach, b)" />
+        <GaugeSparkline :gauge-id="reach.id" flow-status="unknown" :color="sparklineColor(reach)" compact @latest-cfs="(v) => setLiveCfs(reach, v)" />
       </div>
       <span
         v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
@@ -97,14 +97,14 @@
         </button>
       </div>
       <div v-if="density !== 'compact'" class="mt-1.5 opacity-60 pointer-events-none" :class="density === 'full' ? 'h-14' : 'h-6'">
-        <GaugeSparkline :gauge-id="reach.id" flow-status="unknown" :color="sparklineColor(reach)" :compact="density !== 'full'" @latest-cfs="(v) => setLiveCfs(reach, v)" @live-flow-band="(b) => setLiveFlowBand(reach, b)" />
+        <GaugeSparkline :gauge-id="reach.id" flow-status="unknown" :color="sparklineColor(reach)" :compact="density !== 'full'" @latest-cfs="(v) => setLiveCfs(reach, v)" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, onMounted, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
 import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
 
@@ -118,8 +118,8 @@ const emit = defineEmits<{
   (e: 'remove', gauge: WatchedGauge): void
 }>()
 
-const liveCfsMap      = reactive<Record<string, number>>({})
-const liveFlowBandMap = reactive<Record<string, { flowBandLabel: string | null; flowStatus: string }>>({})
+const liveCfsMap = reactive<Record<string, number>>({})
+const { prefetch, bandForCfs, statusForBand } = useReachFlowBand()
 
 function reachKey(reach: WatchedGauge): string {
   return `${reach.id}::${reach.contextReachSlug}`
@@ -129,21 +129,26 @@ function setLiveCfs(reach: WatchedGauge, v: number) {
   liveCfsMap[reachKey(reach)] = v
 }
 
-function setLiveFlowBand(reach: WatchedGauge, band: { flowBandLabel: string | null; flowStatus: string }) {
-  liveFlowBandMap[reachKey(reach)] = band
-}
-
 function displayCfs(reach: WatchedGauge): number | null {
   return liveCfsMap[reachKey(reach)] ?? reach.currentCfs
 }
 
 function displayFlowBandLabel(reach: WatchedGauge): string | null {
-  return liveFlowBandMap[reachKey(reach)]?.flowBandLabel ?? reach.flowBandLabel ?? null
+  return bandForCfs(reach.contextReachSlug, displayCfs(reach)) ?? reach.flowBandLabel ?? null
 }
 
 function displayFlowStatus(reach: WatchedGauge): string {
-  return liveFlowBandMap[reachKey(reach)]?.flowStatus ?? reach.flowStatus ?? 'unknown'
+  return statusForBand(displayFlowBandLabel(reach)) ?? reach.flowStatus ?? 'unknown'
 }
+
+function prefetchAll() {
+  for (const r of props.reaches) {
+    if (r.contextReachSlug) prefetch(r.contextReachSlug)
+  }
+}
+
+onMounted(prefetchAll)
+watch(() => props.reaches, prefetchAll)
 
 function reachLabel(reach: WatchedGauge): string {
   return reach.contextReachCommonName ?? reach.contextReachFullName ?? reach.reachName ?? reach.name ?? reach.externalId
