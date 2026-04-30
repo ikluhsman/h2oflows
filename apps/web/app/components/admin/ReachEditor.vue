@@ -44,7 +44,7 @@
             <div class="flex items-center gap-2 flex-wrap">
               <span v-if="currentRiverName" class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200 font-medium">
                 {{ currentRiverName }}
-                <button class="ml-0.5 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300" @click="repinRiverId = ''; riverSearch = ''">✕</button>
+                <button class="ml-0.5 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300" @click="repinRiverId = ''; repinForm.riverName = ''; riverSearch = ''">✕</button>
               </span>
               <span v-else class="text-xs text-gray-400 italic">Unassigned</span>
               <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorSnap && !repinAnchorComID" @click="fetchRiverName">Auto-assign from NLDI</UButton>
@@ -372,6 +372,7 @@ const riverSearchResults = computed(() => {
 
 function selectRiver(rv: River) {
   repinRiverId.value = rv.id
+  repinForm.value.riverName = rv.name
   riverSearch.value = ''
   showRiverDropdown.value = false
 }

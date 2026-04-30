@@ -579,7 +579,11 @@ func (h *NLDIHandler) UpdateReachMeta(w http.ResponseWriter, r *http.Request) {
 			slug            = $1,
 			name            = $2,
 			common_name     = NULLIF($3, ''),
-			river_name      = NULLIF($4, ''),
+			river_name      = CASE
+			                    WHEN $10::uuid IS NOT NULL
+			                    THEN (SELECT name FROM rivers WHERE id = $10::uuid)
+			                    ELSE NULLIF($4, '')
+			                  END,
 			class_min       = $5,
 			class_max       = $6,
 			permit_required = $7,
