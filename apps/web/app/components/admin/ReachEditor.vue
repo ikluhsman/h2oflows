@@ -39,17 +39,39 @@
         </div>
         <div>
           <label class="block text-xs text-gray-500 mb-1">River</label>
-          <div class="space-y-2">
+          <div class="space-y-1.5">
+            <!-- Current assignment + auto-assign -->
             <div class="flex items-center gap-2 flex-wrap">
-              <USelectMenu
-                v-model="repinRiverSelectItem"
-                :items="riverSelectItems"
-                searchable
-                searchable-placeholder="Search rivers…"
-                placeholder="— Unassigned —"
-                class="flex-1"
-              />
+              <span v-if="currentRiverName" class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200 font-medium">
+                {{ currentRiverName }}
+                <button class="ml-0.5 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300" @click="repinRiverId = ''; riverSearch = ''">✕</button>
+              </span>
+              <span v-else class="text-xs text-gray-400 italic">Unassigned</span>
               <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorSnap && !repinAnchorComID" @click="fetchRiverName">Auto-assign from NLDI</UButton>
+            </div>
+            <!-- River search -->
+            <div class="relative">
+              <input
+                v-model="riverSearch"
+                placeholder="Search rivers to assign…"
+                class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
+                @focus="showRiverDropdown = true"
+                @blur="hideRiverDropdown()"
+              />
+              <div
+                v-if="showRiverDropdown && riverSearchResults.length"
+                class="absolute z-20 left-0 right-0 mt-0.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg max-h-48 overflow-y-auto"
+              >
+                <button
+                  v-for="rv in riverSearchResults"
+                  :key="rv.id"
+                  class="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
+                  @mousedown.prevent="selectRiver(rv)"
+                >
+                  <span class="flex-1 truncate">{{ rv.name }}</span>
+                  <span v-if="rv.state_abbr" class="text-xs text-gray-400 shrink-0">{{ rv.state_abbr }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -333,42 +355,32 @@ const repinEndLat         = ref<number | null>(null)
 const repinEndLng         = ref<number | null>(null)
 const repinFlowlinesDirty = ref(false)
 
-// ── Computed ───────────────────────────────────────────────────────────────────
-const repinRiverSelectItem = computed({
-  get() {
-    if (!repinRiverId.value) return { label: '— Unassigned —', value: '' }
-    const rv = props.rivers.find(r => r.id === repinRiverId.value)
-    return rv ? { label: rv.name, value: rv.id } : { label: '— Unassigned —', value: '' }
-  },
-  set(item: { label: string; value: string } | null) {
-    repinRiverId.value = item?.value ?? ''
-  },
+// ── River search ───────────────────────────────────────────────────────────────
+const riverSearch        = ref('')
+const showRiverDropdown  = ref(false)
+
+const currentRiverName = computed(() =>
+  repinRiverId.value ? (props.rivers.find(r => r.id === repinRiverId.value)?.name ?? null) : null
+)
+
+const riverSearchResults = computed(() => {
+  const q = riverSearch.value.trim().toLowerCase()
+  const sorted = [...props.rivers].sort((a, b) => a.name.localeCompare(b.name))
+  if (!q) return sorted.slice(0, 12)
+  return sorted.filter(r => r.name.toLowerCase().includes(q)).slice(0, 15)
 })
 
-const riverSelectItems = computed(() => {
-  const groups = new Map<string, River[]>()
-  const noState: River[] = []
-  for (const rv of props.rivers) {
-    const s = rv.state_abbr
-    if (!s) { noState.push(rv); continue }
-    if (!groups.has(s)) groups.set(s, [])
-    groups.get(s)!.push(rv)
-  }
-  const result: any[] = [{ label: '— Unassigned —', value: '' }]
-  for (const [state, rvs] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    result.push({
-      label: state,
-      items: [...rvs].sort((a, b) => a.name.localeCompare(b.name)).map(rv => ({ label: rv.name, value: rv.id })),
-    })
-  }
-  if (noState.length) {
-    result.push({
-      label: 'No state',
-      items: [...noState].sort((a, b) => a.name.localeCompare(b.name)).map(rv => ({ label: rv.name, value: rv.id })),
-    })
-  }
-  return result
-})
+function selectRiver(rv: River) {
+  repinRiverId.value = rv.id
+  riverSearch.value = ''
+  showRiverDropdown.value = false
+}
+
+function hideRiverDropdown() {
+  setTimeout(() => { showRiverDropdown.value = false }, 150)
+}
+
+// ── Computed ───────────────────────────────────────────────────────────────────
 
 const repinPutInPin = computed(() => {
   if (repinStartLat.value != null && repinStartLng.value != null)

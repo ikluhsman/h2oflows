@@ -118,42 +118,19 @@
                   </div>
                   <!-- Cards wrapper -->
                   <template v-if="groupByGauge">
-                    <!-- Multi-reach gauge groups -->
-                    <template v-if="groupReaches(river.reaches).some(g => g.all.length > 1)">
-                      <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
-                        <GaugeReachGroup
-                          v-for="group in groupReaches(river.reaches).filter(g => g.all.length > 1)"
-                          :key="group.lead.id"
-                          :lead-gauge="group.lead"
-                          :reach-items="group.all"
-                          :density="viewMode"
-                          :hide-river-name="true"
-                          @open="(g, mode) => openGauge(g, mode)"
-                          @remove-group="group.all.forEach(g => removeAndSync(g.id, g.contextReachSlug))"
-                        />
-                      </div>
-                    </template>
-                    <!-- Single-gauge reaches — visually distinct if groups also exist -->
-                    <template v-if="groupReaches(river.reaches).some(g => g.all.length === 1)">
-                      <div
-                        v-if="groupReaches(river.reaches).some(g => g.all.length > 1)"
-                        class="flex items-center gap-2 mt-3 mb-1"
-                      >
-                        <span class="text-xs text-gray-400 font-medium">Individual reaches</span>
-                        <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
-                      </div>
-                      <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
-                        <DashboardReachRow
-                          v-for="group in groupReaches(river.reaches).filter(g => g.all.length === 1)"
-                          :key="group.lead.id"
-                          :gauge="group.lead"
-                          :view="rowView"
-                          :hide-river-name="true"
-                          @open-gauge="openGauge($event, 'reach')"
-                          @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
-                        />
-                      </div>
-                    </template>
+                    <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
+                      <GaugeReachGroup
+                        v-for="group in groupReaches(river.reaches)"
+                        :key="group.lead.id"
+                        :lead-gauge="group.lead"
+                        :reach-items="group.all"
+                        :density="viewMode"
+                        :hide-river-name="true"
+                        :hide-gauge-header="group.all.length === 1"
+                        @open="(g, mode) => openGauge(g, mode)"
+                        @remove-group="group.all.forEach(g => removeAndSync(g.id, g.contextReachSlug))"
+                      />
+                    </div>
                   </template>
                   <template v-else>
                     <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">

@@ -6,6 +6,7 @@
   >
     <!-- Gauge station header row -->
     <div
+      v-if="!hideGaugeHeader"
       class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
       @click="$emit('open', leadGauge, 'gauge')"
     >
@@ -47,7 +48,7 @@
     </div>
 
     <!-- Reach sub-rows -->
-    <div v-if="reachItems.length > 0" class="border-t border-gray-100 dark:border-gray-800">
+    <div v-if="reachItems.length > 0" :class="hideGaugeHeader ? '' : 'border-t border-gray-100 dark:border-gray-800'">
       <div
         v-for="item in reachItems"
         :key="item.contextReachSlug!"
@@ -98,7 +99,7 @@
     @click="$emit('open', leadGauge, 'gauge')"
   >
     <!-- Gauge header section -->
-    <div :class="density === 'compact' ? 'p-2.5' : density === 'comfortable' ? 'p-3' : 'p-4'">
+    <div v-if="!hideGaugeHeader" :class="density === 'compact' ? 'p-2.5' : density === 'comfortable' ? 'p-3' : 'p-4'">
       <!-- Gauge name -->
       <div class="flex items-center gap-1.5" :class="density === 'compact' ? 'mb-0.5' : 'mb-1'">
         <svg class="text-gray-400 dark:text-gray-500 shrink-0" :class="density === 'compact' ? 'w-3.5 h-3.5' : 'w-4 h-4'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
@@ -151,7 +152,7 @@
     </div>
 
     <!-- Reach sub-list -->
-    <div class="border-t border-gray-100 dark:border-gray-800">
+    <div :class="hideGaugeHeader ? '' : 'border-t border-gray-100 dark:border-gray-800'">
       <div
         v-for="item in reachItems"
         :key="item.contextReachSlug!"
@@ -205,6 +206,7 @@ const props = defineProps<{
   reachItems: WatchedGauge[]
   density?: 'compact' | 'comfortable' | 'full' | 'list'
   hideRiverName?: boolean
+  hideGaugeHeader?: boolean
 }>()
 
 const emit = defineEmits<{
