@@ -54,10 +54,15 @@
             title="Group by gauge"
             @click="groupByGauge = !groupByGauge"
           >
-            <svg class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg v-if="groupByGauge" class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="1" y="5" width="5" height="6" rx="1"/>
               <rect x="10" y="5" width="5" height="6" rx="1"/>
               <line x1="6" y1="8" x2="10" y2="8"/>
+            </svg>
+            <svg v-else class="w-4 h-4 shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="5" width="5" height="6" rx="1"/>
+              <rect x="10" y="5" width="5" height="6" rx="1"/>
+              <line x1="6.5" y1="6.5" x2="9.5" y2="9.5"/>
             </svg>
             <span class="hidden sm:inline">Group gauge</span>
           </button>
@@ -133,17 +138,12 @@
                     </div>
                   </template>
                   <template v-else>
-                    <div :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
-                      <DashboardReachRow
-                        v-for="reach in river.reaches"
-                        :key="`${reach.id}::${reach.contextReachSlug}`"
-                        :gauge="reach"
-                        :view="rowView"
-                        :hide-river-name="true"
-                        @open-gauge="openGauge($event, 'reach')"
-                        @remove-gauge="removeAndSync($event.id, $event.contextReachSlug)"
-                      />
-                    </div>
+                    <DashboardReachGroup
+                      :reaches="river.reaches"
+                      :density="viewMode"
+                      @open="(g, mode) => openGauge(g, mode)"
+                      @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
+                    />
                   </template>
                 </template><!-- end v-for river -->
               </div>
@@ -409,13 +409,6 @@ function setViewMode(m: ViewMode) {
   viewMode.value = m
   localStorage.setItem(VIEW_MODE_KEY, m)
 }
-
-// Maps viewMode → DashboardReachRow 'view' prop
-const rowView = computed<'list' | 'compact' | 'full'>(() => {
-  if (viewMode.value === 'full') return 'full'
-  if (viewMode.value === 'list') return 'list'
-  return 'compact' // comfortable uses the compact card layout
-})
 
 // ── Group by gauge ────────────────────────────────────────────────────────────
 const GROUP_KEY = 'h2oflow_dashboard_group_by_gauge'
