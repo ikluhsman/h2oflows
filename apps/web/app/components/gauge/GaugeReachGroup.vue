@@ -73,9 +73,18 @@
           </NuxtLink>
         </div>
         <span
-          v-if="item.flowStatus !== 'unknown' || item.flowBandLabel"
-          :class="['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
-        >{{ flowBandLabel(item.flowBandLabel, item.flowStatus) }}</span>
+          v-if="displayFlowStatus(item) !== 'unknown' || displayFlowBandLabel(item)"
+          :class="['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(item), displayFlowStatus(item))]"
+        >{{ flowBandLabel(displayFlowBandLabel(item), displayFlowStatus(item)) }}</span>
+        <div class="hidden">
+          <GaugeSparkline
+            :gauge-id="item.id"
+            :reach-slug="item.contextReachSlug"
+            flow-status="unknown"
+            compact
+            @live-flow-band="(b) => setLiveFlowBand(item, b)"
+          />
+        </div>
         <button
           class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           aria-label="Remove"
@@ -177,9 +186,18 @@
           </NuxtLink>
         </div>
         <span
-          v-if="item.flowStatus !== 'unknown' || item.flowBandLabel"
-          :class="['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0', flowBandBadgeClass(item.flowBandLabel, item.flowStatus)]"
-        >{{ flowBandLabel(item.flowBandLabel, item.flowStatus) }}</span>
+          v-if="displayFlowStatus(item) !== 'unknown' || displayFlowBandLabel(item)"
+          :class="['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(item), displayFlowStatus(item))]"
+        >{{ flowBandLabel(displayFlowBandLabel(item), displayFlowStatus(item)) }}</span>
+        <div class="hidden">
+          <GaugeSparkline
+            :gauge-id="item.id"
+            :reach-slug="item.contextReachSlug"
+            flow-status="unknown"
+            compact
+            @live-flow-band="(b) => setLiveFlowBand(item, b)"
+          />
+        </div>
         <button
           class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           aria-label="Remove"
@@ -198,8 +216,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, reactive } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
+import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
 
 const props = defineProps<{
   leadGauge: WatchedGauge
@@ -217,6 +236,27 @@ const emit = defineEmits<{
 const { removeAndSync } = useWatchlistSync()
 
 const liveCfs = ref<number | null>(null)
+
+// Per-reach live flow band — overrides potentially stale stored values.
+// Hidden GaugeSparkline per item fetches reach-level flow ranges and
+// computes the band from the freshest reading.
+const liveFlowBandMap = reactive<Record<string, { flowBandLabel: string | null; flowStatus: string }>>({})
+
+function reachKey(reach: WatchedGauge): string {
+  return `${reach.id}::${reach.contextReachSlug}`
+}
+
+function setLiveFlowBand(reach: WatchedGauge, band: { flowBandLabel: string | null; flowStatus: string }) {
+  liveFlowBandMap[reachKey(reach)] = band
+}
+
+function displayFlowBandLabel(reach: WatchedGauge): string | null {
+  return liveFlowBandMap[reachKey(reach)]?.flowBandLabel ?? reach.flowBandLabel ?? null
+}
+
+function displayFlowStatus(reach: WatchedGauge): string {
+  return liveFlowBandMap[reachKey(reach)]?.flowStatus ?? reach.flowStatus ?? 'unknown'
+}
 
 const currentCfs = computed(() => liveCfs.value ?? props.leadGauge.currentCfs)
 
