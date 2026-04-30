@@ -1636,28 +1636,37 @@ func (h *ReachHandler) GlobalAsk(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Load all reach slugs for identification.
-	rows, err := h.db.Query(r.Context(), `SELECT slug, name FROM reaches ORDER BY name`)
+	// Load reaches with rapids and access names for richer identification.
+	rows, err := h.db.Query(r.Context(), `
+		SELECT r.slug, r.name, COALESCE(r.common_name,''), COALESCE(r.region,''),
+		       COALESCE(array_agg(DISTINCT rap.name) FILTER (WHERE rap.name IS NOT NULL), '{}') AS rapids,
+		       COALESCE(array_agg(DISTINCT ra.name)  FILTER (WHERE ra.name  IS NOT NULL), '{}') AS access_names
+		FROM reaches r
+		LEFT JOIN rapids rap ON rap.reach_id = r.id
+		LEFT JOIN reach_access ra ON ra.reach_id = r.id
+		GROUP BY r.id, r.slug, r.name, r.common_name, r.region
+		ORDER BY r.name
+	`)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "could not load reaches")
 		return
 	}
 	defer rows.Close()
-	type reachStub struct{ slug, name string }
-	var all []reachStub
-	slugs := []string{}
+	var reachContexts []ai.IdentifyReachContext
 	for rows.Next() {
-		var s reachStub
-		rows.Scan(&s.slug, &s.name)
-		all = append(all, s)
-		slugs = append(slugs, s.slug)
+		var rc ai.IdentifyReachContext
+		if err := rows.Scan(&rc.Slug, &rc.Name, &rc.CommonName, &rc.Region, &rc.Rapids, &rc.Access); err != nil {
+			errorResponse(w, http.StatusInternalServerError, "could not scan reaches")
+			return
+		}
+		reachContexts = append(reachContexts, rc)
 	}
 
 	askCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
 	// Step 1 — identify reach(es).
-	identified, err := h.asker.IdentifyReach(askCtx, body.Question, slugs)
+	identified, err := h.asker.IdentifyReach(askCtx, body.Question, reachContexts)
 	if err != nil {
 		log.Printf("global ask identify: %v", err)
 		errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("could not identify reach: %v", err))
@@ -1692,8 +1701,8 @@ func (h *ReachHandler) GlobalAsk(w http.ResponseWriter, r *http.Request) {
 			var primaryGaugeID *string
 			if err := h.db.QueryRow(askCtx, `
 				SELECT id, name,
-				       ST_Y(put_in::geometry) AS put_in_lat,
-				       ST_X(put_in::geometry) AS put_in_lng,
+				       ST_Y(start_point::geometry) AS put_in_lat,
+				       ST_X(start_point::geometry) AS put_in_lng,
 				       primary_gauge_id
 				FROM reaches WHERE slug = $1
 			`, slug).Scan(&reachID, &reachName, &putInLat, &putInLng, &primaryGaugeID); err != nil {

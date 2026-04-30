@@ -42,7 +42,10 @@ Known reaches:
 %s
 
 Rules:
-- Match common nicknames: "the numbers" → arkansas-the-numbers, "browns" → arkansas-browns-canyon, "gore" → colorado-gore-canyon, etc.
+- Each line: slug | Official Name [aka Common Name] (Region) | rapids: ... | access: ...
+- Match "aka" names and common nicknames: "browns canyon" → reach with aka "Browns Canyon"; "the numbers" → arkansas-the-numbers; "gore" → colorado-gore-canyon, etc.
+- Match by rapid name or access point name (e.g. "pinball rapid" → the reach whose rapids include "Pinball").
+- Reach names often reference put-in/take-out landmarks (e.g. "Fisherman's Bridge to Hecla Junction"); the common name (aka) is what paddlers call it.
 - Keep the question natural — don't rewrite it heavily`
 
 // ReachAsker answers natural-language questions about a reach using RAG:
@@ -69,11 +72,42 @@ type IdentifyResult struct {
 	Question string   `json:"question"`
 }
 
+// IdentifyReachContext carries the identifying information about a reach used
+// for natural-language reach identification.
+type IdentifyReachContext struct {
+	Slug       string
+	Name       string
+	CommonName string
+	Region     string
+	Rapids     []string
+	Access     []string
+}
+
 // IdentifyReach uses Claude to figure out which reach slug a question is about,
-// given a list of known slugs. Returns an empty slug if no match.
-func (a *ReachAsker) IdentifyReach(ctx context.Context, question string, slugs []string) (*IdentifyResult, error) {
-	slugList := strings.Join(slugs, "\n")
-	system := fmt.Sprintf(identifySystemPrompt, slugList)
+// given a list of known reaches with rapids and access point names.
+func (a *ReachAsker) IdentifyReach(ctx context.Context, question string, reaches []IdentifyReachContext) (*IdentifyResult, error) {
+	var sb strings.Builder
+	for _, rc := range reaches {
+		fmt.Fprintf(&sb, "%s | %s", rc.Slug, rc.Name)
+		if rc.CommonName != "" && rc.CommonName != rc.Name {
+			fmt.Fprintf(&sb, " aka %s", rc.CommonName)
+		}
+		if rc.Region != "" {
+			fmt.Fprintf(&sb, " (%s)", rc.Region)
+		}
+		rapids := rc.Rapids
+		if len(rapids) > 15 {
+			rapids = rapids[:15]
+		}
+		if len(rapids) > 0 {
+			fmt.Fprintf(&sb, " | rapids: %s", strings.Join(rapids, ", "))
+		}
+		if len(rc.Access) > 0 {
+			fmt.Fprintf(&sb, " | access: %s", strings.Join(rc.Access, ", "))
+		}
+		sb.WriteByte('\n')
+	}
+	system := fmt.Sprintf(identifySystemPrompt, strings.TrimRight(sb.String(), "\n"))
 
 	msg, err := a.claude.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.ModelClaudeHaiku4_5,

@@ -278,6 +278,8 @@ definePageMeta({ ssr: false })
 
 const { apiBase } = useRuntimeConfig().public
 const router = useRouter()
+const route = useRoute()
+let pendingFocusSlug: string | null = (route.query.focus as string) || null
 const watchlistStore = useWatchlistStore()
 const { addAndSync, removeAndSync } = useWatchlistSync()
 const { isDataAdmin } = useAuth()
@@ -430,6 +432,11 @@ function setReachRef(slug: string, el: HTMLElement | null) {
 
 function onReachesUpdated(r: MapReachItem[]) {
   mapReaches.value = r
+  if (pendingFocusSlug && r.some(x => x.slug === pendingFocusSlug)) {
+    mapRef.value?.flyToSlug(pendingFocusSlug)
+    pendingFocusSlug = null
+    router.replace({ query: {} })
+  }
 }
 
 // Map hover → highlight + scroll list

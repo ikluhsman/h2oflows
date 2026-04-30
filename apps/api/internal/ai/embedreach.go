@@ -118,11 +118,14 @@ func EmbedReaches(ctx context.Context, pool *pgxpool.Pool, embedder *Embedder, i
 type embedReachRow struct {
 	id          string
 	name        string
+	commonName  *string
 	region      string
 	classMin    *float64
 	classMax    *float64
 	lengthMi    *float64
 	description *string
+	putInName   *string
+	takeOutName *string
 	rapids      []embedRapidRow
 	access      []embedAccessRow
 	flowRanges  []embedFlowRangeRow
@@ -137,6 +140,8 @@ type embedRapidRow struct {
 	lng         *float64
 	description *string
 	portageDesc *string
+	isHazard    bool
+	hazardType  *string
 }
 
 type embedAccessRow struct {
@@ -166,19 +171,32 @@ func loadEmbedReach(ctx context.Context, pool *pgxpool.Pool, id string) (embedRe
 	var r embedReachRow
 	r.id = id
 	err := pool.QueryRow(ctx, `
-		SELECT name, COALESCE(region,''), class_min, class_max, length_mi, description
+		SELECT name, common_name, COALESCE(region,''), class_min, class_max, length_mi, description,
+		       put_in_name, take_out_name
 		FROM reaches WHERE id = $1
-	`, id).Scan(&r.name, &r.region, &r.classMin, &r.classMax, &r.lengthMi, &r.description)
+	`, id).Scan(&r.name, &r.commonName, &r.region, &r.classMin, &r.classMax, &r.lengthMi, &r.description,
+		&r.putInName, &r.takeOutName)
 	if err != nil {
 		return r, err
 	}
 
 	// Rapids — include all, even those without description text.
+	// Compute river_mile from centerline when not explicitly set.
 	rapRows, err := pool.Query(ctx, `
-		SELECT id, name, class_rating, river_mile,
-		       ST_Y(location::geometry), ST_X(location::geometry),
-		       description, portage_description
-		FROM rapids WHERE reach_id = $1 ORDER BY river_mile NULLS LAST, name
+		SELECT rap.id, rap.name, rap.class_rating,
+		       COALESCE(rap.river_mile,
+		         CASE WHEN rc.centerline IS NOT NULL AND rap.location IS NOT NULL
+		           THEN ROUND((ST_LineLocatePoint(rc.centerline::geometry, rap.location::geometry)
+		                       * ST_Length(rc.centerline::geometry) / 1609.34)::numeric, 2)
+		           ELSE NULL END
+		       ) AS effective_river_mile,
+		       ST_Y(rap.location::geometry), ST_X(rap.location::geometry),
+		       rap.description, rap.portage_description,
+		       rap.is_permanent_hazard, rap.hazard_type
+		FROM rapids rap
+		JOIN reaches rc ON rc.id = rap.reach_id
+		WHERE rap.reach_id = $1
+		ORDER BY effective_river_mile NULLS LAST, rap.name
 	`, id)
 	if err != nil {
 		return r, err
@@ -186,7 +204,7 @@ func loadEmbedReach(ctx context.Context, pool *pgxpool.Pool, id string) (embedRe
 	defer rapRows.Close()
 	for rapRows.Next() {
 		var rr embedRapidRow
-		if err := rapRows.Scan(&rr.id, &rr.name, &rr.classRating, &rr.riverMile, &rr.lat, &rr.lng, &rr.description, &rr.portageDesc); err != nil {
+		if err := rapRows.Scan(&rr.id, &rr.name, &rr.classRating, &rr.riverMile, &rr.lat, &rr.lng, &rr.description, &rr.portageDesc, &rr.isHazard, &rr.hazardType); err != nil {
 			return r, err
 		}
 		r.rapids = append(r.rapids, rr)
@@ -248,8 +266,12 @@ func loadEmbedReach(ctx context.Context, pool *pgxpool.Pool, id string) (embedRe
 func buildEmbedChunks(r embedReachRow) []embedChunk {
 	var chunks []embedChunk
 
-	// Reach description chunk — only when description is set.
-	if r.description != nil && *r.description != "" {
+	// Reach description chunk — emit when any descriptive metadata is present.
+	hasDesc := (r.description != nil && *r.description != "") ||
+		(r.commonName != nil && *r.commonName != "") ||
+		(r.putInName != nil && *r.putInName != "") ||
+		(r.takeOutName != nil && *r.takeOutName != "")
+	if hasDesc {
 		chunks = append(chunks, embedChunk{
 			chunkType: "reach_description",
 			text:      buildDescChunk(r),
@@ -312,6 +334,15 @@ func buildDescChunk(r embedReachRow) string {
 	if r.lengthMi != nil {
 		fmt.Fprintf(&sb, ", %.1f miles", *r.lengthMi)
 	}
+	if r.commonName != nil && *r.commonName != "" && *r.commonName != r.name {
+		fmt.Fprintf(&sb, "\nCommonly known as: %s", *r.commonName)
+	}
+	if r.putInName != nil && *r.putInName != "" {
+		fmt.Fprintf(&sb, "\nPut-in: %s", *r.putInName)
+	}
+	if r.takeOutName != nil && *r.takeOutName != "" {
+		fmt.Fprintf(&sb, "\nTake-out: %s", *r.takeOutName)
+	}
 	if r.description != nil {
 		fmt.Fprintf(&sb, "\n%s", *r.description)
 	}
@@ -346,6 +377,13 @@ func buildRapidChunk(reachName string, rr embedRapidRow) string {
 	}
 	if rr.portageDesc != nil && *rr.portageDesc != "" {
 		fmt.Fprintf(&sb, "\nPortage: %s", *rr.portageDesc)
+	}
+	if rr.isHazard {
+		if rr.hazardType != nil && *rr.hazardType != "" {
+			fmt.Fprintf(&sb, "\nHazard: %s", *rr.hazardType)
+		} else {
+			sb.WriteString("\nHazard: permanent hazard")
+		}
 	}
 	return sb.String()
 }

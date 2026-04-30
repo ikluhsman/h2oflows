@@ -274,11 +274,11 @@
             >
               <div class="flex items-center justify-between gap-2">
                 <span class="text-xs font-semibold uppercase tracking-wide text-blue-500">{{ result.reach_name }}</span>
-                <NuxtLink
-                  :to="`/reaches/${result.reach_slug}`"
+                <button
+                  type="button"
                   class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0"
-                  @click="closeAsk"
-                >View reach →</NuxtLink>
+                  @click="goToReachOnMap(result.reach_slug)"
+                >Show on map →</button>
               </div>
               <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{{ result.answer }}</p>
             </div>
@@ -358,6 +358,11 @@ watch(askOpen, async (open) => {
 })
 
 function closeAsk() { askOpen.value = false }
+
+function goToReachOnMap(slug: string) {
+  closeAsk()
+  router.push({ path: '/explore', query: { focus: slug } })
+}
 
 async function askQuestion() {
   const q = askQuery.value.trim()

@@ -135,13 +135,14 @@
               </div>
               <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap mb-3">{{ result.answer }}</p>
               <div class="flex items-center gap-2 flex-wrap">
-                <NuxtLink
-                  :to="`/reaches/${result.reach_slug}`"
+                <button
+                  type="button"
                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+                  @click="zoomMapToReach(result.reach_slug)"
                 >
                   <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
                   Navigate there now
-                </NuxtLink>
+                </button>
                 <button
                   v-if="result.primary_gauge_id"
                   class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold transition-colors"
@@ -158,9 +159,10 @@
         </div>
 
         <!-- Framed reach map -->
-        <div class="relative w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm" style="height: 420px;">
+        <div ref="mapWrapRef" class="relative w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm" style="height: 420px;">
           <ClientOnly>
             <ReachesMap
+              ref="mapRef"
               embedded
               :hovered-slug="heroHoveredSlug"
               @reaches-updated="onReachesUpdated"
@@ -275,8 +277,26 @@ onMounted(async () => {
 // ── Map callbacks ─────────────────────────────────────────────────────────────
 
 const heroHoveredSlug = ref<string | null>(null)
+const mapRef = ref<{ flyToSlug: (slug: string) => void } | null>(null)
+const mapWrapRef = ref<HTMLDivElement | null>(null)
+let pendingFocusSlug: string | null = null
 
-function onReachesUpdated(_reaches: { slug: string; name: string; class_max: number | null }[]) {}
+function zoomMapToReach(slug: string) {
+  mapWrapRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  if (mapRef.value?.flyToSlug) {
+    mapRef.value.flyToSlug(slug)
+    pendingFocusSlug = slug
+  } else {
+    pendingFocusSlug = slug
+  }
+}
+
+function onReachesUpdated(reaches: { slug: string; name: string; class_max: number | null }[]) {
+  if (pendingFocusSlug && reaches.some(r => r.slug === pendingFocusSlug)) {
+    mapRef.value?.flyToSlug(pendingFocusSlug)
+    pendingFocusSlug = null
+  }
+}
 function onBoundsUpdated(_bbox: string) {}
 
 async function addGaugeById(gaugeId: string) {
@@ -364,11 +384,14 @@ async function askQuestion() {
       body: JSON.stringify({ question: q }),
       signal: controller.signal,
     })
-    if (!res.ok) throw new Error(`${res.status}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      throw new Error(body?.error || `HTTP ${res.status}`)
+    }
     searchResult.value = await res.json()
   } catch (err: any) {
     if (err?.name !== 'AbortError') {
-      searchError.value = 'Something went wrong. Try again.'
+      searchError.value = err?.message ? `Error: ${err.message}` : 'Something went wrong. Try again.'
     }
   } finally {
     searching.value = false
