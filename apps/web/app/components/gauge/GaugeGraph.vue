@@ -178,7 +178,8 @@ function buildChart() {
   const ys = new Float64Array(sorted.map(r => r.cfs))
 
   const ranges = flowRanges.value
-  const currentCfs = props.currentCfs ?? null
+  // Use freshest reading from the fetched data — not the potentially stale prop.
+  const currentCfs = readings.value.length > 0 ? readings.value[0].cfs : (props.currentCfs ?? null)
 
   const opts: uPlot.Options = {
     width:  container.value!.clientWidth,

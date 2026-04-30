@@ -26,12 +26,12 @@
         </NuxtLink>
       </div>
       <div class="w-36 shrink-0 hidden sm:block h-6 opacity-60 pointer-events-none">
-        <GaugeSparkline :gauge-id="reach.id" flow-status="unknown" :color="sparklineColor(reach)" compact @latest-cfs="(v) => setLiveCfs(reach, v)" />
+        <GaugeSparkline :gauge-id="reach.id" flow-status="unknown" :color="sparklineColor(reach)" compact @latest-cfs="(v) => setLiveCfs(reach, v)" @live-flow-band="(b) => setLiveFlowBand(reach, b)" />
       </div>
       <span
-        v-if="reach.flowStatus !== 'unknown' || reach.flowBandLabel"
-        :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', flowBandBadgeClass(reach.flowBandLabel, reach.flowStatus)]"
-      >{{ flowBandLabel(reach.flowBandLabel, reach.flowStatus) }}</span>
+        v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
+        :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
+      >{{ flowBandLabel(displayFlowBandLabel(reach), displayFlowStatus(reach)) }}</span>
       <span class="w-16 shrink-0 text-right text-sm font-bold tabular-nums" :class="cfsColorClass(reach)">
         {{ displayCfs(reach) != null ? displayCfs(reach)!.toLocaleString() : '—' }}
         <span class="text-xs font-normal text-gray-400">cfs</span>
@@ -78,9 +78,9 @@
           </NuxtLink>
         </div>
         <span
-          v-if="reach.flowStatus !== 'unknown' || reach.flowBandLabel"
-          :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', flowBandBadgeClass(reach.flowBandLabel, reach.flowStatus)]"
-        >{{ flowBandLabel(reach.flowBandLabel, reach.flowStatus) }}</span>
+          v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
+          :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
+        >{{ flowBandLabel(displayFlowBandLabel(reach), displayFlowStatus(reach)) }}</span>
         <span
           class="font-bold tabular-nums shrink-0 leading-none"
           :class="[density === 'compact' ? 'text-lg' : density === 'comfortable' ? 'text-xl' : 'text-2xl', cfsColorClass(reach)]"
@@ -97,7 +97,7 @@
         </button>
       </div>
       <div v-if="density !== 'compact'" class="mt-1.5 opacity-60 pointer-events-none" :class="density === 'full' ? 'h-14' : 'h-6'">
-        <GaugeSparkline :gauge-id="reach.id" flow-status="unknown" :color="sparklineColor(reach)" :compact="density !== 'full'" @latest-cfs="(v) => setLiveCfs(reach, v)" />
+        <GaugeSparkline :gauge-id="reach.id" flow-status="unknown" :color="sparklineColor(reach)" :compact="density !== 'full'" @latest-cfs="(v) => setLiveCfs(reach, v)" @live-flow-band="(b) => setLiveFlowBand(reach, b)" />
       </div>
     </div>
   </div>
@@ -118,14 +118,31 @@ const emit = defineEmits<{
   (e: 'remove', gauge: WatchedGauge): void
 }>()
 
-const liveCfsMap = reactive<Record<string, number>>({})
+const liveCfsMap      = reactive<Record<string, number>>({})
+const liveFlowBandMap = reactive<Record<string, { flowBandLabel: string | null; flowStatus: string }>>({})
+
+function reachKey(reach: WatchedGauge): string {
+  return `${reach.id}::${reach.contextReachSlug}`
+}
 
 function setLiveCfs(reach: WatchedGauge, v: number) {
-  liveCfsMap[`${reach.id}::${reach.contextReachSlug}`] = v
+  liveCfsMap[reachKey(reach)] = v
+}
+
+function setLiveFlowBand(reach: WatchedGauge, band: { flowBandLabel: string | null; flowStatus: string }) {
+  liveFlowBandMap[reachKey(reach)] = band
 }
 
 function displayCfs(reach: WatchedGauge): number | null {
-  return liveCfsMap[`${reach.id}::${reach.contextReachSlug}`] ?? reach.currentCfs
+  return liveCfsMap[reachKey(reach)] ?? reach.currentCfs
+}
+
+function displayFlowBandLabel(reach: WatchedGauge): string | null {
+  return liveFlowBandMap[reachKey(reach)]?.flowBandLabel ?? reach.flowBandLabel ?? null
+}
+
+function displayFlowStatus(reach: WatchedGauge): string {
+  return liveFlowBandMap[reachKey(reach)]?.flowStatus ?? reach.flowStatus ?? 'unknown'
 }
 
 function reachLabel(reach: WatchedGauge): string {
@@ -133,20 +150,20 @@ function reachLabel(reach: WatchedGauge): string {
 }
 
 function sparklineColor(reach: WatchedGauge): string {
-  const s = reach.flowStatus
-  if (s === 'running')                    return '#22c55e'
-  if (s === 'high')                       return '#f97316'
-  if (s === 'very_high' || s === 'flood') return '#ef4444'
-  if (s === 'low')                        return '#f59e0b'
+  const band = displayFlowBandLabel(reach)
+  if (band === 'running')   return '#22c55e'
+  if (band === 'high')      return '#16a34a'
+  if (band === 'very_high') return '#38bdf8'
+  if (band === 'too_low')   return '#ef4444'
   return '#3b82f6'
 }
 
 function cfsColorClass(reach: WatchedGauge): string {
-  const s = reach.flowStatus
-  if (s === 'running')                    return 'text-green-600 dark:text-green-400'
-  if (s === 'high')                       return 'text-orange-500 dark:text-orange-400'
-  if (s === 'very_high' || s === 'flood') return 'text-red-600 dark:text-red-400'
-  if (s === 'low')                        return 'text-amber-500 dark:text-amber-400'
+  const band = displayFlowBandLabel(reach)
+  if (band === 'running')   return 'text-emerald-500 dark:text-emerald-400'
+  if (band === 'high')      return 'text-green-600 dark:text-green-500'
+  if (band === 'very_high') return 'text-sky-500 dark:text-sky-400'
+  if (band === 'too_low')   return 'text-red-500 dark:text-red-400'
   return 'text-gray-900 dark:text-white'
 }
 </script>
