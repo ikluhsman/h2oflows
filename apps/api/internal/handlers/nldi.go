@@ -482,6 +482,20 @@ func (h *NLDIHandler) NearbyGauges(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// normalizeExternalID strips the source prefix (e.g. "USGS-", "DWR-") that the
+// NLDI API sometimes includes in the identifier field. NWIS and DWR polling APIs
+// expect the bare station number (e.g. "09342500", not "USGS-09342500").
+func normalizeExternalID(extID, source string) string {
+	if extID == "" || source == "" {
+		return extID
+	}
+	prefix := strings.ToUpper(source) + "-"
+	if strings.HasPrefix(strings.ToUpper(extID), prefix) {
+		return extID[len(prefix):]
+	}
+	return extID
+}
+
 // SetPrimaryGauge handles PUT /api/v1/admin/reaches/{slug}/primary-gauge
 // Upserts the gauge by (external_id, source) and sets reaches.primary_gauge_id.
 func (h *NLDIHandler) SetPrimaryGauge(w http.ResponseWriter, r *http.Request) {
@@ -497,24 +511,27 @@ func (h *NLDIHandler) SetPrimaryGauge(w http.ResponseWriter, r *http.Request) {
 		errorResponse(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	if body.ExternalID == "" {
-		errorResponse(w, http.StatusBadRequest, "external_id required")
-		return
-	}
 	if body.Source == "" {
 		body.Source = "usgs"
 	}
 
 	ctx := r.Context()
 
+	externalID := normalizeExternalID(strings.TrimSpace(body.ExternalID), body.Source)
+	if externalID == "" {
+		errorResponse(w, http.StatusBadRequest, "external_id required")
+		return
+	}
+
 	var gaugeID string
 	err := h.db.QueryRow(ctx, `
 		INSERT INTO gauges (external_id, source, name, location)
 		VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326))
 		ON CONFLICT (external_id, source) DO UPDATE
-			SET name = EXCLUDED.name
+			SET name     = EXCLUDED.name,
+			    location = EXCLUDED.location
 		RETURNING id
-	`, body.ExternalID, body.Source, body.Name, body.Lng, body.Lat).Scan(&gaugeID)
+	`, externalID, body.Source, body.Name, body.Lng, body.Lat).Scan(&gaugeID)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("upsert gauge: %v", err))
 		return
@@ -528,14 +545,38 @@ func (h *NLDIHandler) SetPrimaryGauge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Link gauge to reach if it has no reach association yet.
-	h.db.Exec(ctx, `UPDATE gauges SET reach_id = $1 WHERE id = $2 AND reach_id IS NULL`, reachID, gaugeID)
+	if _, err := h.db.Exec(ctx,
+		`UPDATE gauges SET reach_id = $1 WHERE id = $2 AND reach_id IS NULL`,
+		reachID, gaugeID); err != nil {
+		log.Printf("nldi: set gauges.reach_id for %s: %v", gaugeID, err)
+	}
+
+	if _, err := h.db.Exec(ctx, `
+		INSERT INTO gauge_reach_associations (gauge_id, reach_id, relationship)
+		VALUES ($1, $2, 'primary')
+		ON CONFLICT (gauge_id, reach_id) DO NOTHING
+	`, gaugeID, reachID); err != nil {
+		errorResponse(w, http.StatusInternalServerError,
+			fmt.Sprintf("link gauge association: %v", err))
+		return
+	}
+
+	if _, err := h.db.Exec(ctx, `
+		UPDATE gauges
+		SET status               = 'active',
+		    consecutive_failures = 0
+		WHERE id = $1
+		  AND auto_managed = TRUE
+		  AND status = 'inactive'
+	`, gaugeID); err != nil {
+		log.Printf("nldi: reactivate gauge %s: %v", gaugeID, err)
+	}
 
 	h.warmCache()
 
 	jsonResponse(w, http.StatusOK, map[string]any{
 		"gauge_id":    gaugeID,
-		"external_id": body.ExternalID,
+		"external_id": externalID,
 		"name":        body.Name,
 	})
 }

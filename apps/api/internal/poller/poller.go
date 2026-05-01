@@ -658,6 +658,11 @@ type dbGauge struct {
 	externalID string
 }
 
+// INVARIANT: a gauge is polled only if it has at least one row in
+// gauge_reach_associations. Any code path that sets reaches.primary_gauge_id
+// MUST also insert into gauge_reach_associations. See SetPrimaryGauge in
+// handlers/nldi.go. Migration 000066 backfills this invariant.
+
 // loadGauges returns gauges for the given source that should be polled this tick.
 // A gauge is polled if and only if it has at least one entry in gauge_reach_associations.
 func (p *Poller) loadGauges(ctx context.Context, sourceName string) ([]dbGauge, error) {
