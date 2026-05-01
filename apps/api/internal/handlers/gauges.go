@@ -875,6 +875,16 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusOK, newFeatureCollection(features))
+
+	// Touch every returned gauge so dashboard gauges stay in the demand-poll window.
+	if h.poller != nil {
+		go func() {
+			ctx := context.Background()
+			for _, id := range gaugeIDs {
+				h.poller.TouchRequested(ctx, id)
+			}
+		}()
+	}
 }
 
 // GetSeasonalStats handles GET /api/v1/gauges/{id}/seasonal
