@@ -234,23 +234,6 @@ func (p *Poller) pruneOldReadings(ctx context.Context) {
 	}
 }
 
-// TouchRequested marks a gauge as recently requested, bringing it into the
-// demand-driven poll window. Call this whenever the API serves gauge data to
-// a user — search results, detail page, watchlist load.
-// Fire-and-forget: errors are logged but not returned to the caller.
-//
-// Reach-linked gauges are skipped: they're already polled every cycle, so
-// touching them just churns last_requested_at without changing behaviour.
-func (p *Poller) TouchRequested(ctx context.Context, gaugeID string) {
-	_, err := p.db.Exec(ctx,
-		`UPDATE gauges SET last_requested_at = NOW() WHERE id = $1 AND reach_id IS NULL`,
-		gaugeID,
-	)
-	if err != nil {
-		log.Printf("poller: touch requested for %s: %v", gaugeID, err)
-	}
-}
-
 // FetchNowIfStale fetches a single reading synchronously from the upstream
 // source if the gauge's most recent reading is older than maxAge (or absent).
 // Returns true if a fresh reading was written.
@@ -364,9 +347,8 @@ func (p *Poller) backfillSource(ctx context.Context, sc sourceConfig) {
 		LEFT   JOIN trailing_gap  tg ON tg.gauge_id = g.id
 		WHERE  g.source = $1
 		  AND  g.status NOT IN ('retired', 'inactive')
-		  AND  (
-		           g.reach_id IS NOT NULL
-		           OR g.last_requested_at > NOW() - $2::interval
+		  AND  EXISTS (
+		           SELECT 1 FROM gauge_reach_associations gra WHERE gra.gauge_id = g.id
 		       )
 		  AND  (
 		           -- no readings at all in the window
@@ -379,7 +361,7 @@ func (p *Poller) backfillSource(ctx context.Context, sc sourceConfig) {
 		           OR eg.gauge_id IS NOT NULL
 		           OR tg.gauge_id IS NOT NULL
 		       )
-	`, sourceType, demandWindow)
+	`, sourceType)
 	if err != nil {
 		log.Printf("poller: backfill query [%s]: %v", sourceType, err)
 		return
@@ -676,21 +658,8 @@ type dbGauge struct {
 	externalID string
 }
 
-// demandWindow is how long a non-featured gauge stays in the poll set after
-// its last user request. After this period with no activity it is silently
-// dropped — the source API remains the source of truth for historical data.
-const demandWindow = 7 * 24 * time.Hour
-
 // loadGauges returns gauges for the given source that should be polled this tick.
-//
-// A gauge is included if:
-//   - It is associated with a reach (always polled — these are the load-bearing
-//     gauges that back reach pages), OR
-//   - It was actively requested by a user within the demand window
-//
-// This keeps the poll set small. USGS has ~10,000 gauges in Colorado alone;
-// we have no business polling gauges that nobody is looking at and that don't
-// belong to any reach.
+// A gauge is polled if and only if it has at least one entry in gauge_reach_associations.
 func (p *Poller) loadGauges(ctx context.Context, sourceName string) ([]dbGauge, error) {
 	rows, err := p.db.Query(ctx, `
 		SELECT id, external_id
@@ -703,11 +672,10 @@ func (p *Poller) loadGauges(ctx context.Context, sourceName string) ([]dbGauge, 
 		      OR seasonal_start_mmdd IS NULL
 		      OR TO_CHAR(NOW(), 'MM-DD') BETWEEN seasonal_start_mmdd AND seasonal_end_mmdd
 		  )
-		  AND (
-		      reach_id IS NOT NULL
-		      OR last_requested_at > NOW() - $2::interval
+		  AND  EXISTS (
+		      SELECT 1 FROM gauge_reach_associations gra WHERE gra.gauge_id = g.id
 		  )
-	`, sourceName, demandWindow)
+	`, sourceName)
 	if err != nil {
 		return nil, err
 	}

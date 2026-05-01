@@ -48,7 +48,6 @@ func (c *jsonCache) get() ([]byte, bool) {
 // hard dependency on the poller implementation.
 type gaugeFetcher interface {
 	FetchNowIfStale(ctx context.Context, gaugeID string, maxAge time.Duration) bool
-	TouchRequested(ctx context.Context, gaugeID string)
 }
 
 // ReachHandler handles reach-related HTTP routes.
@@ -620,7 +619,6 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		).Scan(&primaryGaugeID)
 		if primaryGaugeID != nil && *primaryGaugeID != "" {
 			h.poller.FetchNowIfStale(r.Context(), *primaryGaugeID, 15*time.Minute)
-			go h.poller.TouchRequested(context.Background(), *primaryGaugeID)
 		}
 	}
 

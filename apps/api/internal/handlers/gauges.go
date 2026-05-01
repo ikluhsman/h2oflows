@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"log"
@@ -16,21 +15,14 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// toucher is the narrow poller interface GaugeHandler needs — keeps the handler
-// package free of a direct dependency on the full poller implementation.
-type toucher interface {
-	TouchRequested(ctx context.Context, gaugeID string)
-}
-
 // GaugeHandler handles gauge-related HTTP routes.
 type GaugeHandler struct {
 	db       *pgxpool.Pool
 	enricher *ai.SearchEnricher // nil = AI enrichment disabled
-	poller   toucher            // nil = demand-polling disabled
 }
 
-func NewGaugeHandler(db *pgxpool.Pool, enricher *ai.SearchEnricher, poller toucher) *GaugeHandler {
-	return &GaugeHandler{db: db, enricher: enricher, poller: poller}
+func NewGaugeHandler(db *pgxpool.Pool, enricher *ai.SearchEnricher) *GaugeHandler {
+	return &GaugeHandler{db: db, enricher: enricher}
 }
 
 // Search handles GET /api/v1/gauges/search
@@ -95,14 +87,13 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 			currentCFS          *float64
 			flowStatus          string
 			flowBandLabel       *string
-			pollTier            string
 		)
 		if err := rows.Scan(
 			&id, &externalID, &source, &name, &status,
 			&featured, &prominenceScore, &reachID, &reachNamesRaw, &reachSlugsRaw, &reachCommonNamesRaw,
 			&reachRelationship, &lastReadingAt,
 			&lng, &lat, &stateAbbr, &basinName, &watershedName, &riverName,
-			&currentCFS, &flowStatus, &flowBandLabel, &pollTier,
+			&currentCFS, &flowStatus, &flowBandLabel,
 		); err != nil {
 			continue
 		}
@@ -133,7 +124,6 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 				"current_cfs":         currentCFS,
 				"flow_status":         flowStatus,
 				"flow_band_label":     flowBandLabel,
-				"poll_tier":           pollTier,
 			},
 		})
 	}
@@ -143,19 +133,6 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusOK, newFeatureCollection(features))
-
-	// Touch every returned gauge so cold gauges enter the demand-polling window.
-	// Fire-and-forget — the user already has their search results.
-	if h.poller != nil {
-		go func() {
-			ctx := context.Background()
-			for _, f := range features {
-				if id, ok := f.Properties["id"].(string); ok {
-					h.poller.TouchRequested(ctx, id)
-				}
-			}
-		}()
-	}
 }
 
 // GetReadings handles GET /api/v1/gauges/{id}/readings
@@ -185,11 +162,6 @@ func (h *GaugeHandler) GetReadings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		since = &t
-	}
-
-	// Touch for demand polling — user is actively viewing this gauge.
-	if h.poller != nil {
-		go h.poller.TouchRequested(context.Background(), gaugeID)
 	}
 
 	var rows interface {
@@ -563,12 +535,7 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			) AS river_name,
 			g.current_cfs,
 			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
-			fr_band.label                            AS flow_band_label,
-			CASE
-				WHEN g.reach_id IS NOT NULL                                     THEN 'trusted'
-				WHEN g.last_requested_at > NOW() - INTERVAL '7 days'           THEN 'demand'
-				ELSE                                                                 'cold'
-			END AS poll_tier
+			fr_band.label                            AS flow_band_label
 		FROM gauges g
 		LEFT JOIN LATERAL (
 			SELECT fr.label,
@@ -875,16 +842,6 @@ func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	jsonResponse(w, http.StatusOK, newFeatureCollection(features))
-
-	// Touch every returned gauge so dashboard gauges stay in the demand-poll window.
-	if h.poller != nil {
-		go func() {
-			ctx := context.Background()
-			for _, id := range gaugeIDs {
-				h.poller.TouchRequested(ctx, id)
-			}
-		}()
-	}
 }
 
 // GetSeasonalStats handles GET /api/v1/gauges/{id}/seasonal

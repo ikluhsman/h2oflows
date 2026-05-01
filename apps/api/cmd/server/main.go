@@ -96,7 +96,7 @@ func main() {
 		log.Println("SUPABASE_JWKS_URL not set — auth middleware disabled, all requests anonymous")
 	}
 
-	gauges    := handlers.NewGaugeHandler(pool, enricher, p)
+	gauges    := handlers.NewGaugeHandler(pool, enricher)
 	reaches   := handlers.NewReachHandler(pool, asker).WithPoller(p)
 	watchlist := handlers.NewWatchlistHandler(pool)
 	admin     := handlers.NewAdminHandler(pool)
