@@ -144,6 +144,7 @@ func main() {
 		r.Use(loadAppRoles)
 		r.Get("/gauges/search", gauges.Search)
 		r.Get("/gauges/batch", gauges.BatchGet)
+		r.Post("/gauges/batch", gauges.BatchPost)
 		r.Get("/gauges/{id}/readings", gauges.GetReadings)
 		r.Get("/gauges/{id}/flow-ranges", gauges.GetFlowRanges)
 		r.Get("/gauges/{id}/seasonal", gauges.GetSeasonalStats)

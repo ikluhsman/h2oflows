@@ -68,10 +68,11 @@ export function useWatchlistSync() {
     // Build batch ids with reach context: "uuid:reach-slug" or "uuid"
     const batchIds = newItems
       .map(item => item.reach_slug ? `${item.gauge_id}:${item.reach_slug}` : item.gauge_id)
-      .join(',')
 
-    const batchRes = await fetch(`${apiBase}/api/v1/gauges/batch?ids=${batchIds}`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const batchRes = await fetch(`${apiBase}/api/v1/gauges/batch`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: batchIds }),
     }).catch(() => null)
     if (!batchRes?.ok) return
 

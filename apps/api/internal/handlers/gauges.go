@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -603,48 +604,67 @@ func parseFloats(ss []string) ([]float64, error) {
 	return out, nil
 }
 
+// splitBatchItems parses a slice of "uuid:reach-slug" or plain "uuid" strings
+// into parallel gaugeIDs and reachSlugs slices (empty string = no reach context).
+// Capped at 200 items.
+func splitBatchItems(items []string) (gaugeIDs, reachSlugs []string) {
+	if len(items) > 200 {
+		items = items[:200]
+	}
+	gaugeIDs = make([]string, 0, len(items))
+	reachSlugs = make([]string, 0, len(items))
+	for _, item := range items {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if i := strings.IndexByte(item, ':'); i >= 0 {
+			gaugeIDs = append(gaugeIDs, item[:i])
+			reachSlugs = append(reachSlugs, item[i+1:])
+		} else {
+			gaugeIDs = append(gaugeIDs, item)
+			reachSlugs = append(reachSlugs, "")
+		}
+	}
+	return
+}
+
 // BatchGet handles GET /api/v1/gauges/batch?ids=uuid1:reach-slug,uuid2,uuid3:other-slug
-//
-// IDs may be plain gauge UUIDs or "uuid:reach-slug" pairs. When a reach slug is
-// present the flow ranges and context reach metadata are resolved for that specific
-// reach rather than falling back to the alphabetically-first associated reach.
-// The same gauge UUID can appear multiple times with different reach slugs.
-//
-// Returns a GeoJSON FeatureCollection. Each feature echoes back context_reach_slug
-// so the frontend can match features to the correct (gauge, reach) watchlist items.
+// Kept for backward compatibility. Prefer BatchPost for large watchlists.
 func (h *GaugeHandler) BatchGet(w http.ResponseWriter, r *http.Request) {
 	raw := strings.TrimSpace(r.URL.Query().Get("ids"))
 	if raw == "" {
 		jsonResponse(w, http.StatusOK, newFeatureCollection(nil))
 		return
 	}
-
-	// Parse "uuid1:reach-slug,uuid2,uuid3:other-slug" into parallel slices.
-	// Empty string in reachSlugs means no reach context (standalone gauge).
-	parts := strings.Split(raw, ",")
-	if len(parts) > 200 {
-		parts = parts[:200]
-	}
-	gaugeIDs := make([]string, 0, len(parts))
-	reachSlugs := make([]string, 0, len(parts)) // "" = no context
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		if i := strings.IndexByte(part, ':'); i >= 0 {
-			gaugeIDs = append(gaugeIDs, part[:i])
-			reachSlugs = append(reachSlugs, part[i+1:])
-		} else {
-			gaugeIDs = append(gaugeIDs, part)
-			reachSlugs = append(reachSlugs, "")
-		}
-	}
+	gaugeIDs, reachSlugs := splitBatchItems(strings.Split(raw, ","))
 	if len(gaugeIDs) == 0 {
 		jsonResponse(w, http.StatusOK, newFeatureCollection(nil))
 		return
 	}
+	h.executeBatch(w, r, gaugeIDs, reachSlugs)
+}
 
+// BatchPost handles POST /api/v1/gauges/batch
+// Body: {"ids": ["uuid1:reach-slug", "uuid2", ...]}
+// Preferred over BatchGet for large watchlists — avoids long query strings.
+func (h *GaugeHandler) BatchPost(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.IDs) == 0 {
+		jsonResponse(w, http.StatusOK, newFeatureCollection(nil))
+		return
+	}
+	gaugeIDs, reachSlugs := splitBatchItems(body.IDs)
+	if len(gaugeIDs) == 0 {
+		jsonResponse(w, http.StatusOK, newFeatureCollection(nil))
+		return
+	}
+	h.executeBatch(w, r, gaugeIDs, reachSlugs)
+}
+
+func (h *GaugeHandler) executeBatch(w http.ResponseWriter, r *http.Request, gaugeIDs, reachSlugs []string) {
 	// ctx CTE: one row per requested (gauge_id, reach_slug) pair.
 	// NULLIF converts "" back to NULL so SQL COALESCE logic works correctly.
 	rows, err := h.db.Query(r.Context(), `

@@ -13,10 +13,13 @@ export function useWatchlistRefresh() {
     // Build "uuid:reach-slug" pairs for gauges with reach context; plain "uuid" for standalone.
     const ids = store.gauges
       .map(g => g.contextReachSlug ? `${g.id}:${g.contextReachSlug}` : g.id)
-      .join(',')
 
     try {
-      const res = await fetch(`${apiBase}/api/v1/gauges/batch?ids=${ids}`)
+      const res = await fetch(`${apiBase}/api/v1/gauges/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
       if (!res.ok) return
       const data = await res.json()
       for (const f of data.features ?? []) {
