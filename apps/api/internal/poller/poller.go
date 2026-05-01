@@ -662,15 +662,15 @@ type dbGauge struct {
 // A gauge is polled if and only if it has at least one entry in gauge_reach_associations.
 func (p *Poller) loadGauges(ctx context.Context, sourceName string) ([]dbGauge, error) {
 	rows, err := p.db.Query(ctx, `
-		SELECT id, external_id
-		FROM   gauges
-		WHERE  source = $1
-		  AND  status IN ('active', 'seasonal', 'maintenance')
+		SELECT g.id, g.external_id
+		FROM   gauges g
+		WHERE  g.source = $1
+		  AND  g.status IN ('active', 'seasonal', 'maintenance')
 		  AND  (
 		      -- seasonal: only poll when within the season window
-		      status != 'seasonal'
-		      OR seasonal_start_mmdd IS NULL
-		      OR TO_CHAR(NOW(), 'MM-DD') BETWEEN seasonal_start_mmdd AND seasonal_end_mmdd
+		      g.status != 'seasonal'
+		      OR g.seasonal_start_mmdd IS NULL
+		      OR TO_CHAR(NOW(), 'MM-DD') BETWEEN g.seasonal_start_mmdd AND g.seasonal_end_mmdd
 		  )
 		  AND  EXISTS (
 		      SELECT 1 FROM gauge_reach_associations gra WHERE gra.gauge_id = g.id
