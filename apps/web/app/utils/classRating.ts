@@ -10,6 +10,15 @@ export function romanClass(n: number): string {
   return ROMAN[n] ?? String(n)
 }
 
+export function classColor(n: number): string {
+  if (n <= 1.5) return '#22c55e'
+  if (n <= 2.5) return '#84cc16'
+  if (n <= 3.5) return '#eab308'
+  if (n <= 4.5) return '#f97316'
+  if (n <= 5.5) return '#ef4444'
+  return '#7f1d1d'
+}
+
 export function classRange(min: number | null, max: number | null): string {
   if (min == null && max == null) return ''
   if (min == null) return romanClass(max!)

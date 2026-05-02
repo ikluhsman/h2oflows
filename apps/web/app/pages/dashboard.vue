@@ -96,18 +96,35 @@
           <template v-if="!collapsedStates.has(stateGroup.name)">
             <div v-for="basin in stateGroup.basins" :key="basin.name" class="mb-4 pl-2">
               <!-- Basin header: collapsible -->
-              <button class="flex items-center gap-2 w-full text-left mb-3" @click="toggleBasin(stateGroup.name, basin.name)">
-                <svg
-                  class="w-3 h-3 text-gray-400 dark:text-gray-500 shrink-0 transition-transform duration-150"
-                  :class="{ 'rotate-90': !collapsedBasins.has(basinKey(stateGroup.name, basin.name)) }"
-                  viewBox="0 0 20 20" fill="currentColor"
+              <div class="flex items-center gap-2 w-full mb-3">
+                <button class="flex items-center gap-2 text-left shrink-0" @click="toggleBasin(stateGroup.name, basin.name)">
+                  <svg
+                    class="w-3 h-3 text-gray-400 dark:text-gray-500 shrink-0 transition-transform duration-150"
+                    :class="{ 'rotate-90': !collapsedBasins.has(basinKey(stateGroup.name, basin.name)) }"
+                    viewBox="0 0 20 20" fill="currentColor"
+                  >
+                    <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                  </svg>
+                  <h2 class="text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">{{ basin.name }} Basin</h2>
+                  <span class="text-xs text-gray-400">({{ basin.reachCount }})</span>
+                </button>
+                <NuxtLink
+                  :to="`/basin/${slugifyBasin(basin.name)}`"
+                  class="p-0.5 rounded text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors shrink-0"
+                  title="View basin map"
                 >
-                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-                </svg>
-                <h2 class="text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">{{ basin.name }} Basin</h2>
-                <span class="text-xs text-gray-400">({{ basin.reachCount }})</span>
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="8" y1="15" x2="8" y2="9"/>
+                    <line x1="8" y1="9" x2="3" y2="4"/>
+                    <line x1="8" y1="9" x2="13" y2="4"/>
+                    <line x1="3" y1="4" x2="1" y2="2"/>
+                    <line x1="3" y1="4" x2="5" y2="2"/>
+                    <line x1="13" y1="4" x2="11" y2="2"/>
+                    <line x1="13" y1="4" x2="15" y2="2"/>
+                  </svg>
+                </NuxtLink>
                 <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700/60" />
-              </button>
+              </div>
 
               <template v-if="!collapsedBasins.has(basinKey(stateGroup.name, basin.name))">
               <!-- Reaches grouped by river -->
@@ -264,6 +281,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
+import { cleanBasinName, slugifyBasin } from '~/utils/basin'
 
 definePageMeta({ ssr: false })
 
@@ -293,15 +311,6 @@ onMounted(() => {
 onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 
 // ── Reach-primary grouping: state → basin → river → reaches ─────────────────
-
-function cleanBasinName(name: string | null): string | null {
-  if (!name) return null
-  const cleaned = name
-    .replace(/^(Upper|Middle|Lower)\s+/i, '')
-    .replace(/\s+(River|Rivers|Basin)s?$/i, '')
-    .trim()
-  return cleaned || null
-}
 
 interface RiverGroup { name: string; reaches: WatchedGauge[] }
 interface BasinGroup { name: string; reachCount: number; rivers: RiverGroup[]; standaloneGauges: WatchedGauge[] }
