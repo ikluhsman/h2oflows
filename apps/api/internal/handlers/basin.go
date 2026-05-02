@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -187,21 +188,14 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	distanceKm := 50
-	if d := r.URL.Query().Get("distance"); d != "" {
-		if v, err := strconv.Atoi(d); err == nil {
-			if v < 1 {
-				v = 1
-			} else if v > 200 {
-				v = 200
-			}
-			distanceKm = v
-		}
-	}
-
-	// Resolve start_comid and end_comid from DB.
+	// Resolve start_comid, end_comid, and reach length from DB.
+	// Length drives the NLDI search distance: 40km base × 1.75 per 20km of reach.
 	rows, err := h.db.Query(r.Context(),
-		`SELECT start_comid, end_comid FROM reaches WHERE slug = ANY($1) AND (start_comid IS NOT NULL OR end_comid IS NOT NULL)`,
+		`SELECT start_comid, end_comid,
+		        COALESCE(ST_Length(centerline::geography)/1000, 0) AS length_km
+		 FROM reaches
+		 WHERE slug = ANY($1)
+		   AND (start_comid IS NOT NULL OR end_comid IS NOT NULL)`,
 		slugs,
 	)
 	if err != nil {
@@ -214,11 +208,16 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 	seenStart := make(map[string]struct{})
 	seenEnd := make(map[string]struct{})
 	var startComIDs, endComIDs []string
+	var maxLengthKm float64
 
 	for rows.Next() {
 		var startComID, endComID *string
-		if err := rows.Scan(&startComID, &endComID); err != nil {
+		var lengthKm float64
+		if err := rows.Scan(&startComID, &endComID, &lengthKm); err != nil {
 			continue
+		}
+		if lengthKm > maxLengthKm {
+			maxLengthKm = lengthKm
 		}
 		if startComID != nil {
 			dashboardComIDs[*startComID] = struct{}{}
@@ -240,6 +239,18 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 	if len(startComIDs) == 0 && len(endComIDs) == 0 {
 		jsonResponse(w, http.StatusOK, emptyOK)
 		return
+	}
+
+	// Auto-compute NLDI search distance from longest reach.
+	// Steps of 20 km each multiply the base by 1.75:
+	//   0–19 km → 40 km,  20–39 km → 70 km,  40–59 km → 123 km,  60+ km → 200 km (cap)
+	steps := int(maxLengthKm / 20.0)
+	distanceKm := int(math.Min(200, math.Max(20, math.Round(40*math.Pow(1.75, float64(steps))))))
+	// Allow explicit override for testing (?distance=N).
+	if d := r.URL.Query().Get("distance"); d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v >= 1 && v <= 200 {
+			distanceKm = v
+		}
 	}
 
 	c := nldi.New()
