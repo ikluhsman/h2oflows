@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from '#app'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { cleanBasinName, slugifyBasin } from '~/utils/basin'
@@ -202,10 +202,16 @@ async function fetchAll() {
   }
 }
 
-// immediate:true handles both cases:
-//   - persistedstate already hydrated → fires on setup, slugs non-empty, fetches
-//   - persistedstate hydrates later  → fires again when reachSlugs changes
+// Watch fires when persistedstate patches the store (app:mounted hook).
 watch(reachSlugs, (slugs) => {
   if (slugs.length > 0 && mapData.value.length === 0) fetchAll()
-}, { immediate: true })
+})
+
+// Fallback: persistedstate's app:mounted runs after component onMounted.
+// setTimeout(0) defers to the next macrotask — by then the store is hydrated.
+onMounted(() => {
+  setTimeout(() => {
+    if (reachSlugs.value.length > 0 && mapData.value.length === 0) fetchAll()
+  }, 0)
+})
 </script>
