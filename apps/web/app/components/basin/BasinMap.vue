@@ -256,17 +256,17 @@ onMounted(() => {
     map!.addLayer({
       id: 'basin-tributaries', type: 'line', source: 'basin-tributaries',
       paint: {
-        'line-color': '#60a5fa',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.5, 14, 3],
-        'line-opacity': 1,
+        'line-color': '#3b82f6',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2, 14, 4],
+        'line-opacity': 0.85,
       },
     })
     map!.addLayer({
       id: 'basin-mainstem', type: 'line', source: 'basin-mainstem',
       paint: {
-        'line-color': '#0d9488',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2, 14, 4],
-        'line-opacity': 1,
+        'line-color': '#1d4ed8',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2.5, 14, 5],
+        'line-opacity': 0.9,
       },
     })
 

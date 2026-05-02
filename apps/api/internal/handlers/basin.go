@@ -204,7 +204,6 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	dashboardComIDs := make(map[string]struct{})
 	seenStart := make(map[string]struct{})
 	seenEnd := make(map[string]struct{})
 	var startComIDs, endComIDs []string
@@ -220,14 +219,12 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 			maxLengthKm = lengthKm
 		}
 		if startComID != nil {
-			dashboardComIDs[*startComID] = struct{}{}
 			if _, ok := seenStart[*startComID]; !ok {
 				seenStart[*startComID] = struct{}{}
 				startComIDs = append(startComIDs, *startComID)
 			}
 		}
 		if endComID != nil {
-			dashboardComIDs[*endComID] = struct{}{}
 			if _, ok := seenEnd[*endComID]; !ok {
 				seenEnd[*endComID] = struct{}{}
 				endComIDs = append(endComIDs, *endComID)
@@ -292,8 +289,9 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Deduplicate and strip flowlines that overlap dashboard reaches.
-	tributaries := dedupeFlowlines(allTributaries, dashboardComIDs)
-	mainstem := dedupeFlowlines(allMainstem, dashboardComIDs)
+	// Deduplicate but keep all flowlines — reach centerlines paint on top in the map.
+	tributaries := dedupeFlowlines(allTributaries)
+	mainstem := dedupeFlowlines(allMainstem)
 
 	resp := basinNetworkResponse{
 		Tributaries:   nldi.Collection{Type: "FeatureCollection", Features: tributaries},
@@ -307,9 +305,8 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, resp)
 }
 
-// dedupeFlowlines removes duplicate features by nhdplus_comid and strips any
-// whose comid is in the exclude set (dashboard reach centerlines).
-func dedupeFlowlines(features []nldi.Feature, exclude map[string]struct{}) []nldi.Feature {
+// dedupeFlowlines removes duplicate NLDI features by nhdplus_comid.
+func dedupeFlowlines(features []nldi.Feature) []nldi.Feature {
 	seen := make(map[string]struct{}, len(features))
 	out := make([]nldi.Feature, 0, len(features))
 	for _, f := range features {
@@ -319,9 +316,6 @@ func dedupeFlowlines(features []nldi.Feature, exclude map[string]struct{}) []nld
 		}
 		if id == "" {
 			out = append(out, f)
-			continue
-		}
-		if _, excluded := exclude[id]; excluded {
 			continue
 		}
 		if _, dup := seen[id]; dup {

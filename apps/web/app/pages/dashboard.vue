@@ -110,10 +110,10 @@
                 </button>
                 <NuxtLink
                   :to="`/basin/${slugifyBasin(basin.name)}`"
-                  class="p-0.5 rounded text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors shrink-0"
+                  class="p-0.5 rounded text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors shrink-0"
                   title="View basin map"
                 >
-                  <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="8" cy="3" r="1.5"/>
                     <circle cx="4" cy="13" r="1.5"/>
                     <circle cx="12" cy="13" r="1.5"/>
