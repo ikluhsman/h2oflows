@@ -77,13 +77,11 @@ function setBasemap(value: 'street' | 'topo' | 'satellite') {
 
 function classColorExpr(): any {
   return ['step', ['coalesce', ['get', 'class_max'], 0],
-    '#6b7280',        // no class
-    0.5, '#22c55e',   // I
-    2,   '#84cc16',   // II
-    3,   '#eab308',   // III
-    4,   '#f97316',   // IV
-    5,   '#ef4444',   // V
-    5.5, '#7f1d1d',   // VI
+    '#6b7280',        // gray  (no class)
+    0.5, '#16a34a',   // green (I–II)
+    3.0, '#3b82f6',   // blue  (III)
+    4.0, '#111827',   // black (IV)
+    5.0, '#dc2626',   // red   (V+)
   ]
 }
 
@@ -156,7 +154,7 @@ function fitToReaches() {
 }
 
 function updateSources() {
-  if (!map || !mapReady.value) return
+  if (!map) return
   ;(map.getSource('basin-reaches') as maplibregl.GeoJSONSource | undefined)?.setData(buildReachFC())
   ;(map.getSource('basin-endpoints') as maplibregl.GeoJSONSource | undefined)?.setData(buildEndpointsFC())
 }
@@ -302,6 +300,7 @@ onMounted(() => {
     })
 
     mapReady.value = true
+    updateSources()   // handles data that arrived while map was loading
     fitToReaches()
   })
 

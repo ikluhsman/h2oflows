@@ -6,11 +6,11 @@
 
       <!-- Header -->
       <div class="flex items-center gap-3">
-        <NuxtLink to="/" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+        <button class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors" @click="router.back()">
           <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
           </svg>
-        </NuxtLink>
+        </button>
         <div>
           <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
             {{ displayName ? `${displayName} Basin` : slug }}
@@ -57,8 +57,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from '#app'
+import { ref, computed, watch } from 'vue'
+import { useRoute, useRouter } from '#app'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { cleanBasinName, slugifyBasin } from '~/utils/basin'
 import type { BasinReach } from '~/components/basin/BasinMap.vue'
@@ -66,6 +66,7 @@ import type { BasinReach } from '~/components/basin/BasinMap.vue'
 definePageMeta({ ssr: false })
 
 const route  = useRoute()
+const router = useRouter()
 const slug   = route.params.slug as string
 const store  = useWatchlistStore()
 const { apiBase } = useRuntimeConfig().public
@@ -130,5 +131,9 @@ async function fetchMapData() {
   }
 }
 
-onMounted(fetchMapData)
+// Watch reachSlugs rather than onMounted — store may not be hydrated yet at mount.
+// immediate: true fires synchronously if slugs are already available.
+watch(reachSlugs, (slugs) => {
+  if (slugs.length > 0 && mapData.value.length === 0) fetchMapData()
+}, { immediate: true })
 </script>
