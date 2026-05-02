@@ -77,6 +77,11 @@ const reachTooltip = new maplibregl.Popup({
   className: 'basin-map-tooltip',
 })
 
+const flowlineTooltip = new maplibregl.Popup({
+  closeButton: false, closeOnClick: false, offset: [0, -8],
+  className: 'basin-map-tooltip',
+})
+
 function setBasemap(value: 'street' | 'topo' | 'satellite') {
   if (!map) return
   basemap.value = value
@@ -256,18 +261,28 @@ onMounted(() => {
     map!.addLayer({
       id: 'basin-tributaries', type: 'line', source: 'basin-tributaries',
       paint: {
-        'line-color': '#3b82f6',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2, 14, 4],
-        'line-opacity': 0.85,
+        'line-color': '#6d9eeb',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1, 14, 2.5],
+        'line-opacity': 0.8,
       },
     })
     map!.addLayer({
       id: 'basin-mainstem', type: 'line', source: 'basin-mainstem',
       paint: {
-        'line-color': '#1d4ed8',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2.5, 14, 5],
-        'line-opacity': 0.9,
+        'line-color': '#4a86d8',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.5, 14, 3],
+        'line-opacity': 0.85,
       },
+    })
+
+    // Wider invisible hit areas so flowlines are hoverable
+    map!.addLayer({
+      id: 'basin-tributaries-hit', type: 'line', source: 'basin-tributaries',
+      paint: { 'line-color': 'transparent', 'line-width': 14, 'line-opacity': 0 },
+    })
+    map!.addLayer({
+      id: 'basin-mainstem-hit', type: 'line', source: 'basin-mainstem',
+      paint: { 'line-color': 'transparent', 'line-width': 14, 'line-opacity': 0 },
     })
 
     map!.addSource('basin-reaches', {
@@ -344,6 +359,24 @@ onMounted(() => {
       if (slug) flyToReach(slug)
     })
 
+    // Flowline hover — show GNIS name if available
+    function showFlowlineTooltip(e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) {
+      const p = e.features?.[0]?.properties
+      if (!p) return
+      const name = p.gnis_name || p.name
+      if (!name) return
+      map!.getCanvas().style.cursor = 'default'
+      flowlineTooltip.setLngLat(e.lngLat).setHTML(name).addTo(map!)
+    }
+    for (const hitId of ['basin-tributaries-hit', 'basin-mainstem-hit'] as const) {
+      map!.on('mouseenter', hitId, showFlowlineTooltip)
+      map!.on('mousemove',  hitId, (e) => flowlineTooltip.setLngLat(e.lngLat))
+      map!.on('mouseleave', hitId, () => {
+        map!.getCanvas().style.cursor = ''
+        flowlineTooltip.remove()
+      })
+    }
+
     mapReady.value = true
     updateSources()   // handles data that arrived while map was loading
     fitToReaches()
@@ -354,6 +387,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   reachTooltip.remove()
+  flowlineTooltip.remove()
   map?.remove()
   map = null
 })
