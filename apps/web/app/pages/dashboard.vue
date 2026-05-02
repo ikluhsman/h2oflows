@@ -94,7 +94,7 @@
           </button>
 
           <template v-if="!collapsedStates.has(stateGroup.name)">
-            <div v-for="basin in stateGroup.basins" :key="basin.name" class="mb-4 pl-2">
+            <div v-for="basin in stateGroup.basins" :key="basin.name" class="mb-4">
               <!-- Basin header: collapsible -->
               <div class="flex items-center gap-2 w-full mb-3">
                 <button class="flex items-center gap-2 text-left shrink-0" @click="toggleBasin(stateGroup.name, basin.name)">
