@@ -295,24 +295,24 @@ onMounted(() => {
       data: buildEndpointsFC(),
     })
 
-    // Glow layer
+    // Subtle glow — keeps same width ratio as admin centerline-glow
     map!.addLayer({
       id: 'basin-glow', type: 'line', source: 'basin-reaches',
       paint: {
         'line-color': classColorExpr(),
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 8, 14, 18],
-        'line-opacity': 0.18,
+        'line-width': 10,
+        'line-opacity': 0.12,
         'line-blur': 4,
       },
     })
 
-    // Main reach lines, colored by difficulty
+    // Main reach lines — matches admin centerline: solid, round-capped, difficulty color
     map!.addLayer({
       id: 'basin-lines', type: 'line', source: 'basin-reaches',
       paint: {
         'line-color': classColorExpr(),
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2.5, 14, 5],
-        'line-opacity': 1,
+        'line-width': 3.5,
+        'line-opacity': 0.92,
         'line-cap': 'round',
         'line-join': 'round',
       },
