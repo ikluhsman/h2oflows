@@ -28,9 +28,10 @@ export default defineNuxtConfig({
 
   // Exclude client-only / dynamic routes from static prerender
   routeRules: {
-    '/confirm':   { prerender: false },
-    '/dashboard': { prerender: false },
-    '/trips':     { prerender: false },
+    '/confirm':    { prerender: false },
+    '/dashboard':  { prerender: false },
+    '/trips':      { prerender: false },
+    '/basin/**':   { prerender: false, ssr: false },
   },
 
   // Register components by filename only, not directory/filename prefix.

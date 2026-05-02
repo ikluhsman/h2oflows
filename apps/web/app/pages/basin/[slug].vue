@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from '#app'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { cleanBasinName, slugifyBasin } from '~/utils/basin'
@@ -202,7 +202,14 @@ async function fetchAll() {
   }
 }
 
+// onMounted + nextTick: gives persistedstate plugin time to patch the store
+// before we read reachSlugs. The watch catches late hydration (e.g. server sync).
+onMounted(async () => {
+  await nextTick()
+  if (reachSlugs.value.length > 0 && mapData.value.length === 0) fetchAll()
+})
+
 watch(reachSlugs, (slugs) => {
   if (slugs.length > 0 && mapData.value.length === 0) fetchAll()
-}, { immediate: true })
+})
 </script>
