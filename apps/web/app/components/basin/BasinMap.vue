@@ -263,7 +263,7 @@ onMounted(() => {
       paint: {
         'line-color': '#6d9eeb',
         'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1, 14, 2.5],
-        'line-opacity': 0.8,
+        'line-opacity': 0.9,
       },
     })
     map!.addLayer({
@@ -271,7 +271,7 @@ onMounted(() => {
       paint: {
         'line-color': '#4a86d8',
         'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.5, 14, 3],
-        'line-opacity': 0.85,
+        'line-opacity': 0.9,
       },
     })
 
