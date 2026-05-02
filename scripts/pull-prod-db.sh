@@ -11,7 +11,7 @@
 set -euo pipefail
 
 PROD_HOST="ubuntu@52.88.134.14"
-PROD_DIR="/home/ubuntu/"          # project directory on the server
+PROD_DIR="/home/ubuntu/h2oflows"          # project directory on the server
 SSH_KEY="$HOME/.ssh/h2oflow_prod"
 LOCAL_PGURL="postgres://h2oflows:h2oflows@localhost:5432"
 DUMP="/tmp/h2oflows-prod-$(date +%Y%m%d-%H%M%S).dump"

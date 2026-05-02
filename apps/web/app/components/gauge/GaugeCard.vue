@@ -50,7 +50,7 @@
   <div
     v-else
     class="relative rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden"
-    :class="[cardClass, density === 'compact' ? 'p-2.5' : density === 'comfortable' ? 'p-3' : 'p-4']"
+    :class="[cardClass, density === 'compact' ? 'p-2.5' : 'p-3']"
     @click="emit('open')"
   >
     <!-- Compact: background sparkline along the bottom edge -->
@@ -99,47 +99,50 @@
 
     <!-- Current flow reading -->
     <div class="relative flex items-baseline gap-2 flex-wrap" :class="density === 'compact' ? 'mb-6' : 'mb-1.5'">
-      <span class="font-bold tabular-nums leading-none" :class="[cfsClass, density === 'compact' ? 'text-xl' : density === 'comfortable' ? 'text-2xl' : 'text-3xl']">
+      <span class="font-bold tabular-nums leading-none" :class="[cfsClass, density === 'compact' ? 'text-xl' : 'text-2xl']">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
       </span>
       <span class="text-xs text-gray-500">cfs</span>
       <!-- Trending arrow — shown in comfortable + full -->
       <TrendArrow v-if="currentCfs != null && density !== 'compact'" :gauge-id="gauge.id" class="text-lg" />
-      <!-- Badge inline with CFS on sm+ for comfortable mode only -->
+      <!-- Badge inline with CFS on sm+ for comfortable + full -->
       <span
-        v-if="density === 'comfortable' && (displayFlowStatus !== 'unknown' || displayFlowBand)"
+        v-if="(density === 'comfortable' || density === 'full') && (displayFlowStatus !== 'unknown' || displayFlowBand)"
         :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', statusBadgeClass]"
       >{{ statusLabel }}</span>
     </div>
 
-    <!-- Flow status badge — full: always shown; comfortable: mobile only -->
+    <!-- Flow status badge — mobile only (sm+ gets inline badge above) -->
     <div
       v-if="(displayFlowStatus !== 'unknown' || displayFlowBand) && density !== 'compact'"
-      class="flex items-center gap-2 mb-2"
-      :class="density === 'full' ? '' : 'sm:hidden'"
+      class="flex items-center gap-2 mb-2 sm:hidden"
     >
-      <span :class="['inline-flex items-center rounded-md font-medium', density === 'full' ? 'px-2 py-0.5 text-sm' : 'px-1.5 py-0.5 text-xs', statusBadgeClass]">{{ statusLabel }}</span>
+      <span :class="['inline-flex items-center rounded-md font-medium px-1.5 py-0.5 text-xs', statusBadgeClass]">{{ statusLabel }}</span>
       <span v-if="displayFlowBand === 'very_high'" class="relative flex h-2 w-2">
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
         <span class="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />
       </span>
     </div>
 
-    <!-- Sparkline — comfortable gets compact sparkline; full gets full sparkline -->
-    <GaugeSparkline v-if="density === 'comfortable'" :gauge-id="gauge.id" :flow-status="displayFlowStatus" :flow-band-label="displayFlowBand" :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug" compact class="mb-1" @latest-cfs="liveCfs = $event" @live-flow-band="liveFlowBand = $event" />
-    <GaugeSparkline v-else-if="density === 'full'" :gauge-id="gauge.id" :flow-status="displayFlowStatus" :flow-band-label="displayFlowBand" :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug" class="mb-2" @latest-cfs="liveCfs = $event" @live-flow-band="liveFlowBand = $event" />
+    <!-- Sparkline — comfortable + full both use compact sparkline -->
+    <GaugeSparkline v-if="density === 'comfortable' || density === 'full'" :gauge-id="gauge.id" :flow-status="displayFlowStatus" :flow-band-label="displayFlowBand" :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug" compact class="mb-1" @latest-cfs="liveCfs = $event" @live-flow-band="liveFlowBand = $event" />
 
-    <!-- Diurnal forecast — compact/comfortable: one-liner; full: richer summary -->
+    <!-- Diurnal forecast — compact/comfortable: one-liner; full: styled pill box -->
     <p v-if="diurnal.detected && diurnal.forecast && density !== 'full'" class="relative text-[10px] text-indigo-500 dark:text-indigo-400 truncate">
       {{ diurnal.forecast.label }}
     </p>
-    <div v-if="diurnal.detected && density === 'full'" class="flex items-center gap-2 text-[11px] text-indigo-500 dark:text-indigo-400 mt-0.5 mb-1">
-      <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-      <span class="truncate">
-        {{ diurnalPhaseLabel }}
+    <div
+      v-if="diurnal.detected && density === 'full'"
+      class="mt-1 mb-1 inline-flex items-start gap-1.5 rounded-md border border-indigo-200/70 dark:border-indigo-800/60 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-1 text-[11px] text-indigo-700 dark:text-indigo-300"
+    >
+      <svg class="w-3.5 h-3.5 shrink-0 mt-px text-indigo-500 dark:text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+      </svg>
+      <div class="min-w-0 leading-tight">
+        <span class="font-medium">{{ diurnalPhaseLabel }}</span>
         <template v-if="diurnal.forecast"> · {{ diurnal.forecast.label }}</template>
-        <template v-if="diurnal.swingPct != null"> · {{ diurnal.swingPct }}% swing</template>
-      </span>
+        <template v-if="diurnal.swingPct != null"><span class="opacity-75"> · {{ diurnal.swingPct }}% swing</span></template>
+      </div>
     </div>
 
     <!-- Last updated — full only, when no subtitle already shows source info -->

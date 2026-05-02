@@ -2,22 +2,10 @@
   <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
     <AppHeader />
 
-    <main class="max-w-5xl mx-auto px-4 py-6 pb-20 sm:pb-6 space-y-8">
-
-      <!-- Empty state -->
-      <div v-if="store.gauges.length === 0" class="mt-20 flex flex-col items-center gap-4 text-center">
-        <div class="text-5xl">🌊</div>
-        <h2 class="text-xl font-semibold">No reaches yet</h2>
-        <p class="text-gray-500 max-w-sm text-sm">
-          Search for a reach or gauge and add it to your dashboard.
-        </p>
-        <UButton color="primary" @click="searchOpen = true">Find a gauge</UButton>
-      </div>
-
-      <!-- Reaches grouped by basin → river -->
-      <template v-else>
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-2">
+    <!-- Sticky controls bar — only shown when gauges exist -->
+    <div v-if="store.gauges.length > 0" class="sticky top-[41px] z-10 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+      <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
           <!-- View mode toggle -->
           <div class="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
             <button
@@ -29,22 +17,19 @@
               :title="m.label"
               @click="setViewMode(m.key)"
             >
-              <!-- List icon -->
               <svg v-if="m.key === 'list'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
                 <line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/>
               </svg>
-              <!-- Comfortable icon: 2x2 grid -->
               <svg v-else-if="m.key === 'comfortable'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/>
                 <rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/>
               </svg>
-              <!-- Full icon -->
               <svg v-else class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="2" y="2" width="12" height="4" rx="1"/><rect x="2" y="7" width="12" height="3" rx="1"/><rect x="2" y="11" width="12" height="3" rx="1"/>
               </svg>
             </button>
           </div>
-          <!-- Group by gauge toggle — only shown when shared gauges exist -->
+          <!-- Group by gauge toggle -->
           <button
             v-if="hasSharedGauges"
             class="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors"
@@ -64,18 +49,34 @@
               <rect x="10" y="5" width="5" height="6" rx="1"/>
               <line x1="6.5" y1="6.5" x2="9.5" y2="9.5"/>
             </svg>
-            <span class="hidden sm:inline">Group gauge</span>
+            <span class="hidden sm:inline">Group</span>
           </button>
           <!-- Expand / Collapse all -->
           <button
             class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-medium transition-colors whitespace-nowrap"
             @click="toggleAllSections"
           >{{ allExpanded ? 'Collapse all' : 'Expand all' }}</button>
-          </div>
-          <UButton size="xs" color="neutral" variant="outline" icon="i-heroicons-plus" @click="searchOpen = true">
-            Add gauge
-          </UButton>
         </div>
+        <UButton size="xs" color="neutral" variant="outline" icon="i-heroicons-plus" @click="searchOpen = true">
+          Add gauge
+        </UButton>
+      </div>
+    </div>
+
+    <main class="max-w-5xl mx-auto px-4 py-6 pb-20 sm:pb-6 space-y-8">
+
+      <!-- Empty state -->
+      <div v-if="store.gauges.length === 0" class="mt-20 flex flex-col items-center gap-4 text-center">
+        <div class="text-5xl">🌊</div>
+        <h2 class="text-xl font-semibold">No reaches yet</h2>
+        <p class="text-gray-500 max-w-sm text-sm">
+          Search for a reach or gauge and add it to your dashboard.
+        </p>
+        <UButton color="primary" @click="searchOpen = true">Find a gauge</UButton>
+      </div>
+
+      <!-- Reaches grouped by basin → river -->
+      <template v-else>
 
         <section v-for="stateGroup in byStateTree" :key="stateGroup.name" class="mb-4">
           <!-- State header: large, collapsible, h1+hr style -->
@@ -124,7 +125,7 @@
                   <!-- Cards wrapper -->
                   <template v-if="groupByGauge">
                     <template v-for="split in [splitReachGroups(river.reaches)]" :key="'split'">
-                      <div v-if="split.gaugeGroups.length > 0" :class="viewMode === 'list' ? 'space-y-1.5' : 'grid sm:grid-cols-2 gap-2'">
+                      <div v-if="split.gaugeGroups.length > 0" :class="viewMode === 'list' ? 'space-y-1.5' : cardGridClass">
                         <GaugeReachGroup
                           v-for="group in split.gaugeGroups"
                           :key="group.lead.id"
@@ -171,8 +172,8 @@
                   <div
                     v-for="g in basin.standaloneGauges"
                     :key="g.id"
-                    class="rounded-2xl border border-gray-200 dark:border-gray-700/60 bg-white dark:bg-gray-900 shadow-sm cursor-pointer active:opacity-80 transition-opacity"
-                    :class="viewMode === 'list' ? 'px-3 py-2.5' : 'px-4 py-3'"
+                    class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+                    :class="viewMode === 'list' ? 'px-3 py-1.5' : viewMode === 'comfortable' ? 'px-3 py-2.5' : 'px-4 py-3'"
                     @click="openGauge(g, 'gauge')"
                   >
                     <div class="flex items-center gap-3">
@@ -187,7 +188,7 @@
                       <div class="w-24 shrink-0 hidden sm:block h-5 opacity-50 pointer-events-none">
                         <GaugeSparkline :gauge-id="g.id" flow-status="unknown" color="#3b82f6" compact />
                       </div>
-                      <span :class="viewMode === 'list' ? 'text-sm font-bold tabular-nums text-gray-900 dark:text-white' : 'text-[22px] font-bold tabular-nums text-gray-900 dark:text-white leading-none'">
+                      <span :class="viewMode === 'list' ? 'text-sm font-bold tabular-nums text-gray-900 dark:text-white' : 'text-2xl font-bold tabular-nums text-gray-900 dark:text-white leading-none'">
                         {{ g.currentCfs != null ? g.currentCfs.toLocaleString() : '—' }}
                       </span>
                       <span class="text-xs text-gray-400">cfs</span>
@@ -453,10 +454,12 @@ function splitReachGroups(reaches: WatchedGauge[]): SplitGroups {
   return { gaugeGroups, ungrouped }
 }
 
-// Container class: 2-col grid for comfortable + full
+const cardGridClass = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2'
+
+// Container class: multi-col grid for comfortable + full
 const reachContainerClass = computed(() =>
   viewMode.value === 'comfortable' || viewMode.value === 'full'
-    ? 'grid sm:grid-cols-2 gap-2 mt-1'
+    ? `${cardGridClass} mt-1`
     : 'space-y-2 mt-1'
 )
 
