@@ -151,6 +151,7 @@ func main() {
 
 		r.Get("/reaches/map/all", reaches.MapAll)
 		r.Get("/reaches/map", reaches.Map)
+		r.Get("/reaches/basin/{slug}/map", reaches.BasinMap)
 		r.Get("/reaches", reaches.List)
 		r.Get("/reaches/{slug}", reaches.Get)
 		r.Get("/reaches/{slug}/conditions", reaches.GetConditions)
