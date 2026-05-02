@@ -114,13 +114,12 @@
                   title="View basin map"
                 >
                   <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="8" y1="15" x2="8" y2="9"/>
-                    <line x1="8" y1="9" x2="3" y2="4"/>
-                    <line x1="8" y1="9" x2="13" y2="4"/>
-                    <line x1="3" y1="4" x2="1" y2="2"/>
-                    <line x1="3" y1="4" x2="5" y2="2"/>
-                    <line x1="13" y1="4" x2="11" y2="2"/>
-                    <line x1="13" y1="4" x2="15" y2="2"/>
+                    <circle cx="8" cy="3" r="1.5"/>
+                    <circle cx="4" cy="13" r="1.5"/>
+                    <circle cx="12" cy="13" r="1.5"/>
+                    <line x1="8" y1="4.5" x2="8" y2="7"/>
+                    <path d="M8 7 Q4 9 4 11.5"/>
+                    <path d="M8 7 Q12 9 12 11.5"/>
                   </svg>
                 </NuxtLink>
                 <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700/60" />
