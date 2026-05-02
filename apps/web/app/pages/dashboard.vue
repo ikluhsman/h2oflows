@@ -3,7 +3,7 @@
     <AppHeader />
 
     <!-- Sticky controls bar — only shown when gauges exist -->
-    <div v-if="store.gauges.length > 0" class="sticky top-[41px] z-10 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+    <div v-if="store.gauges.length > 0" class="sticky top-[41px] z-10 overflow-hidden bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
       <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <!-- View mode toggle -->
@@ -137,23 +137,49 @@
                           @remove-group="group.all.forEach(g => removeAndSync(g.id, g.contextReachSlug))"
                         />
                       </div>
-                      <DashboardReachGroup
-                        v-if="split.ungrouped.length > 0"
-                        :reaches="split.ungrouped"
-                        :density="viewMode"
-                        :class="split.gaugeGroups.length > 0 ? 'mt-3' : ''"
-                        @open="(g, mode) => openGauge(g, mode)"
-                        @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
-                      />
+                      <!-- Ungrouped: list = one card; card modes = individual cards in grid -->
+                      <template v-if="split.ungrouped.length > 0">
+                        <DashboardReachGroup
+                          v-if="viewMode === 'list'"
+                          :reaches="split.ungrouped"
+                          density="list"
+                          :class="split.gaugeGroups.length > 0 ? 'mt-3' : ''"
+                          @open="(g, mode) => openGauge(g, mode)"
+                          @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
+                        />
+                        <div v-else :class="[cardGridClass, split.gaugeGroups.length > 0 ? 'mt-3' : '']">
+                          <DashboardReachGroup
+                            v-for="reach in split.ungrouped"
+                            :key="`${reach.id}::${reach.contextReachSlug}`"
+                            :reaches="[reach]"
+                            :density="viewMode"
+                            @open="(g, mode) => openGauge(g, mode)"
+                            @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
+                          />
+                        </div>
+                      </template>
                     </template>
                   </template>
                   <template v-else>
+                    <!-- List: all reaches in one grouped card -->
                     <DashboardReachGroup
+                      v-if="viewMode === 'list'"
                       :reaches="river.reaches"
-                      :density="viewMode"
+                      density="list"
                       @open="(g, mode) => openGauge(g, mode)"
                       @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
                     />
+                    <!-- Card modes: each reach = own card in grid -->
+                    <div v-else :class="cardGridClass">
+                      <DashboardReachGroup
+                        v-for="reach in river.reaches"
+                        :key="`${reach.id}::${reach.contextReachSlug}`"
+                        :reaches="[reach]"
+                        :density="viewMode"
+                        @open="(g, mode) => openGauge(g, mode)"
+                        @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
+                      />
+                    </div>
                   </template>
                 </template><!-- end v-for river -->
               </div>
@@ -454,7 +480,7 @@ function splitReachGroups(reaches: WatchedGauge[]): SplitGroups {
   return { gaugeGroups, ungrouped }
 }
 
-const cardGridClass = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2'
+const cardGridClass = 'grid grid-cols-1 sm:grid-cols-2 gap-2'
 
 // Container class: multi-col grid for comfortable + full
 const reachContainerClass = computed(() =>
