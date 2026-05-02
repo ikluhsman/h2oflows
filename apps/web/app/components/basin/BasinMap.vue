@@ -244,17 +244,17 @@ onMounted(() => {
     map!.addLayer({
       id: 'basin-tributaries', type: 'line', source: 'basin-tributaries',
       paint: {
-        'line-color': '#3b82f6',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1, 14, 2.5],
-        'line-opacity': 0.55,
+        'line-color': '#60a5fa',
+        'line-width': 2.5,
+        'line-opacity': 0.8,
       },
     })
     map!.addLayer({
       id: 'basin-mainstem', type: 'line', source: 'basin-mainstem',
       paint: {
-        'line-color': '#3b82f6',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.5, 14, 3.5],
-        'line-opacity': 0.7,
+        'line-color': '#0d9488',
+        'line-width': 3,
+        'line-opacity': 0.9,
       },
     })
 
@@ -297,15 +297,15 @@ onMounted(() => {
       paint: { 'line-color': 'transparent', 'line-width': 14, 'line-opacity': 0 },
     })
 
-    // Start/end turquoise circles
+    // Start (green) / end (red) circles — matches admin reach map
     map!.addLayer({
       id: 'basin-endpoints', type: 'circle', source: 'basin-endpoints',
       paint: {
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 3, 14, 6],
-        'circle-color': '#14b8a6',
-        'circle-stroke-width': 2,
+        'circle-radius': 6,
+        'circle-color': ['match', ['get', 'kind'], 'start', '#16a34a', '#dc2626'],
+        'circle-stroke-width': 1.5,
         'circle-stroke-color': '#ffffff',
-        'circle-opacity': 0.95,
+        'circle-opacity': 1,
       },
     })
 
