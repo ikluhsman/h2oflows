@@ -54,6 +54,40 @@
           </ClientOnly>
         </section>
 
+        <!-- Reach list -->
+        <section class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden">
+          <div
+            v-for="reach in mapData"
+            :key="reach.slug"
+            class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors cursor-pointer"
+            @click="basinMapRef?.flyToReach(reach.slug)"
+          >
+            <span
+              class="w-2 h-2 rounded-full shrink-0"
+              :style="{ background: classColor(reach.class_max ?? 0) }"
+            />
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                {{ reach.common_name ?? reach.name }}
+              </p>
+              <p v-if="reach.river_name" class="text-xs text-gray-400 truncate">{{ reach.river_name }}</p>
+            </div>
+            <span class="text-xs font-mono text-gray-400 shrink-0">{{ classRange(reach.class_min, reach.class_max) || '—' }}</span>
+            <span
+              v-if="reach.flow_status !== 'unknown'"
+              class="text-xs px-1.5 py-0.5 rounded font-medium shrink-0"
+              :class="{
+                'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300': reach.flow_status === 'runnable',
+                'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300': reach.flow_status === 'caution',
+                'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300': reach.flow_status === 'flood',
+              }"
+            >{{ reach.flow_status }}</span>
+          </div>
+          <div v-if="mapData.length === 0 && reachSlugs.length > 0" class="px-4 py-6 text-center text-sm text-gray-400">
+            Loading reaches…
+          </div>
+        </section>
+
         <!-- D3 River Tree placeholder — wired in PR 6 -->
         <section class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
           <div class="flex items-center gap-2 mb-1">
@@ -76,6 +110,7 @@ import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from '#app'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { cleanBasinName, slugifyBasin } from '~/utils/basin'
+import { classColor, classRange } from '~/utils/classRating'
 import type { BasinReach, BasinNetwork } from '~/components/basin/BasinMap.vue'
 
 definePageMeta({ ssr: false })
