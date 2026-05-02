@@ -47,7 +47,17 @@ export interface BasinReach {
   flow_status: string
 }
 
-const props = defineProps<{ reaches: BasinReach[] }>()
+export interface BasinNetwork {
+  tributaries: { type: string; features: any[] }
+  mainstem:    { type: string; features: any[] }
+}
+
+const EMPTY_FC = { type: 'FeatureCollection', features: [] }
+
+const props = defineProps<{
+  reaches: BasinReach[]
+  network?: BasinNetwork | null
+}>()
 const emit  = defineEmits<{ (e: 'select', slug: string): void }>()
 
 const container = ref<HTMLDivElement>()
@@ -155,8 +165,10 @@ function fitToReaches() {
 
 function updateSources() {
   if (!map) return
-  ;(map.getSource('basin-reaches') as maplibregl.GeoJSONSource | undefined)?.setData(buildReachFC())
-  ;(map.getSource('basin-endpoints') as maplibregl.GeoJSONSource | undefined)?.setData(buildEndpointsFC())
+  ;(map.getSource('basin-reaches')      as maplibregl.GeoJSONSource | undefined)?.setData(buildReachFC())
+  ;(map.getSource('basin-endpoints')    as maplibregl.GeoJSONSource | undefined)?.setData(buildEndpointsFC())
+  ;(map.getSource('basin-tributaries')  as maplibregl.GeoJSONSource | undefined)?.setData(props.network?.tributaries ?? EMPTY_FC)
+  ;(map.getSource('basin-mainstem')     as maplibregl.GeoJSONSource | undefined)?.setData(props.network?.mainstem    ?? EMPTY_FC)
 }
 
 // Public: called by the parent page when the D3 tree node is clicked
@@ -225,6 +237,27 @@ onMounted(() => {
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
 
   map.on('load', () => {
+    // Network sources — added before reach layers so they render underneath
+    map!.addSource('basin-tributaries', { type: 'geojson', data: props.network?.tributaries ?? EMPTY_FC })
+    map!.addSource('basin-mainstem',    { type: 'geojson', data: props.network?.mainstem    ?? EMPTY_FC })
+
+    map!.addLayer({
+      id: 'basin-tributaries', type: 'line', source: 'basin-tributaries',
+      paint: {
+        'line-color': '#3b82f6',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1, 14, 2.5],
+        'line-opacity': 0.55,
+      },
+    })
+    map!.addLayer({
+      id: 'basin-mainstem', type: 'line', source: 'basin-mainstem',
+      paint: {
+        'line-color': '#3b82f6',
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.5, 14, 3.5],
+        'line-opacity': 0.7,
+      },
+    })
+
     map!.addSource('basin-reaches', {
       type: 'geojson',
       data: buildReachFC(),
@@ -317,6 +350,10 @@ watch(() => props.reaches, () => {
   updateSources()
   fitToReaches()
 }, { deep: true })
+
+watch(() => props.network, () => {
+  updateSources()
+})
 </script>
 
 <style>
