@@ -88,16 +88,22 @@
           </div>
         </section>
 
-        <!-- D3 River Tree placeholder — wired in PR 6 -->
-        <section class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-6">
-          <div class="flex items-center gap-2 mb-1">
+        <!-- D3 River Tree -->
+        <section class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+          <div class="flex items-center gap-2 mb-3">
             <svg class="w-4 h-4 text-gray-400" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="8" cy="3" r="1.5"/><circle cx="4" cy="13" r="1.5"/><circle cx="12" cy="13" r="1.5"/>
               <line x1="8" y1="4.5" x2="8" y2="7"/><path d="M8 7 Q4 9 4 11.5"/><path d="M8 7 Q12 9 12 11.5"/>
             </svg>
             <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">River Tree</h2>
           </div>
-          <p class="text-sm text-gray-400 italic">Coming soon — dendritic reach tree.</p>
+          <ClientOnly>
+            <BasinTree
+              :reaches="mapData"
+              :selected-slug="selectedSlug"
+              @select="onTreeSelect"
+            />
+          </ClientOnly>
         </section>
       </template>
 
@@ -126,6 +132,11 @@ const networkData  = ref<BasinNetwork | null>(null)
 const nldiError    = ref<string | null>(null)
 const selectedSlug = ref<string | null>(null)
 const basinMapRef  = ref<{ flyToReach: (s: string) => void } | null>(null)
+
+function onTreeSelect(slug: string) {
+  selectedSlug.value = slug
+  basinMapRef.value?.flyToReach(slug)
+}
 
 function gaugeBasinSlug(g: ReturnType<typeof store.gauges>[number]): string | null {
   const name = cleanBasinName(g.contextReachBasinGroup)
