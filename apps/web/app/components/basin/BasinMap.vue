@@ -125,6 +125,8 @@ function buildReachFC(): GeoJSON.FeatureCollection {
 
 function buildEndpointsFC(): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = []
+
+  // All start points (green)
   for (const r of props.reaches) {
     if (r.start_point) {
       features.push({
@@ -133,14 +135,24 @@ function buildEndpointsFC(): GeoJSON.FeatureCollection {
         properties: { slug: r.slug, kind: 'start', name: r.name },
       })
     }
-    if (r.end_point) {
-      features.push({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: r.end_point },
-        properties: { slug: r.slug, kind: 'end', name: r.name },
-      })
+  }
+
+  // Only the most-downstream end point (max longitude = furthest downstream)
+  let mostDownstream: BasinReach | null = null
+  for (const r of props.reaches) {
+    if (!r.end_point) continue
+    if (!mostDownstream || !mostDownstream.end_point || r.end_point[0] > mostDownstream.end_point[0]) {
+      mostDownstream = r
     }
   }
+  if (mostDownstream?.end_point) {
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: mostDownstream.end_point },
+      properties: { slug: mostDownstream.slug, kind: 'end', name: mostDownstream.name },
+    })
+  }
+
   return { type: 'FeatureCollection', features }
 }
 
@@ -245,16 +257,16 @@ onMounted(() => {
       id: 'basin-tributaries', type: 'line', source: 'basin-tributaries',
       paint: {
         'line-color': '#60a5fa',
-        'line-width': 2.5,
-        'line-opacity': 0.8,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.5, 14, 3],
+        'line-opacity': 1,
       },
     })
     map!.addLayer({
       id: 'basin-mainstem', type: 'line', source: 'basin-mainstem',
       paint: {
         'line-color': '#0d9488',
-        'line-width': 3,
-        'line-opacity': 0.9,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 2, 14, 4],
+        'line-opacity': 1,
       },
     })
 

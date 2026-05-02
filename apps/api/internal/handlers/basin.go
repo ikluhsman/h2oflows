@@ -146,9 +146,8 @@ func (h *ReachHandler) BasinMap(w http.ResponseWriter, r *http.Request) {
 // ── BasinNetwork ──────────────────────────────────────────────────────────────
 
 type networkCacheEntry struct {
-	tributaries nldi.Collection
-	mainstem    nldi.Collection
-	cachedAt    time.Time
+	upstream nldi.Collection // UT result for one comid
+	cachedAt time.Time
 }
 
 var (
@@ -165,11 +164,12 @@ type basinNetworkResponse struct {
 
 // BasinNetwork handles GET /api/v1/reaches/basin/{slug}/network
 //
-// For each reach slug in ?slugs=, looks up anchor_comid and fetches upstream
-// tributaries (UT) and downstream mainstem (DM) from NLDI within ?distance= km
-// (default 50, clamped 1–200). Results are cached per (comid, distance) for 24 h.
+// For each reach slug in ?slugs=, fetches UT (upstream tributaries) for each
+// start_comid → shown as blue tributaries, and UT for each end_comid → shown as
+// teal mainstem. This shows all flowlines contributing to each reach section.
+// Results are cached per (comid, distance) for 24 h.
 //
-// Flowlines whose nhdplus_comid matches a dashboard reach's anchor_comid are
+// Flowlines whose nhdplus_comid matches a dashboard reach start/end comid are
 // stripped so the overlay doesn't repaint over the colored reach lines.
 //
 // On NLDI downtime, returns 200 with empty collections and nldi_available=false
@@ -199,9 +199,9 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Resolve anchor_comids from DB.
+	// Resolve start_comid and end_comid from DB.
 	rows, err := h.db.Query(r.Context(),
-		`SELECT slug, anchor_comid FROM reaches WHERE slug = ANY($1) AND anchor_comid IS NOT NULL`,
+		`SELECT start_comid, end_comid FROM reaches WHERE slug = ANY($1) AND (start_comid IS NOT NULL OR end_comid IS NOT NULL)`,
 		slugs,
 	)
 	if err != nil {
@@ -210,32 +210,36 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rows.Close()
 
-	type slugComID struct{ slug, comid string }
-	var pairs []slugComID
-	dashboardComIDs := make(map[string]struct{}) // for stripping overlap
+	dashboardComIDs := make(map[string]struct{})
+	seenStart := make(map[string]struct{})
+	seenEnd := make(map[string]struct{})
+	var startComIDs, endComIDs []string
+
 	for rows.Next() {
-		var sc slugComID
-		if err := rows.Scan(&sc.slug, &sc.comid); err != nil {
+		var startComID, endComID *string
+		if err := rows.Scan(&startComID, &endComID); err != nil {
 			continue
 		}
-		pairs = append(pairs, sc)
-		dashboardComIDs[sc.comid] = struct{}{}
+		if startComID != nil {
+			dashboardComIDs[*startComID] = struct{}{}
+			if _, ok := seenStart[*startComID]; !ok {
+				seenStart[*startComID] = struct{}{}
+				startComIDs = append(startComIDs, *startComID)
+			}
+		}
+		if endComID != nil {
+			dashboardComIDs[*endComID] = struct{}{}
+			if _, ok := seenEnd[*endComID]; !ok {
+				seenEnd[*endComID] = struct{}{}
+				endComIDs = append(endComIDs, *endComID)
+			}
+		}
 	}
 	_ = rows.Err()
 
-	if len(pairs) == 0 {
+	if len(startComIDs) == 0 && len(endComIDs) == 0 {
 		jsonResponse(w, http.StatusOK, emptyOK)
 		return
-	}
-
-	// Deduplicate comIDs (multiple slugs may share one anchor).
-	seen := make(map[string]struct{})
-	var comIDs []string
-	for _, p := range pairs {
-		if _, ok := seen[p.comid]; !ok {
-			seen[p.comid] = struct{}{}
-			comIDs = append(comIDs, p.comid)
-		}
 	}
 
 	c := nldi.New()
@@ -247,45 +251,33 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 		nldiErr        error
 	)
 
-	for _, comid := range comIDs {
+	fetchUT := func(comid string, dest *[]nldi.Feature) {
 		key := cacheKey(comid)
-
-		// Check cache.
 		if v, ok := networkCache.Load(key); ok {
 			entry := v.(networkCacheEntry)
 			if time.Since(entry.cachedAt) < networkCacheTTL {
-				allTributaries = append(allTributaries, entry.tributaries.Features...)
-				allMainstem = append(allMainstem, entry.mainstem.Features...)
-				continue
+				*dest = append(*dest, entry.upstream.Features...)
+				return
 			}
 			networkCache.Delete(key)
 		}
-
-		// Fetch from NLDI. Errors are soft — log and continue.
 		ut, errUT := c.UpstreamFlowlines(r.Context(), comid, distanceKm)
-		dm, errDM := c.DownstreamFlowlines(r.Context(), comid, distanceKm)
-
-		if errUT != nil || errDM != nil {
-			log.Printf("basin network: comid %s: ut=%v dm=%v", comid, errUT, errDM)
+		if errUT != nil {
+			log.Printf("basin network: UT comid %s: %v", comid, errUT)
 			if nldiErr == nil {
-				if errUT != nil {
-					nldiErr = errUT
-				} else {
-					nldiErr = errDM
-				}
+				nldiErr = errUT
 			}
-			continue
+			return
 		}
+		networkCache.Store(key, networkCacheEntry{upstream: *ut, cachedAt: time.Now()})
+		*dest = append(*dest, ut.Features...)
+	}
 
-		entry := networkCacheEntry{
-			tributaries: *ut,
-			mainstem:    *dm,
-			cachedAt:    time.Now(),
-		}
-		networkCache.Store(key, entry)
-
-		allTributaries = append(allTributaries, ut.Features...)
-		allMainstem = append(allMainstem, dm.Features...)
+	for _, comid := range startComIDs {
+		fetchUT(comid, &allTributaries)
+	}
+	for _, comid := range endComIDs {
+		fetchUT(comid, &allMainstem)
 	}
 
 	// Deduplicate and strip flowlines that overlap dashboard reaches.
