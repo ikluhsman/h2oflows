@@ -1,17 +1,18 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/h2oflow/h2oflow/apps/api/internal/nldi"
+	"golang.org/x/sync/errgroup"
 )
 
 // ── BasinMap ──────────────────────────────────────────────────────────────────
@@ -147,40 +148,54 @@ func (h *ReachHandler) BasinMap(w http.ResponseWriter, r *http.Request) {
 // ── BasinNetwork ──────────────────────────────────────────────────────────────
 
 type networkCacheEntry struct {
-	upstream nldi.Collection // UT result for one comid
+	upstream nldi.Collection
+	cachedAt time.Time
+}
+
+type dmCacheEntry struct {
+	sampled  []string // sampled COMIDs along DM
 	cachedAt time.Time
 }
 
 var (
 	networkCache    sync.Map
 	networkCacheTTL = 24 * time.Hour
+	dmCache         sync.Map
+	dmCacheTTL      = 7 * 24 * time.Hour
 )
 
 type basinNetworkResponse struct {
 	Tributaries   nldi.Collection `json:"tributaries"`
-	Mainstem      nldi.Collection `json:"mainstem"`
+	Gauges        nldi.Collection `json:"gauges"`
 	NLDIAvailable bool            `json:"nldi_available"`
 	NLDIError     string          `json:"nldi_error,omitempty"`
 }
 
+const (
+	tributaryKm     = 10  // UT radius for direct tributary flowlines
+	gaugeKm         = 25  // UT radius for upstream gauges (put-in anchors only)
+	longReachKm     = 30  // threshold to enable DM mainstem sampling
+	sampleSpacingKm = 20  // one tributary anchor per ~20 km
+	dmBufferKm      = 25  // overshoot beyond reach length for DM request
+	dmMaxKm         = 600 // hard cap on a single DM call
+	maxAnchorsTotal = 40  // safety cap on total NLDI fanout per request
+)
+
 // BasinNetwork handles GET /api/v1/reaches/basin/{slug}/network
 //
-// For each reach slug in ?slugs=, fetches UT (upstream tributaries) for each
-// start_comid → shown as blue tributaries, and UT for each end_comid → shown as
-// teal mainstem. This shows all flowlines contributing to each reach section.
-// Results are cached per (comid, distance) for 24 h.
+// For each reach's start_comid it fetches:
+//   - Short UT flowlines (10 km) — direct tributaries near the put-in
+//   - UT gauge sites (25 km) — USGS gauges near the put-in
 //
-// Flowlines whose nhdplus_comid matches a dashboard reach start/end comid are
-// stripped so the overlay doesn't repaint over the colored reach lines.
+// For long reaches (≥ 30 km centerline) it also walks the downstream
+// mainstem (DM) from start_comid and samples an additional tributary
+// anchor every ~20 km, giving full tributary coverage along the entire run.
 //
-// On NLDI downtime, returns 200 with empty collections and nldi_available=false
-// so the map still renders without the network halo.
+// Results are cached per comid (UT: 24 h, DM: 7 d). On NLDI downtime, returns
+// 200 with empty collections and nldi_available=false.
 func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
-	emptyOK := basinNetworkResponse{
-		Tributaries:   nldi.Collection{Type: "FeatureCollection", Features: []nldi.Feature{}},
-		Mainstem:      nldi.Collection{Type: "FeatureCollection", Features: []nldi.Feature{}},
-		NLDIAvailable: true,
-	}
+	empty := nldi.Collection{Type: "FeatureCollection", Features: []nldi.Feature{}}
+	emptyOK := basinNetworkResponse{Tributaries: empty, Gauges: empty, NLDIAvailable: true}
 
 	slugs := parseSlugsParam(r.URL.Query().Get("slugs"))
 	if len(slugs) == 0 {
@@ -188,121 +203,206 @@ func (h *ReachHandler) BasinNetwork(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve start_comid, end_comid, and reach length from DB.
-	// Length drives the NLDI search distance: 40km base × 1.75 per 20km of reach.
-	rows, err := h.db.Query(r.Context(),
-		`SELECT start_comid, end_comid,
-		        COALESCE(ST_Length(centerline::geography)/1000, 0) AS length_km
-		 FROM reaches
-		 WHERE slug = ANY($1)
-		   AND (start_comid IS NOT NULL OR end_comid IS NOT NULL)`,
-		slugs,
-	)
+	type reachAnchor struct {
+		startCID string
+		lengthKm float64
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT
+			start_comid,
+			COALESCE(ST_Length(centerline::geography) / 1000.0, 0) AS length_km
+		FROM reaches
+		WHERE slug = ANY($1) AND start_comid IS NOT NULL
+	`, slugs)
 	if err != nil {
 		jsonResponse(w, http.StatusOK, emptyOK)
 		return
 	}
 	defer rows.Close()
 
-	seenStart := make(map[string]struct{})
-	seenEnd := make(map[string]struct{})
-	var startComIDs, endComIDs []string
-	var maxLengthKm float64
-
+	seenCID := make(map[string]float64) // comid → max length_km seen
 	for rows.Next() {
-		var startComID, endComID *string
-		var lengthKm float64
-		if err := rows.Scan(&startComID, &endComID, &lengthKm); err != nil {
+		var ra reachAnchor
+		if err := rows.Scan(&ra.startCID, &ra.lengthKm); err != nil {
 			continue
 		}
-		if lengthKm > maxLengthKm {
-			maxLengthKm = lengthKm
-		}
-		if startComID != nil {
-			if _, ok := seenStart[*startComID]; !ok {
-				seenStart[*startComID] = struct{}{}
-				startComIDs = append(startComIDs, *startComID)
-			}
-		}
-		if endComID != nil {
-			if _, ok := seenEnd[*endComID]; !ok {
-				seenEnd[*endComID] = struct{}{}
-				endComIDs = append(endComIDs, *endComID)
-			}
+		if prev, ok := seenCID[ra.startCID]; !ok || ra.lengthKm > prev {
+			seenCID[ra.startCID] = ra.lengthKm
 		}
 	}
 	_ = rows.Err()
 
-	if len(startComIDs) == 0 && len(endComIDs) == 0 {
+	if len(seenCID) == 0 {
 		jsonResponse(w, http.StatusOK, emptyOK)
 		return
 	}
 
-	// Auto-compute NLDI search distance from longest reach.
-	// Steps of 20 km each multiply the base by 1.75:
-	//   0–19 km → 40 km,  20–39 km → 70 km,  40–59 km → 123 km,  60+ km → 200 km (cap)
-	steps := int(maxLengthKm / 20.0)
-	distanceKm := int(math.Min(200, math.Max(20, math.Round(40*math.Pow(1.75, float64(steps))))))
-	// Allow explicit override for testing (?distance=N).
-	if d := r.URL.Query().Get("distance"); d != "" {
-		if v, err := strconv.Atoi(d); err == nil && v >= 1 && v <= 200 {
-			distanceKm = v
-		}
-	}
-
 	c := nldi.New()
-	cacheKey := func(comid string) string { return fmt.Sprintf("%s|%d", comid, distanceKm) }
 
-	var (
-		allTributaries []nldi.Feature
-		allMainstem    []nldi.Feature
-		nldiErr        error
-	)
+	// Build full anchor list: put-in COMIDs + mid-reach samples for long reaches.
+	type anchor struct {
+		comid   string
+		isPutIn bool
+	}
+	var anchors []anchor
+	seenAnchor := make(map[string]struct{})
 
-	fetchUT := func(comid string, dest *[]nldi.Feature) {
-		key := cacheKey(comid)
-		if v, ok := networkCache.Load(key); ok {
-			entry := v.(networkCacheEntry)
-			if time.Since(entry.cachedAt) < networkCacheTTL {
-				*dest = append(*dest, entry.upstream.Features...)
-				return
-			}
-			networkCache.Delete(key)
-		}
-		ut, errUT := c.UpstreamFlowlines(r.Context(), comid, distanceKm)
-		if errUT != nil {
-			log.Printf("basin network: UT comid %s: %v", comid, errUT)
-			if nldiErr == nil {
-				nldiErr = errUT
-			}
+	addAnchor := func(comid string, isPutIn bool) {
+		if _, dup := seenAnchor[comid]; dup {
 			return
 		}
-		networkCache.Store(key, networkCacheEntry{upstream: *ut, cachedAt: time.Now()})
-		*dest = append(*dest, ut.Features...)
+		seenAnchor[comid] = struct{}{}
+		anchors = append(anchors, anchor{comid, isPutIn})
 	}
 
-	for _, comid := range startComIDs {
-		fetchUT(comid, &allTributaries)
-	}
-	for _, comid := range endComIDs {
-		fetchUT(comid, &allMainstem)
+	for comid, lengthKm := range seenCID {
+		addAnchor(comid, true)
+		if lengthKm >= longReachKm {
+			for _, mid := range sampledAnchors(r.Context(), c, comid, lengthKm) {
+				addAnchor(mid, false)
+			}
+		}
 	}
 
-	// Deduplicate and strip flowlines that overlap dashboard reaches.
-	// Deduplicate but keep all flowlines — reach centerlines paint on top in the map.
-	tributaries := dedupeFlowlines(allTributaries)
-	mainstem := dedupeFlowlines(allMainstem)
+	var (
+		mu           sync.Mutex
+		allFlowlines []nldi.Feature
+		allGauges    []nldi.Feature
+		nldiErr      error
+	)
+
+	g, gctx := errgroup.WithContext(r.Context())
+	g.SetLimit(8)
+
+	for _, a := range anchors {
+		a := a
+		g.Go(func() error {
+			if fl := cachedFlowlines(gctx, c, a.comid); fl != nil {
+				mu.Lock()
+				allFlowlines = append(allFlowlines, fl...)
+				mu.Unlock()
+			} else {
+				mu.Lock()
+				if nldiErr == nil {
+					nldiErr = fmt.Errorf("flowlines unavailable for %s", a.comid)
+				}
+				mu.Unlock()
+			}
+			if a.isPutIn {
+				if gs := cachedGauges(gctx, c, a.comid); gs != nil {
+					mu.Lock()
+					allGauges = append(allGauges, gs...)
+					mu.Unlock()
+				}
+			}
+			return nil
+		})
+	}
+	_ = g.Wait()
 
 	resp := basinNetworkResponse{
-		Tributaries:   nldi.Collection{Type: "FeatureCollection", Features: tributaries},
-		Mainstem:      nldi.Collection{Type: "FeatureCollection", Features: mainstem},
+		Tributaries:   nldi.Collection{Type: "FeatureCollection", Features: dedupeFlowlines(allFlowlines)},
+		Gauges:        nldi.Collection{Type: "FeatureCollection", Features: dedupeByIdentifier(allGauges)},
 		NLDIAvailable: nldiErr == nil,
 	}
 	if nldiErr != nil {
-		resp.NLDIError = "River network data is temporarily unavailable (NLDI). The map will display your dashboard reaches without the upstream/downstream overlay."
+		resp.NLDIError = "River network data is temporarily unavailable (NLDI). The map will display your dashboard reaches without the tributary overlay."
+	}
+	jsonResponse(w, http.StatusOK, resp)
+}
+
+// sampledAnchors returns mid-reach COMIDs by walking the DM mainstem from
+// startCID and sampling every sampleSpacingKm. Returns nil on NLDI failure.
+func sampledAnchors(ctx context.Context, c *nldi.Client, startCID string, lengthKm float64) []string {
+	bucket := int(math.Ceil(lengthKm/50)) * 50
+	key := fmt.Sprintf("dm|%s|%d|%d", startCID, bucket, sampleSpacingKm)
+
+	if v, ok := dmCache.Load(key); ok {
+		e := v.(dmCacheEntry)
+		if time.Since(e.cachedAt) < dmCacheTTL {
+			return e.sampled
+		}
+		dmCache.Delete(key)
 	}
 
-	jsonResponse(w, http.StatusOK, resp)
+	distance := int(math.Ceil(lengthKm)) + dmBufferKm
+	if distance > dmMaxKm {
+		distance = dmMaxKm
+	}
+	coll, err := c.DownstreamFlowlines(ctx, startCID, distance)
+	if err != nil || coll == nil || len(coll.Features) == 0 {
+		log.Printf("basin network: DM comid %s: %v", startCID, err)
+		return nil
+	}
+
+	sampled := nldi.SampleDownstreamComIDs(coll.Features, float64(sampleSpacingKm), maxAnchorsTotal)
+	// skip first — it's the put-in comid, already added as isPutIn anchor
+	if len(sampled) > 1 {
+		sampled = sampled[1:]
+	} else {
+		sampled = nil
+	}
+	dmCache.Store(key, dmCacheEntry{sampled: sampled, cachedAt: time.Now()})
+	return sampled
+}
+
+// cachedFlowlines fetches UT flowlines for comid, using networkCache.
+// Returns nil if NLDI fails (caller records the error).
+func cachedFlowlines(ctx context.Context, c *nldi.Client, comid string) []nldi.Feature {
+	key := fmt.Sprintf("fl|%s|%d", comid, tributaryKm)
+	if v, ok := networkCache.Load(key); ok {
+		e := v.(networkCacheEntry)
+		if time.Since(e.cachedAt) < networkCacheTTL {
+			return e.upstream.Features
+		}
+		networkCache.Delete(key)
+	}
+	fl, err := c.UpstreamFlowlines(ctx, comid, tributaryKm)
+	if err != nil {
+		log.Printf("basin network: flowlines comid %s: %v", comid, err)
+		return nil
+	}
+	networkCache.Store(key, networkCacheEntry{upstream: *fl, cachedAt: time.Now()})
+	return fl.Features
+}
+
+// cachedGauges fetches UT gauge sites for comid, using networkCache.
+func cachedGauges(ctx context.Context, c *nldi.Client, comid string) []nldi.Feature {
+	key := fmt.Sprintf("g|%s|%d", comid, gaugeKm)
+	if v, ok := networkCache.Load(key); ok {
+		e := v.(networkCacheEntry)
+		if time.Since(e.cachedAt) < networkCacheTTL {
+			return e.upstream.Features
+		}
+		networkCache.Delete(key)
+	}
+	g, err := c.UpstreamGauges(ctx, comid, gaugeKm)
+	if err != nil {
+		log.Printf("basin network: gauges comid %s: %v", comid, err)
+		return nil
+	}
+	networkCache.Store(key, networkCacheEntry{upstream: *g, cachedAt: time.Now()})
+	return g.Features
+}
+
+// dedupeByIdentifier removes duplicate NLDI point features (gauges) by identifier.
+func dedupeByIdentifier(features []nldi.Feature) []nldi.Feature {
+	seen := make(map[string]struct{}, len(features))
+	out := make([]nldi.Feature, 0, len(features))
+	for _, f := range features {
+		id := f.Props.Identifier
+		if id == "" {
+			out = append(out, f)
+			continue
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, f)
+	}
+	return out
 }
 
 // dedupeFlowlines removes duplicate NLDI features by nhdplus_comid.

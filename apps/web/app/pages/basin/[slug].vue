@@ -49,6 +49,7 @@
               ref="basinMapRef"
               :reaches="mapData"
               :network="networkData"
+              :watched-gauge-ids="watchedGaugeIds"
               @select="selectedSlug = $event"
             />
           </ClientOnly>
@@ -162,6 +163,12 @@ const displayName = computed<string | null>(() => {
     ?? null
 })
 
+// Set of externalIds (e.g. "09058000") for all gauges on the dashboard.
+// Used to shade tributary gauges differently on the basin map.
+const watchedGaugeIds = computed<Set<string>>(
+  () => new Set(store.gauges.map(g => g.externalId).filter(Boolean))
+)
+
 const reachSlugs = computed<string[]>(() => {
   const seen = new Set<string>()
   const out: string[] = []
@@ -185,7 +192,7 @@ async function fetchNetworkData(params: URLSearchParams) {
   const res = await fetch(`${apiBase}/api/v1/reaches/basin/${slug}/network?${params}`)
   if (!res.ok) return
   const body = await res.json()
-  networkData.value = { tributaries: body.tributaries, mainstem: body.mainstem }
+  networkData.value = { tributaries: body.tributaries, gauges: body.gauges }
   if (!body.nldi_available && body.nldi_error) {
     nldiError.value = body.nldi_error
   }

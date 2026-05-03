@@ -49,14 +49,15 @@ export interface BasinReach {
 
 export interface BasinNetwork {
   tributaries: { type: string; features: any[] }
-  mainstem:    { type: string; features: any[] }
+  gauges:      { type: string; features: any[] }
 }
 
 const EMPTY_FC = { type: 'FeatureCollection', features: [] }
 
 const props = defineProps<{
-  reaches: BasinReach[]
-  network?: BasinNetwork | null
+  reaches:           BasinReach[]
+  network?:          BasinNetwork | null
+  watchedGaugeIds?:  Set<string>   // externalIds already on dashboard (e.g. "09058000")
 }>()
 const emit  = defineEmits<{ (e: 'select', slug: string): void }>()
 
@@ -180,12 +181,28 @@ function fitToReaches() {
   )
 }
 
+function buildGaugesFC(): GeoJSON.FeatureCollection {
+  const features = (props.network?.gauges?.features ?? []).map((f: any) => {
+    const id: string = f.properties?.identifier ?? ''
+    // NLDI identifier is "USGS-09058000"; strip prefix to match watchlist externalId
+    const externalId = id.replace(/^[A-Z]+-/, '')
+    return {
+      ...f,
+      properties: {
+        ...f.properties,
+        onDashboard: props.watchedGaugeIds?.has(externalId) ?? false,
+      },
+    }
+  })
+  return { type: 'FeatureCollection', features }
+}
+
 function updateSources() {
   if (!map) return
   ;(map.getSource('basin-reaches')      as maplibregl.GeoJSONSource | undefined)?.setData(buildReachFC())
   ;(map.getSource('basin-endpoints')    as maplibregl.GeoJSONSource | undefined)?.setData(buildEndpointsFC())
   ;(map.getSource('basin-tributaries')  as maplibregl.GeoJSONSource | undefined)?.setData(props.network?.tributaries ?? EMPTY_FC)
-  ;(map.getSource('basin-mainstem')     as maplibregl.GeoJSONSource | undefined)?.setData(props.network?.mainstem    ?? EMPTY_FC)
+  ;(map.getSource('basin-gauges')       as maplibregl.GeoJSONSource | undefined)?.setData(buildGaugesFC())
 }
 
 // Public: called by the parent page when the D3 tree node is clicked
@@ -256,7 +273,7 @@ onMounted(() => {
   map.on('load', () => {
     // Network sources — added before reach layers so they render underneath
     map!.addSource('basin-tributaries', { type: 'geojson', data: props.network?.tributaries ?? EMPTY_FC })
-    map!.addSource('basin-mainstem',    { type: 'geojson', data: props.network?.mainstem    ?? EMPTY_FC })
+    map!.addSource('basin-gauges',      { type: 'geojson', data: buildGaugesFC() })
 
     map!.addLayer({
       id: 'basin-tributaries', type: 'line', source: 'basin-tributaries',
@@ -266,22 +283,10 @@ onMounted(() => {
         'line-opacity': 0.9,
       },
     })
-    map!.addLayer({
-      id: 'basin-mainstem', type: 'line', source: 'basin-mainstem',
-      paint: {
-        'line-color': '#4a86d8',
-        'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1.5, 14, 3],
-        'line-opacity': 0.9,
-      },
-    })
 
-    // Wider invisible hit areas so flowlines are hoverable
+    // Wider invisible hit area so tributaries are hoverable
     map!.addLayer({
       id: 'basin-tributaries-hit', type: 'line', source: 'basin-tributaries',
-      paint: { 'line-color': 'transparent', 'line-width': 14, 'line-opacity': 0 },
-    })
-    map!.addLayer({
-      id: 'basin-mainstem-hit', type: 'line', source: 'basin-mainstem',
       paint: { 'line-color': 'transparent', 'line-width': 14, 'line-opacity': 0 },
     })
 
@@ -313,6 +318,18 @@ onMounted(() => {
     map!.addLayer({
       id: 'basin-lines-hit', type: 'line', source: 'basin-reaches',
       paint: { 'line-color': 'transparent', 'line-width': 14, 'line-opacity': 0 },
+    })
+
+    // Tributary gauges — hollow for new, filled for already-on-dashboard
+    map!.addLayer({
+      id: 'basin-gauges', type: 'circle', source: 'basin-gauges',
+      paint: {
+        'circle-radius': 5,
+        'circle-color': ['case', ['get', 'onDashboard'], '#3b82f6', '#ffffff'],
+        'circle-stroke-width': 1.5,
+        'circle-stroke-color': ['case', ['get', 'onDashboard'], '#1d4ed8', '#6d9eeb'],
+        'circle-opacity': 0.9,
+      },
     })
 
     // Start (green) / end (red) circles — matches admin reach map
@@ -351,22 +368,34 @@ onMounted(() => {
     })
 
     // Flowline hover — show GNIS name if available
-    function showFlowlineTooltip(e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) {
+    map!.on('mouseenter', 'basin-tributaries-hit', (e) => {
       const p = e.features?.[0]?.properties
       if (!p) return
       const name = p.gnis_name || p.name
       if (!name) return
       map!.getCanvas().style.cursor = 'default'
       flowlineTooltip.setLngLat(e.lngLat).setHTML(name).addTo(map!)
-    }
-    for (const hitId of ['basin-tributaries-hit', 'basin-mainstem-hit'] as const) {
-      map!.on('mouseenter', hitId, showFlowlineTooltip)
-      map!.on('mousemove',  hitId, (e) => flowlineTooltip.setLngLat(e.lngLat))
-      map!.on('mouseleave', hitId, () => {
-        map!.getCanvas().style.cursor = ''
-        flowlineTooltip.remove()
-      })
-    }
+    })
+    map!.on('mousemove',  'basin-tributaries-hit', (e) => flowlineTooltip.setLngLat(e.lngLat))
+    map!.on('mouseleave', 'basin-tributaries-hit', () => {
+      map!.getCanvas().style.cursor = ''
+      flowlineTooltip.remove()
+    })
+
+    // Gauge hover — show gauge name + external ID
+    map!.on('mouseenter', 'basin-gauges', (e) => {
+      map!.getCanvas().style.cursor = 'pointer'
+      const p = e.features?.[0]?.properties
+      if (!p) return
+      const id = (p.identifier as string ?? '').replace(/^[A-Z]+-/, '')
+      const label = p.name ? `<strong>${p.name}</strong><br/><span style="opacity:.7">${id}</span>` : id
+      flowlineTooltip.setLngLat(e.lngLat).setHTML(label).addTo(map!)
+    })
+    map!.on('mousemove',  'basin-gauges', (e) => flowlineTooltip.setLngLat(e.lngLat))
+    map!.on('mouseleave', 'basin-gauges', () => {
+      map!.getCanvas().style.cursor = ''
+      flowlineTooltip.remove()
+    })
 
     mapReady.value = true
     updateSources()   // handles data that arrived while map was loading
@@ -388,9 +417,8 @@ watch(() => props.reaches, () => {
   fitToReaches()
 }, { deep: true })
 
-watch(() => props.network, () => {
-  updateSources()
-})
+watch(() => props.network,          () => { updateSources() })
+watch(() => props.watchedGaugeIds,  () => { updateSources() })
 </script>
 
 <style>

@@ -1,5 +1,5 @@
 <template>
-  <header class="sticky top-0 z-20 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm">
+  <header class="sticky top-0 z-20 shrink-0 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm">
     <div class="max-w-5xl mx-auto px-4 py-2.5 flex items-center gap-2">
 
       <!-- Logo -->
