@@ -3,7 +3,7 @@
     <AppHeader />
 
     <!-- Sticky controls bar — only shown when gauges exist -->
-    <div v-if="store.gauges.length > 0" class="sticky top-[41px] z-10 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+    <div v-if="store.gauges.length > 0" class="sticky top-[51px] z-10 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
       <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <!-- View mode toggle -->

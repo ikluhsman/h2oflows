@@ -111,7 +111,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from '#app'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { cleanBasinName, slugifyBasin } from '~/utils/basin'
@@ -208,11 +207,13 @@ async function fetchAll() {
   }
 }
 
-// Watch the raw gauges array. When persistedstate (or @pinia/nuxt payload
-// restore) patches the store, this fires and triggers the fetch.
-// immediate:true handles the case where gauges are already in memory (SPA nav).
-const { gauges } = storeToRefs(store)
-watch(gauges, () => {
-  if (reachSlugs.value.length > 0 && mapData.value.length === 0) fetchAll()
+// With localStorage persistence, store is populated synchronously before mount.
+// immediate:true handles SPA nav (already in memory) and hard refresh (restored).
+const hasFetched = ref(false)
+watch(reachSlugs, (slugs) => {
+  if (slugs.length > 0 && !hasFetched.value) {
+    hasFetched.value = true
+    fetchAll()
+  }
 }, { immediate: true })
 </script>

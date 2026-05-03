@@ -9,6 +9,13 @@ export default defineNuxtConfig({
     '@nuxtjs/supabase',
   ],
 
+  // Default to localStorage so the watchlist (large array) survives hard refresh.
+  // Cookie storage (the plugin default) has a 4KB limit — truncated cookies
+  // produce an empty store on refresh. localStorage has no practical limit.
+  piniaPersistedstate: {
+    storage: 'localStorage',
+  },
+
   supabase: {
     redirect: false,
     redirectOptions: {
