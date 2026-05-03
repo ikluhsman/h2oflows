@@ -207,6 +207,13 @@
             <template v-else-if="repinPrimaryGauge">Gauge · <span class="font-mono">{{ repinPrimaryGauge.external_id }}</span></template>
             <template v-else>Select gauge</template>
           </button>
+          <button
+            v-if="repinPrimaryGauge && !repinGaugeSelectMode"
+            class="px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-red-500 hover:border-red-400 transition-colors text-xs disabled:opacity-50"
+            :disabled="repinGaugeSaving"
+            title="Clear gauge"
+            @click="clearGauge"
+          >✕</button>
         </div>
 
         <!-- Pending gauge — awaiting save confirmation -->
@@ -328,10 +335,10 @@ const repinFlowBands = ref({
   very_high: { min: null as number | null, max: null as number | null },
 })
 const repinFlowBandsDef = [
-  { key: 'too_low',   label: 'Too Low',   dot: '#64748b', showMin: false, showMax: true  },
-  { key: 'running',   label: 'Runnable',  dot: '#22c55e', showMin: true,  showMax: true  },
-  { key: 'high',      label: 'High',      dot: '#f97316', showMin: true,  showMax: true  },
-  { key: 'very_high', label: 'Very High', dot: '#ef4444', showMin: true,  showMax: false },
+  { key: 'too_low',   label: 'Too Low',   dot: '#ef4444', showMin: false, showMax: true  },
+  { key: 'running',   label: 'Runnable',  dot: '#34d399', showMin: true,  showMax: true  },
+  { key: 'high',      label: 'High',      dot: '#16a34a', showMin: true,  showMax: true  },
+  { key: 'very_high', label: 'Very High', dot: '#38bdf8', showMin: true,  showMax: false },
 ] as const
 const repinFlowBandsSaving = ref(false)
 const repinFlowBandsMsg    = ref('')
@@ -648,6 +655,29 @@ async function saveGauge() {
     repinPendingGauge.value = null
   } catch (e: any) {
     repinGaugeError.value = e?.message ?? 'Failed to set gauge'
+  } finally {
+    repinGaugeSaving.value = false
+  }
+}
+
+async function clearGauge() {
+  if (!repinReach.value) return
+  repinGaugeSaving.value = true
+  repinGaugeError.value = ''
+  try {
+    const token = await getToken()
+    const res = await fetch(`${apiBase}/api/v1/admin/reaches/${repinReach.value.slug}/primary-gauge`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      repinGaugeError.value = body.error ?? `Error ${res.status}`
+      return
+    }
+    repinPrimaryGauge.value = null
+  } catch (e: any) {
+    repinGaugeError.value = e?.message ?? 'Failed to clear gauge'
   } finally {
     repinGaugeSaving.value = false
   }

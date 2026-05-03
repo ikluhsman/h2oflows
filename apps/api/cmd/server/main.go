@@ -198,6 +198,7 @@ func main() {
 			r.Get("/admin/nldi/preview-centerline", nldiH.PreviewCenterline)
 			r.Get("/admin/nldi/nearby-gauges", nldiH.NearbyGauges)
 			r.Put("/admin/reaches/{slug}/primary-gauge", nldiH.SetPrimaryGauge)
+				r.Delete("/admin/reaches/{slug}/primary-gauge", nldiH.ClearPrimaryGauge)
 			r.Post("/admin/reaches", nldiH.CreateReach)
 			r.Get("/admin/reaches/{slug}", nldiH.GetAdminReach)
 			r.Post("/admin/reaches/{slug}/generate-description", nldiH.GenerateDescription)

@@ -568,7 +568,7 @@ const gnisLookupMsg = ref('')
 
 function autoSlug() {
   newRiver.value.slug = newRiver.value.name
-    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-/, '')
 }
 
 async function lookupGNIS(gnisId: string, target: { state_abbr: string; basin: string; huc8: string }) {
@@ -597,11 +597,12 @@ async function createRiver() {
   createLoading.value = true
   const token = await getToken()
   try {
+    const slug = newRiver.value.slug.replace(/-+$/, '')
     const res = await fetch(`${apiBase}/api/v1/admin/rivers`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        slug: newRiver.value.slug,
+        slug,
         name: newRiver.value.name,
         basin: newRiver.value.basin || null,
         state_abbr: newRiver.value.state_abbr || null,
@@ -613,6 +614,22 @@ async function createRiver() {
       createRiverOpen.value = false
       newRiver.value = { name: '', slug: '', basin: '', state_abbr: '', gnis_id: '', huc8: '' }
       loadRivers()
+      // Background auto-fill: resolve state/basin from NHD or GNIS
+      fetch(`${apiBase}/api/v1/admin/rivers/${slug}/auto-fill`, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).then(r => r.ok ? r.json() : null).then(data => {
+        if (!data) return
+        const patch: Record<string, string> = {}
+        if (data.state_abbr) patch.state_abbr = data.state_abbr
+        if (data.basin) patch.basin = data.basin
+        if (data.huc8) patch.huc8 = data.huc8
+        if (Object.keys(patch).length === 0) return
+        fetch(`${apiBase}/api/v1/admin/rivers/${slug}`, {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        }).then(() => loadRivers())
+      }).catch(() => {})
     }
   } finally {
     createLoading.value = false

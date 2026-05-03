@@ -303,10 +303,10 @@ const authorForm = ref({
 })
 
 const authorFlowBands = [
-  { key: 'too_low',   label: 'Too Low',   dot: '#64748b', showMin: false, showMax: true  },
-  { key: 'running',   label: 'Runnable',  dot: '#22c55e', showMin: true,  showMax: true  },
-  { key: 'high',      label: 'High',      dot: '#f97316', showMin: true,  showMax: true  },
-  { key: 'very_high', label: 'Very High', dot: '#ef4444', showMin: true,  showMax: false },
+  { key: 'too_low',   label: 'Too Low',   dot: '#ef4444', showMin: false, showMax: true  },
+  { key: 'running',   label: 'Runnable',  dot: '#34d399', showMin: true,  showMax: true  },
+  { key: 'high',      label: 'High',      dot: '#16a34a', showMin: true,  showMax: true  },
+  { key: 'very_high', label: 'Very High', dot: '#38bdf8', showMin: true,  showMax: false },
 ] as const
 
 const authorPutInPin = computed(() =>
