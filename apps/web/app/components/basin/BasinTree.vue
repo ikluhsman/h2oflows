@@ -1,27 +1,6 @@
 <template>
   <div ref="container" class="w-full">
-    <!-- Orientation toggle -->
-    <div class="flex justify-end mb-2">
-      <button
-        class="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors px-2 py-1 rounded"
-        :title="orientation === 'horizontal' ? 'Switch to portrait' : 'Switch to landscape'"
-        @click="orientation = orientation === 'horizontal' ? 'vertical' : 'horizontal'"
-      >
-        <!-- landscape icon -->
-        <svg v-if="orientation === 'horizontal'" class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="1" y="3" width="14" height="10" rx="1"/>
-          <line x1="8" y1="3" x2="8" y2="13"/>
-        </svg>
-        <!-- portrait icon -->
-        <svg v-else class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="1" width="10" height="14" rx="1"/>
-          <line x1="3" y1="8" x2="13" y2="8"/>
-        </svg>
-        {{ orientation === 'horizontal' ? 'Portrait' : 'Landscape' }}
-      </button>
-    </div>
-
-    <div :class="orientation === 'horizontal' ? 'overflow-x-auto' : 'overflow-x-auto overflow-y-hidden'">
+    <div class="overflow-x-auto">
       <svg
         v-if="layout.nodes.length > 0"
         :width="layout.width"
@@ -47,78 +26,42 @@
           :style="node.isLeaf ? 'cursor:pointer' : undefined"
           @click="node.isLeaf ? emit('select', node.slug!) : undefined"
         >
-          <!-- ── HORIZONTAL layout labels ───────────────────────────── -->
-          <template v-if="orientation === 'horizontal'">
-            <!-- Leaf -->
-            <template v-if="node.isLeaf">
-              <circle
-                :r="5"
-                :fill="node.slug === selectedSlug ? '#3b82f6' : isDark ? '#d1d5db' : '#374151'"
-                stroke="none"
-              />
-              <text
-                x="10" dy="0.35em"
-                :font-size="11" :font-family="'ui-monospace, monospace'"
-                :font-weight="node.slug === selectedSlug ? 700 : 400"
-                :fill="node.slug === selectedSlug ? '#3b82f6' : isDark ? '#d1d5db' : '#374151'"
-              >{{ node.label }}</text>
-              <text
-                x="10" dy="1.5em"
-                :font-size="10" font-family="ui-sans-serif, sans-serif"
-                :fill="isDark ? '#9ca3af' : '#6b7280'"
-              >{{ node.name }}</text>
-            </template>
-            <!-- Internal river group -->
-            <template v-else-if="node.depth > 0">
-              <circle :r="3" :fill="isDark ? '#4b5563' : '#d1d5db'" stroke="none" />
-              <text
-                x="-8" dy="0.35em" text-anchor="end"
-                :font-size="11" font-family="ui-sans-serif, sans-serif"
-                :fill="isDark ? '#9ca3af' : '#6b7280'"
-              >{{ node.name }}</text>
-            </template>
-            <!-- Root -->
-            <template v-else>
-              <circle :r="3" :fill="isDark ? '#4b5563' : '#d1d5db'" stroke="none" />
-            </template>
+          <!-- Leaf -->
+          <template v-if="node.isLeaf">
+            <circle
+              :r="5"
+              :fill="node.slug === selectedSlug ? '#3b82f6' : isDark ? '#d1d5db' : '#374151'"
+              stroke="none"
+            />
+            <text
+              x="10" dy="0.35em"
+              :font-size="11" :font-family="'ui-monospace, monospace'"
+              :font-weight="node.slug === selectedSlug ? 700 : 400"
+              :fill="node.slug === selectedSlug ? '#3b82f6' : isDark ? '#d1d5db' : '#374151'"
+            >{{ node.label }}</text>
+            <text
+              x="10" dy="1.5em"
+              :font-size="10" font-family="ui-sans-serif, sans-serif"
+              :fill="isDark ? '#9ca3af' : '#6b7280'"
+            >{{ node.name }}</text>
           </template>
-
-          <!-- ── VERTICAL layout labels ─────────────────────────────── -->
+          <!-- Internal river group -->
+          <template v-else-if="node.depth > 0">
+            <circle :r="3" :fill="isDark ? '#4b5563' : '#d1d5db'" stroke="none" />
+            <text
+              x="-8" dy="0.35em" text-anchor="end"
+              :font-size="11" font-family="ui-sans-serif, sans-serif"
+              :fill="isDark ? '#9ca3af' : '#6b7280'"
+            >{{ node.name }}</text>
+          </template>
+          <!-- Root (basin) -->
           <template v-else>
-            <!-- Leaf: dot + rotated label below -->
-            <template v-if="node.isLeaf">
-              <circle
-                :r="5"
-                :fill="node.slug === selectedSlug ? '#3b82f6' : isDark ? '#d1d5db' : '#374151'"
-                stroke="none"
-              />
-              <g transform="rotate(-55) translate(8,0)">
-                <text
-                  x="0" dy="0.35em"
-                  :font-size="10" :font-family="'ui-monospace, monospace'"
-                  :font-weight="node.slug === selectedSlug ? 700 : 400"
-                  :fill="node.slug === selectedSlug ? '#3b82f6' : isDark ? '#d1d5db' : '#374151'"
-                >{{ node.label }}</text>
-                <text
-                  x="0" dy="1.5em"
-                  :font-size="9" font-family="ui-sans-serif, sans-serif"
-                  :fill="isDark ? '#9ca3af' : '#6b7280'"
-                >{{ node.name }}</text>
-              </g>
-            </template>
-            <!-- Internal river group: label above dot -->
-            <template v-else-if="node.depth > 0">
-              <circle :r="3" :fill="isDark ? '#4b5563' : '#d1d5db'" stroke="none" />
-              <text
-                x="0" dy="-0.7em" text-anchor="middle"
-                :font-size="10" font-family="ui-sans-serif, sans-serif"
-                :fill="isDark ? '#9ca3af' : '#6b7280'"
-              >{{ node.name }}</text>
-            </template>
-            <!-- Root -->
-            <template v-else>
-              <circle :r="3" :fill="isDark ? '#4b5563' : '#d1d5db'" stroke="none" />
-            </template>
+            <circle :r="4" :fill="isDark ? '#6b7280' : '#9ca3af'" stroke="none" />
+            <text
+              x="-10" dy="0.35em" text-anchor="end"
+              :font-size="12" font-weight="600" font-family="ui-sans-serif, sans-serif"
+              :fill="isDark ? '#e5e7eb' : '#374151'"
+            >{{ node.name }}</text>
           </template>
         </g>
       </svg>
@@ -134,19 +77,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { hierarchy, tree } from 'd3-hierarchy'
-import { linkHorizontal, linkVertical } from 'd3-shape'
+import { linkHorizontal } from 'd3-shape'
 import type { BasinReach } from './BasinMap.vue'
 
 const props = defineProps<{
   reaches:      BasinReach[]
+  basinName?:   string | null
   selectedSlug?: string | null
 }>()
 
 const emit = defineEmits<{ (e: 'select', slug: string): void }>()
-
-const orientation = ref<'horizontal' | 'vertical'>('horizontal')
 
 const isDark = typeof window !== 'undefined'
   && window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -188,21 +130,17 @@ const treeData = computed<TreeNode>(() => {
       })),
     }))
 
-  return { name: 'basin', children: rivers }
+  const rootName = props.basinName ? `${props.basinName} Basin` : 'Basin'
+  return { name: rootName, children: rivers }
 })
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
-// Horizontal
-const H_LEVEL_W = 180
-const H_NODE_H  = 36
-const H_LABEL_W = 220
-const PAD       = 24
-
-// Vertical
-const V_LEAF_W  = 90   // breadth spacing per leaf
-const V_LEVEL_H = 56   // depth spacing per level
-const V_LABEL_H = 90   // space below leaves for rotated text
+const H_LEVEL_W   = 180
+const H_NODE_H    = 36
+const H_LABEL_W   = 220
+const PAD         = 24
+const H_ROOT_PAD  = 110  // left margin so root label doesn't clip
 
 interface LayoutNode {
   id:     string
@@ -215,76 +153,42 @@ interface LayoutNode {
   sy:     number
 }
 
-// ── Computed layout (branches by orientation) ─────────────────────────────────
+// ── Computed layout ───────────────────────────────────────────────────────────
 
 const layout = computed(() => {
   const root = hierarchy<TreeNode>(treeData.value)
   if (root.leaves().length === 0) return { nodes: [], links: [], width: 0, height: 0 }
 
-  if (orientation.value === 'horizontal') {
-    const treeLayout = tree<TreeNode>().nodeSize([H_NODE_H, H_LEVEL_W])
-    treeLayout(root)
+  const treeLayout = tree<TreeNode>().nodeSize([H_NODE_H, H_LEVEL_W])
+  treeLayout(root)
 
-    let minX = Infinity, maxX = -Infinity
-    root.each(n => {
-      minX = Math.min(minX, (n as any).x)
-      maxX = Math.max(maxX, (n as any).x)
-    })
+  let minX = Infinity, maxX = -Infinity
+  root.each(n => {
+    minX = Math.min(minX, (n as any).x)
+    maxX = Math.max(maxX, (n as any).x)
+  })
 
-    const svgH   = maxX - minX + H_NODE_H + PAD * 2
-    const svgW   = (root.height + 1) * H_LEVEL_W + H_LABEL_W + PAD * 2
-    const shiftY = -minX + PAD
+  const svgH   = maxX - minX + H_NODE_H + PAD * 2
+  const svgW   = H_ROOT_PAD + (root.height + 1) * H_LEVEL_W + H_LABEL_W + PAD * 2
+  const shiftY = -minX + PAD
+  const offX   = PAD + H_ROOT_PAD
 
-    const linkGen = linkHorizontal<any, any>()
-      .x((d: any) => d.y + PAD)
-      .y((d: any) => d.x + shiftY)
+  const linkGen = linkHorizontal<any, any>()
+    .x((d: any) => d.y + offX)
+    .y((d: any) => d.x + shiftY)
 
-    const links = root.links().map(l => linkGen(l) ?? '')
+  const links = root.links().map(l => linkGen(l) ?? '')
 
-    const nodes: LayoutNode[] = root.descendants().map(n => {
-      const d = n as any
-      return {
-        id: n.data.slug ?? n.data.name, depth: n.depth,
-        isLeaf: !n.children, slug: n.data.slug,
-        name: n.data.name, label: n.data.label,
-        sx: d.y + PAD, sy: d.x + shiftY,
-      }
-    })
+  const nodes: LayoutNode[] = root.descendants().map(n => {
+    const d = n as any
+    return {
+      id: n.data.slug ?? n.data.name, depth: n.depth,
+      isLeaf: !n.children, slug: n.data.slug,
+      name: n.data.name, label: n.data.label,
+      sx: d.y + offX, sy: d.x + shiftY,
+    }
+  })
 
-    return { nodes, links, width: svgW, height: svgH }
-
-  } else {
-    // Vertical: root at top, leaves at bottom
-    const treeLayout = tree<TreeNode>().nodeSize([V_LEAF_W, V_LEVEL_H])
-    treeLayout(root)
-
-    let minX = Infinity, maxX = -Infinity
-    root.each(n => {
-      minX = Math.min(minX, (n as any).x)
-      maxX = Math.max(maxX, (n as any).x)
-    })
-
-    const svgW   = maxX - minX + V_LEAF_W + PAD * 2
-    const svgH   = (root.height + 1) * V_LEVEL_H + PAD * 2 + V_LABEL_H
-    const shiftX = -minX + PAD + V_LEAF_W / 2
-
-    const linkGen = linkVertical<any, any>()
-      .x((d: any) => d.x + shiftX)
-      .y((d: any) => d.y + PAD)
-
-    const links = root.links().map(l => linkGen(l) ?? '')
-
-    const nodes: LayoutNode[] = root.descendants().map(n => {
-      const d = n as any
-      return {
-        id: n.data.slug ?? n.data.name, depth: n.depth,
-        isLeaf: !n.children, slug: n.data.slug,
-        name: n.data.name, label: n.data.label,
-        sx: d.x + shiftX, sy: d.y + PAD,
-      }
-    })
-
-    return { nodes, links, width: svgW, height: svgH }
-  }
+  return { nodes, links, width: svgW, height: svgH }
 })
 </script>

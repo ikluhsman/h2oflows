@@ -91,11 +91,12 @@
               <circle cx="8" cy="3" r="1.5"/><circle cx="4" cy="13" r="1.5"/><circle cx="12" cy="13" r="1.5"/>
               <line x1="8" y1="4.5" x2="8" y2="7"/><path d="M8 7 Q4 9 4 11.5"/><path d="M8 7 Q12 9 12 11.5"/>
             </svg>
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">River Tree</h2>
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Basin Tree</h2>
           </div>
           <ClientOnly>
             <BasinTree
               :reaches="mapData"
+              :basin-name="displayName ?? slug"
               :selected-slug="selectedSlug"
               @select="onTreeSelect"
             />
