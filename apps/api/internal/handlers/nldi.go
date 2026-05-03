@@ -581,6 +581,21 @@ func (h *NLDIHandler) SetPrimaryGauge(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ClearPrimaryGauge handles DELETE /api/v1/admin/reaches/{slug}/primary-gauge
+func (h *NLDIHandler) ClearPrimaryGauge(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	ctx := r.Context()
+	var reachID string
+	if err := h.db.QueryRow(ctx,
+		`UPDATE reaches SET primary_gauge_id = NULL WHERE slug = $1 RETURNING id`,
+		slug,
+	).Scan(&reachID); err != nil {
+		errorResponse(w, http.StatusNotFound, "reach not found")
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 // UpdateReachMeta handles PUT /api/v1/admin/reaches/{slug}/meta
 //
 // Full metadata update: name, common_name, river_name, class_min, class_max,
