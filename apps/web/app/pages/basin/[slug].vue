@@ -75,13 +75,9 @@
             <span class="text-xs font-mono text-gray-400 shrink-0">{{ classRange(reach.class_min, reach.class_max) || '—' }}</span>
             <span
               v-if="reach.flow_status !== 'unknown'"
-              class="text-xs px-1.5 py-0.5 rounded font-medium shrink-0"
-              :class="{
-                'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300': reach.flow_status === 'runnable',
-                'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300': reach.flow_status === 'caution',
-                'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300': reach.flow_status === 'flood',
-              }"
-            >{{ reach.flow_status }}</span>
+              class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0"
+              :class="flowBandBadgeClass(null, reach.flow_status)"
+            >{{ flowBandLabel(null, reach.flow_status) }}</span>
           </div>
           <div v-if="mapData.length === 0 && reachSlugs.length > 0" class="px-4 py-6 text-center text-sm text-gray-400">
             Loading reaches…
@@ -112,11 +108,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from '#app'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { cleanBasinName, slugifyBasin } from '~/utils/basin'
 import { classColor, classRange } from '~/utils/classRating'
+import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
 import type { BasinReach, BasinNetwork } from '~/components/basin/BasinMap.vue'
 
 definePageMeta({ ssr: false })
@@ -202,16 +200,11 @@ async function fetchAll() {
   }
 }
 
-// Watch fires when persistedstate patches the store (app:mounted hook).
-watch(reachSlugs, (slugs) => {
-  if (slugs.length > 0 && mapData.value.length === 0) fetchAll()
-})
-
-// Fallback: persistedstate's app:mounted runs after component onMounted.
-// setTimeout(0) defers to the next macrotask — by then the store is hydrated.
-onMounted(() => {
-  setTimeout(() => {
-    if (reachSlugs.value.length > 0 && mapData.value.length === 0) fetchAll()
-  }, 0)
-})
+// Watch the raw gauges array. When persistedstate (or @pinia/nuxt payload
+// restore) patches the store, this fires and triggers the fetch.
+// immediate:true handles the case where gauges are already in memory (SPA nav).
+const { gauges } = storeToRefs(store)
+watch(gauges, () => {
+  if (reachSlugs.value.length > 0 && mapData.value.length === 0) fetchAll()
+}, { immediate: true })
 </script>
