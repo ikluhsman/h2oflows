@@ -6,7 +6,7 @@
       Loading map…
     </div>
 
-    <div v-if="mapReady && reaches.length === 0" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+    <div v-if="mapReady && fetchDone && reaches.length === 0" class="absolute inset-0 flex items-center justify-center pointer-events-none">
       <p class="text-sm text-gray-400 bg-white/80 dark:bg-gray-900/80 rounded-lg px-4 py-2">
         No centerlines available for this basin yet.
       </p>
@@ -58,6 +58,7 @@ const props = defineProps<{
   reaches:           BasinReach[]
   network?:          BasinNetwork | null
   watchedGaugeIds?:  Set<string>   // externalIds already on dashboard (e.g. "09058000")
+  fetchDone?:        boolean       // true once the parent's fetch has settled
 }>()
 const emit  = defineEmits<{ (e: 'select', slug: string): void }>()
 

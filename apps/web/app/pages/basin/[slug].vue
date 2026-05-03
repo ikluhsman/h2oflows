@@ -50,6 +50,7 @@
               :reaches="mapData"
               :network="networkData"
               :watched-gauge-ids="watchedGaugeIds"
+              :fetch-done="fetchDone"
               @select="selectedSlug = $event"
             />
           </ClientOnly>
@@ -197,6 +198,8 @@ async function fetchNetworkData(params: URLSearchParams) {
   }
 }
 
+const fetchDone = ref(false)
+
 async function fetchAll() {
   if (reachSlugs.value.length === 0) return
   const params = new URLSearchParams({ slugs: reachSlugs.value.join(',') })
@@ -204,6 +207,8 @@ async function fetchAll() {
     await Promise.all([fetchMapData(params), fetchNetworkData(params)])
   } catch (e) {
     console.warn('[basin page] fetch:', e)
+  } finally {
+    fetchDone.value = true
   }
 }
 
