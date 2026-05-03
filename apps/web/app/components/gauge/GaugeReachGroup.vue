@@ -100,55 +100,57 @@
   >
     <!-- Gauge header section -->
     <div v-if="!hideGaugeHeader" :class="density === 'compact' ? 'p-2.5' : density === 'comfortable' ? 'p-3' : 'p-4'">
-      <!-- Gauge name -->
-      <div class="flex items-center gap-1.5" :class="density === 'compact' ? 'mb-0.5' : 'mb-1'">
-        <svg class="text-gray-400 dark:text-gray-500 shrink-0" :class="density === 'compact' ? 'w-3.5 h-3.5' : 'w-4 h-4'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
-          <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
-          <path d="M12 12 16 8"/>
-          <path d="M3 12a9 9 0 0 1 18 0"/>
-        </svg>
-        <div class="min-w-0">
-          <span
-            class="font-medium text-gray-600 dark:text-gray-400 truncate block leading-tight"
-            :class="density === 'compact' ? 'text-xs' : 'text-sm'"
-          >{{ gaugeName }}</span>
-          <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+
+      <!-- Compact: simple horizontal row -->
+      <template v-if="density === 'compact'">
+        <div class="flex items-center gap-1.5 mb-2">
+          <svg class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
+            <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 12 16 8"/><path d="M3 12a9 9 0 0 1 18 0"/>
+          </svg>
+          <span class="min-w-0 text-xs font-medium text-gray-600 dark:text-gray-400 truncate">{{ gaugeName }}</span>
         </div>
-      </div>
+        <div class="flex items-baseline gap-2 mb-2">
+          <span class="text-xl font-bold tabular-nums leading-none text-gray-900 dark:text-white">
+            {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
+          </span>
+          <span class="text-xs text-gray-500">cfs</span>
+        </div>
+      </template>
 
-      <!-- CFS + trend -->
-      <div
-        class="flex items-baseline gap-2 flex-wrap"
-        :class="density === 'compact' ? 'mb-2' : 'mb-1.5'"
-      >
-        <span
-          class="font-bold tabular-nums leading-none text-gray-900 dark:text-white"
-          :class="density === 'compact' ? 'text-xl' : density === 'comfortable' ? 'text-2xl' : 'text-3xl'"
-        >
-          {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
-        </span>
-        <span class="text-xs text-gray-500">cfs</span>
-        <TrendArrow v-if="currentCfs != null && density !== 'compact'" :gauge-id="leadGauge.id" class="text-lg" />
-      </div>
-
-      <!-- Sparkline — comfortable: compact; full: full -->
-      <div v-if="density === 'comfortable'" class="opacity-60 mb-1">
-        <GaugeSparkline
-          :gauge-id="leadGauge.id"
-          flow-status="unknown"
-          color="#3b82f6"
-          compact
-          @latest-cfs="liveCfs = $event"
-        />
-      </div>
-      <div v-else-if="density === 'full'" class="opacity-60 mb-1.5">
-        <GaugeSparkline
-          :gauge-id="leadGauge.id"
-          flow-status="unknown"
-          color="#3b82f6"
-          @latest-cfs="liveCfs = $event"
-        />
-      </div>
+      <!-- Comfortable / Full: two-column — name+sparkline left, CFS right -->
+      <template v-else>
+        <div class="flex items-start gap-3">
+          <!-- Left -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-1.5 mb-1">
+              <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
+                <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 12 16 8"/><path d="M3 12a9 9 0 0 1 18 0"/>
+              </svg>
+              <div class="min-w-0">
+                <span class="text-sm font-medium text-gray-600 dark:text-gray-400 truncate block leading-tight">{{ gaugeName }}</span>
+                <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+              </div>
+            </div>
+            <div class="opacity-60" :class="density === 'full' ? 'h-14' : 'h-6'">
+              <GaugeSparkline
+                :gauge-id="leadGauge.id"
+                flow-status="unknown"
+                color="#3b82f6"
+                :compact="density !== 'full'"
+                @latest-cfs="liveCfs = $event"
+              />
+            </div>
+          </div>
+          <!-- Right: CFS -->
+          <div class="text-right shrink-0">
+            <div class="font-bold tabular-nums leading-none text-gray-900 dark:text-white" :class="density === 'comfortable' ? 'text-2xl' : 'text-3xl'">
+              {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
+            </div>
+            <div class="text-xs text-gray-400 mt-0.5">cfs</div>
+            <TrendArrow v-if="currentCfs != null" :gauge-id="leadGauge.id" class="text-base justify-end mt-0.5" />
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- Reach sub-list -->

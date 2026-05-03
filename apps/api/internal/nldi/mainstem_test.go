@@ -2,6 +2,7 @@ package nldi
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 )
 
@@ -108,6 +109,71 @@ func TestToGeoJSONLineString(t *testing.T) {
 	want := `{"type":"LineString","coordinates":[[-106.1234567,40.1234567],[-106.7654321,40.7654321]]}`
 	if got != want {
 		t.Errorf("ToGeoJSONLineString:\ngot:  %s\nwant: %s", got, want)
+	}
+}
+
+func TestSampleDownstreamComIDs_empty(t *testing.T) {
+	if got := SampleDownstreamComIDs(nil, 20, 30); got != nil {
+		t.Errorf("expected nil, got %v", got)
+	}
+}
+
+func TestSampleDownstreamComIDs_singleFeature(t *testing.T) {
+	// one short feature — only the put-in comid should be emitted
+	f := makeLineStringFeature("AAA", [][]float64{{-106.0, 39.0}, {-106.001, 39.0}})
+	out := SampleDownstreamComIDs([]Feature{f}, 20, 30)
+	if len(out) != 1 || out[0] != "AAA" {
+		t.Errorf("expected [AAA], got %v", out)
+	}
+}
+
+func TestSampleDownstreamComIDs_nilComIDSkipped(t *testing.T) {
+	noComID := Feature{
+		Geometry: Geometry{
+			Type:        "LineString",
+			Coordinates: func() json.RawMessage { b, _ := json.Marshal([][]float64{{-106.0, 39.0}, {-106.001, 39.0}}); return b }(),
+		},
+	}
+	out := SampleDownstreamComIDs([]Feature{noComID}, 20, 30)
+	if len(out) != 0 {
+		t.Errorf("expected no comids for nil NhdplusComID, got %v", out)
+	}
+}
+
+func TestSampleDownstreamComIDs_spacingRespected(t *testing.T) {
+	// build a chain of 5 features each ~20 km long (1 degree lat ≈ 111 km → ~0.18 deg = 20 km)
+	step := 0.18 // ≈ 20 km
+	features := make([]Feature, 5)
+	for i := 0; i < 5; i++ {
+		lat := 39.0 + float64(i)*step
+		features[i] = makeLineStringFeature(
+			fmt.Sprintf("%03d", i+1),
+			[][]float64{{-106.0, lat}, {-106.0, lat + step}},
+		)
+	}
+	// spacing 20 km, max 10 — expect one sample per feature (5 total)
+	out := SampleDownstreamComIDs(features, 20, 10)
+	if len(out) == 0 {
+		t.Fatal("expected at least 1 sampled comid")
+	}
+	if len(out) > 6 {
+		t.Errorf("expected roughly 5 samples, got %d: %v", len(out), out)
+	}
+}
+
+func TestSampleDownstreamComIDs_maxAnchorsRespected(t *testing.T) {
+	step := 0.18
+	features := make([]Feature, 20)
+	for i := 0; i < 20; i++ {
+		lat := 39.0 + float64(i)*step
+		features[i] = makeLineStringFeature(
+			fmt.Sprintf("%03d", i+1),
+			[][]float64{{-106.0, lat}, {-106.0, lat + step}},
+		)
+	}
+	out := SampleDownstreamComIDs(features, 20, 5)
+	if len(out) > 5 {
+		t.Errorf("maxAnchors not respected: got %d", len(out))
 	}
 }
 

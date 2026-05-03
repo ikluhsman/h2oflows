@@ -6,6 +6,58 @@ import (
 	"strings"
 )
 
+// SampleDownstreamComIDs walks ordered DM flowline features and returns one
+// nhdplus_comid per spacingKm of cumulative haversine distance. The first
+// eligible comid is always emitted at distance 0. Features with a nil comid
+// are skipped (distance still accumulates). At most maxAnchors comids returned.
+func SampleDownstreamComIDs(features []Feature, spacingKm float64, maxAnchors int) []string {
+	if len(features) == 0 || spacingKm <= 0 {
+		return nil
+	}
+	out := make([]string, 0, 8)
+	var cumKm float64
+	nextThreshold := 0.0
+	var prevCoord *Coord
+
+	for _, f := range features {
+		if len(out) >= maxAnchors {
+			break
+		}
+		comid := ""
+		if f.Props.NhdplusComID != nil {
+			comid = *f.Props.NhdplusComID
+		}
+
+		coords, err := flowlineCoords(f)
+		if err != nil || len(coords) == 0 {
+			continue
+		}
+
+		for i, c := range coords {
+			if i == 0 && prevCoord != nil {
+				// accumulate distance from end of previous feature
+				cumKm += haversineKm(prevCoord[1], prevCoord[0], c[1], c[0])
+			} else if i > 0 {
+				prev := coords[i-1]
+				cumKm += haversineKm(prev[1], prev[0], c[1], c[0])
+			}
+
+			// emit once per threshold crossing
+			for cumKm >= nextThreshold && len(out) < maxAnchors {
+				if comid != "" {
+					out = append(out, comid)
+				}
+				nextThreshold += spacingKm
+			}
+		}
+		if len(coords) > 0 {
+			last := coords[len(coords)-1]
+			prevCoord = &last
+		}
+	}
+	return out
+}
+
 // Coord is [lng, lat] (GeoJSON order).
 type Coord [2]float64
 

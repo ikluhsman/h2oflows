@@ -425,15 +425,21 @@ function updateLayers(features: ReachFeature[]) {
       },
     })
 
+    // Wide invisible hit area — makes tap/click easy on mobile
+    map.addLayer({
+      id: 'reach-lines-hit', type: 'line', source: 'reaches',
+      paint: { 'line-color': 'transparent', 'line-width': 24, 'line-opacity': 0 },
+    })
+
     // Click → navigate (no popup)
-    map.on('click', 'reach-lines', e => {
+    map.on('click', 'reach-lines-hit', e => {
       if (!map || !e.features?.length) return
       const slug = (e.features[0].properties as any).slug as string
       if (slug) emit('reach-click', slug)
     })
 
     // Hover → sync sidebar + tooltip
-    map.on('mouseenter', 'reach-lines', e => {
+    map.on('mouseenter', 'reach-lines-hit', e => {
       if (!map || !e.features?.length) return
       map.getCanvas().style.cursor = 'pointer'
       const p = e.features[0].properties as any
@@ -446,10 +452,10 @@ function updateLayers(features: ReachFeature[]) {
         `<strong>${commonName}</strong>${subtitle}`
       ).addTo(map!)
     })
-    map.on('mousemove', 'reach-lines', e => {
+    map.on('mousemove', 'reach-lines-hit', e => {
       reachTooltip.setLngLat(e.lngLat)
     })
-    map.on('mouseleave', 'reach-lines', () => {
+    map.on('mouseleave', 'reach-lines-hit', () => {
       if (map) map.getCanvas().style.cursor = ''
       reachTooltip.remove()
       emit('hover-changed', null)

@@ -10,6 +10,15 @@ export function romanClass(n: number): string {
   return ROMAN[n] ?? String(n)
 }
 
+// Matches the map's classColorExpr step expression.
+export function classColor(n: number): string {
+  if (n < 0.5) return '#6b7280'   // gray  — no class
+  if (n < 3.0) return '#16a34a'   // green — I–II
+  if (n < 4.0) return '#3b82f6'   // blue  — III
+  if (n < 5.0) return '#111827'   // black — IV
+  return '#dc2626'                  // red   — V+
+}
+
 export function classRange(min: number | null, max: number | null): string {
   if (min == null && max == null) return ''
   if (min == null) return romanClass(max!)
