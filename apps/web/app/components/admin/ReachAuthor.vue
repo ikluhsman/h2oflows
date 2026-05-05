@@ -295,18 +295,16 @@ const authorForm = ref({
   permitRequired: false,
   multiDay: 1,
   flowRanges: {
-    too_low:   { min: null as number | null, max: null as number | null },
-    running:   { min: null as number | null, max: null as number | null },
-    high:      { min: null as number | null, max: null as number | null },
-    very_high: { min: null as number | null, max: null as number | null },
+    low:     { min: null as number | null, max: null as number | null },
+    running: { min: null as number | null, max: null as number | null },
+    high:    { min: null as number | null, max: null as number | null },
   },
 })
 
 const authorFlowBands = [
-  { key: 'too_low',   label: 'Too Low',   dot: '#ef4444', showMin: false, showMax: true  },
-  { key: 'running',   label: 'Runnable',  dot: '#34d399', showMin: true,  showMax: true  },
-  { key: 'high',      label: 'High',      dot: '#16a34a', showMin: true,  showMax: true  },
-  { key: 'very_high', label: 'Very High', dot: '#38bdf8', showMin: true,  showMax: false },
+  { key: 'low',     label: 'Too Low',  dot: '#ef4444', showMin: false, showMax: true  },
+  { key: 'running', label: 'Runnable', dot: '#34d399', showMin: true,  showMax: true  },
+  { key: 'high',    label: 'High',     dot: '#38bdf8', showMin: true,  showMax: false },
 ] as const
 
 const authorPutInPin = computed(() =>
@@ -386,10 +384,9 @@ function reset() {
     permitRequired: false,
     multiDay: 1,
     flowRanges: {
-      too_low:   { min: null, max: null },
-      running:   { min: null, max: null },
-      high:      { min: null, max: null },
-      very_high: { min: null, max: null },
+      low:     { min: null, max: null },
+      running: { min: null, max: null },
+      high:    { min: null, max: null },
     },
   }
   authorSlugManual.value = false
@@ -547,10 +544,9 @@ async function submit() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          too_low:   { min_cfs: null,                 max_cfs: ranges.too_low.max   },
-          running:   { min_cfs: ranges.running.min,   max_cfs: ranges.running.max   },
-          high:      { min_cfs: ranges.high.min,      max_cfs: ranges.high.max      },
-          very_high: { min_cfs: ranges.very_high.min, max_cfs: null                 },
+          low:     { min_value: null,              max_value: ranges.low.max     },
+          running: { min_value: ranges.running.min, max_value: ranges.running.max },
+          high:    { min_value: ranges.high.min,    max_value: null               },
         }),
       })
     }

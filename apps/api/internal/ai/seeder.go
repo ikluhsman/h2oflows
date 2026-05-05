@@ -153,9 +153,9 @@ Respond ONLY with a valid JSON object matching this exact schema. No markdown, n
   ],
   "flow_ranges": [
     {
-      "label": "too_low" | "running" | "high" | "very_high",
-      "min_cfs": number | null,
-      "max_cfs": number | null,
+      "label": "low" | "running" | "high",
+      "min_value": number | null,
+      "max_value": number | null,
       "notes": "string — brief context, e.g. 'Bony but runnable at minimum flows'",
       "confidence": 0-100
     }
@@ -178,16 +178,17 @@ IMPORTANT on access points:
 - Omit waypoints for boat_ramp and bank entry styles — a single point is sufficient.
 
 IMPORTANT on flow ranges:
-- Provide community-accepted CFS windows for the reach's primary gauge (the gauge that most paddlers use to decide whether to run this reach).
-- Use exactly these four labels (omit any you are not confident about):
-    "too_low"   — below the minimum runnable flow; scrapy, portages increase, not worth the trip
-    "running"   — the standard recommended window; the river at its typical good levels
-    "high"      — pushy but still runnable for experienced paddlers; stepped-up difficulty
-    "very_high" — above the safe or enjoyable limit; experts only or do not run
-- min_cfs null means "any flow below max_cfs". max_cfs null means "any flow above min_cfs". Both null is invalid — omit the entry instead.
-- For dam-regulated rivers, note if the window is release-dependent rather than flow-dependent.
-- Well-documented classics (Browns Canyon, The Numbers, Gore Canyon) should have complete ranges at high confidence. Obscure runs may have only 1-2 bands.
-- Do not include flow ranges if the reach is better described by a stage gauge (feet) rather than a flow gauge (cfs) — note this in the reach description instead.
+- Provide community-accepted CFS windows for the reach's primary gauge.
+- Use exactly these three labels:
+    "low"     — below minimum runnable flow; bony, portages increase
+    "running" — the runnable window (minimum to maximum safe/enjoyable flow)
+    "high"    — above the safe/enjoyable window; flood conditions
+- Always emit all three bands. "low" has null min_value. "high" has null max_value.
+  "low".max_value == "running".min_value (contiguous boundary).
+  "high".min_value == "running".max_value (contiguous boundary).
+- min_value null means no lower bound. max_value null means no upper bound.
+- Well-documented classics (Browns Canyon, The Numbers, Gore Canyon) should have complete ranges at high confidence. Obscure runs may omit if confidence < 50.
+- Do not include flow ranges if the reach uses a stage gauge (feet) — note in the reach description instead.
 
 Confidence guidelines:
 - 90-100: Classic, nationally recognized run. Named rapids appear in printed guidebooks (Caudill, Stohlquist, Nealy), American Whitewater, and countless trip reports. Zoom Flume, Gorilla, Maytag, Sunshine Falls, the Toilet Bowl — these should be 95+. Do not hedge on runs you clearly know.

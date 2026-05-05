@@ -106,7 +106,7 @@ const cfsClass = computed(() => {
 
 const impressionLabel = computed(() => {
   switch (report.value?.flow_impression) {
-    case 'too_low': return 'Too Low'
+    case 'low': return 'Too Low'
     case 'good':    return 'Good'
     case 'high':    return 'High'
     default:        return ''
@@ -115,7 +115,7 @@ const impressionLabel = computed(() => {
 
 const impressionClass = computed(() => {
   switch (report.value?.flow_impression) {
-    case 'too_low': return 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+    case 'low': return 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
     case 'good':    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
     case 'high':    return 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300'
     default:        return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'

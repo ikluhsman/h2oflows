@@ -151,7 +151,7 @@
 <script setup lang="ts">
 import { reactive, onMounted, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
-import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
+import { flowBandBadgeClass, flowBandLabel, flowBandSolidColor, flowBandCfsClass } from '~/utils/flowBand'
 
 const props = defineProps<{
   reaches: WatchedGauge[]
@@ -200,20 +200,10 @@ function reachLabel(reach: WatchedGauge): string {
 }
 
 function sparklineColor(reach: WatchedGauge): string {
-  const band = displayFlowBandLabel(reach)
-  if (band === 'running')   return '#22c55e'
-  if (band === 'high')      return '#16a34a'
-  if (band === 'very_high') return '#38bdf8'
-  if (band === 'too_low')   return '#ef4444'
-  return '#3b82f6'
+  return flowBandSolidColor(displayFlowBandLabel(reach))
 }
 
 function cfsColorClass(reach: WatchedGauge): string {
-  const band = displayFlowBandLabel(reach)
-  if (band === 'running')   return 'text-emerald-500 dark:text-emerald-400'
-  if (band === 'high')      return 'text-green-600 dark:text-green-500'
-  if (band === 'very_high') return 'text-sky-500 dark:text-sky-400'
-  if (band === 'too_low')   return 'text-red-500 dark:text-red-400'
-  return 'text-gray-900 dark:text-white'
+  return flowBandCfsClass(displayFlowBandLabel(reach))
 }
 </script>

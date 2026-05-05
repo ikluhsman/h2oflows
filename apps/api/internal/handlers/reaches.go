@@ -172,11 +172,11 @@ const mapBaseSQL = `
 		g.gauge_notes,
 		g.info_links,
 		CASE
-			WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
-			WHEN fr.label IN ('running', 'high')       THEN 'runnable'
-			WHEN fr.label = 'too_low'                  THEN 'caution'
-			WHEN fr.label = 'very_high'                THEN 'flood'
-			ELSE                                            'unknown'
+			WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
+			WHEN fr.label = 'running'                 THEN 'runnable'
+			WHEN fr.label = 'low'                     THEN 'caution'
+			WHEN fr.label = 'high'                    THEN 'flood'
+			ELSE                                           'unknown'
 		END AS flow_status
 	FROM reaches r
 	LEFT JOIN gauges g ON g.id = r.primary_gauge_id
@@ -184,10 +184,9 @@ const mapBaseSQL = `
 	LEFT JOIN LATERAL (
 		SELECT label FROM flow_ranges
 		WHERE reach_id = r.id
-		  AND craft_type = 'general'
-		  AND (min_cfs IS NULL OR lr.value >= min_cfs)
-		  AND (max_cfs IS NULL OR lr.value <  max_cfs)
-		ORDER BY min_cfs ASC NULLS FIRST
+		  AND (min_value IS NULL OR lr.value >= min_value)
+		  AND (max_value IS NULL OR lr.value <  max_value)
+		ORDER BY min_value ASC NULLS FIRST
 		LIMIT 1
 	) fr ON TRUE
 `
@@ -388,11 +387,11 @@ func (h *ReachHandler) queryAllFeatures(ctx context.Context) ([]Feature, error) 
 			g.gauge_notes,
 			g.info_links,
 			CASE
-				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
-				WHEN fr.label IN ('running', 'high')       THEN 'runnable'
-				WHEN fr.label = 'too_low'                  THEN 'caution'
-				WHEN fr.label = 'very_high'                THEN 'flood'
-				ELSE                                            'unknown'
+				WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
+				WHEN fr.label = 'running'                 THEN 'runnable'
+				WHEN fr.label = 'low'                     THEN 'caution'
+				WHEN fr.label = 'high'                    THEN 'flood'
+				ELSE                                           'unknown'
 			END AS flow_status
 		FROM reaches r
 		LEFT JOIN rivers rv ON rv.id = r.river_id
@@ -401,10 +400,9 @@ func (h *ReachHandler) queryAllFeatures(ctx context.Context) ([]Feature, error) 
 		LEFT JOIN LATERAL (
 			SELECT label FROM flow_ranges
 			WHERE reach_id = r.id
-			  AND craft_type = 'general'
-			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
-			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
-			ORDER BY min_cfs ASC NULLS FIRST
+			  AND (min_value IS NULL OR lr.value >= min_value)
+			  AND (max_value IS NULL OR lr.value <  max_value)
+			ORDER BY min_value ASC NULLS FIRST
 			LIMIT 1
 		) fr ON TRUE
 		WHERE r.centerline IS NOT NULL
@@ -549,11 +547,11 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 			g.source       AS gauge_source,
 			g.name         AS gauge_name,
 			CASE
-				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
-				WHEN fr.label IN ('running', 'high')       THEN 'runnable'
-				WHEN fr.label = 'too_low'                  THEN 'caution'
-				WHEN fr.label = 'very_high'                THEN 'flood'
-				ELSE                                            'unknown'
+				WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
+				WHEN fr.label = 'running'                 THEN 'runnable'
+				WHEN fr.label = 'low'                     THEN 'caution'
+				WHEN fr.label = 'high'                    THEN 'flood'
+				ELSE                                           'unknown'
 			END AS flow_status
 		FROM reaches r
 		LEFT JOIN rivers rv ON rv.id = r.river_id
@@ -562,10 +560,9 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 		LEFT JOIN LATERAL (
 			SELECT label FROM flow_ranges
 			WHERE reach_id = r.id
-			  AND craft_type = 'general'
-			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
-			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
-			ORDER BY min_cfs ASC NULLS FIRST
+			  AND (min_value IS NULL OR lr.value >= min_value)
+			  AND (max_value IS NULL OR lr.value <  max_value)
+			ORDER BY min_value ASC NULLS FIRST
 			LIMIT 1
 		) fr ON TRUE
 		ORDER BY rv.basin NULLS LAST,
@@ -668,10 +665,10 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			COALESCE(ST_X(g.location::geometry), NULL) AS gauge_lng,
 			COALESCE(ST_Y(g.location::geometry), NULL) AS gauge_lat,
 			CASE
-				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
-				WHEN fr.label IN ('running','high')        THEN 'runnable'
-				WHEN fr.label = 'too_low'                  THEN 'caution'
-				WHEN fr.label = 'very_high'                THEN 'flood'
+				WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
+				WHEN fr.label = 'running'                 THEN 'runnable'
+				WHEN fr.label = 'low'                     THEN 'caution'
+				WHEN fr.label = 'high'                    THEN 'flood'
 				ELSE 'unknown'
 			END AS flow_status,
 			fr.label AS flow_band_label
@@ -687,10 +684,9 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN LATERAL (
 			SELECT label FROM flow_ranges
 			WHERE reach_id = r.id
-			  AND craft_type = 'general'
-			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
-			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
-			ORDER BY min_cfs ASC NULLS FIRST
+			  AND (min_value IS NULL OR lr.value >= min_value)
+			  AND (max_value IS NULL OR lr.value <  max_value)
+			ORDER BY min_value ASC NULLS FIRST
 			LIMIT 1
 		) fr ON TRUE
 		WHERE r.slug = $1
@@ -734,9 +730,9 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 			lr.value AS current_cfs,
 			CASE
 				WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
-				WHEN fr.label IN ('running','high')       THEN 'runnable'
-				WHEN fr.label = 'too_low'                 THEN 'caution'
-				WHEN fr.label = 'very_high'               THEN 'flood'
+				WHEN fr.label = 'running'                 THEN 'runnable'
+				WHEN fr.label = 'low'                     THEN 'caution'
+				WHEN fr.label = 'high'                    THEN 'flood'
 				ELSE 'unknown'
 			END AS flow_status,
 			fr.label AS flow_band_label,
@@ -753,10 +749,9 @@ func (h *ReachHandler) Get(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN LATERAL (
 			SELECT label FROM flow_ranges
 			WHERE reach_id = g.reach_id
-			  AND craft_type = 'general'
-			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
-			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
-			ORDER BY min_cfs ASC NULLS FIRST
+			  AND (min_value IS NULL OR lr.value >= min_value)
+			  AND (max_value IS NULL OR lr.value <  max_value)
+			ORDER BY min_value ASC NULLS FIRST
 			LIMIT 1
 		) fr ON TRUE
 		WHERE g.reach_id = $1
@@ -1072,25 +1067,15 @@ func (h *ReachHandler) GetHazards(w http.ResponseWriter, r *http.Request) {
 
 // GetFlowRanges handles GET /api/v1/reaches/{slug}/flow-ranges
 //
-// Returns the flow range bands for a reach, sorted min_cfs ASC.
+// Returns the 3-band flow ranges for a reach, sorted min_value ASC.
 // The frontend overlays these as colored bands on the gauge graph.
-//
-// Query params:
-//
-//	craft=general   craft type filter (default "general")
 func (h *ReachHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
-	craft := r.URL.Query().Get("craft")
-	if craft == "" {
-		craft = "general"
-	}
-
 	type flowRange struct {
 		Label        string   `json:"label"`
-		MinCFS       *float64 `json:"min_cfs"`
-		MaxCFS       *float64 `json:"max_cfs"`
-		CraftType    string   `json:"craft_type"`
+		MinValue     *float64 `json:"min_value"`
+		MaxValue     *float64 `json:"max_value"`
 		ClassMod     *float64 `json:"class_modifier"`
 		SourceURL    *string  `json:"source_url,omitempty"`
 		DataSource   string   `json:"data_source"`
@@ -1101,9 +1086,8 @@ func (h *ReachHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(r.Context(), `
 		SELECT
 			fr.label,
-			fr.min_cfs,
-			fr.max_cfs,
-			fr.craft_type,
+			fr.min_value,
+			fr.max_value,
 			fr.class_modifier,
 			fr.source_url,
 			fr.data_source,
@@ -1111,10 +1095,9 @@ func (h *ReachHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 			fr.verified
 		FROM flow_ranges fr
 		JOIN reaches rch ON rch.id = fr.reach_id
-		WHERE rch.slug   = $1
-		  AND fr.craft_type = $2
-		ORDER BY fr.min_cfs ASC NULLS FIRST
-	`, slug, craft)
+		WHERE rch.slug = $1
+		ORDER BY fr.min_value ASC NULLS FIRST
+	`, slug)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "query failed")
 		return
@@ -1125,8 +1108,8 @@ func (h *ReachHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var fr flowRange
 		if err := rows.Scan(
-			&fr.Label, &fr.MinCFS, &fr.MaxCFS,
-			&fr.CraftType, &fr.ClassMod, &fr.SourceURL,
+			&fr.Label, &fr.MinValue, &fr.MaxValue,
+			&fr.ClassMod, &fr.SourceURL,
 			&fr.DataSource, &fr.AIConfidence, &fr.Verified,
 		); err != nil {
 			continue
@@ -1143,36 +1126,29 @@ func (h *ReachHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 
 // SetFlowRanges handles PUT /api/v1/reaches/{slug}/flow-ranges
 //
-// Upserts the four canonical bands for a reach+craft combination.
-// Missing bands are deleted.  Body example:
+// Upserts the three canonical bands for a reach. Missing bands are deleted.
+// Body example:
 //
 //	{
-//	  "craft": "general",
-//	  "too_low":   { "max_cfs": 170 },
-//	  "running":   { "min_cfs": 170, "max_cfs": 400 },
-//	  "high":      { "min_cfs": 400, "max_cfs": 600 },
-//	  "very_high": { "min_cfs": 600 }
+//	  "low":     { "max_value": 170 },
+//	  "running": { "min_value": 170, "max_value": 400 },
+//	  "high":    { "min_value": 400 }
 //	}
 func (h *ReachHandler) SetFlowRanges(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
 	type bandInput struct {
-		MinCFS *float64 `json:"min_cfs"`
-		MaxCFS *float64 `json:"max_cfs"`
+		MinValue *float64 `json:"min_value"`
+		MaxValue *float64 `json:"max_value"`
 	}
 	var body struct {
-		Craft    string     `json:"craft"`
-		TooLow   *bandInput `json:"too_low"`
-		Running  *bandInput `json:"running"`
-		High     *bandInput `json:"high"`
-		VeryHigh *bandInput `json:"very_high"`
+		Low     *bandInput `json:"low"`
+		Running *bandInput `json:"running"`
+		High    *bandInput `json:"high"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		errorResponse(w, http.StatusBadRequest, "invalid JSON")
 		return
-	}
-	if body.Craft == "" {
-		body.Craft = "general"
 	}
 
 	// Resolve reach ID.
@@ -1185,43 +1161,40 @@ func (h *ReachHandler) SetFlowRanges(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Also need gauge_id for the row (keeps backward-compat FK intact).
+	// Keep gauge_id FK populated from the reach's primary gauge.
 	var gaugeID *string
 	_ = h.db.QueryRow(r.Context(),
 		`SELECT primary_gauge_id::text FROM reaches WHERE id = $1`, reachID,
 	).Scan(&gaugeID)
 
 	type band struct {
-		label  string
-		input  *bandInput
+		label string
+		input *bandInput
 	}
 	bands := []band{
-		{"too_low", body.TooLow},
+		{"low", body.Low},
 		{"running", body.Running},
 		{"high", body.High},
-		{"very_high", body.VeryHigh},
 	}
 
 	for _, b := range bands {
 		if b.input == nil {
-			// Delete this band if it exists.
 			_, _ = h.db.Exec(r.Context(), `
 				DELETE FROM flow_ranges
-				WHERE reach_id = $1 AND label = $2 AND craft_type = $3
-			`, reachID, b.label, body.Craft)
+				WHERE reach_id = $1 AND label = $2
+			`, reachID, b.label)
 			continue
 		}
-		// Upsert.
 		_, err := h.db.Exec(r.Context(), `
 			INSERT INTO flow_ranges
-			  (gauge_id, reach_id, label, min_cfs, max_cfs, craft_type, data_source, verified)
-			VALUES ($1, $2, $3, $4, $5, $6, 'manual', true)
-			ON CONFLICT (reach_id, label, craft_type) DO UPDATE
-			  SET min_cfs    = EXCLUDED.min_cfs,
-			      max_cfs    = EXCLUDED.max_cfs,
+			  (gauge_id, reach_id, label, min_value, max_value, data_source, verified)
+			VALUES ($1, $2, $3, $4, $5, 'manual', true)
+			ON CONFLICT (reach_id, label) DO UPDATE
+			  SET min_value   = EXCLUDED.min_value,
+			      max_value   = EXCLUDED.max_value,
 			      data_source = 'manual',
 			      verified    = true
-		`, gaugeID, reachID, b.label, b.input.MinCFS, b.input.MaxCFS, body.Craft)
+		`, gaugeID, reachID, b.label, b.input.MinValue, b.input.MaxValue)
 		if err != nil {
 			errorResponse(w, http.StatusInternalServerError, "upsert failed: "+err.Error())
 			return

@@ -66,6 +66,7 @@ func main() {
 
 	type target struct {
 		GaugeID    string
+		ReachID    string
 		GaugeName  string
 		ExternalID string
 		Source     string
@@ -74,16 +75,15 @@ func main() {
 		ClassMin   float64
 		ClassMax   float64
 		LengthMi   float64
-		AWReachID  *string // nullable — most reaches won't have this populated yet
+		AWReachID  *string
 	}
 
 	var targets []target
 	for rows.Next() {
 		var t target
-		var reachID string // unused beyond join
 		if err := rows.Scan(
 			&t.GaugeID, &t.GaugeName, &t.ExternalID, &t.Source,
-			&reachID, &t.ReachName, &t.Region,
+			&t.ReachID, &t.ReachName, &t.Region,
 			&t.ClassMin, &t.ClassMax, &t.LengthMi, &t.AWReachID,
 		); err != nil {
 			log.Printf("scan: %v", err)
@@ -140,11 +140,10 @@ func main() {
 			if verified {
 				flag = "auto-verified"
 			}
-			fmt.Printf("  %-10s  %6.0f–%-6s  craft=%-8s  conf=%d  %s  %s\n",
+			fmt.Printf("  %-10s  %6.0f–%-6s  conf=%d  %s  %s\n",
 				s.Label,
-				derefF(s.MinCFS),
-				formatMax(s.MaxCFS),
-				s.CraftType,
+				derefF(s.MinValue),
+				formatMax(s.MaxValue),
 				s.Confidence,
 				flag,
 				s.SourceURL,
@@ -156,7 +155,7 @@ func main() {
 			continue
 		}
 
-		if err := writeFlowRanges(ctx, pool, t.GaugeID, seeds, seeder.DataSource()); err != nil {
+		if err := writeFlowRanges(ctx, pool, t.ReachID, t.GaugeID, seeds, seeder.DataSource()); err != nil {
 			fmt.Printf("  ✗ write error: %v\n", err)
 			failed++
 			continue
@@ -171,20 +170,20 @@ func main() {
 
 // writeFlowRanges inserts AI-seeded flow ranges.
 // ON CONFLICT DO NOTHING — verified manual entries are never overwritten.
-func writeFlowRanges(ctx context.Context, pool *pgxpool.Pool, gaugeID string, seeds []ai.FlowRangeSeed, dataSource string) error {
+func writeFlowRanges(ctx context.Context, pool *pgxpool.Pool, reachID, gaugeID string, seeds []ai.FlowRangeSeed, dataSource string) error {
 	for _, s := range seeds {
 		_, err := pool.Exec(ctx, `
 			INSERT INTO flow_ranges
-				(gauge_id, label, min_cfs, max_cfs, craft_type, class_modifier,
+				(reach_id, gauge_id, label, min_value, max_value, class_modifier,
 				 source_url, ai_confidence, data_source, verified)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-			ON CONFLICT (gauge_id, label, craft_type) DO NOTHING
+			ON CONFLICT (reach_id, label) DO NOTHING
 		`,
+			reachID,
 			gaugeID,
 			s.Label,
-			s.MinCFS,
-			s.MaxCFS,
-			s.CraftType,
+			s.MinValue,
+			s.MaxValue,
 			s.ClassMod,
 			nullStr(s.SourceURL),
 			s.Confidence,

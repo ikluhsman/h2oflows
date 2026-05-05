@@ -65,7 +65,7 @@ const readings = ref<{ cfs: number; timestamp: string }[]>([])
 // Flow ranges are fetched once per mount so we can compute the live band
 // from the freshest reading and emit it upward, overriding the (potentially
 // stale) flowBandLabel coming from the watchlist store.
-const flowRanges = ref<{ label: string; min_cfs: number | null; max_cfs: number | null }[]>([])
+const flowRanges = ref<{ label: string; min_value: number | null; max_value: number | null }[]>([])
 let rangesLoaded = false
 
 async function loadFlowRanges() {
@@ -92,8 +92,8 @@ async function fetchReadings() {
         const latestCfs = readings.value[readings.value.length - 1].cfs
         emit('latestCfs', latestCfs)
         const matched = flowRanges.value.find(fr =>
-          (fr.min_cfs == null || latestCfs >= fr.min_cfs) &&
-          (fr.max_cfs == null || latestCfs <  fr.max_cfs)
+          (fr.min_value == null || latestCfs >= fr.min_value) &&
+          (fr.max_value == null || latestCfs <  fr.max_value)
         )
         const liveLabel = matched?.label ?? null
         emit('liveFlowBand', { flowBandLabel: liveLabel, flowStatus: flowStatusForBand(liveLabel) })

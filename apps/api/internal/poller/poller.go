@@ -148,17 +148,16 @@ func (p *Poller) writeReading(ctx context.Context, gaugeID string, r gauge.Readi
 		SET current_cfs = $2,
 		    flow_status  = COALESCE(
 		        (SELECT CASE
-		                    WHEN fr.label IN ('running','high') THEN 'runnable'
-		                    WHEN fr.label = 'too_low'           THEN 'caution'
-		                    WHEN fr.label = 'very_high'         THEN 'flood'
+		                    WHEN fr.label = 'running' THEN 'runnable'
+		                    WHEN fr.label = 'low'     THEN 'caution'
+		                    WHEN fr.label = 'high'    THEN 'flood'
 		                    ELSE 'unknown'
 		                END
 		         FROM flow_ranges fr
 		         WHERE fr.gauge_id = $1
-		           AND fr.craft_type = 'general'
-		           AND (fr.min_cfs IS NULL OR $2 >= fr.min_cfs)
-		           AND (fr.max_cfs IS NULL OR $2 <  fr.max_cfs)
-		         ORDER BY fr.min_cfs ASC NULLS FIRST
+		           AND (fr.min_value IS NULL OR $2 >= fr.min_value)
+		           AND (fr.max_value IS NULL OR $2 <  fr.max_value)
+		         ORDER BY fr.min_value ASC NULLS FIRST
 		         LIMIT 1),
 		        'unknown'
 		    )
