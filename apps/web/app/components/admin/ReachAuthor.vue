@@ -1,24 +1,35 @@
 <template>
   <div>
-    <p class="text-xs text-gray-400 mb-3">Pick an anchor point near the reach to load NHD tributary flowlines. Then click flowline segments to select the upstream and downstream ComIDs — no access-point coordinates needed yet.</p>
+    <!-- Step 1: anchor not yet set -->
+    <template v-if="!authorAnchorSnap && !authorAnchorSnapping">
+      <div class="mb-3 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-3 py-2.5 text-xs text-blue-800 dark:text-blue-200">
+        <span class="font-medium">Tap the river on the map</span> near the reach start point. We'll snap to the nearest NHD flowline.
+      </div>
+    </template>
+    <template v-else-if="authorAnchorSnapping">
+      <div class="mb-3 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 animate-pulse">
+        Snapping to NHD…
+      </div>
+    </template>
+    <!-- Anchor snapped — show controls -->
+    <template v-else-if="authorAnchorSnap">
+      <div class="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+        <span class="flex-1 font-medium text-blue-800 dark:text-blue-200">
+          <template v-if="authorAnchorSnap.name">{{ authorAnchorSnap.name }}</template>
+          <template v-else>ComID {{ authorAnchorSnap.comid }}</template>
+        </span>
+        <UButton size="xs" variant="ghost" color="neutral" @click="resetToPickMode">Pick another point</UButton>
+        <UButton size="xs" variant="ghost" color="error" @click="reset">Clear</UButton>
+      </div>
+    </template>
 
-    <!-- Anchor controls -->
-    <div class="flex flex-wrap items-center gap-2 mb-3">
-      <UButton
-        size="xs"
-        :color="authorPickMode ? 'primary' : 'neutral'"
-        :variant="authorPickMode ? 'solid' : 'outline'"
-        @click="authorPickMode = !authorPickMode"
-      >{{ authorPickMode ? 'Cancel' : 'Pick anchor point' }}</UButton>
-      <UButton v-if="authorAnchorSnap" size="xs" variant="ghost" color="neutral" @click="reset">Clear</UButton>
-      <span v-if="authorAnchorSnapping" class="text-xs text-blue-600 dark:text-blue-400 animate-pulse">Snapping to NHD…</span>
+    <!-- Step 2: anchor snapped, prompt for ComID selection -->
+    <div v-if="authorAnchorSnap && !authorUpComID" class="mb-3 rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+      Click the upstream (put-in) flowline segment on the map. Try satellite view to find the boat ramp.
     </div>
-
-    <!-- Anchor badge -->
-    <div v-if="authorAnchorSnap" class="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs">
-      <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
-      <span class="font-medium text-blue-800 dark:text-blue-200">Anchor ComID {{ authorAnchorSnap.comid }}</span>
-      <span v-if="authorAnchorSnap.name" class="text-blue-600 dark:text-blue-300">{{ authorAnchorSnap.name }}</span>
+    <div v-else-if="authorUpComID && !authorDownComID" class="mb-3 rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+      Now click the downstream (take-out) flowline segment.
     </div>
 
     <!-- ComID slot selector -->
@@ -86,8 +97,14 @@
       <UButton size="xs" variant="outline" color="neutral" :loading="authorPreviewLoading" @click="previewCenterline">
         {{ authorPreviewCenterline ? 'Refresh preview' : 'Preview centerline' }}
       </UButton>
-      <UButton size="xs" :loading="authorRiverNameFetching" :disabled="!authorUpComID" @click="fetchRiverName">Save flow lines</UButton>
       <span v-if="authorPreviewCenterline" class="text-xs text-blue-600 dark:text-blue-400">Dashed line shows trimmed reach</span>
+      <span v-if="authorRiverNameFetching" class="text-xs text-gray-400 animate-pulse">Looking up river…</span>
+    </div>
+
+    <!-- "Looks like [river name]" hint — appears once river name is auto-detected -->
+    <div v-if="authorUpComID && authorDownComID && authorForm.riverName && !authorRiverNameFetching" class="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-200">
+      <svg class="w-3.5 h-3.5 shrink-0 text-emerald-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+      <span>Looks like <strong>{{ authorForm.riverName }}</strong><template v-if="authorGnisId"> · GNIS {{ authorGnisId }}</template></span>
     </div>
 
     <!-- Reach form — shown once both ComIDs selected -->
@@ -235,16 +252,34 @@
       <div v-if="authorError" class="text-xs text-red-500">{{ authorError }}</div>
       <div v-if="authorSuccess" class="text-xs text-green-600 dark:text-green-400">{{ authorSuccess }}</div>
 
-      <div class="flex gap-2 justify-end pt-1">
+      <!-- GNIS confirm step — inline before final save -->
+      <div v-if="authorGnisConfirm" class="rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 space-y-2">
+        <p class="text-xs font-semibold text-amber-800 dark:text-amber-200">Confirm river assignment</p>
+        <div class="flex items-center gap-2">
+          <label class="text-xs text-gray-600 dark:text-gray-300 shrink-0">River name</label>
+          <input
+            v-model="authorForm.riverName"
+            class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs"
+            placeholder="River name"
+          />
+        </div>
+        <p class="text-xs text-gray-400">{{ authorGnisId ? `GNIS ${authorGnisId} · ` : 'No GNIS match · ' }}River will be created if it doesn't exist.</p>
+        <div class="flex gap-2 justify-end">
+          <UButton size="xs" variant="ghost" color="neutral" @click="authorGnisConfirm = false">Back</UButton>
+          <UButton size="xs" :loading="authorSaving" :disabled="!authorForm.name.trim()" @click="submit">Confirm &amp; save</UButton>
+        </div>
+      </div>
+
+      <div v-else class="flex gap-2 justify-end pt-1">
         <UButton size="sm" variant="ghost" color="neutral" @click="onCancel">Cancel</UButton>
-        <UButton size="sm" :loading="authorSaving" :disabled="!authorForm.name.trim()" @click="submit">Save reach</UButton>
+        <UButton size="sm" :disabled="!authorForm.name.trim()" @click="authorGnisConfirm = true">Save reach</UButton>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 
 interface NHDFC { type: string; features: any[] }
 
@@ -287,6 +322,7 @@ const authorGaugeSaving         = ref(false)
 const authorGaugeError          = ref('')
 const authorRiverNameFetching   = ref(false)
 const authorGnisId              = ref('')
+const authorGnisConfirm         = ref(false)
 
 const authorForm = ref({
   name: '', commonName: '', riverName: '', slug: '',
@@ -361,8 +397,32 @@ watch(authorUpComID, async (comid) => {
   finally { authorDownstreamLoading.value = false }
 })
 
+// Both ComIDs set → auto-preview centerline and look up river name.
+watch([authorUpComID, authorDownComID], async ([up, down]) => {
+  if (!up || !down) return
+  previewCenterline()
+  fetchRiverName()
+})
+
+onMounted(() => {
+  authorPickMode.value = true
+})
+
+function resetToPickMode() {
+  authorPickMode.value = true
+  authorAnchorSnap.value = null
+  authorTributaries.value = null
+  authorDownstreamFlowlines.value = null
+  authorUpComID.value = null; authorDownComID.value = null
+  authorStartLat.value = null; authorStartLng.value = null
+  authorEndLat.value = null; authorEndLng.value = null
+  authorPreviewCenterline.value = null
+  authorComIDSlot.value = 'up'
+  authorGnisConfirm.value = false
+}
+
 function reset() {
-  authorPickMode.value = false
+  authorPickMode.value = true  // auto-restart pick mode after clear
   authorAnchorSnapping.value = false
   authorAnchorSnap.value = null
   authorTributaries.value = null
@@ -398,6 +458,7 @@ function reset() {
   authorGaugeError.value = ''
   authorRiverNameFetching.value = false
   authorGnisId.value = ''
+  authorGnisConfirm.value = false
 }
 
 async function fetchNearbyGauges(lat: number, lng: number, comid?: string | null) {

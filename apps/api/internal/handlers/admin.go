@@ -50,7 +50,7 @@ func (h *AdminHandler) SlugCheck(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) ListRivers(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(r.Context(), `
 		SELECT rv.id, rv.slug, rv.name, rv.gnis_id, rv.basin, rv.basin_locked, rv.state_abbr,
-		       COUNT(re.id) AS reach_count
+		       rv.verified, COUNT(re.id) AS reach_count
 		FROM rivers rv
 		LEFT JOIN reaches re ON re.river_id = rv.id
 		GROUP BY rv.id
@@ -70,13 +70,14 @@ func (h *AdminHandler) ListRivers(w http.ResponseWriter, r *http.Request) {
 		Basin       *string `json:"basin"`
 		BasinLocked bool    `json:"basin_locked"`
 		StateAbbr   *string `json:"state_abbr"`
+		Verified    bool    `json:"verified"`
 		ReachCount  int     `json:"reach_count"`
 	}
 
 	rivers := make([]River, 0)
 	for rows.Next() {
 		var rv River
-		if err := rows.Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.GNISID, &rv.Basin, &rv.BasinLocked, &rv.StateAbbr, &rv.ReachCount); err != nil {
+		if err := rows.Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.GNISID, &rv.Basin, &rv.BasinLocked, &rv.StateAbbr, &rv.Verified, &rv.ReachCount); err != nil {
 			continue
 		}
 		rivers = append(rivers, rv)
@@ -343,11 +344,13 @@ func (h *AdminHandler) AutoAssignRiver(w http.ResponseWriter, r *http.Request) {
 			gnisParam = body.GnisID
 			stateAbbr, basin, huc8 = riverMetaFromGNIS(ctx, body.GnisID)
 		}
+		// verified = true when GNIS match confirms the river identity, false otherwise.
+		verified := body.GnisID != ""
 		if err := h.db.QueryRow(ctx, `
-			INSERT INTO rivers (slug, name, gnis_id, state_abbr, basin, huc8)
-			VALUES ($1, $2, $3, NULLIF($4,''), NULLIF($5,''), NULLIF($6,''))
+			INSERT INTO rivers (slug, name, gnis_id, state_abbr, basin, huc8, verified)
+			VALUES ($1, $2, $3, NULLIF($4,''), NULLIF($5,''), NULLIF($6,''), $7)
 			RETURNING id, name, slug, gnis_id
-		`, riverSlug, body.RiverName, gnisParam, stateAbbr, basin, huc8).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID); err != nil {
+		`, riverSlug, body.RiverName, gnisParam, stateAbbr, basin, huc8, verified).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID); err != nil {
 			errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("insert river: %v", err))
 			return
 		}
