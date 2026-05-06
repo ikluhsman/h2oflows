@@ -145,12 +145,13 @@ func writeKnownRapid(ctx context.Context, pool *pgxpool.Pool, reachID string, r 
 func writeKnownFlowRange(ctx context.Context, pool *pgxpool.Pool, gaugeExtID, gaugeSource string, fr knownFlowRange) error {
 	_, err := pool.Exec(ctx, `
 		INSERT INTO flow_ranges
-			(gauge_id, label, min_cfs, max_cfs, craft_type, data_source, verified)
-		SELECT g.id, $2, $3, $4, 'general', 'manual', TRUE
+			(reach_id, gauge_id, label, min_value, max_value, data_source, verified)
+		SELECT r.id, g.id, $2, $3, $4, 'manual', TRUE
 		FROM gauges g
+		JOIN reaches r ON r.primary_gauge_id = g.id
 		WHERE g.external_id = $1 AND g.source = $5
-		ON CONFLICT (gauge_id, label, craft_type) DO NOTHING
-	`, gaugeExtID, fr.Label, fr.MinCFS, fr.MaxCFS, gaugeSource)
+		ON CONFLICT (reach_id, label) DO NOTHING
+	`, gaugeExtID, fr.Label, fr.MinValue, fr.MaxValue, gaugeSource)
 	return err
 }
 
@@ -159,18 +160,15 @@ func writeKnownFlowRange(ctx context.Context, pool *pgxpool.Pool, gaugeExtID, ga
 // ON CONFLICT DO NOTHING — never overwrites existing manual or verified rows.
 func writeFlowRanges(ctx context.Context, pool *pgxpool.Pool, gaugeExtID, gaugeSource string, ranges []ai.FlowRangeSeed) (written, autoVerified int) {
 	for _, fr := range ranges {
-		craftType := fr.CraftType
-		if craftType == "" {
-			craftType = "general"
-		}
 		_, err := pool.Exec(ctx, `
 			INSERT INTO flow_ranges
-				(gauge_id, label, min_cfs, max_cfs, craft_type, data_source, ai_confidence, verified)
-			SELECT g.id, $2, $3, $4, $5, 'ai_seed', $6, $7
+				(reach_id, gauge_id, label, min_value, max_value, data_source, ai_confidence, verified)
+			SELECT r.id, g.id, $2, $3, $4, 'ai_seed', $5, $6
 			FROM gauges g
-			WHERE g.external_id = $1 AND g.source = $8
-			ON CONFLICT (gauge_id, label, craft_type) DO NOTHING
-		`, gaugeExtID, fr.Label, fr.MinCFS, fr.MaxCFS, craftType, fr.Confidence, fr.AutoVerified(), gaugeSource)
+			JOIN reaches r ON r.primary_gauge_id = g.id
+			WHERE g.external_id = $1 AND g.source = $7
+			ON CONFLICT (reach_id, label) DO NOTHING
+		`, gaugeExtID, fr.Label, fr.MinValue, fr.MaxValue, fr.Confidence, fr.AutoVerified(), gaugeSource)
 		if err != nil {
 			fmt.Printf("    ✗ flow range %s: %v\n", fr.Label, err)
 			continue

@@ -52,6 +52,8 @@ export interface WatchedGauge {
   // Named flow band from flow_ranges (e.g. "optimal", "fun") — null if no ranges seeded
   flowBandLabel: string | null
   lastReadingAt: string | null
+  pollHealth: 'healthy' | 'degraded' | 'stale' | 'unreachable' | null
+  lastPollSuccessAt: string | null
   // Watch state — kept for trip recorder removal in Phase 8
   watchState: 'saved' | 'active'
   activeSince: string | null
@@ -242,6 +244,8 @@ export const useWatchlistStore = defineStore('watchlist', {
       gauge.flowStatus            = fresh.flowStatus
       gauge.flowBandLabel         = fresh.flowBandLabel
       gauge.lastReadingAt         = fresh.lastReadingAt
+      gauge.pollHealth            = fresh.pollHealth ?? null
+      gauge.lastPollSuccessAt     = fresh.lastPollSuccessAt ?? null
     },
   },
 

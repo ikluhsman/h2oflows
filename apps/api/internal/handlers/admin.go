@@ -50,9 +50,13 @@ func (h *AdminHandler) SlugCheck(w http.ResponseWriter, r *http.Request) {
 func (h *AdminHandler) ListRivers(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(r.Context(), `
 		SELECT rv.id, rv.slug, rv.name, rv.gnis_id, rv.basin, rv.basin_locked, rv.state_abbr,
-		       COUNT(re.id) AS reach_count
+		       rv.verified, COUNT(re.id) AS reach_count,
+		       COUNT(g.id) FILTER (WHERE g.poll_health = 'degraded')    AS gauges_degraded,
+		       COUNT(g.id) FILTER (WHERE g.poll_health = 'stale')       AS gauges_stale,
+		       COUNT(g.id) FILTER (WHERE g.poll_health = 'unreachable') AS gauges_unreachable
 		FROM rivers rv
 		LEFT JOIN reaches re ON re.river_id = rv.id
+		LEFT JOIN gauges g ON g.id = re.primary_gauge_id
 		GROUP BY rv.id
 		ORDER BY rv.name
 	`)
@@ -63,20 +67,28 @@ func (h *AdminHandler) ListRivers(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 
 	type River struct {
-		ID          string  `json:"id"`
-		Slug        string  `json:"slug"`
-		Name        string  `json:"name"`
-		GNISID      *string `json:"gnis_id"`
-		Basin       *string `json:"basin"`
-		BasinLocked bool    `json:"basin_locked"`
-		StateAbbr   *string `json:"state_abbr"`
-		ReachCount  int     `json:"reach_count"`
+		ID                string  `json:"id"`
+		Slug              string  `json:"slug"`
+		Name              string  `json:"name"`
+		GNISID            *string `json:"gnis_id"`
+		Basin             *string `json:"basin"`
+		BasinLocked       bool    `json:"basin_locked"`
+		StateAbbr         *string `json:"state_abbr"`
+		Verified          bool    `json:"verified"`
+		ReachCount        int     `json:"reach_count"`
+		GaugesDegraded    int     `json:"gauges_degraded"`
+		GaugesStale       int     `json:"gauges_stale"`
+		GaugesUnreachable int     `json:"gauges_unreachable"`
 	}
 
 	rivers := make([]River, 0)
 	for rows.Next() {
 		var rv River
-		if err := rows.Scan(&rv.ID, &rv.Slug, &rv.Name, &rv.GNISID, &rv.Basin, &rv.BasinLocked, &rv.StateAbbr, &rv.ReachCount); err != nil {
+		if err := rows.Scan(
+			&rv.ID, &rv.Slug, &rv.Name, &rv.GNISID, &rv.Basin, &rv.BasinLocked, &rv.StateAbbr,
+			&rv.Verified, &rv.ReachCount,
+			&rv.GaugesDegraded, &rv.GaugesStale, &rv.GaugesUnreachable,
+		); err != nil {
 			continue
 		}
 		rivers = append(rivers, rv)
@@ -343,11 +355,13 @@ func (h *AdminHandler) AutoAssignRiver(w http.ResponseWriter, r *http.Request) {
 			gnisParam = body.GnisID
 			stateAbbr, basin, huc8 = riverMetaFromGNIS(ctx, body.GnisID)
 		}
+		// verified = true when GNIS match confirms the river identity, false otherwise.
+		verified := body.GnisID != ""
 		if err := h.db.QueryRow(ctx, `
-			INSERT INTO rivers (slug, name, gnis_id, state_abbr, basin, huc8)
-			VALUES ($1, $2, $3, NULLIF($4,''), NULLIF($5,''), NULLIF($6,''))
+			INSERT INTO rivers (slug, name, gnis_id, state_abbr, basin, huc8, verified)
+			VALUES ($1, $2, $3, NULLIF($4,''), NULLIF($5,''), NULLIF($6,''), $7)
 			RETURNING id, name, slug, gnis_id
-		`, riverSlug, body.RiverName, gnisParam, stateAbbr, basin, huc8).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID); err != nil {
+		`, riverSlug, body.RiverName, gnisParam, stateAbbr, basin, huc8, verified).Scan(&riverID, &riverName, &riverSlugOut, &riverGnisID); err != nil {
 			errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("insert river: %v", err))
 			return
 		}

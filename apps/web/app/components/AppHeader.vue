@@ -120,6 +120,28 @@
               {{ colorMode.value === 'dark' ? 'Light mode' : 'Dark mode' }}
             </button>
             <NuxtLink
+              v-if="isAuthenticated"
+              to="/my/reaches"
+              class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              @click="userMenuOpen = false"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/>
+              </svg>
+              My Reaches
+            </NuxtLink>
+            <NuxtLink
+              v-if="isAuthenticated"
+              to="/my/gauges"
+              class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              @click="userMenuOpen = false"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 7h6m0 10v-3m-3 3v-6m-3 6v-1"/>
+              </svg>
+              My Gauges
+            </NuxtLink>
+            <NuxtLink
               v-if="isDataAdmin"
               to="/admin"
               class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"

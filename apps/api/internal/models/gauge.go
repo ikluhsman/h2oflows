@@ -46,9 +46,9 @@ type GaugeReading struct {
 type FlowRange struct {
 	ID            string
 	GaugeID       string
-	Label         string  // too_low / minimum / fun / optimal / pushy / high / flood
-	MinCFS        *float64
-	MaxCFS        *float64
+	Label         string   // low / running / high
+	MinValue      *float64
+	MaxValue      *float64
 	ClassModifier *float64
 	CreatedAt     time.Time
 }

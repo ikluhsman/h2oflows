@@ -753,8 +753,8 @@ const activeBand = computed(() => {
   if (cfs == null) return null
   const bands = (flowRanges.value as any[]) ?? []
   for (const b of bands) {
-    const aboveMin = b.min_cfs == null || cfs >= b.min_cfs
-    const belowMax = b.max_cfs == null || cfs <  b.max_cfs
+    const aboveMin = b.min_value == null || cfs >= b.min_value
+    const belowMax = b.max_value == null || cfs <  b.max_value
     if (aboveMin && belowMax) return b.label
   }
   return null

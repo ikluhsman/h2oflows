@@ -11,25 +11,17 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
-// FlowRangeSeed is one flow band for a gauge, as returned by the AI seeder.
-// It maps directly onto a row in the flow_ranges table.
+// FlowRangeSeed is one flow band, as returned by the AI seeder.
+// Maps directly onto a row in the flow_ranges table.
 type FlowRangeSeed struct {
-	// Label must be one of the DB CHECK values:
-	//   too_low | running | high | very_high
-	//
-	// Mapping to user-visible label:
-	//   too_low   → "Too Low"   (red)
-	//   running   → "Running"   (green)
-	//   high      → "High"      (darker green)
-	//   very_high → "Very High" (light blue)
+	// Label must be one of the DB CHECK values: low | running | high
 	Label     string   `json:"label"`
-	MinCFS    *float64 `json:"min_cfs"`    // null = no lower bound (only valid for too_low)
-	MaxCFS    *float64 `json:"max_cfs"`    // null = no upper bound (only valid for very_high)
-	CraftType string   `json:"craft_type"` // general | kayak | raft | sup | packraft | canoe
-	ClassMod  *float64 `json:"class_modifier"` // difficulty shift at this band, e.g. +0.5
-	SourceURL string   `json:"source_url"` // AW page or other cited source; empty if unknown
-	Notes      string   `json:"notes"`      // freeform — e.g. "Bony but runnable at minimum"
-	Confidence int      `json:"confidence"` // 0–100
+	MinValue  *float64 `json:"min_value"`  // null = no lower bound (low band only)
+	MaxValue  *float64 `json:"max_value"`  // null = no upper bound (high band only)
+	ClassMod  *float64 `json:"class_modifier"`
+	SourceURL string   `json:"source_url"`
+	Notes     string   `json:"notes"`
+	Confidence int     `json:"confidence"` // 0–100
 }
 
 // AutoVerified reports whether this seed's confidence meets the auto-verify threshold.
@@ -110,53 +102,34 @@ func (s *FlowRangeSeeder) DataSource() string {
 
 const flowRangeSystemPrompt = `You are a whitewater paddling data assistant for H2OFlows. Your job is to produce accurate river flow range data for a given gauge and reach combination.
 
-Flow ranges define the cfs (cubic feet per second) bands at which a whitewater river section is paddleable and at what difficulty level. This data is shown to experienced paddlers — accuracy matters. A Class 5 kayaker who sees wrong flow data will distrust the entire platform.
+Flow ranges define the cfs (cubic feet per second) bands at which a whitewater river section is paddleable. This data is shown to experienced paddlers — accuracy matters.
 
-You will output a JSON array of flow range objects. Each object represents one flow band for the gauge.
+You will output a JSON array of exactly 2–3 flow range objects.
 
-LABELS — use EXACTLY these four values (they map to the database CHECK constraint):
-  "too_low"   — below minimum runnable flow. Bony, boat-dragging, exposed rocks. Do not run or high portage risk.
-  "running"   — the standard recommended window. The run is in at its typical good levels.
-  "high"      — pushy but still runnable for experienced paddlers; stepped-up difficulty.
-  "very_high" — above safe/enjoyable flows. Significantly elevated hazard: strainer risk, washed-out features, flood conditions.
+LABELS — use EXACTLY these three values:
+  "low"     — below minimum runnable flow. Bony, boat-dragging, exposed rocks. Do not run.
+  "running" — the runnable window (minimum to maximum safe/enjoyable flow).
+  "high"    — above the safe/enjoyable window. Elevated hazard: strainer risk, flood conditions.
 
-Each reach gets 2–4 bands:
-  - Always include "too_low" (with min_cfs: null) and "very_high" (with max_cfs: null).
-  - Always include at least "running". Include "high" if you have reliable information for a distinct pushy-but-runnable window above the standard range.
-  - If you have craft-specific information, you may emit separate rows for different craft types (e.g. kayak vs raft). Otherwise use craft_type "general".
+REQUIRED: always emit all three bands — "low", "running", and "high".
 
-CRAFT TYPES:
-  "general"  — applies to all craft, or you do not have craft-specific info (most common)
-  "kayak"    — whitewater kayak (creek boat, playboat, river runner)
-  "raft"     — commercial or private raft (4-person+)
-  "sup"      — stand-up paddleboard
-
-Use "general" unless you have specific per-craft minimum knowledge (e.g., commercial raft minimums are often set by permit conditions and differ from kayak minimums).
+FIELD RULES:
+  - "low" has no lower bound: set min_value to null, max_value to the minimum runnable cfs.
+  - "running" has both bounds: min_value = minimum runnable cfs, max_value = maximum runnable cfs.
+  - "high" has no upper bound: set min_value equal to running.max_value, max_value to null.
+  - Adjacent bands are contiguous: low.max_value == running.min_value == high.min_value.
 
 CONFIDENCE guidelines:
-  90–100: The cfs numbers appear in American Whitewater, published guidebooks (Caudill, Stohlquist),
-          or are so widely cited in trip reports that there is no ambiguity.
-          The Numbers optimal range, Browns Canyon minimum, Gore Canyon flood — these are 95+.
-          Do not hedge on runs you clearly know.
-  85–89:  Well-documented run, strong information, one detail (exact threshold) may have shifted.
-  70–84:  Known run, moderate documentation. Include it but note uncertainty.
+  90–100: Numbers appear in American Whitewater, published guidebooks, or widely cited trip reports. Do not hedge on runs you clearly know.
+  85–89:  Well-documented run, strong info, one detail may have shifted.
+  70–84:  Known run, moderate documentation.
   50–69:  Seldom-documented. Partial information only.
   Below 50: Omit entirely. Wrong flow data is dangerous.
 
 SOURCE URLS:
-  If the data comes from an American Whitewater page, set source_url to the AW reach URL.
+  If data comes from American Whitewater, set source_url to the AW reach URL.
   Format: https://www.americanwhitewater.org/content/River/detail/id/[reach_id]/
-  If you know the AW reach ID for a classic run, include it. If not, leave source_url empty.
   Do not fabricate URLs.
-
-IMPORTANT:
-  - min_cfs and max_cfs define the band: the label applies when current_cfs >= min_cfs AND current_cfs < max_cfs.
-  - "too_low" has no lower bound — set min_cfs to null.
-  - "very_high" has no upper bound — set max_cfs to null.
-  - Adjacent bands must be contiguous: max_cfs of one band equals min_cfs of the next (too_low → running → high → very_high).
-  - class_modifier: how much the difficulty shifts at this band relative to the listed class rating.
-    E.g. if the reach is Class IV at "running" and becomes Class IV+ at "high", set class_modifier to +0.5 on "high".
-    Leave null if you do not have reliable information.
 
 Respond ONLY with a valid JSON array. No markdown fences, no explanation, no preamble.`
 

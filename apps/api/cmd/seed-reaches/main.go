@@ -242,10 +242,10 @@ type gaugeAssoc struct {
 // knownFlowRange is a flow range band entered from direct domain knowledge
 // (not AI-generated). Written with data_source='manual' and verified=true.
 type knownFlowRange struct {
-	Label  string
-	MinCFS *float64
-	MaxCFS *float64
-	Notes  string
+	Label    string
+	MinValue *float64
+	MaxValue *float64
+	Notes    string
 }
 
 // knownAccess is an access point entered from direct domain knowledge with
@@ -553,11 +553,9 @@ The Parkdale gauge (07094500) is at the put-in and is the primary flow reference
 		ClassMin: 3.0, ClassMax: 4.0, Character: "creeking", LengthMi: 12.0,
 		GaugeExtID: "09151500", GaugeSource: "usgs",
 		KnownFlowRanges: []knownFlowRange{
-			{Label: "too_low", MinCFS: nil, MaxCFS: ptr(200), Notes: "Boat-dragging conditions below 200 cfs."},
-			{Label: "minimum", MinCFS: ptr(200), MaxCFS: ptr(300), Notes: "Runnable but bony."},
-			{Label: "fun", MinCFS: ptr(300), MaxCFS: ptr(500), Notes: "Good medium flow. Classic Escalante conditions."},
-			{Label: "pushy", MinCFS: ptr(500), MaxCFS: ptr(800), Notes: "Higher, faster. Diurnal peak range on big snowmelt days."},
-			{Label: "flood", MinCFS: ptr(800), MaxCFS: nil, Notes: "Do not run."},
+			{Label: "low",     MinValue: nil,       MaxValue: ptr(200.0)},
+			{Label: "running", MinValue: ptr(200.0), MaxValue: ptr(800.0)},
+			{Label: "high",    MinValue: ptr(800.0), MaxValue: nil},
 		},
 	},
 
@@ -792,11 +790,9 @@ Gauge math: PLAGRACO at Grant is the best upstream indicator but misses unmonito
 			},
 		},
 		KnownFlowRanges: []knownFlowRange{
-			{Label: "too_low", MinCFS: nil, MaxCFS: ptr(100.0), Notes: "Too shallow for comfortable paddling."},
-			{Label: "minimum", MinCFS: ptr(100.0), MaxCFS: ptr(150.0), Notes: "Runnable but scratchy in spots."},
-			{Label: "fun", MinCFS: ptr(150.0), MaxCFS: ptr(300.0), Notes: "Ideal. ~200 CFS is the sweet spot — current moves well, no hazards."},
-			{Label: "pushy", MinCFS: ptr(300.0), MaxCFS: ptr(500.0), Notes: "Faster current, still appropriate for intermediate paddlers."},
-			{Label: "flood", MinCFS: ptr(500.0), MaxCFS: nil, Notes: "High — use caution."},
+			{Label: "low",     MinValue: nil,       MaxValue: ptr(100.0)},
+			{Label: "running", MinValue: ptr(100.0), MaxValue: ptr(500.0)},
+			{Label: "high",    MinValue: ptr(500.0), MaxValue: nil},
 		},
 		Notes: `Relaxed flatwater float through Waterton Canyon, suitable for SUP, tubing, and beginners. No significant rapids. ~200 CFS on the PLAWATCO gauge (averaging ~1.5 ft) is reported as the ideal level for recreational paddling.
 
@@ -903,9 +899,8 @@ Not a whitewater run — mellow and continuous, suitable for recreational kayaks
 
 Minimum floatable flow is approximately 150 cfs. Below that, expect dragging and rocky shallows. At 200 cfs and above the run has enough current to be genuinely enjoyable.`,
 		KnownFlowRanges: []knownFlowRange{
-			{Label: "too_low", MinCFS: nil, MaxCFS: ptr(150), Notes: "Too shallow to float without dragging."},
-			{Label: "minimum", MinCFS: ptr(150), MaxCFS: ptr(200), Notes: "Marginal but floatable; expect some scraping in shallows."},
-			{Label: "fun", MinCFS: ptr(200), MaxCFS: nil, Notes: "Good current; enjoyable recreational float."},
+			{Label: "low",     MinValue: nil,       MaxValue: ptr(150.0)},
+			{Label: "running", MinValue: ptr(150.0), MaxValue: nil},
 		},
 	},
 }

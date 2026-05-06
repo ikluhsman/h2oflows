@@ -44,7 +44,7 @@
           <span class="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" :style="{ background: bandColorSolid(fr.label) }" />
           <span class="font-medium">{{ labelDisplay(fr.label) }}</span>
           <span class="text-gray-500 dark:text-gray-400">
-            {{ fr.min_cfs != null ? fr.min_cfs.toLocaleString() : '—' }}–{{ fr.max_cfs != null ? fr.max_cfs.toLocaleString() : '∞' }} cfs
+            {{ fr.min_value != null ? fr.min_value.toLocaleString() : '—' }}–{{ fr.max_value != null ? fr.max_value.toLocaleString() : '∞' }} cfs
           </span>
         </span>
       </div>
@@ -87,12 +87,11 @@ interface Reading {
 
 interface FlowRange {
   label:         string
-  min_cfs:       number | null
-  max_cfs:       number | null
-  craft_type:    string
+  min_value:     number | null
+  max_value:     number | null
   class_modifier: number | null
   source_url?:   string
-  data_source:   string   // 'manual' | 'ai_seed' | 'ai_web' | 'community'
+  data_source:   string
   ai_confidence: number | null
   verified:      boolean
 }
@@ -154,8 +153,8 @@ async function load() {
       emit('latestCfs', latestCfs)
       // Also emit the live flow band so the modal can correct its color
       const matchedRange = flowRanges.value.find(fr =>
-        (fr.min_cfs == null || latestCfs >= fr.min_cfs) &&
-        (fr.max_cfs == null || latestCfs < fr.max_cfs)
+        (fr.min_value == null || latestCfs >= fr.min_value) &&
+        (fr.max_value == null || latestCfs < fr.max_value)
       )
       const liveLabel = matchedRange?.label ?? null
       emit('liveFlowBand', { flowBandLabel: liveLabel, flowStatus: flowStatusForBand(liveLabel) })
@@ -265,14 +264,13 @@ function drawBands(u: uPlot, ranges: FlowRange[]) {
     if (!color) continue
 
     // Convert CFS values to canvas Y coordinates.
-    // min_cfs null means the band extends to the bottom (too_low).
-    // max_cfs null means it extends to the top (very_high).
-    const yMin = fr.max_cfs != null
-      ? u.valToPos(fr.max_cfs, 'y', true) * dpr
+    // min_value null = band extends to bottom (low). max_value null = extends to top (high).
+    const yMin = fr.max_value != null
+      ? u.valToPos(fr.max_value, 'y', true) * dpr
       : bbox.top
 
-    const yMax = fr.min_cfs != null
-      ? u.valToPos(fr.min_cfs, 'y', true) * dpr
+    const yMax = fr.min_value != null
+      ? u.valToPos(fr.min_value, 'y', true) * dpr
       : bbox.top + bbox.height
 
     const height = Math.abs(yMax - yMin)
@@ -310,15 +308,15 @@ function lineColor(ranges: FlowRange[], cfs: number | null): string {
   if (props.color) return props.color
   if (cfs == null || ranges.length === 0) return '#6b7280'
   const match = ranges.find(fr =>
-    (fr.min_cfs == null || cfs >= fr.min_cfs) &&
-    (fr.max_cfs == null || cfs <  fr.max_cfs)
+    (fr.min_value == null || cfs >= fr.min_value) &&
+    (fr.max_value == null || cfs <  fr.max_value)
   )
   if (match) return flowBandSolidColor(match.label)
   // No exact match — infer from position relative to known ranges.
-  const mins = ranges.filter(r => r.min_cfs != null).map(r => r.min_cfs!)
-  const maxs = ranges.filter(r => r.max_cfs != null).map(r => r.max_cfs!)
-  if (mins.length > 0 && cfs < Math.min(...mins)) return flowBandSolidColor('too_low')
-  if (maxs.length > 0 && cfs >= Math.max(...maxs)) return flowBandSolidColor('very_high')
+  const mins = ranges.filter(r => r.min_value != null).map(r => r.min_value!)
+  const maxs = ranges.filter(r => r.max_value != null).map(r => r.max_value!)
+  if (mins.length > 0 && cfs < Math.min(...mins)) return flowBandSolidColor('low')
+  if (maxs.length > 0 && cfs >= Math.max(...maxs)) return flowBandSolidColor('high')
   return '#6b7280'
 }
 

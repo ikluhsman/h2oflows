@@ -30,7 +30,7 @@ export function useTelemetryConsent() {
 export interface RunNote {
   reach_slug:       string
   note_type:        'trip_report' | 'flow_update' | 'hazard_alert' | 'general'
-  flow_impression:  'too_low' | 'good' | 'high'
+  flow_impression:  'low' | 'good' | 'high'
   note_text:        string
   observed_at:      string
   timestamp:        string

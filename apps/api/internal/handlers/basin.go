@@ -82,11 +82,11 @@ func (h *ReachHandler) BasinMap(w http.ResponseWriter, r *http.Request) {
 			ST_X(r.end_point::geometry)   AS end_lng,
 			ST_Y(r.end_point::geometry)   AS end_lat,
 			CASE
-				WHEN lr.value IS NULL OR fr.label IS NULL  THEN 'unknown'
-				WHEN fr.label IN ('running', 'high')       THEN 'runnable'
-				WHEN fr.label = 'too_low'                  THEN 'caution'
-				WHEN fr.label = 'very_high'                THEN 'flood'
-				ELSE                                            'unknown'
+				WHEN lr.value IS NULL OR fr.label IS NULL THEN 'unknown'
+				WHEN fr.label = 'running'                 THEN 'runnable'
+				WHEN fr.label = 'low'                     THEN 'caution'
+				WHEN fr.label = 'high'                    THEN 'flood'
+				ELSE                                           'unknown'
 			END AS flow_status
 		FROM reaches r
 		LEFT JOIN rivers rv ON rv.id = r.river_id
@@ -95,10 +95,9 @@ func (h *ReachHandler) BasinMap(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN LATERAL (
 			SELECT label FROM flow_ranges
 			WHERE reach_id = r.id
-			  AND craft_type = 'general'
-			  AND (min_cfs IS NULL OR lr.value >= min_cfs)
-			  AND (max_cfs IS NULL OR lr.value <  max_cfs)
-			ORDER BY min_cfs ASC NULLS FIRST
+			  AND (min_value IS NULL OR lr.value >= min_value)
+			  AND (max_value IS NULL OR lr.value <  max_value)
+			ORDER BY min_value ASC NULLS FIRST
 			LIMIT 1
 		) fr ON TRUE
 		WHERE r.slug = ANY($1)

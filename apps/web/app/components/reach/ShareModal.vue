@@ -250,7 +250,7 @@ const externalDests = [
 ]
 
 const impressionOpts = [
-  { value: 'too_low', label: 'Too Low' },
+  { value: 'low', label: 'Too Low' },
   { value: 'good',    label: 'Good' },
   { value: 'high',    label: 'High' },
 ]

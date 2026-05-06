@@ -251,6 +251,220 @@
           <AggregateGraph :gauges="aggregateGauges" />
         </section>
 
+        <!-- My Reaches section -->
+        <section v-if="userReaches.length || hiddenReaches.size">
+          <div class="flex items-center gap-2 mb-3">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">My Reaches</h2>
+            <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+            <div v-if="hiddenReaches.size" class="relative" ref="reachAddWrap">
+              <button
+                class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors flex items-center gap-1"
+                @click="reachAddOpen = !reachAddOpen"
+              >
+                <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                Add
+              </button>
+              <div v-if="reachAddOpen" class="absolute right-0 top-full mt-1 z-50 w-52 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden">
+                <button
+                  v-for="r in userReaches.filter(r => hiddenReaches.has(r.id))"
+                  :key="r.id"
+                  class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+                  @click="showReach(r.id); reachAddOpen = false"
+                >{{ r.name }}</button>
+              </div>
+            </div>
+            <NuxtLink to="/my/reaches" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Manage</NuxtLink>
+          </div>
+          <!-- List view -->
+          <div v-if="viewMode === 'list'" class="space-y-1.5">
+            <div
+              v-for="r in userReaches.filter(r => !hiddenReaches.has(r.id))"
+              :key="r.id"
+              class="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all duration-200 cursor-pointer"
+              @click="openUserReach(r)"
+            >
+              <div class="min-w-0 flex-1 flex items-center gap-1.5">
+                <!-- My reach origin indicator — list -->
+                <svg class="w-3 h-3 shrink-0 hidden sm:block text-gray-400/40 dark:text-gray-500/30" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+                <span class="text-sm font-medium truncate">{{ r.name }}</span>
+                <NuxtLink
+                  :to="`/my/reaches/${r.slug}`"
+                  class="shrink-0 text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                  title="Edit reach"
+                  @click.stop
+                >
+                  <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                </NuxtLink>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <div v-if="r.gauge_id" class="w-32 shrink-0 hidden sm:block">
+                  <GaugeSparkline :gauge-id="r.gauge_id" :flow-status="(r.flow_status as any)" :flow-band-label="r.flow_band ?? null" compact class="h-full w-full" />
+                </div>
+                <span
+                  v-if="r.flow_status !== 'unknown' || r.flow_band"
+                  :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', reachBadgeClass(r)]"
+                >{{ reachStatusLabel(r) }}</span>
+                <span class="text-base font-bold tabular-nums min-w-14 text-right" :class="reachCfsClass(r)">
+                  {{ r.current_cfs != null ? r.current_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-gray-400 dark:text-gray-500 ml-0.5">cfs</span>
+                </span>
+              </div>
+              <button
+                class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"
+                aria-label="Remove from dashboard"
+                @click.stop="hideReach(r.id)"
+              >
+                <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/></svg>
+              </button>
+            </div>
+          </div>
+          <!-- Card views (comfortable / full) -->
+          <div v-else :class="cardGridClass">
+            <div
+              v-for="r in userReaches.filter(r => !hiddenReaches.has(r.id))"
+              :key="r.id"
+              class="relative rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 transition-all duration-200 cursor-pointer overflow-hidden"
+              @click="openUserReach(r)"
+            >
+              <!-- Name+badge (left) | CFS + link + remove (right) -->
+              <div class="flex items-start gap-3 mb-2">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="text-sm font-medium truncate">{{ r.name }}</span>
+                    <span
+                      v-if="r.flow_status !== 'unknown' || r.flow_band"
+                      :class="['shrink-0 inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', reachBadgeClass(r)]"
+                    >{{ reachStatusLabel(r) }}</span>
+                  </div>
+                  <span v-if="r.river_name" class="text-xs text-blue-400/70 truncate block mt-0.5">{{ r.river_name }}</span>
+                </div>
+                <div class="shrink-0 flex items-center gap-1">
+                  <span class="text-xl font-bold tabular-nums leading-none" :class="reachCfsClass(r)">
+                    {{ r.current_cfs != null ? r.current_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-0.5">cfs</span>
+                  </span>
+                  <NuxtLink
+                    :to="`/my/reaches/${r.slug}`"
+                    class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                    title="Edit reach"
+                    @click.stop
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                  </NuxtLink>
+                  <button
+                    class="rounded p-1 transition-all duration-150 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400"
+                    aria-label="Remove from dashboard"
+                    @click.stop="hideReach(r.id)"
+                  >
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/></svg>
+                  </button>
+                </div>
+              </div>
+              <!-- Sparkline -->
+              <GaugeSparkline v-if="r.gauge_id" :gauge-id="r.gauge_id" :flow-status="(r.flow_status as any)" :flow-band-label="r.flow_band ?? null" compact class="mb-1" />
+              <!-- Last reading — full only -->
+              <p v-if="viewMode === 'full' && r.last_reading_at" class="text-xs text-gray-400 mt-0.5">{{ reachLastUpdated(r) }}</p>
+              <!-- My reach origin badge -->
+              <div class="flex items-center gap-1 mt-1.5 text-gray-400/50 dark:text-gray-500/40">
+                <svg class="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+                <span class="text-[10px] font-medium">My reach</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Custom Gauges section -->
+        <section v-if="customGauges.length || hiddenCustomGauges.size">
+          <div class="flex items-center gap-2 mb-3">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Custom Gauges</h2>
+            <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+            <div v-if="hiddenCustomGauges.size" class="relative" ref="gaugeAddWrap">
+              <button
+                class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors flex items-center gap-1"
+                @click="gaugeAddOpen = !gaugeAddOpen"
+              >
+                <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                Add
+              </button>
+              <div v-if="gaugeAddOpen" class="absolute right-0 top-full mt-1 z-50 w-52 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden">
+                <button
+                  v-for="cg in customGauges.filter(g => hiddenCustomGauges.has(g.id))"
+                  :key="cg.id"
+                  class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+                  @click="showCustomGauge(cg.id); gaugeAddOpen = false"
+                >{{ cg.name }}</button>
+              </div>
+            </div>
+            <NuxtLink to="/my/gauges" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Manage</NuxtLink>
+          </div>
+          <!-- List view -->
+          <div v-if="viewMode === 'list'" class="space-y-1.5">
+            <div
+              v-for="cg in customGauges.filter(g => !hiddenCustomGauges.has(g.id))"
+              :key="cg.id"
+              class="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all duration-200 cursor-pointer"
+              @click="router.push(`/my/gauges/${cg.slug}`)"
+            >
+              <div class="min-w-0 flex-1 flex items-center gap-1.5">
+                <!-- Calculated origin indicator — list -->
+                <svg class="w-3.5 h-3.5 text-gray-400/40 dark:text-gray-500/30 shrink-0 hidden sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/></svg>
+                <span class="text-sm font-medium truncate">{{ cg.name }}</span>
+                <span v-if="cg.any_input_unhealthy" class="hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 shrink-0">Stale</span>
+              </div>
+              <span class="text-base font-bold tabular-nums text-gray-900 dark:text-white shrink-0">
+                {{ cg.last_value_cfs != null ? cg.last_value_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-gray-400 ml-0.5">{{ cg.unit }}</span>
+              </span>
+              <button
+                class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"
+                aria-label="Remove from dashboard"
+                @click.stop="hideCustomGauge(cg.id)"
+              >
+                <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/></svg>
+              </button>
+            </div>
+          </div>
+          <!-- Card views (comfortable / full) -->
+          <div v-else :class="cardGridClass">
+            <div
+              v-for="cg in customGauges.filter(g => !hiddenCustomGauges.has(g.id))"
+              :key="cg.id"
+              class="relative rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 transition-all duration-200 cursor-pointer overflow-hidden"
+              @click="router.push(`/my/gauges/${cg.slug}`)"
+            >
+              <!-- Name/icon (left) | value + remove (right) -->
+              <div class="flex items-start gap-3">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/>
+                    </svg>
+                    <span class="text-sm font-medium truncate block">{{ cg.name }}</span>
+                  </div>
+                  <p v-if="viewMode === 'full' && cg.description" class="text-xs text-gray-400 truncate mt-0.5">{{ cg.description }}</p>
+                </div>
+                <div class="shrink-0 flex items-center gap-1.5">
+                  <span class="text-xl font-bold tabular-nums leading-none text-gray-900 dark:text-white">
+                    {{ cg.last_value_cfs != null ? cg.last_value_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-0.5">{{ cg.unit }}</span>
+                  </span>
+                  <button
+                    class="rounded-lg p-1.5 transition-all duration-150 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                    aria-label="Remove from dashboard"
+                    @click.stop="hideCustomGauge(cg.id)"
+                  >
+                    <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/></svg>
+                  </button>
+                </div>
+              </div>
+              <!-- Calculated origin badge + stale indicator -->
+              <div class="flex items-center gap-2 mt-1.5">
+                <div class="flex items-center gap-1 text-gray-400/50 dark:text-gray-500/40">
+                  <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/></svg>
+                  <span class="text-[10px] font-medium">Calculated</span>
+                </div>
+                <span v-if="cg.any_input_unhealthy" class="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">Stale</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Dashboard map -->
         <section>
           <div class="flex items-center gap-2 mb-3">
@@ -274,6 +488,11 @@
 
     <GaugeSearchModal v-model:open="searchOpen" @add="handleAdd" />
     <GaugeDetailModal v-if="detailGauge" v-model:open="detailOpen" :gauge="detailGauge" :mode="detailMode" />
+    <UserReachCustomGaugeModal
+      v-if="customGaugeModalProps"
+      v-model:open="customGaugeModalOpen"
+      v-bind="customGaugeModalProps"
+    />
   </div>
 </template>
 
@@ -281,13 +500,16 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
 import { cleanBasinName, slugifyBasin } from '~/utils/basin'
+import { flowBandBadgeClass, flowBandCfsClass, flowBandLabel } from '~/utils/flowBand'
 
 definePageMeta({ ssr: false })
 
+const router = useRouter()
 const store = useWatchlistStore()
 store.deduplicate()
 const { refresh } = useWatchlistRefresh()
-const { isAuthenticated } = useAuth()
+const { isAuthenticated, getToken } = useAuth()
+const { apiBase } = useRuntimeConfig().public
 const { addAndSync, removeAndSync, loadFromServer, pushLocalToServer } = useWatchlistSync()
 
 // ── Server sync ───────────────────────────────────────────────────────────────
@@ -299,14 +521,144 @@ async function syncWithServer() {
   await pushLocalToServer()
 }
 
-watch(isAuthenticated, (val) => { if (val) syncWithServer() })
+watch(isAuthenticated, (val) => { if (val) { syncWithServer(); loadUserReaches(); loadCustomGauges() } })
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
 onMounted(() => {
-  if (isAuthenticated.value) syncWithServer()
+  if (isAuthenticated.value) { syncWithServer(); loadUserReaches(); loadCustomGauges() }
   refresh()
   refreshTimer = setInterval(refresh, 60_000)
 })
+
+// ── User reaches ──────────────────────────────────────────────────────────────
+interface UserReachSummary {
+  id: string; slug: string; name: string; river_name: string | null
+  current_cfs: number | null; flow_band: string | null
+  flow_status: 'runnable' | 'caution' | 'flood' | 'unknown'
+  last_reading_at: string | null; gauge_id: string | null
+  custom_gauge_id: string | null; custom_gauge_slug: string | null; custom_gauge_name: string | null
+}
+
+function reachCfsClass(r: UserReachSummary): string {
+  return flowBandCfsClass(r.flow_band, r.flow_status)
+}
+function reachBadgeClass(r: UserReachSummary): string {
+  return flowBandBadgeClass(r.flow_band, r.flow_status)
+}
+function reachStatusLabel(r: UserReachSummary): string {
+  return flowBandLabel(r.flow_band, r.flow_status)
+}
+function reachLastUpdated(r: UserReachSummary): string {
+  if (!r.last_reading_at) return ''
+  const ms = Date.now() - new Date(r.last_reading_at).getTime()
+  const minutes = Math.floor(ms / 60_000)
+  if (minutes < 1)  return 'Updated just now'
+  if (minutes < 60) return `Updated ${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24)   return `Updated ${hours}h ago`
+  return `Updated ${Math.floor(hours / 24)}d ago`
+}
+
+// Custom gauge modal state
+const customGaugeModalOpen  = ref(false)
+const customGaugeModalProps = ref<{
+  reachName: string; reachSlug: string
+  gaugeName: string; gaugeSlug: string
+  currentCfs: number | null; flowBand: string | null; flowStatus: string
+} | null>(null)
+
+// Click a user reach card → open appropriate modal or navigate.
+function openUserReach(r: UserReachSummary) {
+  if (r.custom_gauge_id && r.custom_gauge_slug) {
+    customGaugeModalProps.value = {
+      reachName:  r.name,
+      reachSlug:  r.slug,
+      gaugeName:  r.custom_gauge_name ?? r.name,
+      gaugeSlug:  r.custom_gauge_slug,
+      currentCfs: r.current_cfs,
+      flowBand:   r.flow_band,
+      flowStatus: r.flow_status,
+    }
+    customGaugeModalOpen.value = true
+    return
+  }
+  if (r.gauge_id) {
+    const gauge = store.gauges.find(g => g.id === r.gauge_id)
+    if (gauge) { openGauge(gauge, 'gauge'); return }
+  }
+  router.push(`/my/reaches/${r.slug}`)
+}
+const userReaches = ref<UserReachSummary[]>([])
+async function loadUserReaches() {
+  const token = await getToken()
+  if (!token) return
+  const res = await fetch(`${apiBase}/api/v1/me/reaches`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => null)
+  if (!res?.ok) return
+  userReaches.value = await res.json() ?? []
+}
+
+const HIDDEN_REACHES_KEY = 'h2oflow_hidden_reaches'
+const HIDDEN_GAUGES_KEY  = 'h2oflow_hidden_custom_gauges'
+
+function loadSet(key: string): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(key) ?? '[]')) } catch { return new Set() }
+}
+function saveSet(key: string, s: Set<string>) {
+  localStorage.setItem(key, JSON.stringify([...s]))
+}
+
+const hiddenReaches      = ref<Set<string>>(new Set())
+const hiddenCustomGauges = ref<Set<string>>(new Set())
+const reachAddOpen       = ref(false)
+const gaugeAddOpen       = ref(false)
+const reachAddWrap       = ref<HTMLElement | null>(null)
+const gaugeAddWrap       = ref<HTMLElement | null>(null)
+
+onMounted(() => {
+  hiddenReaches.value      = loadSet(HIDDEN_REACHES_KEY)
+  hiddenCustomGauges.value = loadSet(HIDDEN_GAUGES_KEY)
+})
+
+function hideReach(id: string) {
+  hiddenReaches.value = new Set([...hiddenReaches.value, id])
+  saveSet(HIDDEN_REACHES_KEY, hiddenReaches.value)
+}
+function showReach(id: string) {
+  const s = new Set(hiddenReaches.value); s.delete(id)
+  hiddenReaches.value = s; saveSet(HIDDEN_REACHES_KEY, s)
+}
+function hideCustomGauge(id: string) {
+  hiddenCustomGauges.value = new Set([...hiddenCustomGauges.value, id])
+  saveSet(HIDDEN_GAUGES_KEY, hiddenCustomGauges.value)
+}
+function showCustomGauge(id: string) {
+  const s = new Set(hiddenCustomGauges.value); s.delete(id)
+  hiddenCustomGauges.value = s; saveSet(HIDDEN_GAUGES_KEY, s)
+}
+
+// Close add-dropdowns on outside click
+if (import.meta.client) {
+  document.addEventListener('click', (e) => {
+    if (reachAddWrap.value && !reachAddWrap.value.contains(e.target as Node)) reachAddOpen.value = false
+    if (gaugeAddWrap.value && !gaugeAddWrap.value.contains(e.target as Node)) gaugeAddOpen.value = false
+  })
+}
+
+// ── Custom gauges ─────────────────────────────────────────────────────────────
+interface CustomGaugeSummary { id: string; slug: string; name: string; description: string | null; unit: string; last_value_cfs: number | null; any_input_unhealthy: boolean }
+const customGauges = ref<CustomGaugeSummary[]>([])
+async function loadCustomGauges() {
+  const token = await getToken()
+  if (!token) return
+  const res = await fetch(`${apiBase}/api/v1/me/custom-gauges`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).catch(() => null)
+  if (!res?.ok) return
+  const data = await res.json()
+  customGauges.value = data.items ?? []
+}
 onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 
 // ── Reach-primary grouping: state → basin → river → reaches ─────────────────

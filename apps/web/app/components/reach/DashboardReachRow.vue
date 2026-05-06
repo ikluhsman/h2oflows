@@ -212,19 +212,17 @@ const gaugeSourceUrl = computed(() => {
 
 const cfsColorClass = computed(() => {
   const s = props.gauge.flowStatus
-  if (s === 'running')                    return 'text-green-600 dark:text-green-400'
-  if (s === 'high')                       return 'text-orange-500 dark:text-orange-400'
-  if (s === 'very_high' || s === 'flood') return 'text-red-600 dark:text-red-400'
-  if (s === 'low')                        return 'text-amber-500 dark:text-amber-400'
+  if (s === 'runnable') return 'text-emerald-500 dark:text-emerald-400'
+  if (s === 'flood')    return 'text-sky-500 dark:text-sky-400'
+  if (s === 'caution')  return 'text-red-500 dark:text-red-400'
   return 'text-gray-900 dark:text-white'
 })
 
 const sparklineColor = computed(() => {
   const s = props.gauge.flowStatus
-  if (s === 'running')                    return '#22c55e'
-  if (s === 'high')                       return '#f97316'
-  if (s === 'very_high' || s === 'flood') return '#ef4444'
-  if (s === 'low')                        return '#f59e0b'
+  if (s === 'runnable') return '#34d399'
+  if (s === 'flood')    return '#38bdf8'
+  if (s === 'caution')  return '#ef4444'
   return '#3b82f6'
 })
 

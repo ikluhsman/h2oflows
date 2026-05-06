@@ -3,8 +3,8 @@ import { flowStatusForBand } from '~/utils/flowBand'
 
 interface FlowRange {
   label: string
-  min_cfs: number | null
-  max_cfs: number | null
+  min_value: number | null
+  max_value: number | null
 }
 
 export function useReachFlowBand() {
@@ -25,8 +25,8 @@ export function useReachFlowBand() {
     const ranges = rangesCache[slug]
     if (!ranges || ranges.length === 0) return null
     return ranges.find(fr =>
-      (fr.min_cfs == null || cfs >= fr.min_cfs) &&
-      (fr.max_cfs == null || cfs < fr.max_cfs)
+      (fr.min_value == null || cfs >= fr.min_value) &&
+      (fr.max_value == null || cfs < fr.max_value)
     )?.label ?? null
   }
 

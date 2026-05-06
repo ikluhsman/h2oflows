@@ -88,6 +88,8 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 			currentCFS          *float64
 			flowStatus          string
 			flowBandLabel       *string
+			pollHealth          string
+			lastPollSuccessAt   *time.Time
 		)
 		if err := rows.Scan(
 			&id, &externalID, &source, &name, &status,
@@ -95,6 +97,7 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 			&reachRelationship, &lastReadingAt,
 			&lng, &lat, &stateAbbr, &basinName, &watershedName, &riverName,
 			&currentCFS, &flowStatus, &flowBandLabel,
+			&pollHealth, &lastPollSuccessAt,
 		); err != nil {
 			continue
 		}
@@ -103,28 +106,30 @@ func (h *GaugeHandler) Search(w http.ResponseWriter, r *http.Request) {
 			Type:     "Feature",
 			Geometry: PointGeometry{Type: "Point", Coordinates: [2]float64{lng, lat}},
 			Properties: map[string]any{
-				"id":                  id,
-				"external_id":         externalID,
-				"source":              source,
-				"name":                name,
-				"status":              status,
-				"featured":            featured,
-				"prominence_score":    prominenceScore,
-				"reach_id":            reachID,
-				"reach_name":          combineReachNames(reachNamesRaw),
-				"reach_names":         reachNamesRaw,
-				"reach_slug":          firstOrNil(reachSlugsRaw),
-				"reach_slugs":         reachSlugsRaw,
-				"reach_common_names":  reachCommonNamesRaw,
-				"reach_relationship":  reachRelationship,
-				"last_reading_at":     lastReadingAt,
-				"state_abbr":          stateAbbr,
-				"basin_name":          basinName,
-				"watershed_name":      watershedName,
-				"river_name":          riverName,
-				"current_cfs":         currentCFS,
-				"flow_status":         flowStatus,
-				"flow_band_label":     flowBandLabel,
+				"id":                    id,
+				"external_id":           externalID,
+				"source":                source,
+				"name":                  name,
+				"status":                status,
+				"featured":              featured,
+				"prominence_score":      prominenceScore,
+				"reach_id":              reachID,
+				"reach_name":            combineReachNames(reachNamesRaw),
+				"reach_names":           reachNamesRaw,
+				"reach_slug":            firstOrNil(reachSlugsRaw),
+				"reach_slugs":           reachSlugsRaw,
+				"reach_common_names":    reachCommonNamesRaw,
+				"reach_relationship":    reachRelationship,
+				"last_reading_at":       lastReadingAt,
+				"state_abbr":            stateAbbr,
+				"basin_name":            basinName,
+				"watershed_name":        watershedName,
+				"river_name":            riverName,
+				"current_cfs":           currentCFS,
+				"flow_status":           flowStatus,
+				"flow_band_label":       flowBandLabel,
+				"poll_health":           pollHealth,
+				"last_poll_success_at":  lastPollSuccessAt,
 			},
 		})
 	}
@@ -232,20 +237,13 @@ func (h *GaugeHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	craft := r.URL.Query().Get("craft")
-	if craft == "" {
-		craft = "general"
-	}
-
-	// After migration 039, flow_ranges are per-reach. For the gauge endpoint
-	// (used by sparklines on the dashboard), return ranges for the alphabetically-
-	// first reach that uses this gauge as its primary gauge.
+	// flow_ranges are per-reach. For the gauge endpoint (used by sparklines on the
+	// dashboard), return ranges for the alphabetically-first reach using this gauge.
 	rows, err := h.db.Query(r.Context(), `
 		SELECT
 			fr.label,
-			fr.min_cfs,
-			fr.max_cfs,
-			fr.craft_type,
+			fr.min_value,
+			fr.max_value,
 			fr.class_modifier,
 			fr.source_url,
 			fr.data_source,
@@ -254,14 +252,13 @@ func (h *GaugeHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 		FROM flow_ranges fr
 		JOIN reaches rch ON rch.id = fr.reach_id
 		WHERE rch.primary_gauge_id = $1
-		  AND fr.craft_type         = $2
 		  AND rch.id = (
 			  SELECT id FROM reaches
 			  WHERE primary_gauge_id = $1
 			  ORDER BY slug LIMIT 1
 		  )
-		ORDER BY fr.min_cfs ASC NULLS FIRST
-	`, gaugeID, craft)
+		ORDER BY fr.min_value ASC NULLS FIRST
+	`, gaugeID)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "query failed")
 		return
@@ -270,9 +267,8 @@ func (h *GaugeHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 
 	type flowRange struct {
 		Label        string   `json:"label"`
-		MinCFS       *float64 `json:"min_cfs"`
-		MaxCFS       *float64 `json:"max_cfs"`
-		CraftType    string   `json:"craft_type"`
+		MinValue     *float64 `json:"min_value"`
+		MaxValue     *float64 `json:"max_value"`
 		ClassMod     *float64 `json:"class_modifier"`
 		SourceURL    *string  `json:"source_url,omitempty"`
 		DataSource   string   `json:"data_source"`
@@ -283,8 +279,8 @@ func (h *GaugeHandler) GetFlowRanges(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var fr flowRange
 		if err := rows.Scan(
-			&fr.Label, &fr.MinCFS, &fr.MaxCFS,
-			&fr.CraftType, &fr.ClassMod, &fr.SourceURL,
+			&fr.Label, &fr.MinValue, &fr.MaxValue,
+			&fr.ClassMod, &fr.SourceURL,
 			&fr.DataSource, &fr.AIConfidence, &fr.Verified,
 		); err != nil {
 			continue
@@ -419,7 +415,7 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			// name says "North Fork S Platte at Grant", because it has an
 			// upstream_indicator association with the Foxton reach.
 			textClauses = append(textClauses, fmt.Sprintf(
-				`(g.name ILIKE $%d OR g.external_id ILIKE $%d
+				`(g.name ILIKE $%d OR g.external_id ILIKE $%d OR g.source ILIKE $%d
 				  OR similarity(g.name, $%d) > 0.25
 				  OR EXISTS (
 					SELECT 1 FROM gauge_reach_associations gra
@@ -439,7 +435,7 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 					    OR ra.river_name  ILIKE $%d
 					    OR similarity(ra.name, $%d) > 0.25
 					    OR similarity(COALESCE(ra.common_name, ''), $%d) > 0.25)
-				  ))`, likeN, likeN, termN, likeN, likeN, likeN, termN, termN, likeN, likeN, likeN, termN, termN))
+				  ))`, likeN, likeN, likeN, termN, likeN, likeN, likeN, termN, termN, likeN, likeN, likeN, termN, termN))
 		}
 		if len(textClauses) > 0 {
 			where = append(where, "("+strings.Join(textClauses, " OR ")+")")
@@ -536,14 +532,16 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			) AS river_name,
 			g.current_cfs,
 			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
-			fr_band.label                            AS flow_band_label
+			fr_band.label                            AS flow_band_label,
+			g.poll_health,
+			g.last_poll_success_at
 		FROM gauges g
 		LEFT JOIN LATERAL (
 			SELECT fr.label,
 			       CASE
-			           WHEN fr.label IN ('running', 'high') THEN 'runnable'
-			           WHEN fr.label = 'too_low'            THEN 'caution'
-			           WHEN fr.label = 'very_high'          THEN 'flood'
+			           WHEN fr.label = 'running' THEN 'runnable'
+			           WHEN fr.label = 'low'     THEN 'caution'
+			           WHEN fr.label = 'high'    THEN 'flood'
 			           ELSE 'unknown'
 			       END AS flow_status
 			FROM flow_ranges fr
@@ -554,10 +552,9 @@ func (h *GaugeHandler) querySearch(r *http.Request, p searchParams) (interface {
 			      WHERE primary_gauge_id = g.id
 			      ORDER BY slug LIMIT 1
 			  )
-			  AND fr.craft_type = 'general'
-			  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
-			  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
-			ORDER BY fr.min_cfs ASC NULLS FIRST, fr.max_cfs ASC NULLS LAST
+			  AND (fr.min_value IS NULL OR g.current_cfs >= fr.min_value)
+			  AND (fr.max_value IS NULL OR g.current_cfs < fr.max_value)
+			ORDER BY fr.min_value ASC NULLS FIRST, fr.max_value ASC NULLS LAST
 			LIMIT 1
 		) fr_band ON TRUE
 		WHERE %s
@@ -712,7 +709,9 @@ func (h *GaugeHandler) executeBatch(w http.ResponseWriter, r *http.Request, gaug
 			ctx_reach.river_order            AS context_reach_river_order,
 			g.current_cfs,
 			COALESCE(fr_band.flow_status, 'unknown') AS flow_status,
-			fr_band.label                    AS flow_band_label
+			fr_band.label                    AS flow_band_label,
+			g.poll_health,
+			g.last_poll_success_at
 		FROM ctx
 		JOIN gauges g ON g.id = ctx.gauge_id
 		LEFT JOIN LATERAL (
@@ -749,9 +748,9 @@ func (h *GaugeHandler) executeBatch(w http.ResponseWriter, r *http.Request, gaug
 		LEFT JOIN LATERAL (
 			SELECT fr.label,
 			       CASE
-			           WHEN fr.label IN ('running', 'high') THEN 'runnable'
-			           WHEN fr.label = 'too_low'            THEN 'caution'
-			           WHEN fr.label = 'very_high'          THEN 'flood'
+			           WHEN fr.label = 'running' THEN 'runnable'
+			           WHEN fr.label = 'low'     THEN 'caution'
+			           WHEN fr.label = 'high'    THEN 'flood'
 			           ELSE 'unknown'
 			       END AS flow_status
 			FROM flow_ranges fr
@@ -761,10 +760,9 @@ func (h *GaugeHandler) executeBatch(w http.ResponseWriter, r *http.Request, gaug
 			      ctx.reach_slug,
 			      (SELECT slug FROM reaches WHERE primary_gauge_id = g.id ORDER BY slug LIMIT 1)
 			  )
-			  AND fr.craft_type = 'general'
-			  AND (fr.min_cfs IS NULL OR g.current_cfs >= fr.min_cfs)
-			  AND (fr.max_cfs IS NULL OR g.current_cfs < fr.max_cfs)
-			ORDER BY fr.min_cfs ASC NULLS FIRST, fr.max_cfs ASC NULLS LAST
+			  AND (fr.min_value IS NULL OR g.current_cfs >= fr.min_value)
+			  AND (fr.max_value IS NULL OR g.current_cfs < fr.max_value)
+			ORDER BY fr.min_value ASC NULLS FIRST, fr.max_value ASC NULLS LAST
 			LIMIT 1
 		) fr_band ON TRUE
 	`, gaugeIDs, reachSlugs)
@@ -805,6 +803,8 @@ func (h *GaugeHandler) executeBatch(w http.ResponseWriter, r *http.Request, gaug
 			currentCFS              *float64
 			flowStatus             string
 			flowBandLabel          *string
+			pollHealth             string
+			lastPollSuccessAt      *time.Time
 		)
 		if err := rows.Scan(
 			&id, &contextReachSlug, &externalID, &source, &name, &status,
@@ -814,6 +814,7 @@ func (h *GaugeHandler) executeBatch(w http.ResponseWriter, r *http.Request, gaug
 			&lng, &lat, &stateAbbr, &basinName, &watershedName,
 			&contextReachCommonName, &contextReachFullName, &contextReachRiverName, &contextReachBasinGroup, &contextReachCenterLng, &contextReachRiverOrder,
 			&currentCFS, &flowStatus, &flowBandLabel,
+			&pollHealth, &lastPollSuccessAt,
 		); err != nil {
 			continue
 		}
@@ -853,6 +854,8 @@ func (h *GaugeHandler) executeBatch(w http.ResponseWriter, r *http.Request, gaug
 				"current_cfs":                 currentCFS,
 				"flow_status":                 flowStatus,
 				"flow_band_label":             flowBandLabel,
+				"poll_health":                 pollHealth,
+				"last_poll_success_at":        lastPollSuccessAt,
 			},
 		})
 	}

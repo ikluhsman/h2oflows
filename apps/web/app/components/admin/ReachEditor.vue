@@ -329,16 +329,14 @@ const repinSlugChecking  = ref(false)
 let   repinSlugTimer: ReturnType<typeof setTimeout> | null = null
 
 const repinFlowBands = ref({
-  too_low:   { min: null as number | null, max: null as number | null },
-  running:   { min: null as number | null, max: null as number | null },
-  high:      { min: null as number | null, max: null as number | null },
-  very_high: { min: null as number | null, max: null as number | null },
+  low:     { min: null as number | null, max: null as number | null },
+  running: { min: null as number | null, max: null as number | null },
+  high:    { min: null as number | null, max: null as number | null },
 })
 const repinFlowBandsDef = [
-  { key: 'too_low',   label: 'Too Low',   dot: '#ef4444', showMin: false, showMax: true  },
-  { key: 'running',   label: 'Runnable',  dot: '#34d399', showMin: true,  showMax: true  },
-  { key: 'high',      label: 'High',      dot: '#16a34a', showMin: true,  showMax: true  },
-  { key: 'very_high', label: 'Very High', dot: '#38bdf8', showMin: true,  showMax: false },
+  { key: 'low',     label: 'Too Low', dot: '#ef4444', showMin: false, showMax: true  },
+  { key: 'running', label: 'Running', dot: '#34d399', showMin: true,  showMax: true  },
+  { key: 'high',    label: 'High',    dot: '#38bdf8', showMin: true,  showMax: false },
 ] as const
 const repinFlowBandsSaving = ref(false)
 const repinFlowBandsMsg    = ref('')
@@ -444,7 +442,7 @@ function resetState() {
   repinEndLat.value = null;   repinEndLng.value = null
   repinFlowlinesDirty.value = false
   repinForm.value = { name: '', commonName: '', riverName: '', slug: '', classMin: null, classMax: null, permitRequired: false, multiDay: 1 }
-  repinFlowBands.value = { too_low: { min: null, max: null }, running: { min: null, max: null }, high: { min: null, max: null }, very_high: { min: null, max: null } }
+  repinFlowBands.value = { low: { min: null, max: null }, running: { min: null, max: null }, high: { min: null, max: null } }
   repinFlowBandsSaving.value = false; repinFlowBandsMsg.value = ''
   repinRiverId.value = ''
   repinSlugAvailable.value = null
@@ -524,11 +522,11 @@ async function loadReach() {
         headers: token2 ? { Authorization: `Bearer ${token2}` } : {},
       })
       if (frRes.ok) {
-        const bands: Array<{ label: string; min_cfs: number | null; max_cfs: number | null }> = await frRes.json()
-        repinFlowBands.value = { too_low: { min: null, max: null }, running: { min: null, max: null }, high: { min: null, max: null }, very_high: { min: null, max: null } }
+        const bands: Array<{ label: string; min_value: number | null; max_value: number | null }> = await frRes.json()
+        repinFlowBands.value = { low: { min: null, max: null }, running: { min: null, max: null }, high: { min: null, max: null } }
         for (const b of bands) {
           const k = b.label as keyof typeof repinFlowBands.value
-          if (k in repinFlowBands.value) repinFlowBands.value[k] = { min: b.min_cfs ?? null, max: b.max_cfs ?? null }
+          if (k in repinFlowBands.value) repinFlowBands.value[k] = { min: b.min_value ?? null, max: b.max_value ?? null }
         }
       }
     } catch { /* non-fatal */ }
@@ -742,10 +740,9 @@ async function saveFlowBands() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       body: JSON.stringify({
-        too_low:   { min_cfs: null,            max_cfs: b.too_low.max   },
-        running:   { min_cfs: b.running.min,   max_cfs: b.running.max   },
-        high:      { min_cfs: b.high.min,      max_cfs: b.high.max      },
-        very_high: { min_cfs: b.very_high.min, max_cfs: null            },
+        low:     b.low.max     != null ? { min_value: null,          max_value: b.low.max     } : null,
+        running: b.running.min != null ? { min_value: b.running.min, max_value: b.running.max } : null,
+        high:    b.high.min    != null ? { min_value: b.high.min,    max_value: null           } : null,
       }),
     })
     repinFlowBandsMsg.value = res.ok ? 'Saved' : `HTTP ${res.status}`

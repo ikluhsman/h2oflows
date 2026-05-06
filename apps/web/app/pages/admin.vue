@@ -55,8 +55,30 @@
             <div v-for="i in 5" :key="i" class="h-12 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
           </div>
 
-          <div v-else class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <template v-for="stateGroup in filteredGroupedReaches" :key="stateGroup.state">
+          <!-- Needs review -->
+          <div v-if="needsReviewRivers.length" class="mb-3 rounded-lg border border-amber-200 dark:border-amber-800 overflow-hidden">
+            <div
+              class="flex items-center gap-3 px-4 py-2.5 bg-amber-50 dark:bg-amber-950/40 cursor-pointer"
+              @click="needsReviewExpanded = !needsReviewExpanded"
+            >
+              <span class="text-xs font-semibold text-amber-700 dark:text-amber-300 flex-1">Needs review ({{ needsReviewRivers.length }})</span>
+              <span class="text-xs text-amber-500">Rivers created without GNIS confirmation</span>
+              <svg class="w-4 h-4 text-amber-400 shrink-0 transition-transform" :class="needsReviewExpanded ? 'rotate-90' : ''" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
+              </svg>
+            </div>
+            <div v-if="needsReviewExpanded" class="divide-y divide-amber-100 dark:divide-amber-900/40">
+              <div v-for="rv in needsReviewRivers" :key="rv.id" class="flex items-center gap-3 px-4 py-2 bg-white dark:bg-gray-900/60 text-sm">
+                <span class="flex-1 truncate font-medium">{{ rv.name }}</span>
+                <span v-if="rv.state_abbr" class="text-xs font-mono text-gray-400">{{ rv.state_abbr }}</span>
+                <span v-if="rv.basin" class="text-xs text-gray-400">{{ rv.basin }}</span>
+                <UButton size="xs" variant="ghost" color="neutral" @click="openEditRiverBySlug(rv.slug)">Edit</UButton>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="!riversLoading" class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <template v-for="stateGroup in groupedByStateBasin" :key="stateGroup.state">
               <!-- State header -->
               <div class="px-4 py-1.5 bg-gray-100 dark:bg-gray-800/80 border-t border-gray-200 dark:border-gray-700 first:border-t-0">
                 <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
@@ -64,7 +86,13 @@
                 </p>
               </div>
 
-              <template v-for="river in stateGroup.rivers" :key="river.river_id + stateGroup.state">
+              <template v-for="basinGroup in stateGroup.basins" :key="basinGroup.basin + stateGroup.state">
+                <!-- Basin sub-header -->
+                <div class="px-6 py-1 bg-gray-50 dark:bg-gray-900/60 border-t border-gray-100 dark:border-gray-800">
+                  <p class="text-xs text-gray-400 dark:text-gray-500">{{ basinGroup.basin === '—' ? 'No basin' : basinGroup.basin }}</p>
+                </div>
+
+              <template v-for="river in basinGroup.rivers.filter(r => isRiverVisible(r.river_id))" :key="river.river_id + stateGroup.state">
                 <!-- River row -->
                 <div
                   class="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
@@ -72,8 +100,18 @@
                 >
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.river_name }}</p>
-                    <p class="text-xs text-gray-400">
-                      {{ river.reaches.length }} reach{{ river.reaches.length !== 1 ? 'es' : '' }}<template v-if="river.river_basin"> · {{ river.river_basin }}</template>
+                    <p class="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap">
+                      <span>{{ river.reaches.length }} reach{{ river.reaches.length !== 1 ? 'es' : '' }}<template v-if="river.river_basin"> · {{ river.river_basin }}</template></span>
+                      <template v-if="riverHealthMap.get(river.river_slug) as any">
+                        <span v-if="(riverHealthMap.get(river.river_slug)?.gauges_unreachable ?? 0) > 0" class="inline-flex items-center gap-0.5 text-red-500 dark:text-red-400 font-medium">
+                          <span class="w-1.5 h-1.5 rounded-full bg-red-500 dark:bg-red-400 inline-block" />
+                          {{ riverHealthMap.get(river.river_slug)?.gauges_unreachable }} offline
+                        </span>
+                        <span v-else-if="(riverHealthMap.get(river.river_slug)?.gauges_stale ?? 0) > 0" class="inline-flex items-center gap-0.5 text-amber-500 dark:text-amber-400 font-medium">
+                          <span class="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 inline-block" />
+                          {{ riverHealthMap.get(river.river_slug)?.gauges_stale }} stale
+                        </span>
+                      </template>
                     </p>
                   </div>
                   <svg
@@ -141,10 +179,29 @@
                   </div>
                 </div>
               </template>
+              </template>  <!-- end basin loop -->
             </template>
 
-            <div v-if="filteredGroupedReaches.length === 0 && !riversLoading" class="px-4 py-8 text-center text-sm text-gray-400">
+            <div v-if="groupedByStateBasin.length === 0 && !riversLoading" class="px-4 py-8 text-center text-sm text-gray-400">
               {{ riverSearch ? 'No reaches match your search' : 'No reaches yet' }}
+            </div>
+
+            <!-- Pagination -->
+            <div v-if="totalPages > 1 || totalRivers > 10" class="flex items-center justify-between px-4 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40 text-xs text-gray-500">
+              <div class="flex items-center gap-2">
+                <span>Show</span>
+                <select v-model="pageSize" class="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-0.5 text-xs" @change="currentPage = 1">
+                  <option :value="10">10</option>
+                  <option :value="50">50</option>
+                  <option :value="100">100</option>
+                </select>
+                <span>per page · {{ totalRivers }} rivers total</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <button class="px-2 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30" :disabled="currentPage <= 1" @click="currentPage--">‹</button>
+                <span>{{ currentPage }} / {{ totalPages }}</span>
+                <button class="px-2 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30" :disabled="currentPage >= totalPages" @click="currentPage++">›</button>
+              </div>
             </div>
 
             <!-- Unassigned reaches group -->
@@ -406,19 +463,31 @@ const visibleTabs = computed(() => {
 })
 
 // ── Rivers ────────────────────────────────────────────────────────────────────
-interface River { id: string; slug: string; name: string; gnis_id: string | null; basin: string | null; basin_locked: boolean; state_abbr: string | null; huc8: string | null; reach_count: number }
+interface River { id: string; slug: string; name: string; gnis_id: string | null; basin: string | null; basin_locked: boolean; state_abbr: string | null; huc8: string | null; verified: boolean; reach_count: number; gauges_degraded: number; gauges_stale: number; gauges_unreachable: number }
 interface RiverDetail extends River {
   reaches: { id: string; slug: string; name: string; common_name: string | null; has_centerline: boolean; state_abbr: string | null; river_order: number | null }[]
 }
 interface GroupedReach { id: string; slug: string; name: string; common_name: string | null; river_order: number | null; state_abbr: string; has_centerline: boolean }
 interface GroupedRiver { river_id: string; river_slug: string; river_name: string; river_basin: string; reaches: GroupedReach[] }
 interface GroupedState { state: string; rivers: GroupedRiver[] }
+interface GroupedBasin { basin: string; rivers: GroupedRiver[] }
+interface GroupedStateBasin { state: string; basins: GroupedBasin[] }
 
 const rivers = ref<River[]>([])
+const riverHealthMap = computed(() => {
+  const m = new Map<string, Pick<River, 'gauges_degraded' | 'gauges_stale' | 'gauges_unreachable'>>()
+  for (const rv of rivers.value) m.set(rv.slug, rv)
+  return m
+})
 const groupedReaches = ref<GroupedState[]>([])
 const riversLoading = ref(false)
 const riverSearch = ref('')
 const expandedRiverKeys = ref<Set<string>>(new Set())
+
+// Pagination
+const pageSize = ref(50)
+const currentPage = ref(1)
+watch(riverSearch, () => { currentPage.value = 1 })
 
 function riverKey(state: string, riverId: string) { return `${state}::${riverId}` }
 function isRiverExpanded(state: string, riverId: string) { return expandedRiverKeys.value.has(riverKey(state, riverId)) }
@@ -430,26 +499,58 @@ function toggleRiverGroup(state: string, riverId: string) {
   expandedRiverKeys.value = next
 }
 
+// Rivers needing review (verified = false) — populated once 000069 migration runs
+const needsReviewRivers = computed(() => rivers.value.filter(r => !r.verified))
+const needsReviewExpanded = ref(false)
+
+// Filter + basin grouping
 const filteredGroupedReaches = computed(() => {
   const q = riverSearch.value.toLowerCase()
-  if (!q) return groupedReaches.value
-  return groupedReaches.value
-    .map(sg => ({
-      ...sg,
-      rivers: sg.rivers
-        .map(rv => ({
-          ...rv,
-          reaches: rv.reaches.filter(re =>
-            re.name.toLowerCase().includes(q) ||
-            (re.common_name ?? '').toLowerCase().includes(q) ||
-            rv.river_name.toLowerCase().includes(q) ||
-            re.state_abbr.toLowerCase().includes(q)
-          ),
+  const base = q
+    ? groupedReaches.value
+        .map(sg => ({
+          ...sg,
+          rivers: sg.rivers
+            .map(rv => ({
+              ...rv,
+              reaches: rv.reaches.filter(re =>
+                re.name.toLowerCase().includes(q) ||
+                (re.common_name ?? '').toLowerCase().includes(q) ||
+                rv.river_name.toLowerCase().includes(q) ||
+                re.state_abbr.toLowerCase().includes(q)
+              ),
+            }))
+            .filter(rv => rv.reaches.length > 0),
         }))
-        .filter(rv => rv.reaches.length > 0),
-    }))
-    .filter(sg => sg.rivers.length > 0)
+        .filter(sg => sg.rivers.length > 0)
+    : groupedReaches.value
+  return base
 })
+
+// State→Basin→River hierarchy for rendering
+const groupedByStateBasin = computed((): GroupedStateBasin[] => {
+  return filteredGroupedReaches.value.map(sg => {
+    const basinMap = new Map<string, GroupedRiver[]>()
+    for (const rv of sg.rivers) {
+      const b = rv.river_basin || '—'
+      if (!basinMap.has(b)) basinMap.set(b, [])
+      basinMap.get(b)!.push(rv)
+    }
+    const basins: GroupedBasin[] = Array.from(basinMap.entries()).map(([basin, rivers]) => ({ basin, rivers }))
+    return { state: sg.state, basins }
+  })
+})
+
+// Paginate by total river count across all state groups
+const allRivers = computed(() => filteredGroupedReaches.value.flatMap(sg => sg.rivers))
+const totalRivers = computed(() => allRivers.value.length)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalRivers.value / pageSize.value)))
+const pagedRiverIds = computed(() => {
+  const start = (currentPage.value - 1) * pageSize.value
+  return new Set(allRivers.value.slice(start, start + pageSize.value).map(r => r.river_id))
+})
+
+function isRiverVisible(riverId: string) { return pagedRiverIds.value.has(riverId) }
 
 const unassignedReaches = ref<{ id: string; slug: string; name: string; common_name: string | null; river_name: string | null; has_centerline: boolean }[]>([])
 const unassignedExpanded = ref(false)

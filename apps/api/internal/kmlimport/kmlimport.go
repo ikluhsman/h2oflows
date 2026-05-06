@@ -280,8 +280,8 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 		reachID   string
 		reachName string
 		label     string
-		minCFS    *float64
-		maxCFS    *float64
+		minValue  *float64
+		maxValue  *float64
 	}
 	type gaugeAssoc struct {
 		reachID    string
@@ -355,8 +355,8 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 						multiDayDays = &v
 					}
 				default:
-					if label, minCFS, maxCFS, ok := parseFlowRangePM(pm.Name, pm.Description); ok {
-						folderFlowRanges = append(folderFlowRanges, reachFlowRange{"", "", label, minCFS, maxCFS})
+					if label, minVal, maxVal, ok := parseFlowRangePM(pm.Name, pm.Description); ok {
+						folderFlowRanges = append(folderFlowRanges, reachFlowRange{"", "", label, minVal, maxVal})
 					}
 				}
 				continue
@@ -461,7 +461,7 @@ func (imp *Importer) Import(ctx context.Context, doc *KMLDoc) (*Result, error) {
 
 	// Upsert flow ranges after reach matching so reach IDs are known.
 	for _, fr := range flowRanges {
-		if err := imp.upsertFlowRange(ctx, fr.reachID, fr.label, fr.minCFS, fr.maxCFS); err != nil {
+		if err := imp.upsertFlowRange(ctx, fr.reachID, fr.label, fr.minValue, fr.maxValue); err != nil {
 			res.Log = append(res.Log, fmt.Sprintf("⚠  [%s] flow range %s: %v", fr.reachName, fr.label, err))
 		}
 	}
@@ -653,25 +653,24 @@ func slugify(s string) string {
 // ── Flow range parsing ────────────────────────────────────────────────────────
 
 // flowRangeKeywords maps KML placemark names to flow_ranges label values.
-// Accepts both the legacy 5-tier keywords and the new 4-band names as aliases.
 var flowRangeKeywords = map[string]string{
-	"below":     "too_low",
-	"too_low":   "too_low",
-	"low":       "running", // legacy alias
+	"below":     "low",
+	"too_low":   "low",     // legacy alias
+	"low":       "low",
 	"running":   "running",
-	"med":       "running", // legacy alias (was the middle tier)
+	"med":       "running", // legacy alias
 	"high":      "high",
-	"above":     "very_high",
-	"very_high": "very_high",
+	"above":     "high",    // legacy alias
+	"very_high": "high",    // legacy alias
 }
 
 // parseFlowRangePM detects a flow-range metadata placemark and returns the
-// DB label, min/max CFS, and true when the placemark name is a known keyword.
+// DB label, min/max value, and true when the placemark name is a known keyword.
 //
 // Description format:
-//   - "below"/"too_low" / "above"/"very_high": single CFS value — max_cfs or min_cfs respectively
-//   - "running" / "high": "min,max" pair (or single value treated as min)
-func parseFlowRangePM(name, desc string) (label string, minCFS, maxCFS *float64, ok bool) {
+//   - "below"/"low" / "above"/"high": single CFS value — max_value or min_value respectively
+//   - "running": "min,max" pair (or single value treated as min)
+func parseFlowRangePM(name, desc string) (label string, minVal, maxVal *float64, ok bool) {
 	label, ok = flowRangeKeywords[strings.ToLower(strings.TrimSpace(name))]
 	if !ok {
 		return "", nil, nil, false
@@ -688,38 +687,37 @@ func parseFlowRangePM(name, desc string) (label string, minCFS, maxCFS *float64,
 		return nil
 	}
 	switch label {
-	case "too_low":
+	case "low":
 		// single value = upper bound (< this)
-		maxCFS = parseVal(parts[0])
-	case "very_high":
-		// single value = lower bound (> this)
-		minCFS = parseVal(parts[0])
+		maxVal = parseVal(parts[0])
+	case "high":
+		// single value = lower bound (>= this)
+		minVal = parseVal(parts[0])
 	default:
 		// "min,max" or just "min"
-		minCFS = parseVal(parts[0])
+		minVal = parseVal(parts[0])
 		if len(parts) == 2 {
-			maxCFS = parseVal(parts[1])
+			maxVal = parseVal(parts[1])
 		}
 	}
-	return label, minCFS, maxCFS, true
+	return label, minVal, maxVal, true
 }
 
 // upsertFlowRange writes a single flow range band for a reach.
-// gauge_id is intentionally left NULL — KML ranges are reach-level descriptions
-// not tied to a specific gauge reading source.
-func (imp *Importer) upsertFlowRange(ctx context.Context, reachID, label string, minCFS, maxCFS *float64) error {
+// gauge_id intentionally left NULL — KML ranges are reach-level, not gauge-specific.
+func (imp *Importer) upsertFlowRange(ctx context.Context, reachID, label string, minVal, maxVal *float64) error {
 	if imp.DryRun {
 		return nil
 	}
 	_, err := imp.pool.Exec(ctx, `
-		INSERT INTO flow_ranges (reach_id, label, min_cfs, max_cfs, craft_type, data_source)
-		VALUES ($1, $2, $3, $4, 'general', 'manual')
-		ON CONFLICT (reach_id, label, craft_type)
+		INSERT INTO flow_ranges (reach_id, label, min_value, max_value, data_source)
+		VALUES ($1, $2, $3, $4, 'manual')
+		ON CONFLICT (reach_id, label)
 		DO UPDATE SET
-			min_cfs     = EXCLUDED.min_cfs,
-			max_cfs     = EXCLUDED.max_cfs,
+			min_value   = EXCLUDED.min_value,
+			max_value   = EXCLUDED.max_value,
 			data_source = EXCLUDED.data_source
-	`, reachID, label, minCFS, maxCFS)
+	`, reachID, label, minVal, maxVal)
 	return err
 }
 
