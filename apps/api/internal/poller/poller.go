@@ -25,6 +25,13 @@ const pollConcurrency = 10
 // a gauge is automatically marked 'inactive' by the poller.
 const consecutiveFailuresThreshold = 5
 
+// poll_health thresholds (in number of consecutive failures, assuming 15-min cadence).
+const (
+	healthDegradedThreshold    = 2  // ~30 min
+	healthStaleThreshold       = 4  // ~1 hr
+	healthUnreachableThreshold = 48 // ~12 hr
+)
+
 // Poller fetches gauge readings on a schedule and writes them to the database.
 // Each GaugeSource runs on its own ticker so sources with different poll
 // intervals don't block each other.
@@ -62,6 +69,7 @@ func (p *Poller) Run(ctx context.Context) {
 		go p.runSource(ctx, sc)
 	}
 	go p.runPruner(ctx)
+	go p.runHealthLogger(ctx)
 	<-ctx.Done()
 }
 
@@ -111,6 +119,43 @@ func (p *Poller) pollSource(ctx context.Context, sc sourceConfig) {
 		}(g)
 	}
 	wg.Wait()
+
+	// Recompute all custom gauge values from the freshly-stored readings.
+	if err := p.recomputeCustomGauges(ctx); err != nil {
+		log.Printf("poller[%s]: recompute custom gauges: %v", sourceType, err)
+	}
+}
+
+// recomputeCustomGauges bulk-updates last_value_cfs / last_value_at on every
+// custom gauge using the latest stored reading for each input gauge × sign.
+// Sets the output to NULL when any contributing gauge has no reading.
+func (p *Poller) recomputeCustomGauges(ctx context.Context) error {
+	_, err := p.db.Exec(ctx, `
+		WITH latest AS (
+			SELECT DISTINCT ON (gauge_id) gauge_id, value, timestamp
+			FROM gauge_readings
+			ORDER BY gauge_id, timestamp DESC
+		),
+		agg AS (
+			SELECT
+				cgi.custom_gauge_id                                       AS id,
+				SUM(cgi.sign::numeric * latest.value)                     AS value,
+				MAX(latest.timestamp)                                     AS at,
+				COUNT(latest.gauge_id) = COUNT(cgi.gauge_id)
+				  AND BOOL_AND(latest.value IS NOT NULL)                  AS complete
+			FROM custom_gauge_inputs cgi
+			LEFT JOIN latest ON latest.gauge_id = cgi.gauge_id
+			GROUP BY cgi.custom_gauge_id
+		)
+		UPDATE custom_gauges cg
+		SET
+			last_value_cfs = CASE WHEN agg.complete THEN agg.value ELSE NULL END,
+			last_value_at  = CASE WHEN agg.complete THEN agg.at    ELSE NULL END,
+			updated_at     = NOW()
+		FROM agg
+		WHERE cg.id = agg.id
+	`)
+	return err
 }
 
 // fetchAndStore fetches one reading and writes it to the DB.
@@ -167,14 +212,16 @@ func (p *Poller) writeReading(ctx context.Context, gaugeID string, r gauge.Readi
 	return err
 }
 
-// recordSuccess resets consecutive_failures and updates last_reading_at.
-// If the gauge was auto-managed to inactive due to failures, restore it to active.
+// recordSuccess resets the failure counter, stamps last_poll_success_at, and
+// restores poll_health to healthy. Auto-managed inactive gauges are re-activated.
 func (p *Poller) recordSuccess(ctx context.Context, gaugeID string) {
 	_, err := p.db.Exec(ctx, `
 		UPDATE gauges
-		SET last_reading_at      = NOW(),
-		    consecutive_failures = 0,
-		    status               = CASE
+		SET last_reading_at           = NOW(),
+		    last_poll_success_at      = NOW(),
+		    consecutive_poll_failures = 0,
+		    poll_health               = 'healthy',
+		    status                    = CASE
 		        WHEN auto_managed = TRUE AND status = 'inactive' THEN 'active'
 		        ELSE status
 		    END
@@ -185,24 +232,64 @@ func (p *Poller) recordSuccess(ctx context.Context, gaugeID string) {
 	}
 }
 
-// recordFailure increments consecutive_failures. If the gauge is auto-managed
-// and crosses the threshold, it is marked inactive automatically.
+// recordFailure increments the failure counter, updates poll_health, and stamps
+// last_poll_failure_at. Auto-managed gauges are marked inactive at the threshold.
 func (p *Poller) recordFailure(ctx context.Context, gaugeID string, fetchErr error) {
 	log.Printf("poller: fetch failed for gauge %s: %v", gaugeID, fetchErr)
 	_, err := p.db.Exec(ctx, `
 		UPDATE gauges
-		SET consecutive_failures = consecutive_failures + 1,
-		    status               = CASE
+		SET consecutive_poll_failures = consecutive_poll_failures + 1,
+		    last_poll_failure_at      = NOW(),
+		    poll_health               = CASE
+		        WHEN consecutive_poll_failures + 1 >= $2 THEN 'unreachable'
+		        WHEN consecutive_poll_failures + 1 >= $3 THEN 'stale'
+		        WHEN consecutive_poll_failures + 1 >= $4 THEN 'degraded'
+		        ELSE 'healthy'
+		    END,
+		    status                    = CASE
 		        WHEN auto_managed = TRUE
-		             AND consecutive_failures + 1 >= $2
+		             AND consecutive_poll_failures + 1 >= $5
 		             AND status NOT IN ('retired', 'seasonal')
 		        THEN 'inactive'
 		        ELSE status
 		    END
 		WHERE id = $1
-	`, gaugeID, consecutiveFailuresThreshold)
+	`, gaugeID,
+		healthUnreachableThreshold, healthStaleThreshold, healthDegradedThreshold,
+		consecutiveFailuresThreshold)
 	if err != nil {
 		log.Printf("poller: record failure for %s: %v", gaugeID, err)
+	}
+}
+
+// runHealthLogger logs gauges that have been unreachable for 7+ days.
+// Purely informational — no DB writes. Runs once per day alongside runPruner.
+func (p *Poller) runHealthLogger(ctx context.Context) {
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			rows, err := p.db.Query(ctx, `
+				SELECT id, external_id, source
+				FROM gauges
+				WHERE poll_health = 'unreachable'
+				  AND last_poll_success_at < NOW() - INTERVAL '7 days'
+			`)
+			if err != nil {
+				log.Printf("poller: health logger query: %v", err)
+				continue
+			}
+			for rows.Next() {
+				var id, extID, src string
+				if err := rows.Scan(&id, &extID, &src); err == nil {
+					log.Printf("poller: WARNING gauge %s (%s:%s) unreachable for 7+ days — consider swapping", id, src, extID)
+				}
+			}
+			rows.Close()
+		}
 	}
 }
 
@@ -277,7 +364,9 @@ func (p *Poller) FetchNowIfStale(ctx context.Context, gaugeID string, maxAge tim
 
 	reading, err := src.FetchReading(fetchCtx, externalID)
 	if err != nil {
-		p.recordFailure(ctx, gaugeID, err)
+		// Do not call recordFailure here — on-demand fetches are driven by user
+		// traffic and would corrupt the cadence-based poll_health counter.
+		log.Printf("poller: on-demand fetch failed for %s: %v", externalID, err)
 		return false
 	}
 	if err := p.writeReading(ctx, gaugeID, *reading); err != nil {
@@ -347,7 +436,7 @@ func (p *Poller) backfillSource(ctx context.Context, sc sourceConfig) {
 		WHERE  g.source = $1
 		  AND  g.status NOT IN ('retired', 'inactive')
 		  AND  EXISTS (
-		           SELECT 1 FROM gauge_reach_associations gra WHERE gra.gauge_id = g.id
+		           SELECT 1 FROM polled_gauge_ids p WHERE p.gauge_id = g.id
 		       )
 		  AND  (
 		           -- no readings at all in the window
@@ -657,13 +746,9 @@ type dbGauge struct {
 	externalID string
 }
 
-// INVARIANT: a gauge is polled only if it has at least one row in
-// gauge_reach_associations. Any code path that sets reaches.primary_gauge_id
-// MUST also insert into gauge_reach_associations. See SetPrimaryGauge in
-// handlers/nldi.go. Migration 000066 backfills this invariant.
-
 // loadGauges returns gauges for the given source that should be polled this tick.
-// A gauge is polled if and only if it has at least one entry in gauge_reach_associations.
+// A gauge is polled if it appears in polled_gauge_ids (reach association, custom
+// gauge input, or user reach primary gauge).
 func (p *Poller) loadGauges(ctx context.Context, sourceName string) ([]dbGauge, error) {
 	rows, err := p.db.Query(ctx, `
 		SELECT g.id, g.external_id
@@ -677,7 +762,13 @@ func (p *Poller) loadGauges(ctx context.Context, sourceName string) ([]dbGauge, 
 		      OR TO_CHAR(NOW(), 'MM-DD') BETWEEN g.seasonal_start_mmdd AND g.seasonal_end_mmdd
 		  )
 		  AND  EXISTS (
-		      SELECT 1 FROM gauge_reach_associations gra WHERE gra.gauge_id = g.id
+		      SELECT 1 FROM polled_gauge_ids p WHERE p.gauge_id = g.id
+		  )
+		  AND  (
+		      -- unreachable gauges back off to 1×/hour instead of every tick
+		      g.poll_health <> 'unreachable'
+		      OR g.last_poll_failure_at IS NULL
+		      OR g.last_poll_failure_at < NOW() - INTERVAL '1 hour'
 		  )
 	`, sourceName)
 	if err != nil {

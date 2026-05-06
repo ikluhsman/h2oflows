@@ -146,7 +146,6 @@ function makeGaugePinEl(gauge: WatchedGauge, pos: [number, number]): HTMLElement
 
   el.addEventListener('click', () => {
     gaugeTooltip.remove()
-    gaugeClickPopup?.remove()
     emit('open-gauge', gauge.id)
   })
 

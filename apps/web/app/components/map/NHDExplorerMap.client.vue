@@ -1,6 +1,6 @@
 <template>
   <div class="relative rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800">
-    <div ref="container" class="w-full bg-gray-100 dark:bg-gray-900" style="height:480px" />
+    <div ref="container" class="w-full bg-gray-100 dark:bg-gray-900" :style="{ height: props.mapHeight ?? '480px' }" />
 
     <!-- Loading overlay -->
     <div v-if="!mapReady" class="absolute inset-0 flex items-center justify-center text-sm text-gray-400 pointer-events-none">
@@ -89,6 +89,8 @@ const props = defineProps<{
   previewCenterline?:  object | null
   // Gauge selection mode: clicking a gauge circle emits gauge-select instead of a popup.
   gaugeSelectMode?:    boolean
+  // Map container height. Defaults to '480px'. Pass '100%' to fill a sized parent.
+  mapHeight?:          string
 }>()
 
 const emit = defineEmits<{

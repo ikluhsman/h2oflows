@@ -142,5 +142,7 @@ export function featureToWatchedGauge(
     flowStatus:             p.flow_status ?? 'unknown',
     flowBandLabel:          p.flow_band_label ?? null,
     lastReadingAt:          p.last_reading_at ?? null,
+    pollHealth:             p.poll_health ?? null,
+    lastPollSuccessAt:      p.last_poll_success_at ?? null,
   }
 }

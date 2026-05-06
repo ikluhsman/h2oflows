@@ -14,6 +14,10 @@
           v-if="displayFlowStatus !== 'unknown' || displayFlowBand"
           :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', statusBadgeClass]"
         >{{ statusLabel }}</span>
+        <span
+          v-if="isUnhealthy"
+          :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', healthBadgeClass]"
+        >{{ healthBadgeLabel }}</span>
         <TrendArrow v-if="currentCfs != null" :gauge-id="gauge.id" size="lg" class="shrink-0 hidden sm:block" />
         <!-- Shared gauge indicator — list view inline -->
         <UTooltip v-if="sharedWith?.length" :text="`Also: ${sharedWith.join(', ')}`" placement="bottom">
@@ -26,6 +30,11 @@
 
     <!-- Sparkline + CFS -->
     <div class="flex items-center gap-2 shrink-0">
+      <!-- H2OFlows origin indicator — list view -->
+      <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block text-blue-400/40 dark:text-blue-500/30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+      </svg>
       <div class="w-32 shrink-0 hidden sm:block">
         <GaugeSparkline :gauge-id="gauge.id" :flow-status="displayFlowStatus" :flow-band-label="displayFlowBand" :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug" compact @latest-cfs="liveCfs = $event" @live-flow-band="liveFlowBand = $event" />
       </div>
@@ -145,11 +154,27 @@
       </div>
     </div>
 
+    <!-- Health badge — card views -->
+    <div v-if="isUnhealthy && density !== 'list'" class="mt-1">
+      <span :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', healthBadgeClass]">
+        {{ healthBadgeLabel }}
+      </span>
+    </div>
+
     <!-- Last updated — full only, when no subtitle already shows source info -->
     <p v-if="density === 'full' && !contextFullName" class="text-xs text-gray-400 mt-1 truncate">
       {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
     </p>
     <p v-if="density === 'full' && lastUpdatedLabel" class="text-xs text-gray-400 mt-0.5">{{ lastUpdatedLabel }}</p>
+
+    <!-- H2OFlows origin badge — comfortable + full -->
+    <div class="flex items-center gap-1 mt-1.5 text-blue-400/50 dark:text-blue-500/40">
+      <svg class="w-3 h-3 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
+      </svg>
+      <span class="text-[10px] font-medium">H2OFlows</span>
+    </div>
 
     <!-- Shared gauge indicator — card view (comfortable + full) -->
     <UTooltip
@@ -227,8 +252,9 @@ const cardClass = computed(() => ({
 // --- Last updated -----------------------------------------------------------
 
 const lastUpdatedLabel = computed(() => {
-  if (!props.gauge.lastReadingAt) return ''
-  const ms = Date.now() - new Date(props.gauge.lastReadingAt).getTime()
+  const ts = props.gauge.lastReadingAt
+  if (!ts) return ''
+  const ms = Date.now() - new Date(ts).getTime()
   const minutes = Math.floor(ms / 60_000)
   if (minutes < 1)  return 'Updated just now'
   if (minutes < 60) return `Updated ${minutes}m ago`
@@ -236,4 +262,22 @@ const lastUpdatedLabel = computed(() => {
   if (hours < 24)   return `Updated ${hours}h ago`
   return `Updated ${Math.floor(hours / 24)}d ago`
 })
+
+// --- Poll health ------------------------------------------------------------
+
+const isUnhealthy = computed(() =>
+  props.gauge.pollHealth === 'stale' || props.gauge.pollHealth === 'unreachable'
+)
+
+const healthBadgeLabel = computed(() => {
+  if (props.gauge.pollHealth === 'unreachable') return 'Offline'
+  if (props.gauge.pollHealth === 'stale')       return 'Stale'
+  return ''
+})
+
+const healthBadgeClass = computed(() =>
+  props.gauge.pollHealth === 'unreachable'
+    ? 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300'
+    : 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+)
 </script>

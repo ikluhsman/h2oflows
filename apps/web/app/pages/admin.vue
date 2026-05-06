@@ -100,8 +100,18 @@
                 >
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.river_name }}</p>
-                    <p class="text-xs text-gray-400">
-                      {{ river.reaches.length }} reach{{ river.reaches.length !== 1 ? 'es' : '' }}<template v-if="river.river_basin"> · {{ river.river_basin }}</template>
+                    <p class="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap">
+                      <span>{{ river.reaches.length }} reach{{ river.reaches.length !== 1 ? 'es' : '' }}<template v-if="river.river_basin"> · {{ river.river_basin }}</template></span>
+                      <template v-if="riverHealthMap.get(river.river_slug) as any">
+                        <span v-if="(riverHealthMap.get(river.river_slug)?.gauges_unreachable ?? 0) > 0" class="inline-flex items-center gap-0.5 text-red-500 dark:text-red-400 font-medium">
+                          <span class="w-1.5 h-1.5 rounded-full bg-red-500 dark:bg-red-400 inline-block" />
+                          {{ riverHealthMap.get(river.river_slug)?.gauges_unreachable }} offline
+                        </span>
+                        <span v-else-if="(riverHealthMap.get(river.river_slug)?.gauges_stale ?? 0) > 0" class="inline-flex items-center gap-0.5 text-amber-500 dark:text-amber-400 font-medium">
+                          <span class="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 inline-block" />
+                          {{ riverHealthMap.get(river.river_slug)?.gauges_stale }} stale
+                        </span>
+                      </template>
                     </p>
                   </div>
                   <svg
@@ -453,7 +463,7 @@ const visibleTabs = computed(() => {
 })
 
 // ── Rivers ────────────────────────────────────────────────────────────────────
-interface River { id: string; slug: string; name: string; gnis_id: string | null; basin: string | null; basin_locked: boolean; state_abbr: string | null; huc8: string | null; verified: boolean; reach_count: number }
+interface River { id: string; slug: string; name: string; gnis_id: string | null; basin: string | null; basin_locked: boolean; state_abbr: string | null; huc8: string | null; verified: boolean; reach_count: number; gauges_degraded: number; gauges_stale: number; gauges_unreachable: number }
 interface RiverDetail extends River {
   reaches: { id: string; slug: string; name: string; common_name: string | null; has_centerline: boolean; state_abbr: string | null; river_order: number | null }[]
 }
@@ -464,6 +474,11 @@ interface GroupedBasin { basin: string; rivers: GroupedRiver[] }
 interface GroupedStateBasin { state: string; basins: GroupedBasin[] }
 
 const rivers = ref<River[]>([])
+const riverHealthMap = computed(() => {
+  const m = new Map<string, Pick<River, 'gauges_degraded' | 'gauges_stale' | 'gauges_unreachable'>>()
+  for (const rv of rivers.value) m.set(rv.slug, rv)
+  return m
+})
 const groupedReaches = ref<GroupedState[]>([])
 const riversLoading = ref(false)
 const riverSearch = ref('')

@@ -96,10 +96,18 @@ func main() {
 		log.Println("SUPABASE_JWKS_URL not set — auth middleware disabled, all requests anonymous")
 	}
 
-	gauges    := handlers.NewGaugeHandler(pool, enricher)
-	reaches   := handlers.NewReachHandler(pool, asker).WithPoller(p)
-	watchlist := handlers.NewWatchlistHandler(pool)
-	admin     := handlers.NewAdminHandler(pool)
+	// devFallbackID lets user-scoped endpoints work in local dev (no Supabase).
+	devFallbackID := ""
+	if verifier == nil {
+		devFallbackID = "dev-user"
+	}
+
+	gauges      := handlers.NewGaugeHandler(pool, enricher)
+	reaches     := handlers.NewReachHandler(pool, asker).WithPoller(p)
+	watchlist   := handlers.NewWatchlistHandler(pool)
+	admin       := handlers.NewAdminHandler(pool)
+	userReaches  := handlers.NewUserReachHandler(pool, devFallbackID)
+	customGauges := handlers.NewCustomGaugeHandler(pool, devFallbackID)
 	nldiH    := handlers.NewNLDIHandler(pool).WithAnthropicKey(cfg.AnthropicAPIKey).WithCacheWarmer(func() { reaches.WarmCache(context.Background()) })
 	// Warm the reach map cache immediately, then refresh every poll cycle.
 	reaches.WarmCache(context.Background())
@@ -169,7 +177,37 @@ func main() {
 			r.Get("/watchlist", watchlist.List)
 			r.Post("/watchlist", watchlist.Add)
 			r.Delete("/watchlist/{gaugeId}", watchlist.Remove)
+			// NLDI read-only endpoints — public NHD data, no admin role required.
+			r.Get("/nldi/upstream-tributaries", nldiH.UpstreamTributaries)
+			r.Get("/nldi/downstream", nldiH.DownstreamMainstem)
+			r.Get("/nldi/river-name", nldiH.RiverName)
+			r.Get("/nldi/preview-centerline", nldiH.PreviewCenterline)
+			r.Get("/nldi/nearby-gauges", nldiH.NearbyGauges)
 		})
+
+		// User-defined reaches — auth optional here; handler gates by ownerID.
+		r.Get("/me/reaches", userReaches.List)
+		r.Post("/me/reaches", userReaches.Create)
+		r.Post("/me/reaches/import", userReaches.Import)
+		r.Get("/me/reaches/{slug}", userReaches.Get)
+		r.Patch("/me/reaches/{slug}", userReaches.Update)
+		r.Delete("/me/reaches/{slug}", userReaches.Delete)
+		r.Get("/me/reaches/{slug}/flow-ranges", userReaches.GetFlowRanges)
+		r.Put("/me/reaches/{slug}/flow-ranges", userReaches.SetFlowRanges)
+		r.Post("/me/reaches/{slug}/centerline", userReaches.SetCenterline)
+		r.Delete("/me/reaches/{slug}/centerline", userReaches.ClearCenterline)
+		r.Put("/me/reaches/{slug}/gauge", userReaches.SetGauge)
+		r.Delete("/me/reaches/{slug}/gauge", userReaches.ClearGauge)
+
+		// Custom gauges — private to owner, auth gated via ownerID() + devFallbackID.
+		r.Get("/me/custom-gauges", customGauges.List)
+		r.Post("/me/custom-gauges", customGauges.Create)
+		r.Post("/me/custom-gauges/import", customGauges.Import)
+		r.Get("/me/custom-gauges/{slug}", customGauges.Get)
+		r.Patch("/me/custom-gauges/{slug}", customGauges.Update)
+		r.Delete("/me/custom-gauges/{slug}", customGauges.Delete)
+		r.Get("/me/custom-gauges/{slug}/share", customGauges.Share)
+		r.Get("/me/custom-gauges/{slug}/readings", customGauges.Readings)
 
 		// Data admin routes — require data_admin or site_admin role.
 		r.Group(func(r chi.Router) {

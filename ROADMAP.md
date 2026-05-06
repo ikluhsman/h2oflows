@@ -327,13 +327,13 @@ No automatic retirement — user / admin decides whether to swap a reach's gauge
 
 **Add gauge / add reach search:**
 - Default tab: curated h2oflows reaches/gauges
-- Second tab: "My Reaches" / "My Gauges" — owner-only personal items
+- Second tab: "My Reaches & Gauges" — owner-only personal items
 - Import button next to search bar: "Import from share code" → payload paste dialog
 - No public/community tab — sharing is point-to-point via payload only
 
 **Dashboard card icons:**
 - Curated reach card: H2OFlows badge
-- User reach card: subtle "My reach" label (no public avatar; content private)
+- User reach card: just a regular "user" icon, like the blacked-out headshot default avatar
 - Curated gauge card: H2OFlows logo
 - Custom gauge card: calc icon + "calculated" label, no sparkline (single trace only on click-through modal)
 

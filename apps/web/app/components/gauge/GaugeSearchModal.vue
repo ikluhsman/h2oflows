@@ -2,52 +2,92 @@
   <UModal v-model:open="open" title="Add a reach or gauge" :ui="{ width: 'max-w-2xl' }">
     <template #body>
       <div class="space-y-4">
-        <UInput
-          v-model="query"
-          placeholder="Search by river, section, or gauge ID…"
-          icon="i-heroicons-magnifying-glass"
-          size="lg"
-          autofocus
-          @input="onInput"
-        />
 
-        <div class="flex gap-4">
-          <!-- Results list -->
-          <div class="flex-1 min-w-0">
-            <!-- Skeleton loader -->
-            <div v-if="loading" class="space-y-2 py-2">
-              <div v-for="i in 4" :key="i" class="flex items-center gap-3 px-2 py-2.5">
-                <div class="flex-1 space-y-2">
-                  <div class="h-4 w-3/4 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
-                  <div class="h-3 w-1/2 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+        <!-- Tabs + import button -->
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <button
+              v-for="t in TABS" :key="t.key"
+              class="px-3 py-1 text-xs font-medium rounded-md transition-colors"
+              :class="activeTab === t.key
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+              @click="setTab(t.key)"
+            >{{ t.label }}</button>
+          </div>
+          <button
+            class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+            @click="importOpen = true"
+          >
+            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            Import
+          </button>
+        </div>
+
+        <!-- ── Curated tab ── -->
+        <template v-if="activeTab === 'curated'">
+          <UInput
+            v-model="query"
+            placeholder="Search by river, section, or gauge ID…"
+            icon="i-heroicons-magnifying-glass"
+            size="lg"
+            autofocus
+            @input="onInput"
+          />
+
+          <div class="flex gap-4">
+            <div class="flex-1 min-w-0">
+              <div v-if="loading" class="space-y-2 py-2">
+                <div v-for="i in 4" :key="i" class="flex items-center gap-3 px-2 py-2.5">
+                  <div class="flex-1 space-y-2">
+                    <div class="h-4 w-3/4 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                    <div class="h-3 w-1/2 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                  </div>
+                  <div class="h-7 w-14 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
                 </div>
-                <div class="h-7 w-14 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
               </div>
-            </div>
-
-            <!-- Empty state -->
-            <div v-else-if="results.length === 0 && query.length >= 2" class="text-center py-10 text-gray-400 text-sm">
-              No gauges found for "{{ query }}"
-            </div>
-
-            <!-- Idle state -->
-            <div v-else-if="results.length === 0" class="text-center py-10 text-gray-400 text-sm">
-              Type to search rivers, sections, or gauge IDs
-            </div>
-
-            <!-- Results -->
-            <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800 max-h-[60vh] overflow-y-auto">
-              <template v-for="g in results" :key="g.id">
-                <!-- Gauge has reaches: one row per reach -->
-                <template v-if="g.reachSlugs.length">
+              <div v-else-if="results.length === 0 && query.length >= 2" class="text-center py-10 text-gray-400 text-sm">
+                No gauges found for "{{ query }}"
+              </div>
+              <div v-else-if="results.length === 0" class="text-center py-10 text-gray-400 text-sm">
+                Type to search rivers, sections, or gauge IDs
+              </div>
+              <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800 max-h-[60vh] overflow-y-auto">
+                <template v-for="g in results" :key="g.id">
+                  <template v-if="g.reachSlugs.length">
+                    <li
+                      v-for="(slug, i) in g.reachSlugs"
+                      :key="slug"
+                      class="flex items-center justify-between gap-3 py-2.5 px-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors cursor-pointer"
+                      @click="selectWithContext(g, slug, g.reachCommonNames[i] ?? g.reachNames[i] ?? null)"
+                    >
+                      <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ g.reachCommonNames[i] ?? g.reachNames[i] ?? slug }}</p>
+                        <div class="flex items-center gap-1.5 mt-0.5">
+                          <span v-if="g.riverName" class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ g.riverName }}</span>
+                          <span v-if="g.riverName" class="text-gray-300 dark:text-gray-600 text-xs">·</span>
+                          <span class="text-xs text-gray-400 truncate">
+                            {{ g.source.toUpperCase() }} {{ g.externalId }}<template v-if="g.stateAbbr">, {{ g.stateAbbr }}</template>
+                          </span>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2 shrink-0">
+                        <span v-if="g.currentCfs != null" class="text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
+                          {{ g.currentCfs.toLocaleString() }}<span class="text-xs font-normal text-gray-400 ml-0.5">cfs</span>
+                        </span>
+                        <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
+                          @click.stop="selectWithContext(g, slug, g.reachCommonNames[i] ?? g.reachNames[i] ?? null)"
+                        >Add</UButton>
+                      </div>
+                    </li>
+                  </template>
                   <li
-                    v-for="(slug, i) in g.reachSlugs"
-                    :key="slug"
+                    v-else
                     class="flex items-center justify-between gap-3 py-2.5 px-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors cursor-pointer"
-                    @click="selectWithContext(g, slug, g.reachCommonNames[i] ?? g.reachNames[i] ?? null)"
+                    @click="selectWithContext(g, null, null)"
                   >
                     <div class="min-w-0 flex-1">
-                      <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ g.reachCommonNames[i] ?? g.reachNames[i] ?? slug }}</p>
+                      <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ g.name ?? g.externalId }}</p>
                       <div class="flex items-center gap-1.5 mt-0.5">
                         <span v-if="g.riverName" class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ g.riverName }}</span>
                         <span v-if="g.riverName" class="text-gray-300 dark:text-gray-600 text-xs">·</span>
@@ -58,47 +98,118 @@
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                       <span v-if="g.currentCfs != null" class="text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
-                        {{ g.currentCfs.toLocaleString() }}
-                        <span class="text-xs font-normal text-gray-400">cfs</span>
+                        {{ g.currentCfs.toLocaleString() }}<span class="text-xs font-normal text-gray-400 ml-0.5">cfs</span>
                       </span>
                       <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
-                        @click.stop="selectWithContext(g, slug, g.reachCommonNames[i] ?? g.reachNames[i] ?? null)"
+                        @click.stop="selectWithContext(g, null, null)"
                       >Add</UButton>
                     </div>
                   </li>
                 </template>
+              </ul>
+            </div>
+          </div>
+        </template>
 
-                <!-- Standalone gauge (no reaches) -->
+        <!-- ── My Reaches & Gauges tab ── -->
+        <template v-else-if="activeTab === 'mine'">
+          <div class="max-h-[60vh] overflow-y-auto space-y-4">
+
+            <!-- Reaches sub-section -->
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-2 mb-1">Reaches</p>
+              <div v-if="reachesLoading" class="space-y-2 py-1">
+                <div v-for="i in 3" :key="i" class="flex items-center gap-3 px-2 py-2">
+                  <div class="flex-1 h-4 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                  <div class="h-7 w-20 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                </div>
+              </div>
+              <div v-else-if="myReaches.length === 0" class="px-2 py-3 text-sm text-gray-400">
+                No personal reaches yet.
+                <NuxtLink to="/my/reaches/new" class="ml-1 text-blue-500 hover:text-blue-700 transition-colors font-medium" @click="open = false">Create one →</NuxtLink>
+              </div>
+              <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
                 <li
-                  v-else
-                  class="flex items-center justify-between gap-3 py-2.5 px-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors cursor-pointer"
-                  @click="selectWithContext(g, null, null)"
+                  v-for="r in myReaches" :key="r.id"
+                  class="flex items-center justify-between gap-3 py-2.5 px-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors"
                 >
                   <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ g.name ?? g.externalId }}</p>
-                    <div class="flex items-center gap-1.5 mt-0.5">
-                      <span v-if="g.riverName" class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ g.riverName }}</span>
-                      <span v-if="g.riverName" class="text-gray-300 dark:text-gray-600 text-xs">·</span>
-                      <span class="text-xs text-gray-400 truncate">
-                        {{ g.source.toUpperCase() }} {{ g.externalId }}<template v-if="g.stateAbbr">, {{ g.stateAbbr }}</template>
-                      </span>
-                    </div>
+                    <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ r.name }}</p>
+                    <p v-if="r.river_name" class="text-xs text-gray-400 truncate mt-0.5">{{ r.river_name }}</p>
                   </div>
                   <div class="flex items-center gap-2 shrink-0">
-                    <span v-if="g.currentCfs != null" class="text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
-                      {{ g.currentCfs.toLocaleString() }}
-                      <span class="text-xs font-normal text-gray-400">cfs</span>
+                    <span v-if="r.current_cfs != null" class="text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
+                      {{ r.current_cfs.toLocaleString() }}<span class="text-xs font-normal text-gray-400 ml-0.5">cfs</span>
                     </span>
-                    <UButton size="xs" color="primary" variant="soft" icon="i-heroicons-plus"
-                      @click.stop="selectWithContext(g, null, null)"
-                    >Add</UButton>
+                    <NuxtLink
+                      :to="`/my/reaches/${r.slug}`"
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      @click="open = false"
+                    >
+                      <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                      Open
+                    </NuxtLink>
                   </div>
                 </li>
-              </template>
-            </ul>
-          </div>
+              </ul>
+              <NuxtLink to="/my/reaches/new" class="flex items-center gap-1.5 px-2 py-1.5 mt-1 text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors font-medium" @click="open = false">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                New reach
+              </NuxtLink>
+            </div>
 
-        </div>
+            <!-- Divider -->
+            <div class="border-t border-gray-100 dark:border-gray-800" />
+
+            <!-- Custom gauges sub-section -->
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-2 mb-1">Custom Gauges</p>
+              <div v-if="gaugesLoading" class="space-y-2 py-1">
+                <div v-for="i in 3" :key="i" class="flex items-center gap-3 px-2 py-2">
+                  <div class="flex-1 h-4 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                  <div class="h-7 w-20 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
+                </div>
+              </div>
+              <div v-else-if="myGauges.length === 0" class="px-2 py-3 text-sm text-gray-400">
+                No custom gauges yet.
+                <NuxtLink to="/my/gauges/new" class="ml-1 text-blue-500 hover:text-blue-700 transition-colors font-medium" @click="open = false">Create one →</NuxtLink>
+              </div>
+              <ul v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+                <li
+                  v-for="cg in myGauges" :key="cg.id"
+                  class="flex items-center justify-between gap-3 py-2.5 px-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors"
+                >
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5">
+                      <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/></svg>
+                      <p class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ cg.name }}</p>
+                    </div>
+                    <p v-if="cg.description" class="text-xs text-gray-400 truncate mt-0.5">{{ cg.description }}</p>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <span v-if="cg.last_value_cfs != null" class="text-sm font-semibold tabular-nums text-gray-700 dark:text-gray-300">
+                      {{ cg.last_value_cfs.toLocaleString() }}<span class="text-xs font-normal text-gray-400 ml-0.5">{{ cg.unit }}</span>
+                    </span>
+                    <NuxtLink
+                      :to="`/my/gauges/${cg.slug}`"
+                      class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      @click="open = false"
+                    >
+                      <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                      Open
+                    </NuxtLink>
+                  </div>
+                </li>
+              </ul>
+              <NuxtLink to="/my/gauges/new" class="flex items-center gap-1.5 px-2 py-1.5 mt-1 text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors font-medium" @click="open = false">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+                New gauge
+              </NuxtLink>
+            </div>
+
+          </div>
+        </template>
+
       </div>
     </template>
     <template #footer>
@@ -107,30 +218,67 @@
       </div>
     </template>
   </UModal>
+
+  <!-- Import dialog -->
+  <UModal v-model:open="importOpen" title="Import from share code">
+    <template #body>
+      <div class="space-y-3">
+        <p class="text-sm text-gray-500 dark:text-gray-400">Paste a share code to import a reach someone shared with you.</p>
+        <UTextarea v-model="importPayload" placeholder="Paste share code here…" :rows="6" autofocus />
+        <p v-if="importError" class="text-xs text-red-500">{{ importError }}</p>
+      </div>
+    </template>
+    <template #footer>
+      <div class="flex justify-end gap-2">
+        <UButton variant="ghost" color="neutral" size="sm" @click="importOpen = false">Cancel</UButton>
+        <UButton color="primary" size="sm" :loading="importLoading" :disabled="!importPayload.trim()" @click="doImport">Import</UButton>
+      </div>
+    </template>
+  </UModal>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
 import { featureToWatchedGauge } from '~/composables/useWatchlistSync'
 
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ (e: 'add', gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>): void }>()
 
-const query = ref('')
-const loading = ref(false)
-const results = ref<Omit<WatchedGauge, 'watchState' | 'activeSince'>[]>([])
-
 const { apiBase } = useRuntimeConfig().public
+const { getToken } = useAuth()
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+
+type TabKey = 'curated' | 'mine'
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'curated', label: 'H2OFlows'          },
+  { key: 'mine',    label: 'My Reaches & Gauges' },
+]
+const activeTab = ref<TabKey>('curated')
+
+function setTab(key: TabKey) {
+  activeTab.value = key
+  if (key === 'mine') {
+    if (myReaches.value.length === 0 && !reachesLoading.value) loadMyReaches()
+    if (myGauges.value.length === 0  && !gaugesLoading.value)  loadMyGauges()
+  }
+}
+
+// Reset tab when modal closes
+watch(open, (v) => { if (!v) { activeTab.value = 'curated'; query.value = ''; results.value = [] } })
+
+// ── Curated search ────────────────────────────────────────────────────────────
+
+const query    = ref('')
+const loading  = ref(false)
+const results  = ref<Omit<WatchedGauge, 'watchState' | 'activeSince'>[]>([])
 
 let debounceTimer: ReturnType<typeof setTimeout>
 
 function onInput() {
   clearTimeout(debounceTimer)
-  if (query.value.length < 2) {
-    results.value = []
-    return
-  }
+  if (query.value.length < 2) { results.value = []; return }
   debounceTimer = setTimeout(search, 300)
 }
 
@@ -171,4 +319,74 @@ function selectWithContext(
   results.value = []
 }
 
+// ── My Reaches ────────────────────────────────────────────────────────────────
+
+interface ReachSummary { id: string; slug: string; name: string; river_name: string | null; current_cfs: number | null; flow_band: string | null }
+const myReaches      = ref<ReachSummary[]>([])
+const reachesLoading = ref(false)
+
+async function loadMyReaches() {
+  reachesLoading.value = true
+  try {
+    const token = await getToken()
+    if (!token) return
+    const res = await fetch(`${apiBase}/api/v1/me/reaches`, { headers: { Authorization: `Bearer ${token}` } })
+    if (res.ok) myReaches.value = await res.json() ?? []
+  } catch { /* non-fatal */ } finally {
+    reachesLoading.value = false
+  }
+}
+
+// ── My Gauges ─────────────────────────────────────────────────────────────────
+
+interface GaugeSummary { id: string; slug: string; name: string; description: string | null; unit: string; last_value_cfs: number | null }
+const myGauges      = ref<GaugeSummary[]>([])
+const gaugesLoading = ref(false)
+
+async function loadMyGauges() {
+  gaugesLoading.value = true
+  try {
+    const token = await getToken()
+    if (!token) return
+    const res = await fetch(`${apiBase}/api/v1/me/custom-gauges`, { headers: { Authorization: `Bearer ${token}` } })
+    if (res.ok) { const d = await res.json(); myGauges.value = d.items ?? [] }
+  } catch { /* non-fatal */ } finally {
+    gaugesLoading.value = false
+  }
+}
+
+// ── Import ────────────────────────────────────────────────────────────────────
+
+const importOpen    = ref(false)
+const importPayload = ref('')
+const importLoading = ref(false)
+const importError   = ref('')
+
+async function doImport() {
+  importError.value = ''
+  importLoading.value = true
+  try {
+    const payload = JSON.parse(importPayload.value.trim())
+    const token = await getToken()
+    if (!token) { importError.value = 'Sign in to import reaches.'; return }
+    const res = await fetch(`${apiBase}/api/v1/me/reaches/import`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      importError.value = err.error ?? `Import failed (${res.status})`
+      return
+    }
+    importOpen.value = false
+    importPayload.value = ''
+    open.value = false
+    myReaches.value = [] // force reload next open
+  } catch {
+    importError.value = 'Invalid share code — paste the full JSON payload.'
+  } finally {
+    importLoading.value = false
+  }
+}
 </script>
