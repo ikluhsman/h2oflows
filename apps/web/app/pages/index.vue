@@ -62,6 +62,13 @@
             <span class="font-semibold text-gray-800 dark:text-gray-200">{{ dbStats.rivers.toLocaleString() }}</span>
             rivers
           </span>
+          <template v-if="dbStats.reports && dbStats.reports > 0">
+            <span class="text-gray-300 dark:text-gray-700">·</span>
+            <span class="flex items-center gap-1.5">
+              <span class="font-semibold text-gray-800 dark:text-gray-200">{{ dbStats.reports.toLocaleString() }}</span>
+              reports
+            </span>
+          </template>
         </div>
 
         <!-- Primary nav buttons -->
@@ -237,7 +244,7 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 
 // ── DB stats ──────────────────────────────────────────────────────────────────
 
-const { data: dbStats } = await useAsyncData<{ reaches: number; rivers: number }>(
+const { data: dbStats } = await useAsyncData<{ reaches: number; rivers: number; reports?: number }>(
   'db-stats',
   () => $fetch(`${useRuntimeConfig().public.apiBase}/api/v1/stats`),
   { default: () => null as any, server: false }
