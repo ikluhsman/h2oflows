@@ -355,41 +355,446 @@ Each migration self-contained, reversible. Order matters: 68 first (band format 
 
 ---
 
-## Phase 2b — Community data layer
+## Phase 2b — Reports + multi-dashboards + theming
 
-*The contribution pipeline. Turn solo users into a data network. Deferred from original Phase 2.*
+*Contribution layer rebuilt around a unified Reports concept. Trip reports, hazard warnings, and conditions board collapse into one entity. Adds tabbed dashboards and a theme picker. Re-planned from `NewFeatures.md` 2026-05-06; supersedes the original 2b split.*
 
-### Trip reports (backend done, frontend stub)
+The existing `trip_reports`, `hazards`, and `reach_conditions` tables stay live during 2b development (frontend was stub anyway), then drop once routes are migrated. `proximity_events` keeps its FK to `trip_reports` and is deferred to its own phase.
 
-- Filing UI on each reach page — reach, date, craft, flow impression, conditions freetext, optional photos
-- CFS at run auto-stamped from gauge reading at `run_date` (gauge closest to put-in)
-- `class_felt` slider — "how did this feel at that flow?" — feeds flow-band accuracy over time
-- Published reports visible on reach page with flow context (was it runnable? pushy?)
-- Privacy toggle: private (default) / community / public
-- Social sharing — one-tap share to Instagram/Facebook/SMS; shared link renders reach name, CFS, flow band, and photo as OG image (see Phase 3 SEO)
-- Trip report slug at `/trip-reports/{slug}` — shareable, crawlable
+---
 
-### Community conditions board
+### 2b.1 — Unified Reports model
 
-- Short-lived intel posted to any reach: word-of-mouth, personal, outfitter, Discord source
-- Auto-expires 7 days
-- Runnable boolean — quick gut check from the paddler who just got off the water
-- Surfaced on reach page above the fold, sorted by recency
+A **Report** is any user-submitted observation about a reach. Drive-by, paddle, hazard sighting, conditions note — same record. Lower bar than AW trip reports: a user driving home from work who notices a strainer can submit one in 30 seconds.
 
-### Hazard warnings UI
+**Required:** reach, report_date, name, content
+**Optional:** report_time, hazard_warning text, photos, paddled flag (`true` = author was on the water; default `false`)
 
-- Backend routes (`GET/POST /reaches/{slug}/hazards`) already exist
-- Reach page section: active hazards with type badge, description, CFS at report
-- Report-a-hazard form: type (strainer/sieve/undercut/low-head dam/other), location on map, description
-- Admin: mark resolved, add resolution note
+CFS at observation time is auto-stamped from the reach's primary gauge nearest to `report_date` + `report_time` (or noon if time omitted). Flow band at observation time is computed from the reach's bands and stored.
 
-### Proximity events + passive telemetry
+**Schema (migration 000076):**
 
-- Backend route (`POST /proximity-events`) exists
-- Mobile web: opt-in proximity detection near known put-ins/take-outs
-- Aggregate signals feed put-in/take-out confidence scoring (see ARCHITECTURE.md)
-- Never send raw GPS — only derived point candidates
-- Settings page: toggle telemetry contribution on/off
+```sql
+CREATE TABLE reports (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id        TEXT NOT NULL,
+  slug            TEXT NOT NULL,
+  reach_id        UUID NOT NULL REFERENCES reaches(id) ON DELETE CASCADE,
+  name            TEXT NOT NULL,
+  report_date     DATE NOT NULL,
+  report_time     TIME,
+  content         TEXT NOT NULL,
+  hazard_warning  TEXT,
+  paddled         BOOLEAN NOT NULL DEFAULT FALSE,
+  flow_cfs        NUMERIC,
+  flow_band       TEXT CHECK (flow_band IN ('low','running','high')),
+  aw_synced_at    TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (owner_id, slug)
+);
+CREATE INDEX reports_reach_idx       ON reports (reach_id, report_date DESC);
+CREATE INDEX reports_owner_idx       ON reports (owner_id);
+CREATE INDEX reports_hazard_idx      ON reports (reach_id) WHERE hazard_warning IS NOT NULL;
+
+CREATE TABLE report_photos (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_id   UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+  position    SMALLINT NOT NULL,
+  storage_key TEXT NOT NULL,
+  caption     TEXT,
+  taken_at    TIMESTAMPTZ,
+  exif_lat    DOUBLE PRECISION,
+  exif_lng    DOUBLE PRECISION
+);
+CREATE INDEX report_photos_report_idx ON report_photos (report_id, position);
+```
+
+`storage_key` points to R2; upload pre-signed URLs issued by the API.
+
+**Reports against `user_reaches` are blocked at the API layer** — community moderation surface stays bounded. User reach detail page hides the Report CTA.
+
+**Rate limit + abuse:**
+- 5 reports per user per hour (sliding window)
+- Content text passed through a lightweight profanity / link-spam check before insert; soft-flag for admin queue if heuristic trips
+- Photo upload: max 8 per report, 10 MB each, MIME sniffed server-side
+- Edits within 24 hours of creation; after that, locked to preserve attestation. Owner can always delete.
+
+**API:**
+
+```
+POST   /reaches/{slug}/reports
+GET    /reaches/{slug}/reports?cursor=&limit=
+GET    /reports/{slug}                      (public — owner-attributed view)
+PATCH  /me/reports/{slug}
+DELETE /me/reports/{slug}
+GET    /me/reports
+```
+
+Public read; auth required for write/edit/delete. Slug is global (not per-owner) so report URLs are shareable: `/reports/{slug}`.
+
+---
+
+### 2b.2 — Submission UX + nav integration
+
+**Header nav:** "Report" tab added beside Dashboard / Explore. Auth-gated; click while logged-out routes through sign-in.
+
+**Submit flow:**
+1. Reach picker (defaults to last-viewed reach if recent)
+2. Date picker (defaults to today), optional time
+3. Name field (one-line)
+4. Content textarea
+5. Optional hazard warning textarea (separate, surfaces with red badge in lists)
+6. Optional "I paddled this" toggle
+7. Photo uploader (drag/drop)
+8. Submit → confirmation toast + redirect to the report detail page
+
+Submit also reachable from a reach detail page via "Add report" button — pre-fills the reach.
+
+**Report detail page (`/reports/{slug}`):**
+- Owner attribution + avatar
+- Reach link with current band color
+- CFS / flow band at observation time
+- Content + hazard callout + photo gallery
+- Share button (2b.4)
+
+**Per-reach reports section:**
+- Below the gauge card on the reach detail page
+- Paginated 5/10/25, default 5, sorted recency
+- Hazard reports float to the top within page, prefixed with the warning badge
+- Empty state: "Be the first to file a report for this reach."
+
+**My Reports (avatar menu):**
+- `/me/reports`
+- Card grid (desktop multi-column, mobile single column)
+- Filters: hazard-only, by reach, by date range
+- Per-card actions: view, edit (within 24 h), delete
+
+---
+
+### 2b.3 — Sharing + AW cross-post
+
+Each report has a Share button. Two surfaces: native social and AW cross-post.
+
+**Social share:**
+- Twitter / X, Facebook, SMS, Discord, "Copy link"
+- Pre-formatted text: `{report.name} — {reach.name} @ {flow_cfs} cfs ({flow_band}). h2oflow.org/reports/{slug}`
+- OG image generation pulled forward from Phase 3 for reports specifically: `/og/reports/{slug}.png` showing reach name, CFS, band color, first photo if present. Curated reach pages still get OG in Phase 3; reports need it now.
+
+**AW cross-post:**
+
+AW trip-report fields: title, run date, gauge, flow band (5 buckets: too-low / low / medium / high / too-high), rich-text content, photos.
+
+H2OFlows has 3 bands. **Mapping is per-user, set once,** then reused on every cross-post:
+
+| H2OFlows band | AW band (user picks) |
+|---|---|
+| below `running.min` | too-low *or* low |
+| `running.min`…`running.max` | low *or* medium *or* high |
+| above `running.max` | high *or* too-high |
+
+Mapping prompt shown the first time a user clicks "Share to AW". Stored as a JSON object on a new `user_preferences` row. Editable later from settings.
+
+If AW has a usable submission API → POST directly with token-bound auth and stamp `aw_synced_at`.
+If not (most likely path) → open a deep-link to AW's web form with all fields URL-encoded, including the mapped flow band. User reviews + submits manually; we still stamp `aw_synced_at` optimistically with an "I posted it" confirmation.
+
+Photos cross-posted only if AW endpoint supports multipart; otherwise the share copy notes "photos available at h2oflow.org/reports/{slug}".
+
+---
+
+### 2b.4 — Long-context report grounding (no RAG)
+
+The existing AI assistant (`internal/ai`) ingests reports at query time by **stuffing all reach-scoped reports into the prompt** instead of retrieving via embeddings. Reach-bounded queries are naturally narrow — pilot reaches will see tens of reports, 1.0-era reaches unlikely to exceed a few hundred. Long context (Claude 200K+) absorbs that comfortably and prompt caching makes repeat queries to the same reach near-free.
+
+**Why not RAG:** embedding pipeline + pgvector + reindex worker + chunking + retrieval tuning all add infrastructure for a problem we don't have at this scale. Reaches are the natural shard. Skip the retrieval layer entirely.
+
+**Loader:**
+- For a reach query, fetch all reports for that reach (most recent first), capped at last 24 months and ~500 reports max as a defensive ceiling
+- Stamp each with author handle, date, CFS at observation, flow band, hazard flag
+- Format as a structured prompt section the model can cite from verbatim
+
+**Prompt caching:**
+- The reach-reports block is cached per reach using Claude's prompt cache (5-minute TTL, refreshed on each query)
+- Cache key = reach_slug + last report `updated_at` — invalidates automatically on new report or edit
+- Cold-cache cost paid once per reach per ~5-minute window; subsequent queries to the same reach are cheap
+
+**Prompt scaffolding (mandatory):**
+
+> "The following are user-submitted reports about this reach. They are unverified and may be inaccurate, stale, or contradicted by current conditions. Cite each report by author + date when referencing. If a hazard is mentioned, surface it with a 'paddler caution' note even if uncertain about current state."
+
+Response format requires inline citations: `[Jane D., 2026-04-12]` linking back to `/reports/{slug}`. The assistant never paraphrases a report as authoritative h2oflows data. Because the model sees the full text of every cited report, citation accuracy is inherent — no retrieval-quality failure mode.
+
+**Hazard short-circuit:** if any loaded report has a non-null `hazard_warning` within the last 30 days, the assistant leads with the hazard summary regardless of whether the user asked about hazards. Implemented as a deterministic check on the loaded set before prompting, not as a model behavior.
+
+**Scale ceiling:** if a single reach ever crosses ~1000 reports (no current path to that — even an extremely active reach would take years), revisit. Options at that point: (1) trim to last N by date before stuffing, (2) reintroduce retrieval as a pre-filter while keeping long context for the final prompt. Not a 1.0 concern.
+
+---
+
+### 2b.5 — Multiple tabbed dashboards
+
+Single dashboard becomes multi-dashboard with tabs.
+
+**Schema (migration 000077):**
+
+```sql
+CREATE TABLE user_dashboards (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_id    TEXT NOT NULL,
+  slug        TEXT NOT NULL,
+  name        TEXT NOT NULL,
+  position    INTEGER NOT NULL DEFAULT 0,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (owner_id, slug)
+);
+CREATE INDEX user_dashboards_owner_idx ON user_dashboards (owner_id, position);
+
+ALTER TABLE user_watchlists
+  ADD COLUMN dashboard_id UUID REFERENCES user_dashboards(id) ON DELETE CASCADE;
+```
+
+**Backfill:** for each distinct `owner_id` in `user_watchlists`, insert one `user_dashboards` row (slug `default`, name "My Dashboard", position 0) and update existing watchlist rows to point at it. After backfill, set `dashboard_id NOT NULL` in a follow-up migration once all writers are updated.
+
+**UX:**
+- Tab bar above the dashboard grid
+- "+" tab → modal: name, optional description, save
+- Three-dot per tab: rename, delete, reorder via drag
+- Delete prompts confirm; cascades watchlist rows
+- Mobile: tabs become a horizontal-scroll strip; long-press for the three-dot menu
+- Empty new dashboard shows the same empty state as the existing single-dashboard build
+
+**Add-to-dashboard flow** (reach card, gauge card, custom gauge card) gains a dashboard picker — defaults to the most recently used dashboard.
+
+**API:**
+
+```
+GET    /me/dashboards
+POST   /me/dashboards
+PATCH  /me/dashboards/{slug}
+DELETE /me/dashboards/{slug}
+PATCH  /me/dashboards/reorder
+```
+
+Watchlist routes gain a `dashboard_id` query param + body field.
+
+---
+
+### 2b.6 — Theme picker + dark mode
+
+Avatar menu addition. Pattern lifted from Nuxt UI's docs theme picker (`docs/app/components/theme-picker/ThemePicker.vue`, `useTheme.ts`) and the local reference at `~/projects/iansrecipes.com/frontend/components/theme-picker.vue` + `app.config.ts` + `assets/css/main.css`.
+
+**Color palettes (initial set):**
+- `h2oflows` (default — existing brand)
+- `ocean`
+- `river`
+- `indigo-pink`
+- `forest`
+
+Each palette defined as primary/neutral pairs in `app.config.ts`; CSS custom properties live in `assets/css/main.css` keyed off a body data attribute.
+
+**Persistence:**
+- Pinia `useTheme` composable; persisted to localStorage (per `feedback_pinia_hydration.md` — never cookies)
+- `data-theme` and `data-color-mode` attributes set on `<html>` before paint to avoid FOUC (Nuxt color-mode integration)
+
+**Dark mode toggle** sits next to the palette swatches in the same menu. Three-state: light / dark / system.
+
+No DB column for now; cross-device sync deferred until pilot demands it.
+
+---
+
+### 2b.7 — Hero report count
+
+Landing hero already shows reach + river counts. Add reports.
+
+- Source: `SELECT COUNT(*) FROM reports`
+- Cached 60 s in API memory; no need for materialized view at pilot scale
+- New stat block to the right of rivers; same typography
+- Hide block until > 0 reports exist (keeps hero clean before any user contributes)
+
+---
+
+### Migration sequence (2b)
+
+```
+000076_reports.up.sql                   (2b.1: unified reports + report_photos)
+000077_user_dashboards.up.sql           (2b.5: dashboards + watchlist FK)
+000078_user_preferences.up.sql          (2b.3: aw_band_mapping + future prefs)
+000079_user_dashboards_required.up.sql  (after backfill: NOT NULL dashboard_id)
+```
+
+Old tables (`trip_reports`, `hazards`, `reach_conditions`) remain through 2b. A later cleanup migration drops them once frontend cuts over to `/reports`. `proximity_events.promoted_to → trip_reports` FK is repointed to `reports` *or* the column dropped, depending on whether proximity work resumes.
+
+---
+
+### Deferred from 2b
+
+- **Proximity events + passive telemetry** — backend route exists; resume when mobile PWA work begins (Phase 10 territory).
+- **Google Earth picture layer** — design coupled to photos-on-map; revisit after Reports + photo upload are live and we know which EXIF metadata users actually attach.
+- **QR sharing** for custom gauges (already deferred in Phase 2.3) and for reports.
+- **Discord bot ingestion** of report posts — folded into Phase 7.
+
+---
+
+## Repository restructure (pre-pilot)
+
+*Split the monorepo into a GitHub org with three independent repos before pilot outreach. Cleaner deployment story per surface, separate release cadence per layer, easier to hand a single repo to a contributor (e.g. AW collaboration) without exposing the rest.*
+
+GitHub org names cannot contain dots, so the org is `h2oflows` even though the production domain is `h2oflow.org`. (Domain currently registered as `h2oflow.org`, plural-domain `h2oflows.org` purchase TBD — flagged for the user to confirm.)
+
+### Target topology
+
+| Repo | Contents | Deploy target | Stack |
+|---|---|---|---|
+| **`h2oflows/api`** | Go backend (Chi, pgx v5, PostGIS) + migrations + `gauge-core` rolled in as `internal/gaugecore` + poller + AI handlers | TBD (Fly.io / Render / Railway — pick at split time) | Go 1.x, single module, no `go.work` |
+| **`h2oflows/web`** | Nuxt 4 frontend, MapLibre, uPlot, Pinia, Nuxt UI Pro | **Netlify** | Nuxt 4 |
+| **`h2oflows/docs`** | Pilot documentation site (per-feature walkthrough pages) | Netlify or Cloudflare Pages | Nuxt 4 + Nuxt UI + Nuxt Content, scaffolded from a Nuxt docs template (Docus or Nuxt UI Pro `docs` starter) so it matches the look of Nuxt module sites |
+
+### What moves where
+
+- `apps/api/**` → `h2oflows/api/` (root)
+- `apps/api/migrations/**` → `h2oflows/api/migrations/` (unchanged structure)
+- `packages/gauge-core/**` → `h2oflows/api/internal/gaugecore/` — only API consumes it; flatten to remove the workspace dep
+- `apps/web/**` → `h2oflows/web/` (root)
+- `apps/docs/**` (created during 2b for pilot) → `h2oflows/docs/` (root)
+- `ROADMAP.md`, `ARCHITECTURE.md`, `NewFeatures.md` history — keep in `h2oflows/api` as the canonical planning home; symlink or duplicate `CLAUDE.md` per repo with repo-scoped guidance
+- `.claude/memory/` stays local-only (gitignored everywhere)
+
+### Split mechanics
+
+1. Tag current monorepo HEAD as `pre-split` for forensic reference
+2. Use `git filter-repo --path apps/api --path packages/gauge-core --path-rename apps/api:.` (and similar per repo) to preserve commit history per surface
+3. Push each filtered branch to its new GitHub repo
+4. Open a tracking issue in each new repo capturing residual cleanup
+5. Archive (do not delete) the original monorepo with a top-level README pointing to the three new repos
+
+### Cross-repo concerns
+
+- **API URL** injected into `h2oflows/web` build via `NUXT_PUBLIC_API_URL` (Netlify env var); preview deploys point at staging API
+- **CORS** on API explicitly allow-lists web's Netlify origins (production + preview wildcard) and docs origin if docs embed any live data
+- **Auth (Supabase)** config duplicated as env vars in web + docs builds; API verifies same project's JWTs
+- **Shared types** — Go API has no TS consumer today. Phase 4 introduces OpenAPI 3.1; defer codegen until that lands. In the interim, web maintains hand-written types matching the API contract.
+- **Migrations** stay co-located with API; CI runs `migrate up` against staging DB on merge to `main`
+- **Cross-repo references** — docs links to web pages; web links to docs pages; both link to API status / health. Use environment-aware base URLs in each.
+
+### Versioning across the split
+
+Each repo gets its own semver (independent git tags, independent CHANGELOGs). The product version (`0.1.0`, `0.2.0`, `1.0.0` from the Pilot rollout cadence) is a meta version recorded in `h2oflows/api/RELEASES.md`, mapping each product release to the specific commit / tag in each repo at that moment:
+
+```
+0.2.0 (Phase 2b shipped)
+  api: v0.2.0   (commit abcd123)
+  web: v0.2.0   (commit ef45678)
+  docs: v0.1.0  (commit 9012abc)
+```
+
+Repos can ship patches independently (`api@v0.2.1` for a poller fix without touching web). The next coordinated product bump lifts whichever repos changed.
+
+### Order of operations
+
+1. Phase 2b feature work completes in the monorepo (avoid restructuring mid-flight)
+2. Confirm domain + create `h2oflows` org
+3. Stand up `apps/docs` inside the monorepo first (so its history exists to be split)
+4. Filter-split into three repos in one sitting; freeze monorepo writes during the cut
+5. Reconfigure CI/CD per repo
+6. Update local dev docs in each `CLAUDE.md`
+7. Tag `0.2.0` across all three repos as the first post-split product release
+8. Begin pilot outreach against the new topology
+
+### Risks + mitigations
+
+- **History loss on filter-repo** — verify with `git log --follow` on a few key files before pushing; keep `pre-split` tag indefinitely as fallback
+- **Netlify rebuild churn** during cutover — set up the new web repo's Netlify project with a placeholder before DNS flip, then move the domain once builds verify green
+- **Auth env drift** — check Supabase keys identical across web + docs + API (single source: a 1Password vault entry referenced by all three CI configs)
+- **Out-of-sync deploys** during a coordinated bump — release checklist in `RELEASES.md` enforces order: API first, web second, docs last (frontend can degrade gracefully behind a stale API; reverse is messier)
+
+---
+
+## Pilot rollout (0.x)
+
+*Validate Phases 2 + 2b with a small targeted group before public launch. Each pilot contact gets a tailored pitch + a feature-focused walkthrough in a docs site. Doubles as a mobile/device acid test.*
+
+### Pilot group + tailored messaging
+
+The app pivoted from a generic flow tracker to "build your own reaches and dashboards on top of curated content." Curated reaches stay; user reaches and custom gauges are the personal layer. Each contact below gets a distinct pitch.
+
+| Contact | Role / context | Lead with | Docs to link |
+|---|---|---|---|
+| **Nik** | Whitewater kayak instructor; AW stream team contributor; long-time paddling partner | Custom gauges (gauge math is his world) | Custom gauge builder; user reach creation |
+| **Owen** | AW tech team | Data schema standard for an AW pipeline; auto-share Reports → AW trip-report pre-fill (2b.3); public API contract | Reports + AW cross-post (2b.3); public API (Phase 4) |
+| **Greg** | AW Stream Team Google Group; previously floated an alt whitewater DB; emailed direct | "Complementary, not competing" — H2OFlows as the load-shedding seam AW didn't want to host | Public API; reach + gauge data model framed as offload |
+| **Tim Kunin** | Expert paddler since 2014; deep community presence | Custom reach creation + flow tracking + Reports | User reach flow; custom gauges; reports |
+| **Matt Beaman** | Paddler, non-technical | Plain UX walkthrough — no jargon, will catch dreadful breakage | Dashboard + add reach + reports |
+| **Jamie Knight** | PNW paddler, ex-CO; active community member | Reports + conditions across regions; flow tracking | Reports; basin / state navigation |
+
+**Send strategy:**
+- Nik gets a cold link — he'll just load up and explore
+- Everyone else gets a personalized DM/email with: (1) why them specifically, (2) one or two features tailored to them, (3) direct links to the docs pages for those features, (4) ask for an acid-test pass on phone + laptop
+- Drafts kept in a `pilot-outreach/` scratch dir (not committed) until ready to send
+
+### Pitch differentiation
+
+- **Nik / Tim / Matt / Jamie** — paddler users; pitch the personal-dashboard + custom-reach angle. They use the app, they file reports, they break the UX.
+- **Owen** — AW-internal; pitch the data interop angle. Lead with the share-back-to-AW flow (2b.3) and the public API (Phase 4) as a way for AW to receive structured submissions without operating the public API themselves. Open the door to schema-standard collaboration.
+- **Greg** — pitch H2OFlows as an *offload*, not a replacement. Frame the public API as the interop seam. Acknowledge his concern (AW server load from a public API) and demonstrate H2OFlows already shouldering it. Reframes my earlier pushback against an AW alternative — the alternative is a complement, not a fork.
+
+### Pilot docs site
+
+Stand up a small Nuxt docs site (separate package or `apps/docs`). Lightweight — for the pilot, not SEO marketing. **Scaffold from a Nuxt docs template** so it has the polished look of Nuxt module documentation sites — candidates:
+
+- **Docus** (`nuxtlabs/docus`) — the classic Nuxt module docs aesthetic
+- **Nuxt UI Pro `docs` starter** (`nuxt-ui-pro/docs`) — newer, matches Nuxt UI v3/v4 styling, what powers the Nuxt UI Pro docs themselves
+
+Pick at scaffold time based on which one is current and best supported when the docs repo is cut. Default leaning: Nuxt UI Pro `docs` starter, since the web app is already on Nuxt UI Pro and the design language stays consistent across web + docs.
+
+Per-feature pages:
+
+- Dashboard + watchlist
+- Add a curated reach to your dashboard
+- Create a custom gauge
+- Create a user reach (with map walkthrough)
+- File a report
+- Share a report (social + AW cross-post)
+- Theme picker
+
+Each pilot message links directly to the doc pages relevant to that contact — no scrolling a generic landing page.
+
+Tentative deploy: `docs.h2oflow.org` or a subpath on the main app.
+
+### Acid test
+
+The pilot is also a mobile/device matrix shakedown:
+
+- Each contact runs the app on phone + laptop (whatever they own — iOS / Android / macOS / Windows mix expected)
+- Targeted scenarios:
+  - dashboard hydration on cold load
+  - map gestures on touch (reach map zoom/pan, marker tap targets)
+  - custom gauge formula builder on small screens
+  - reach creation map flow on phone (anchor pick, take-out pick, auto-trim preview)
+  - photo upload on report from mobile camera
+  - tabbed dashboard interaction on mobile (horizontal scroll + long-press menu)
+  - theme picker + dark mode toggle persistence across reloads
+- Feedback collected via a single channel (Discord DM or email — TBD) and tracked in a lightweight log
+- Bugs filed, prioritized, and folded into 0.x patch releases
+- Diverse mix of technical expertise + paddling experience expected to surface different bug classes
+
+### 0.x → 1.0 release cadence
+
+Semantic versioning. The pilot lives on 0.x:
+
+- `0.1.0` — Phase 2 (2.1–2.6) shipped; pilot can demo all current features (custom gauges, user reaches, polling resilience, discovery UX)
+- `0.2.0` — Phase 2b shipped (Reports, multi-dashboards, theme picker, hero report stat)
+- `0.x.y` patches — bug fixes from acid-testing
+- `0.x.0` minors — new feature increments below the 1.0 threshold
+- `1.0.0` — public launch
+
+**1.0 gate criteria:**
+- Stable across the pilot device matrix
+- Load-tested (public API + poller under simulated traffic)
+- Pilot UX feedback addressed (or explicitly deferred with rationale)
+- Sufficient curated reach catalog to give a non-pilot user a reason to land
+- All critical hazards in the issue tracker resolved
+- Phase 3 OG images live (curated reaches + reports)
+
+Each release cuts a git tag, a `CHANGELOG.md` entry, and (when relevant) a short post for the pilot channel. 1.0 is the public launch, not a version bump — feature freeze the week prior, full load test, finalize OG images, social prep.
 
 ---
 
