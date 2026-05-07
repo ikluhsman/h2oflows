@@ -283,7 +283,7 @@ func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	reportSlug := body.Slug
 	if reportSlug == "" {
-		reportSlug = slugify(body.Name)
+		reportSlug = reachSlug + "-" + body.ReportDate
 	}
 	reportSlug = h.uniqueSlug(ctx, ownerID, reportSlug)
 
@@ -315,7 +315,7 @@ func (h *ReportHandler) Create(w http.ResponseWriter, r *http.Request) {
 		"id":     id,
 		"slug":   reportSlug,
 		"handle": handle,
-		"url":    fmt.Sprintf("/reports/%s/%s", handle, reportSlug),
+		"url":    fmt.Sprintf("/reports/%s", id),
 		"notice": "All reach reports are public on this site. Please be courteous.",
 	})
 }
@@ -343,7 +343,7 @@ func (h *ReportHandler) ListByReach(w http.ResponseWriter, r *http.Request) {
 	)
 	if cursor != "" {
 		query = `
-			SELECT rp.id, rp.slug, rp.name, rp.report_date, rp.report_time,
+			SELECT rp.id, rp.slug, rp.name, rp.report_date::TEXT, rp.report_time::TEXT,
 			       rp.content, rp.hazard_warning, rp.paddled,
 			       rp.flow_cfs, rp.flow_band, rp.created_at, up.handle
 			FROM reports rp
@@ -354,7 +354,7 @@ func (h *ReportHandler) ListByReach(w http.ResponseWriter, r *http.Request) {
 		args = []any{reachID, cursor, limit + 1}
 	} else {
 		query = `
-			SELECT rp.id, rp.slug, rp.name, rp.report_date, rp.report_time,
+			SELECT rp.id, rp.slug, rp.name, rp.report_date::TEXT, rp.report_time::TEXT,
 			       rp.content, rp.hazard_warning, rp.paddled,
 			       rp.flow_cfs, rp.flow_band, rp.created_at, up.handle
 			FROM reports rp
@@ -403,9 +403,7 @@ func (h *ReportHandler) ListByReach(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rep.CreatedAt = createdAt.Format(time.RFC3339)
-		if rep.Handle != nil {
-			rep.URL = fmt.Sprintf("/reports/%s/%s", *rep.Handle, rep.Slug)
-		}
+		rep.URL = fmt.Sprintf("/reports/%s", rep.ID)
 		reports = append(reports, rep)
 	}
 	if reports == nil {
@@ -439,8 +437,7 @@ func (h *ReportHandler) ListByReach(w http.ResponseWriter, r *http.Request) {
 // ── GET /reports/{handle}/{slug} ──────────────────────────────────────────────
 
 func (h *ReportHandler) Get(w http.ResponseWriter, r *http.Request) {
-	handle := chi.URLParam(r, "handle")
-	slug := chi.URLParam(r, "slug")
+	id := chi.URLParam(r, "id")
 	ctx := r.Context()
 
 	type detail struct {
@@ -464,17 +461,17 @@ func (h *ReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var createdAt time.Time
 	err := h.db.QueryRow(ctx, `
 		SELECT
-			rp.id, rp.slug, up.handle,
-			rp.name, rp.report_date, rp.report_time,
+			rp.id, rp.slug, COALESCE(up.handle, '') AS handle,
+			rp.name, rp.report_date::TEXT, rp.report_time::TEXT,
 			rp.content, rp.hazard_warning, rp.paddled,
 			rp.flow_cfs, rp.flow_band, rp.created_at,
 			COALESCE(re.name, '') AS reach_name,
 			COALESCE(re.slug, '') AS reach_slug
 		FROM reports rp
-		JOIN user_profiles up ON up.owner_id = rp.owner_id
+		LEFT JOIN user_profiles up ON up.owner_id = rp.owner_id
 		JOIN reaches re ON re.id = rp.reach_id
-		WHERE up.handle = $1 AND rp.slug = $2
-	`, handle, slug).Scan(
+		WHERE rp.id = $1
+	`, id).Scan(
 		&d.ID, &d.Slug, &d.Handle,
 		&d.Name, &d.ReportDate, &d.ReportTime,
 		&d.Content, &d.HazardWarning, &d.Paddled,
@@ -595,7 +592,7 @@ func (h *ReportHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Query(ctx, `
 		SELECT
 			rp.id, rp.slug,
-			rp.name, rp.report_date, rp.report_time,
+			rp.name, rp.report_date::TEXT, rp.report_time::TEXT,
 			rp.content, rp.hazard_warning, rp.paddled,
 			rp.flow_cfs, rp.flow_band, rp.created_at,
 			COALESCE(re.name, '') AS reach_name,
@@ -648,9 +645,7 @@ func (h *ReportHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rep.CreatedAt = createdAt.Format(time.RFC3339)
-		if handle != nil {
-			rep.URL = fmt.Sprintf("/reports/%s/%s", *handle, rep.Slug)
-		}
+		rep.URL = fmt.Sprintf("/reports/%s", rep.ID)
 		reports = append(reports, rep)
 	}
 	if reports == nil {

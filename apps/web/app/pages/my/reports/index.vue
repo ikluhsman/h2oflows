@@ -17,7 +17,7 @@
       <NuxtLink to="/login" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">Sign in</NuxtLink>
     </div>
 
-    <main v-else class="max-w-3xl mx-auto px-4 py-6 space-y-5">
+    <main v-else class="max-w-3xl mx-auto px-4 py-6 pb-24 sm:pb-6 space-y-5">
       <div class="flex items-center justify-between">
         <h1 class="text-xl font-bold text-gray-900 dark:text-white">My Reports</h1>
         <NuxtLink
@@ -207,7 +207,7 @@ function canEdit(createdAt: string): boolean {
 }
 
 function editReport(rep: MyReport) {
-  router.push(`/my/reports/${rep.slug}/edit`)
+  router.push(`/my/reports/${rep.slug}`)
 }
 
 const deleteTarget = ref<MyReport | null>(null)

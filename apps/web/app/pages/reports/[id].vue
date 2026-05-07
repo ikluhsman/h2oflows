@@ -15,7 +15,7 @@
       Report not found.
     </div>
 
-    <main v-else class="max-w-2xl mx-auto px-4 py-8 space-y-6">
+    <main v-else class="max-w-2xl mx-auto px-4 py-8 pb-20 sm:pb-8 space-y-6">
 
       <!-- Hazard callout -->
       <div
@@ -34,7 +34,7 @@
         <div class="flex items-start justify-between gap-3 flex-wrap">
           <div>
             <h1 class="text-lg font-bold text-gray-900 dark:text-white">{{ report.name }}</h1>
-            <p class="text-xs text-gray-400 mt-0.5">@{{ report.handle }}</p>
+            <p v-if="report.handle" class="text-xs text-gray-400 mt-0.5">@{{ report.handle }}</p>
           </div>
           <div class="text-right shrink-0">
             <div class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ formatDate(report.report_date) }}</div>
@@ -58,7 +58,7 @@
             class="inline-flex items-center gap-1 rounded-md bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-600 dark:text-gray-300"
           >
             {{ Math.round(report.flow_cfs).toLocaleString() }} cfs
-            <span v-if="report.flow_band" :class="bandBadgeClass(report.flow_band)">{{ report.flow_band }}</span>
+            <span v-if="report.flow_band" :class="bandBadgeClass(report.flow_band)" class="font-medium capitalize">{{ report.flow_band }}</span>
           </span>
           <span
             v-if="report.paddled"
@@ -100,10 +100,10 @@ interface Report {
   reach_slug: string
 }
 
-const { data: report, pending } = await useAsyncData<Report>(
-  `report-${route.params.handle}-${route.params.slug}`,
-  () => $fetch(`${config.public.apiBase}/api/v1/reports/${route.params.handle}/${route.params.slug}`)
-    .catch(() => null) as Promise<Report | null>
+const { data: report, pending } = await useAsyncData<Report | null>(
+  `report-${route.params.id}`,
+  () => $fetch<Report>(`${config.public.apiBase}/api/v1/reports/${route.params.id}`)
+    .catch(() => null)
 )
 
 function formatDate(d: string): string {
@@ -112,9 +112,9 @@ function formatDate(d: string): string {
 }
 
 function bandBadgeClass(band: string): string {
-  if (band === 'low') return 'ml-1 text-sky-600 dark:text-sky-400'
-  if (band === 'running') return 'ml-1 text-emerald-600 dark:text-emerald-400'
-  if (band === 'high') return 'ml-1 text-amber-600 dark:text-amber-400'
-  return 'ml-1 text-gray-500'
+  if (band === 'low') return 'text-sky-600 dark:text-sky-400'
+  if (band === 'running') return 'text-emerald-600 dark:text-emerald-400'
+  if (band === 'high') return 'text-amber-600 dark:text-amber-400'
+  return 'text-gray-500'
 }
 </script>

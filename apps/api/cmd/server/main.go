@@ -271,7 +271,7 @@ func main() {
 		// Reports (unified: trip reports, hazard warnings, conditions).
 		r.Post("/reaches/{slug}/reports", reports.Create)
 		r.Get("/reaches/{slug}/reports", reports.ListByReach)
-		r.Get("/reports/{handle}/{slug}", reports.Get)
+		r.Get("/reports/{id}", reports.Get)
 		r.Get("/me/reports", reports.ListMine)
 		r.Patch("/me/reports/{slug}", reports.Update)
 		r.Delete("/me/reports/{slug}", reports.Delete)

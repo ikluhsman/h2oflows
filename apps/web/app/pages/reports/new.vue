@@ -17,7 +17,7 @@
       <NuxtLink to="/login" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">Sign in</NuxtLink>
     </div>
 
-    <main v-else class="max-w-2xl mx-auto px-4 py-8 space-y-6">
+    <main v-else class="max-w-2xl mx-auto px-4 py-8 pb-24 sm:pb-8 space-y-6">
       <h1 class="text-xl font-bold text-gray-900 dark:text-white">New Reach Report</h1>
 
       <!-- Public notice -->
@@ -292,7 +292,7 @@ async function submit() {
       error.value = data.error ?? 'Failed to submit report'
       return
     }
-    router.push(`/reports/${data.handle}/${data.slug}`)
+    router.push(`/reports/${data.id}`)
   } catch (e: any) {
     error.value = e?.message ?? 'Network error'
   } finally {
