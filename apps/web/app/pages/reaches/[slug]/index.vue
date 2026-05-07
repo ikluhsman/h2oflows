@@ -192,6 +192,94 @@
         </div>
       </section>
 
+      <!-- Community Reports -->
+      <section>
+        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Reports
+              <span v-if="reportsFetchDone && reachReports.length > 0" class="ml-1.5 text-gray-400 font-normal text-xs">({{ reachReports.length }})</span>
+            </h2>
+            <NuxtLink
+              v-if="isAuthenticated"
+              :to="`/reports/new?reach=${(reach as any).slug}`"
+              class="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+              Add report
+            </NuxtLink>
+            <NuxtLink
+              v-else
+              to="/login"
+              class="text-xs text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            >Sign in to report</NuxtLink>
+          </div>
+
+          <!-- Loading -->
+          <div v-if="!reportsFetchDone" class="px-4 py-6 flex justify-center">
+            <div class="w-5 h-5 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+          </div>
+
+          <!-- Empty state -->
+          <div v-else-if="reachReports.length === 0" class="px-4 py-6 text-center text-sm text-gray-400">
+            Be the first to file a report for this reach.
+          </div>
+
+          <!-- Report list -->
+          <div v-else class="divide-y divide-gray-100 dark:divide-gray-800">
+            <div
+              v-for="rep in visibleReports"
+              :key="rep.id"
+              class="px-4 py-3 space-y-1"
+            >
+              <!-- Hazard badge -->
+              <div v-if="rep.hazard_warning" class="flex items-start gap-2 mb-1.5 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900 px-2.5 py-1.5">
+                <svg class="w-3.5 h-3.5 mt-0.5 shrink-0 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                <p class="text-xs text-red-700 dark:text-red-400">{{ rep.hazard_warning }}</p>
+              </div>
+              <div class="flex items-start justify-between gap-2">
+                <span class="text-sm font-medium text-gray-800 dark:text-gray-100">{{ rep.name }}</span>
+                <span class="text-xs text-gray-400 shrink-0">{{ formatReportDate(rep.report_date) }}</span>
+              </div>
+              <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 leading-relaxed">{{ rep.content }}</p>
+              <div class="flex items-center gap-2 pt-0.5">
+                <span v-if="rep.flow_cfs != null" class="text-xs text-gray-400">{{ Math.round(rep.flow_cfs).toLocaleString() }} cfs</span>
+                <span v-if="rep.flow_band" class="text-xs font-medium capitalize" :class="reportBandClass(rep.flow_band)">{{ rep.flow_band }}</span>
+                <span v-if="rep.paddled" class="text-xs text-blue-500 dark:text-blue-400">• paddled</span>
+                <NuxtLink v-if="rep.url" :to="rep.url" class="text-xs text-blue-500 dark:text-blue-400 hover:underline ml-auto">Full report →</NuxtLink>
+              </div>
+            </div>
+          </div>
+
+          <!-- Show more / less -->
+          <div v-if="reportsFetchDone && reachReports.length > reportsPageSize" class="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+            <span class="text-xs text-gray-400">{{ visibleReports.length }} of {{ reachReports.length }}</span>
+            <button
+              class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+              @click="reportsExpanded = !reportsExpanded"
+            >
+              {{ reportsExpanded ? 'Show fewer' : `Show all ${reachReports.length}` }}
+            </button>
+          </div>
+
+          <!-- Load more (cursor pagination) -->
+          <div v-if="reportsNextCursor && !reportsExpanded" class="px-4 py-3 border-t border-gray-100 dark:border-gray-800 text-center">
+            <button
+              :disabled="reportsLoadingMore"
+              class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium disabled:opacity-50"
+              @click="loadMoreReports"
+            >
+              <span v-if="reportsLoadingMore" class="flex items-center gap-1 justify-center">
+                <span class="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                Loading…
+              </span>
+              <span v-else>Load more reports</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
       <!-- Reach Description -->
       <section v-if="reach.description">
         <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed">
@@ -375,7 +463,7 @@ import {
 
 const route  = useRoute()
 const config = useRuntimeConfig()
-const { isDataAdmin } = useAuth()
+const { isAuthenticated, isDataAdmin } = useAuth()
 const store  = useWatchlistStore()
 const { addAndSync, removeAndSync } = useWatchlistSync()
 
@@ -429,6 +517,68 @@ const { data: flowRanges } = await useAsyncData(
   },
   { default: () => [] }
 )
+
+// ---- Community Reports -------------------------------------------------------
+
+interface ReachReport {
+  id: string
+  slug: string
+  name: string
+  report_date: string
+  content: string
+  hazard_warning?: string
+  paddled: boolean
+  flow_cfs?: number
+  flow_band?: string
+  url?: string
+}
+
+const reachReports = ref<ReachReport[]>([])
+const reportsNextCursor = ref<string | null>(null)
+const reportsFetchDone = ref(false)
+const reportsLoadingMore = ref(false)
+const reportsPageSize = 5
+const reportsExpanded = ref(false)
+
+const visibleReports = computed(() =>
+  reportsExpanded.value ? reachReports.value : reachReports.value.slice(0, reportsPageSize)
+)
+
+function formatReportDate(d: string): string {
+  const [y, m, day] = d.split('-').map(Number)
+  return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function reportBandClass(band: string): string {
+  if (band === 'low') return 'text-sky-600 dark:text-sky-400'
+  if (band === 'running') return 'text-emerald-600 dark:text-emerald-400'
+  if (band === 'high') return 'text-amber-600 dark:text-amber-400'
+  return 'text-gray-400'
+}
+
+async function fetchReports(cursor?: string) {
+  const slug = (reach.value as any)?.slug ?? route.params.slug
+  const url = `${config.public.apiBase}/api/v1/reaches/${slug}/reports${cursor ? `?cursor=${cursor}` : ''}`
+  const data = await $fetch<{ reports: ReachReport[]; next_cursor: string | null }>(url).catch(() => null)
+  if (data) {
+    if (cursor) {
+      reachReports.value = [...reachReports.value, ...data.reports]
+    } else {
+      reachReports.value = data.reports
+    }
+    reportsNextCursor.value = data.next_cursor ?? null
+  }
+  reportsFetchDone.value = true
+}
+
+async function loadMoreReports() {
+  if (!reportsNextCursor.value) return
+  reportsLoadingMore.value = true
+  await fetchReports(reportsNextCursor.value)
+  reportsLoadingMore.value = false
+}
+
+onMounted(() => fetchReports())
 
 // ---- River features (upstream→downstream timeline) --------------------------
 

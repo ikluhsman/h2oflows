@@ -40,6 +40,22 @@
         <span class="hidden sm:inline text-xs font-medium">Explore</span>
       </NuxtLink>
 
+      <!-- Report shortcut -->
+      <NuxtLink
+        v-if="isAuthenticated"
+        to="/reports/new"
+        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md transition-colors"
+        :class="route.path === '/reports/new'
+          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
+          : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
+        title="File a Report"
+      >
+        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        <span class="hidden sm:inline text-xs font-medium">Report</span>
+      </NuxtLink>
+
       <!-- AI Ask button — left side (icon always visible, text desktop only) -->
       <button
         class="shrink-0 flex items-center gap-1 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
@@ -121,6 +137,17 @@
             </button>
             <NuxtLink
               v-if="isAuthenticated"
+              to="/my/reports"
+              class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              @click="userMenuOpen = false"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              My Reports
+            </NuxtLink>
+            <NuxtLink
+              v-if="isAuthenticated"
               to="/my/reaches"
               class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
               @click="userMenuOpen = false"
@@ -199,6 +226,22 @@
         </svg>
         Explore
       </NuxtLink>
+      <!-- Report — mobile (auth only) -->
+      <NuxtLink
+        v-if="isAuthenticated"
+        to="/reports/new"
+        class="text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors"
+        :class="route.path === '/reports/new'
+          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
+          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'"
+        @click="menuOpen = false"
+      >
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        Report
+      </NuxtLink>
+
       <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2 flex flex-col gap-1">
         <!-- Ask — mobile -->
         <button
