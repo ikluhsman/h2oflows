@@ -163,6 +163,7 @@ func main() {
 		r.Get("/reaches/basin/{slug}/map", reaches.BasinMap)
 		r.Get("/reaches/basin/{slug}/network", reaches.BasinNetwork)
 		r.Get("/reaches", reaches.List)
+		r.Get("/reaches/active-hazards", reports.ActiveHazards)
 		r.Get("/reaches/{slug}", reaches.Get)
 		r.Get("/reaches/{slug}/conditions", reaches.GetConditions)
 		r.Get("/reaches/{slug}/hazards", reaches.GetHazards)

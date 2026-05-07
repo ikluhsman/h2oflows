@@ -195,15 +195,36 @@
       <!-- Community Reports -->
       <section>
         <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+
+          <!-- Header row -->
+          <div class="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 shrink-0">
               Reports
               <span v-if="reportsFetchDone && reachReports.length > 0" class="ml-1.5 text-gray-400 font-normal text-xs">({{ reachReports.length }})</span>
             </h2>
+            <!-- Search toggle -->
+            <button
+              v-if="reportsFetchDone && reachReports.length > 0"
+              class="shrink-0 p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              :class="reportsSearchOpen ? 'text-blue-500 dark:text-blue-400' : ''"
+              title="Search reports"
+              @click="reportsSearchOpen = !reportsSearchOpen; if (!reportsSearchOpen) reportsQuery = ''"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            </button>
+            <input
+              v-if="reportsSearchOpen"
+              v-model="reportsQuery"
+              type="text"
+              placeholder="Search reports…"
+              class="flex-1 min-w-0 bg-transparent text-xs text-gray-700 dark:text-gray-300 placeholder-gray-400 focus:outline-none"
+              autofocus
+            />
+            <div v-else class="flex-1" />
             <NuxtLink
               v-if="isAuthenticated"
               :to="`/reports/new?reach=${(reach as any).slug}`"
-              class="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
             >
               <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
               Add report
@@ -211,7 +232,7 @@
             <NuxtLink
               v-else
               to="/login"
-              class="text-xs text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+              class="shrink-0 text-xs text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
             >Sign in to report</NuxtLink>
           </div>
 
@@ -223,6 +244,11 @@
           <!-- Empty state -->
           <div v-else-if="reachReports.length === 0" class="px-4 py-6 text-center text-sm text-gray-400">
             Be the first to file a report for this reach.
+          </div>
+
+          <!-- No search results -->
+          <div v-else-if="filteredReports.length === 0" class="px-4 py-6 text-center text-sm text-gray-400">
+            No reports match "{{ reportsQuery }}".
           </div>
 
           <!-- Report list -->
@@ -252,18 +278,18 @@
           </div>
 
           <!-- Show more / less -->
-          <div v-if="reportsFetchDone && reachReports.length > reportsPageSize" class="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
-            <span class="text-xs text-gray-400">{{ visibleReports.length }} of {{ reachReports.length }}</span>
+          <div v-if="reportsFetchDone && filteredReports.length > reportsPageSize" class="px-4 py-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
+            <span class="text-xs text-gray-400">{{ visibleReports.length }} of {{ filteredReports.length }}</span>
             <button
               class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
               @click="reportsExpanded = !reportsExpanded"
             >
-              {{ reportsExpanded ? 'Show fewer' : `Show all ${reachReports.length}` }}
+              {{ reportsExpanded ? 'Show fewer' : `Show all ${filteredReports.length}` }}
             </button>
           </div>
 
           <!-- Load more (cursor pagination) -->
-          <div v-if="reportsNextCursor && !reportsExpanded" class="px-4 py-3 border-t border-gray-100 dark:border-gray-800 text-center">
+          <div v-if="reportsNextCursor && !reportsExpanded && !reportsQuery" class="px-4 py-3 border-t border-gray-100 dark:border-gray-800 text-center">
             <button
               :disabled="reportsLoadingMore"
               class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium disabled:opacity-50"
@@ -537,11 +563,23 @@ const reachReports = ref<ReachReport[]>([])
 const reportsNextCursor = ref<string | null>(null)
 const reportsFetchDone = ref(false)
 const reportsLoadingMore = ref(false)
-const reportsPageSize = 5
+const reportsPageSize = 3
 const reportsExpanded = ref(false)
+const reportsSearchOpen = ref(false)
+const reportsQuery = ref('')
+
+const filteredReports = computed(() => {
+  const q = reportsQuery.value.trim().toLowerCase()
+  if (!q) return reachReports.value
+  return reachReports.value.filter(r =>
+    r.content.toLowerCase().includes(q) ||
+    r.name.toLowerCase().includes(q) ||
+    (r.hazard_warning ?? '').toLowerCase().includes(q)
+  )
+})
 
 const visibleReports = computed(() =>
-  reportsExpanded.value ? reachReports.value : reachReports.value.slice(0, reportsPageSize)
+  reportsExpanded.value ? filteredReports.value : filteredReports.value.slice(0, reportsPageSize)
 )
 
 function formatReportDate(d: string): string {

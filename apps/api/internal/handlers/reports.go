@@ -653,3 +653,44 @@ func (h *ReportHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResponse(w, http.StatusOK, reports)
 }
+
+// ── GET /reaches/active-hazards ───────────────────────────────────────────────
+
+// ActiveHazards returns all reaches with hazard reports filed within the last 2
+// days — one call lets the dashboard badge every card in the watchlist at once.
+func (h *ReportHandler) ActiveHazards(w http.ResponseWriter, r *http.Request) {
+	type activeHazard struct {
+		Slug          string `json:"slug"`
+		HazardWarning string `json:"hazard_warning"`
+		ReportDate    string `json:"report_date"`
+		ReporterName  string `json:"reporter_name"`
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT re.slug, rp.hazard_warning, rp.report_date::TEXT, rp.name
+		FROM reports rp
+		JOIN reaches re ON re.id = rp.reach_id
+		WHERE rp.hazard_warning IS NOT NULL
+		  AND rp.report_date >= CURRENT_DATE - INTERVAL '2 days'
+		ORDER BY rp.report_date DESC, rp.created_at DESC
+	`)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "query failed")
+		return
+	}
+	defer rows.Close()
+
+	var hazards []activeHazard
+	for rows.Next() {
+		var item activeHazard
+		if err := rows.Scan(&item.Slug, &item.HazardWarning, &item.ReportDate, &item.ReporterName); err != nil {
+			continue
+		}
+		hazards = append(hazards, item)
+	}
+	if hazards == nil {
+		hazards = []activeHazard{}
+	}
+	w.Header().Set("Cache-Control", "public, max-age=60")
+	jsonResponse(w, http.StatusOK, hazards)
+}

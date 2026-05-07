@@ -159,6 +159,7 @@
                           v-if="viewMode === 'list'"
                           :reaches="split.ungrouped"
                           density="list"
+                          :hazard-slugs="hazardSlugs"
                           :class="split.gaugeGroups.length > 0 ? 'mt-3' : ''"
                           @open="(g, mode) => openGauge(g, mode)"
                           @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
@@ -169,6 +170,7 @@
                             :key="`${reach.id}::${reach.contextReachSlug}`"
                             :reaches="[reach]"
                             :density="viewMode"
+                            :hazard-slugs="hazardSlugs"
                             @open="(g, mode) => openGauge(g, mode)"
                             @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
                           />
@@ -182,6 +184,7 @@
                       v-if="viewMode === 'list'"
                       :reaches="river.reaches"
                       density="list"
+                      :hazard-slugs="hazardSlugs"
                       @open="(g, mode) => openGauge(g, mode)"
                       @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
                     />
@@ -192,6 +195,7 @@
                         :key="`${reach.id}::${reach.contextReachSlug}`"
                         :reaches="[reach]"
                         :density="viewMode"
+                        :hazard-slugs="hazardSlugs"
                         @open="(g, mode) => openGauge(g, mode)"
                         @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
                       />
@@ -524,9 +528,18 @@ async function syncWithServer() {
 watch(isAuthenticated, (val) => { if (val) { syncWithServer(); loadUserReaches(); loadCustomGauges() } })
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
+// ── Active hazards ────────────────────────────────────────────────────────────
+const hazardSlugs = ref(new Set<string>())
+
+async function loadActiveHazards() {
+  const data = await $fetch<{ slug: string }[]>(`${apiBase}/api/v1/reaches/active-hazards`).catch(() => [])
+  hazardSlugs.value = new Set((data ?? []).map(h => h.slug))
+}
+
 onMounted(() => {
   if (isAuthenticated.value) { syncWithServer(); loadUserReaches(); loadCustomGauges() }
   refresh()
+  loadActiveHazards()
   refreshTimer = setInterval(refresh, 60_000)
 })
 

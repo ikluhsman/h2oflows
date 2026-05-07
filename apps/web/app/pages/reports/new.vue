@@ -186,6 +186,39 @@
 
       </form>
     </main>
+
+    <!-- Hazard confirm dialog -->
+    <Teleport to="body">
+      <div
+        v-if="hazardConfirmOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4"
+      >
+        <div class="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl p-6 space-y-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <h3 class="text-base font-semibold text-gray-900 dark:text-white">Hazard notification</h3>
+          </div>
+          <p class="text-sm text-gray-600 dark:text-gray-400">
+            Your hazard warning will appear on the dashboards of all H2OFlows users watching this reach. Please make sure the description is accurate and specific.
+          </p>
+          <div class="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-300 italic">
+            "{{ form.hazard_warning }}"
+          </div>
+          <div class="flex items-center justify-end gap-3 pt-1">
+            <button
+              class="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+              @click="hazardConfirmOpen = false"
+            >Edit warning</button>
+            <button
+              class="inline-flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 px-4 py-2 text-sm font-medium text-white transition-colors"
+              @click="hazardConfirmOpen = false; doSubmit()"
+            >Submit report</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -264,8 +297,18 @@ onMounted(async () => {
 
 const submitting = ref(false)
 const error = ref('')
+const hazardConfirmOpen = ref(false)
 
-async function submit() {
+function submit() {
+  if (!selectedReach.value) return
+  if (form.value.hazard_warning.trim() && !hazardConfirmOpen.value) {
+    hazardConfirmOpen.value = true
+    return
+  }
+  doSubmit()
+}
+
+async function doSubmit() {
   if (!selectedReach.value) return
   error.value = ''
   submitting.value = true

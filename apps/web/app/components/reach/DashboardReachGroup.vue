@@ -28,6 +28,15 @@
       <div class="w-36 shrink-0 hidden sm:block h-6 opacity-60 pointer-events-none">
         <GaugeSparkline :gauge-id="reach.id" flow-status="unknown" :color="sparklineColor(reach)" compact @latest-cfs="(v) => setLiveCfs(reach, v)" />
       </div>
+      <NuxtLink
+        v-if="hazardSlugs?.has(reach.contextReachSlug ?? '')"
+        :to="`/reaches/${reach.contextReachSlug}`"
+        class="shrink-0 text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
+        title="Hazard reported on this reach"
+        @click.stop
+      >
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4m0 4h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </NuxtLink>
       <span
         v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
         :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
@@ -75,6 +84,15 @@
                 <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11"/>
               </svg>
             </NuxtLink>
+            <NuxtLink
+              v-if="hazardSlugs?.has(reach.contextReachSlug ?? '')"
+              :to="`/reaches/${reach.contextReachSlug}`"
+              class="shrink-0 text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
+              title="Hazard reported on this reach"
+              @click.stop
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </NuxtLink>
           </div>
           <span
             v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
@@ -114,6 +132,15 @@
                 <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11"/>
                 </svg>
+              </NuxtLink>
+              <NuxtLink
+                v-if="hazardSlugs?.has(reach.contextReachSlug ?? '')"
+                :to="`/reaches/${reach.contextReachSlug}`"
+                class="shrink-0 text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
+                title="Hazard reported on this reach"
+                @click.stop
+              >
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               </NuxtLink>
               <span
                 v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
@@ -156,6 +183,7 @@ import { flowBandBadgeClass, flowBandLabel, flowBandSolidColor, flowBandCfsClass
 const props = defineProps<{
   reaches: WatchedGauge[]
   density?: 'compact' | 'comfortable' | 'full' | 'list'
+  hazardSlugs?: Set<string>
 }>()
 
 const emit = defineEmits<{
