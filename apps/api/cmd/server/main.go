@@ -114,6 +114,7 @@ func main() {
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
 	trips         := handlers.NewTripHandler(pool, describer)
 	contributions := handlers.NewContributionHandler(pool)
+	reports       := handlers.NewReportHandler(pool, devFallbackID)
 	var importEmbedder *ai.Embedder
 	if cfg.VoyageAPIKey != "" {
 		importEmbedder = ai.NewEmbedder(cfg.VoyageAPIKey)
@@ -266,6 +267,14 @@ func main() {
 		r.Get("/trip-reports/{slug}", contributions.GetTripReport)
 		r.Patch("/trip-reports/{slug}", contributions.PatchTripReport)
 		r.Delete("/trip-reports/{slug}", contributions.DeleteTripReport)
+
+		// Reports (unified: trip reports, hazard warnings, conditions).
+		r.Post("/reaches/{slug}/reports", reports.Create)
+		r.Get("/reaches/{slug}/reports", reports.ListByReach)
+		r.Get("/reports/{handle}/{slug}", reports.Get)
+		r.Get("/me/reports", reports.ListMine)
+		r.Patch("/me/reports/{slug}", reports.Update)
+		r.Delete("/me/reports/{slug}", reports.Delete)
 		r.Post("/proximity-events", contributions.CreateProximityEvent)
 
 		r.Post("/trips", trips.Create)
