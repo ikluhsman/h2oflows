@@ -138,9 +138,9 @@ func (a *ReachAsker) IdentifyReach(ctx context.Context, question string, reaches
 }
 
 // Answer loads the reach's full structured data (description, rapids, access,
-// flow ranges) directly from the DB, then supplements with embedding-based
-// semantic chunks. This ensures all reach data is available to the AI even
-// if embeddings haven't been generated yet.
+// flow ranges) directly from the DB, supplements with embedding-based semantic
+// chunks, and injects all community reports using long-context prompt stuffing
+// (no retrieval). The reports block is prompt-cached per reach.
 func (a *ReachAsker) Answer(ctx context.Context, reachID, reachName, question string) (string, error) {
 	// 1. Load live structured data directly from DB — always available.
 	r, err := loadEmbedReach(ctx, a.db, reachID)
@@ -183,16 +183,30 @@ func (a *ReachAsker) Answer(ctx context.Context, reachID, reachName, question st
 		return "I don't have any data about this reach yet.", nil
 	}
 
-	// 3. Build the grounded prompt and call Claude.
-	context := strings.Join(chunks, "\n\n---\n\n")
-	systemText := fmt.Sprintf(askSystemPrompt, reachName, context)
+	// 3. Load community reports for long-context grounding.
+	reachReports, _ := loadReachReports(ctx, a.db, reachID)
+
+	// 4. Deterministic hazard short-circuit — prepended regardless of question.
+	hazards := activeHazards(reachReports)
+	hazardPreamble := buildHazardPreamble(hazards)
+
+	// 5. Build system blocks. Reports block carries a prompt-cache breakpoint
+	//    so repeat queries to the same reach (within 5 min) skip re-tokenisation.
+	reachContext := strings.Join(chunks, "\n\n---\n\n")
+	systemBlocks := []anthropic.TextBlockParam{
+		{Text: fmt.Sprintf(askSystemPrompt, reachName, reachContext)},
+	}
+	if reportsBlock := buildReportsBlock(reachReports); reportsBlock != "" {
+		systemBlocks = append(systemBlocks, anthropic.TextBlockParam{
+			Text:         reportsBlock,
+			CacheControl: anthropic.CacheControlEphemeralParam{},
+		})
+	}
 
 	msg, err := a.claude.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:     anthropic.ModelClaudeHaiku4_5,
 		MaxTokens: 512,
-		System: []anthropic.TextBlockParam{
-			{Text: systemText},
-		},
+		System:    systemBlocks,
 		Messages: []anthropic.MessageParam{
 			anthropic.NewUserMessage(anthropic.NewTextBlock(question)),
 		},
@@ -204,5 +218,5 @@ func (a *ReachAsker) Answer(ctx context.Context, reachID, reachName, question st
 		return "", fmt.Errorf("claude: empty response")
 	}
 
-	return msg.Content[0].Text, nil
+	return hazardPreamble + msg.Content[0].Text, nil
 }
