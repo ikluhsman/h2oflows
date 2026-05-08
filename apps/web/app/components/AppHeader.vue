@@ -344,7 +344,7 @@
   </header>
 
   <!-- Global gauge search modal -->
-  <GaugeSearchModal v-model:open="gaugeSearchOpen" @add="handleGaugeAdd" />
+  <GaugeSearchModal v-model:open="gaugeSearchOpen" @add="handleGaugeAdd" @added-external="onAddedExternal" />
 
   <!-- Global Ask modal (Teleport so it's above everything) -->
   <Teleport to="body">
@@ -480,10 +480,17 @@ async function handleSignOut() {
 }
 
 // ── Find a gauge ─────────────────────────────────────────────────────────────
-const { addAndSync } = useWatchlistSync()
+const { addAndSync, loadForDashboard } = useWatchlistSync()
+const dashboardsForAdd = useDashboards()
 const gaugeSearchOpen = ref(false)
-function handleGaugeAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
-  addAndSync(gauge)
+function handleGaugeAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dashboardId: string | null) {
+  addAndSync(gauge, dashboardId)
+}
+async function onAddedExternal() {
+  // User reach or custom gauge added directly to watchlist via API — reload
+  // the active dashboard so the new item shows up immediately.
+  const id = dashboardsForAdd.activeDashboard.value?.id
+  if (id) await loadForDashboard(id)
 }
 
 // ── Global Ask ────────────────────────────────────────────────────────────────

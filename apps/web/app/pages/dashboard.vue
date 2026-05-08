@@ -505,7 +505,7 @@
       </template>
     </main>
 
-    <GaugeSearchModal v-model:open="searchOpen" @add="handleAdd" />
+    <GaugeSearchModal v-model:open="searchOpen" @add="handleAdd" @added-external="onAddedExternal" />
     <GaugeDetailModal v-if="detailGauge" v-model:open="detailOpen" :gauge="detailGauge" :mode="detailMode" />
     <UserReachCustomGaugeModal
       v-if="customGaugeModalProps"
@@ -949,8 +949,16 @@ onMounted(() => {
 })
 watch(mapVisible, val => localStorage.setItem(MAP_VIS_KEY, String(val)))
 
-function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
-  addAndSync(gauge, db.activeDashboard.value?.id ?? null)
+function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dashboardId: string | null) {
+  addAndSync(gauge, dashboardId ?? db.activeDashboard.value?.id ?? null)
+}
+
+async function onAddedExternal() {
+  const id = db.activeDashboard.value?.id
+  if (id) {
+    await loadForDashboard(id)
+    await refresh()
+  }
 }
 
 const detailOpen  = ref(false)
