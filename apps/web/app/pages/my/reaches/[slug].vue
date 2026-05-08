@@ -1,15 +1,96 @@
 <template>
-  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col lg:h-screen lg:overflow-hidden">
+  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950 flex flex-col">
+    <AppHeader>
+      <span class="text-neutral-300 dark:text-neutral-700 shrink-0">/</span>
+      <NuxtLink to="/my/reaches" class="text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors">My Reaches</NuxtLink>
+      <span class="text-neutral-300 dark:text-neutral-700 shrink-0">/</span>
+      <span class="text-sm font-medium text-neutral-700 dark:text-neutral-200 truncate">{{ reach?.name ?? 'Edit' }}</span>
+    </AppHeader>
 
-    <!-- Header -->
-    <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800">
-      <NuxtLink to="/my/reaches" class="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300">
-        <span class="i-heroicons-chevron-left w-3.5 h-3.5" />
-        My Reaches
-      </NuxtLink>
-      <div v-if="reach" class="flex items-center gap-2 shrink-0">
+    <!-- Sticky action bar (below AppHeader) — Save, Cancel, X, Add-to-dashboard, etc. -->
+    <div v-if="reach" class="sticky top-[51px] z-10 flex items-center justify-between gap-2 px-4 py-2 bg-white/95 dark:bg-neutral-950/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800">
+      <div class="flex items-center gap-1.5 min-w-0">
+        <UButton size="xs" variant="ghost" color="neutral" icon="i-heroicons-x-mark" :to="'/my/reaches'" title="Close">Close</UButton>
+        <span class="text-xs text-neutral-300 dark:text-neutral-700 hidden sm:inline">·</span>
+        <div class="relative" data-add-dashboard-wrap>
+          <div class="flex items-stretch rounded-md border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+            <button
+              class="flex items-center gap-1 px-2 py-1 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/30 transition-colors"
+              @click="addUserReachToDashboard(dashboardsAdd.activeDashboard.value?.id ?? null)"
+            >
+              <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+              <span class="hidden sm:inline">Add to {{ dashboardsAdd.activeDashboard.value?.name ?? 'dashboard' }}</span>
+              <span class="sm:hidden">Add</span>
+            </button>
+            <button
+              v-if="dashboardsAdd.dashboards.value.length > 1"
+              class="flex items-center justify-center px-1.5 border-l border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+              title="Pick a different dashboard"
+              @click="dashboardPickerOpen = !dashboardPickerOpen"
+            >
+              <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
+          <div
+            v-if="dashboardPickerOpen"
+            class="absolute left-0 top-full mt-1 z-30 w-44 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden"
+          >
+            <button
+              v-for="d in dashboardsAdd.dashboards.value"
+              :key="d.id"
+              class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-950/30 transition-colors"
+              :class="d.id === dashboardsAdd.activeDashboardId.value ? 'font-medium text-primary-600 dark:text-primary-400' : 'text-neutral-600 dark:text-neutral-300'"
+              @click="addUserReachToDashboard(d.id); dashboardPickerOpen = false"
+            >{{ d.name }}</button>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5 shrink-0">
         <UButton size="xs" variant="ghost" color="neutral" icon="i-heroicons-share" @click="shareOpen = true">Share</UButton>
         <UButton size="xs" variant="ghost" color="error" icon="i-heroicons-trash" @click="confirmDelete">Delete</UButton>
+        <UButton size="xs" variant="outline" color="neutral" :to="'/my/reaches'">Cancel</UButton>
+        <UButton size="xs" :disabled="!form.name.trim()" :loading="saving" icon="i-heroicons-check" @click="save">Save</UButton>
+      </div>
+    </div>
+
+    <!-- CFS strip (top, full width, modal-style summary) -->
+    <div v-if="reach" class="px-4 pt-3">
+      <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-4 py-3 flex items-center gap-4 flex-wrap">
+        <div class="min-w-0 flex-1">
+          <h1 class="text-base font-bold text-neutral-900 dark:text-neutral-100 truncate">{{ reach.name }}</h1>
+          <p v-if="reach.river_name" class="text-xs text-neutral-500 truncate">{{ reach.river_name }}</p>
+        </div>
+        <template v-if="reach.gauge_name || reach.current_cfs != null">
+          <div class="flex items-end gap-3 shrink-0">
+            <div class="text-right">
+              <p v-if="reach.current_cfs != null" class="text-2xl font-bold font-mono leading-none" :class="cfsColorClass">
+                {{ reach.current_cfs.toLocaleString() }}<span class="text-xs font-normal text-neutral-400 ml-1">cfs</span>
+              </p>
+              <p v-else class="text-sm text-neutral-400">No reading</p>
+              <p v-if="reach.gauge_name" class="text-xs text-neutral-400 truncate mt-0.5">{{ reach.gauge_name }}</p>
+            </div>
+            <span
+              v-if="reach.flow_band"
+              class="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 mb-0.5"
+              :class="flowBandBadgeClass(reach.flow_band)"
+            >{{ flowBandLabel(reach.flow_band) }}</span>
+          </div>
+        </template>
+        <div
+          v-if="reach.gauge_poll_health === 'stale' || reach.gauge_poll_health === 'unreachable'"
+          class="basis-full flex items-start gap-2 px-2.5 py-1.5 rounded-md text-xs border"
+          :class="reach.gauge_poll_health === 'unreachable'
+            ? 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900'
+            : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900'"
+        >
+          <svg class="w-3.5 h-3.5 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
+          <div>
+            <span class="font-medium">{{ reach.gauge_poll_health === 'unreachable' ? 'Gauge unreachable' : 'Gauge data is stale' }}</span>
+            <span v-if="reach.gauge_last_poll_success_at" class="block opacity-80">
+              Last update {{ new Date(reach.gauge_last_poll_success_at).toLocaleDateString() }}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -54,43 +135,6 @@
 
       <!-- Form panel — mobile: natural scroll; desktop: fixed-height scrollable column -->
       <div class="lg:w-95 lg:overflow-y-auto lg:h-[calc(100vh-51px)] p-4 pb-20 space-y-4">
-
-        <!-- Reach info + live flow -->
-        <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4">
-          <h1 class="text-lg font-bold text-neutral-900 dark:text-neutral-100 leading-tight">{{ reach.name }}</h1>
-          <p v-if="reach.river_name" class="text-sm text-neutral-500 mt-0.5">{{ reach.river_name }}</p>
-          <div
-            v-if="reach.gauge_poll_health === 'stale' || reach.gauge_poll_health === 'unreachable'"
-            class="mt-2 flex items-start gap-2 px-2.5 py-1.5 rounded-md text-xs border"
-            :class="reach.gauge_poll_health === 'unreachable'
-              ? 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900'
-              : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900'"
-          >
-            <svg class="w-3.5 h-3.5 mt-0.5 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/></svg>
-            <div>
-              <span class="font-medium">{{ reach.gauge_poll_health === 'unreachable' ? 'Gauge unreachable' : 'Gauge data is stale' }}</span>
-              <span v-if="reach.gauge_last_poll_success_at" class="block opacity-80">
-                Last update {{ new Date(reach.gauge_last_poll_success_at).toLocaleDateString() }}
-              </span>
-            </div>
-          </div>
-          <template v-if="reach.gauge_name || reach.current_cfs != null">
-            <div class="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-end gap-4">
-              <div class="flex-1 min-w-0">
-                <p v-if="reach.current_cfs != null" class="text-2xl font-bold font-mono" :class="cfsColorClass">
-                  {{ reach.current_cfs.toLocaleString() }}<span class="text-sm font-normal text-neutral-400 ml-1">cfs</span>
-                </p>
-                <p v-else class="text-sm text-neutral-400">No reading</p>
-                <p v-if="reach.gauge_name" class="text-xs text-neutral-400 truncate mt-0.5">{{ reach.gauge_name }}</p>
-              </div>
-              <span
-                v-if="reach.flow_band"
-                class="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 mb-0.5"
-                :class="flowBandBadgeClass(reach.flow_band)"
-              >{{ flowBandLabel(reach.flow_band) }}</span>
-            </div>
-          </template>
-        </div>
 
         <!-- Flow lines & gauge -->
         <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 space-y-3">
@@ -327,9 +371,6 @@
 
         <!-- Save metadata -->
         <div v-if="saveError" class="text-xs text-red-500 px-1">{{ saveError }}</div>
-        <div class="flex justify-end gap-2 pb-6">
-          <UButton :disabled="!form.name.trim()" :loading="saving" @click="save">Save changes</UButton>
-        </div>
 
       </div>
     </div>
@@ -355,7 +396,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
 
 definePageMeta({ ssr: false })
@@ -366,6 +407,26 @@ const { getToken } = useAuth()
 const { apiBase }  = useRuntimeConfig().public
 
 const slug = computed(() => route.params.slug as string)
+
+// ── Dashboard picker (for "Add to dashboard" button) ──────────────────────────
+const dashboardsAdd = useDashboards()
+const dashboardPickerOpen = ref(false)
+const { addUserReachToWatchlist } = useWatchlistSync()
+async function addUserReachToDashboard(dashboardId: string | null) {
+  if (!reach.value?.gauge_id) return
+  await addUserReachToWatchlist(reach.value.gauge_id, slug.value, dashboardId)
+  dashboardPickerOpen.value = false
+}
+onMounted(() => {
+  if (!dashboardsAdd.loaded.value) dashboardsAdd.load()
+  document.addEventListener('click', closeDashboardPickerOnOutside)
+})
+onUnmounted(() => document.removeEventListener('click', closeDashboardPickerOnOutside))
+function closeDashboardPickerOnOutside(e: MouseEvent) {
+  if (dashboardPickerOpen.value && !(e.target as HTMLElement).closest('[data-add-dashboard-wrap]')) {
+    dashboardPickerOpen.value = false
+  }
+}
 
 const loading   = ref(false)
 const error     = ref('')
@@ -582,7 +643,8 @@ async function lookupRiverName(): Promise<void> {
   try {
     const params = new URLSearchParams({ comid })
     if (lat != null && lng != null) { params.set('lat', String(lat)); params.set('lng', String(lng)) }
-    const res = await fetch(`${apiBase}/api/v1/nldi/river-name?${params}`)
+    const headers = await authHeaders()
+    const res = await fetch(`${apiBase}/api/v1/nldi/river-name?${params}`, { headers })
     if (res.ok) {
       const data = await res.json()
       if (data.river_name) form.value.riverName = data.river_name

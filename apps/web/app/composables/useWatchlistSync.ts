@@ -133,7 +133,52 @@ export function useWatchlistSync() {
     }
   }
 
-  return { addAndSync, removeAndSync, loadFromServer, loadForDashboard, pushLocalToServer }
+  /**
+   * Adds a custom gauge to the watchlist. Used when a user picks a custom
+   * gauge from the My Reaches & Gauges tab in the search modal. The store is
+   * not updated optimistically — caller should re-call loadForDashboard after.
+   */
+  async function addCustomGaugeToWatchlist(customGaugeId: string, dashboardId: string | null) {
+    const token = await getToken()
+    if (!token) return
+    await fetch(`${apiBase}/api/v1/watchlist`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        custom_gauge_id: customGaugeId,
+        dashboard_id: dashboardId ?? null,
+      }),
+    }).catch(() => {})
+  }
+
+  /**
+   * Adds a user reach (by gauge_id + reach_slug) to the watchlist on the given
+   * dashboard. The store is not updated optimistically — caller should re-call
+   * loadForDashboard after to hydrate the gauge metadata from the batch API.
+   */
+  async function addUserReachToWatchlist(gaugeId: string, reachSlug: string, dashboardId: string | null) {
+    const token = await getToken()
+    if (!token) return
+    await fetch(`${apiBase}/api/v1/watchlist`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gauge_id: gaugeId,
+        reach_slug: reachSlug,
+        dashboard_id: dashboardId ?? null,
+      }),
+    }).catch(() => {})
+  }
+
+  return {
+    addAndSync,
+    addCustomGaugeToWatchlist,
+    addUserReachToWatchlist,
+    removeAndSync,
+    loadFromServer,
+    loadForDashboard,
+    pushLocalToServer,
+  }
 }
 
 // Shared helper: map a batch API feature properties object to a WatchedGauge shape.

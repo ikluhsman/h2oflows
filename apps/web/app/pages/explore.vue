@@ -149,7 +149,7 @@
                         />
                         <!-- Name -->
                         <span class="flex-1 min-w-0 text-sm text-neutral-800 dark:text-neutral-200 truncate">
-                          {{ reach.common_name ?? reach.put_in_name ?? reach.slug }}
+                          {{ reach.common_name ?? reach.name ?? reach.put_in_name ?? reach.slug }}
                         </span>
                         <!-- CFS -->
                         <span

@@ -17,7 +17,7 @@
     <div
       v-if="store.gauges.length > 0"
       class="sticky z-10 bg-neutral-50/95 dark:bg-neutral-950/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800"
-      :class="isAuthenticated && db.loaded.value && db.dashboards.value.length ? 'top-[92px]' : 'top-[51px]'"
+      :class="isAuthenticated && db.loaded.value && db.dashboards.value.length ? 'top-[96px]' : 'top-[51px]'"
     >
       <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
@@ -505,7 +505,7 @@
       </template>
     </main>
 
-    <GaugeSearchModal v-model:open="searchOpen" @add="handleAdd" />
+    <GaugeSearchModal v-model:open="searchOpen" @add="handleAdd" @added-external="onAddedExternal" />
     <GaugeDetailModal v-if="detailGauge" v-model:open="detailOpen" :gauge="detailGauge" :mode="detailMode" />
     <UserReachCustomGaugeModal
       v-if="customGaugeModalProps"
@@ -949,8 +949,16 @@ onMounted(() => {
 })
 watch(mapVisible, val => localStorage.setItem(MAP_VIS_KEY, String(val)))
 
-function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
-  addAndSync(gauge, db.activeDashboard.value?.id ?? null)
+function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dashboardId: string | null) {
+  addAndSync(gauge, dashboardId ?? db.activeDashboard.value?.id ?? null)
+}
+
+async function onAddedExternal() {
+  const id = db.activeDashboard.value?.id
+  if (id) {
+    await loadForDashboard(id)
+    await refresh()
+  }
 }
 
 const detailOpen  = ref(false)

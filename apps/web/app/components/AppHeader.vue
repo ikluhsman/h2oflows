@@ -127,19 +127,42 @@
               <p class="px-3 py-1.5 text-xs text-neutral-400 truncate">{{ user?.email ?? user?.user_metadata?.user_name }}</p>
               <div class="border-t border-neutral-100 dark:border-neutral-800" />
             </template>
-            <!-- Appearance: palette + dark mode -->
-            <div class="px-3 py-2 space-y-1.5">
-              <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Appearance</p>
-              <!-- 5×2 palette grid: col = primary color, row = neutral (slate/stone) -->
+            <!-- Appearance: collapsed by default; expand to show palette + mode -->
+            <button
+              class="w-full flex items-center justify-between px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+              @click="appearanceOpen = !appearanceOpen"
+            >
+              <span class="flex items-center gap-2">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/>
+                  <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>
+                </svg>
+                Appearance
+              </span>
+              <span class="flex items-center gap-1.5">
+                <!-- Active palette swatch preview -->
+                <span v-if="activePalette" class="w-4 h-4 rounded-full overflow-hidden border border-neutral-200 dark:border-neutral-700 inline-flex">
+                  <span class="w-1/2 h-full" :style="{ background: activePalette.neutralSwatch }" />
+                  <span class="w-1/2 h-full" :style="{ background: activePalette.primarySwatch }" />
+                </span>
+                <svg
+                  class="w-3 h-3 text-neutral-400 transition-transform"
+                  :class="{ 'rotate-180': appearanceOpen }"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                ><polyline points="6 9 12 15 18 9"/></svg>
+              </span>
+            </button>
+            <div v-if="appearanceOpen" class="px-3 pb-2 space-y-1.5">
+              <!-- 9×2 palette grid: row = neutral (slate/stone), cols wrap -->
               <div class="space-y-1">
-                <div v-for="neutralLabel in ['Slate', 'Stone']" :key="neutralLabel" class="flex items-center gap-1">
-                  <span class="text-[9px] text-neutral-400 w-8 shrink-0">{{ neutralLabel }}</span>
-                  <div class="flex items-center gap-1">
+                <div v-for="neutralLabel in ['Slate', 'Stone']" :key="neutralLabel" class="flex items-start gap-1">
+                  <span class="text-[9px] text-neutral-400 w-8 shrink-0 pt-1">{{ neutralLabel }}</span>
+                  <div class="flex flex-wrap items-center gap-1">
                     <button
                       v-for="p in PALETTES.filter(p => p.neutral === neutralLabel.toLowerCase())"
                       :key="p.id"
                       :title="p.label"
-                      class="w-6 h-6 rounded-full overflow-hidden border-2 transition-all shrink-0"
+                      class="w-5 h-5 rounded-full overflow-hidden border-2 transition-all shrink-0"
                       :class="themeStore.paletteId === p.id
                         ? 'border-neutral-900 dark:border-white scale-110'
                         : 'border-transparent hover:scale-105'"
@@ -154,7 +177,7 @@
                 </div>
               </div>
               <!-- Light / Dark / System -->
-              <div class="flex items-center gap-1 pt-0.5">
+              <div class="flex items-center gap-1 pt-1">
                 <span class="text-[9px] text-neutral-400 w-8 shrink-0">Mode</span>
                 <div class="flex items-center gap-1">
                   <button
@@ -321,7 +344,7 @@
   </header>
 
   <!-- Global gauge search modal -->
-  <GaugeSearchModal v-model:open="gaugeSearchOpen" @add="handleGaugeAdd" />
+  <GaugeSearchModal v-model:open="gaugeSearchOpen" @add="handleGaugeAdd" @added-external="onAddedExternal" />
 
   <!-- Global Ask modal (Teleport so it's above everything) -->
   <Teleport to="body">
@@ -419,12 +442,15 @@ const appConfig = useAppConfig()
 const themeStore = useThemeStore()
 const menuOpen = ref(false)
 const userMenuOpen = ref(false)
+const appearanceOpen = ref(false)
 
 const colorModes = [
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
   { value: 'system', label: 'System' },
 ]
+
+const activePalette = computed(() => PALETTES.find(p => p.id === themeStore.paletteId) ?? null)
 
 function applyPalette(id: PaletteId) {
   const palette = PALETTES.find(p => p.id === id)
@@ -454,10 +480,17 @@ async function handleSignOut() {
 }
 
 // ── Find a gauge ─────────────────────────────────────────────────────────────
-const { addAndSync } = useWatchlistSync()
+const { addAndSync, loadForDashboard } = useWatchlistSync()
+const dashboardsForAdd = useDashboards()
 const gaugeSearchOpen = ref(false)
-function handleGaugeAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
-  addAndSync(gauge)
+function handleGaugeAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dashboardId: string | null) {
+  addAndSync(gauge, dashboardId)
+}
+async function onAddedExternal() {
+  // User reach or custom gauge added directly to watchlist via API — reload
+  // the active dashboard so the new item shows up immediately.
+  const id = dashboardsForAdd.activeDashboard.value?.id
+  if (id) await loadForDashboard(id)
 }
 
 // ── Global Ask ────────────────────────────────────────────────────────────────

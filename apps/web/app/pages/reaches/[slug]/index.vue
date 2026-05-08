@@ -89,16 +89,39 @@
           <div class="shrink-0 flex items-center gap-2 flex-wrap">
             <ClientOnly>
               <template v-if="allGauges.length > 0">
-                <button
-                  v-if="!onDashboard(allGauges[0].id)"
-                  class="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 text-sm font-semibold text-neutral-600 dark:text-neutral-300 hover:border-primary-400 dark:hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
-                  @click="addToDashboard(allGauges[0])"
-                >
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
-                  Add to dashboard
-                </button>
+                <div v-if="!onDashboard(allGauges[0].id)" class="relative" data-add-dashboard-wrap>
+                  <div class="flex items-stretch rounded-xl border-2 border-neutral-200 dark:border-neutral-700 hover:border-primary-400 dark:hover:border-primary-500 transition-colors overflow-hidden">
+                    <button
+                      class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-neutral-600 dark:text-neutral-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                      @click="addToDashboard(allGauges[0], dashboardsAdd.activeDashboard.value?.id ?? null)"
+                    >
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                      </svg>
+                      Add to {{ dashboardsAdd.activeDashboard.value?.name ?? 'dashboard' }}
+                    </button>
+                    <button
+                      v-if="dashboardsAdd.dashboards.value.length > 1"
+                      class="flex items-center justify-center px-2 border-l-2 border-neutral-200 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                      title="Pick a different dashboard"
+                      @click="dashboardPickerOpen = !dashboardPickerOpen"
+                    >
+                      <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                  </div>
+                  <div
+                    v-if="dashboardPickerOpen"
+                    class="absolute right-0 top-full mt-1 z-30 w-48 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden"
+                  >
+                    <button
+                      v-for="d in dashboardsAdd.dashboards.value"
+                      :key="d.id"
+                      class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-950/30 transition-colors"
+                      :class="d.id === dashboardsAdd.activeDashboardId.value ? 'font-medium text-primary-600 dark:text-primary-400' : 'text-neutral-600 dark:text-neutral-300'"
+                      @click="addToDashboard(allGauges[0], d.id); dashboardPickerOpen = false"
+                    >{{ d.name }}</button>
+                  </div>
+                </div>
                 <div
                   v-else
                   class="flex items-stretch rounded-xl border-2 border-primary-400 dark:border-primary-600 bg-primary-50 dark:bg-primary-950/50 overflow-hidden"
@@ -534,6 +557,18 @@ const config = useRuntimeConfig()
 const { isAuthenticated, isDataAdmin } = useAuth()
 const store  = useWatchlistStore()
 const { addAndSync, removeAndSync } = useWatchlistSync()
+const dashboardsAdd = useDashboards()
+const dashboardPickerOpen = ref(false)
+onMounted(() => {
+  if (!dashboardsAdd.loaded.value) dashboardsAdd.load()
+  document.addEventListener('click', closeDashboardPickerOnOutside)
+})
+onUnmounted(() => document.removeEventListener('click', closeDashboardPickerOnOutside))
+function closeDashboardPickerOnOutside(e: MouseEvent) {
+  if (dashboardPickerOpen.value && !(e.target as HTMLElement).closest('[data-add-dashboard-wrap]')) {
+    dashboardPickerOpen.value = false
+  }
+}
 
 
 // ---- Scroll-to-top ----------------------------------------------------------
@@ -1123,7 +1158,7 @@ function confirmRemoveDashboard(gaugeId: string) {
   confirmingRemove.value = null
 }
 
-function addToDashboard(g: any) {
+function addToDashboard(g: any, dashboardId: string | null = null) {
   const r = reach.value as any
   const putIn   = r?.put_in_name  ?? null
   const takeOut = r?.take_out_name ?? null
@@ -1158,7 +1193,7 @@ function addToDashboard(g: any) {
     lastReadingAt:          g.last_reading_at ?? null,
     contextReachPermitRequired: r?.permit_required ?? false,
     contextReachMultiDayDays:   r?.multi_day_days ?? 1,
-  })
+  }, dashboardId)
 }
 
 function removeFromDashboard(gaugeId: string) {

@@ -524,6 +524,7 @@ func (h *ReachHandler) List(w http.ResponseWriter, r *http.Request) {
 // reachListItem is the lightweight struct returned by GET /reaches.
 type reachListItem struct {
 	Slug            string   `json:"slug"`
+	Name            string   `json:"name"`
 	RiverName       *string  `json:"river_name"`
 	CommonName      *string  `json:"common_name"`
 	PutInName       *string  `json:"put_in_name"`
@@ -554,6 +555,7 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 		)
 		SELECT
 			r.slug,
+			r.name,
 			COALESCE(r.river_name, rv.name) AS river_name,
 			r.common_name,
 			r.put_in_name,
@@ -604,7 +606,7 @@ func (h *ReachHandler) queryAllListItems(ctx context.Context) ([]reachListItem, 
 	for rows.Next() {
 		var item reachListItem
 		if err := rows.Scan(
-			&item.Slug,
+			&item.Slug, &item.Name,
 			&item.RiverName, &item.CommonName, &item.PutInName, &item.TakeOutName,
 			&item.Basin, &item.StateAbbr,
 			&item.ClassMin, &item.ClassMax,
