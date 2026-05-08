@@ -693,9 +693,9 @@ async function fetchReports(cursor?: string) {
   const data = await $fetch<{ reports: ReachReport[]; next_cursor: string | null }>(url).catch(() => null)
   if (data) {
     if (cursor) {
-      reachReports.value = [...reachReports.value, ...data.reports]
+      reachReports.value = [...reachReports.value, ...(data.reports ?? [])]
     } else {
-      reachReports.value = data.reports
+      reachReports.value = data.reports ?? []
     }
     reportsNextCursor.value = data.next_cursor ?? null
   }

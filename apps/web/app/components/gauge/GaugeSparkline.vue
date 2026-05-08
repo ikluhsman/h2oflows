@@ -41,6 +41,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
+import { flowStatusForBand } from '~/utils/flowBand'
 
 const props = defineProps<{
   gaugeId: string
@@ -153,5 +154,19 @@ const areaPath = computed(() => {
   return `${toPath(pts)} L${last.x.toFixed(1)},40 L0,40 Z`
 })
 
-const strokeColor = computed(() => props.color ?? flowBandSolidColor(props.flowBandLabel, props.flowStatus))
+function resolvedBandKey(band?: string | null, status?: string | null): string | null {
+  if (band === 'low' || band === 'running' || band === 'high') return band
+  if (status === 'caution')  return 'low'
+  if (status === 'runnable') return 'running'
+  if (status === 'flood')    return 'high'
+  return null
+}
+
+// Use CSS custom property so color follows the active palette (set by useFlowBandPalette in app.vue).
+// Falls back to props.color override (neutral gauge-only mode) or gray when band unknown.
+const strokeColor = computed(() => {
+  if (props.color) return props.color
+  const key = resolvedBandKey(props.flowBandLabel, props.flowStatus)
+  return key ? `var(--flow-${key}, ${flowBandSolidColor(key)})` : '#9ca3af'
+})
 </script>

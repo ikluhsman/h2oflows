@@ -54,8 +54,10 @@ export function useWatchlistSync() {
     }).catch(() => null)
     if (!res?.ok) return
     const data = await res.json()
-    const serverItems: { gauge_id: string; reach_slug: string | null }[] =
-      data.items ?? []
+    // Filter to gauge items only — custom_gauge items have gauge_id: null and are
+    // displayed via loadCustomGauges(), not the batch endpoint.
+    const allItems: { gauge_id: string | null; reach_slug: string | null }[] = data.items ?? []
+    const serverItems = allItems.filter(item => item.gauge_id != null) as { gauge_id: string; reach_slug: string | null }[]
     if (serverItems.length === 0) return
     const batchIds = serverItems.map(item => item.reach_slug ? `${item.gauge_id}:${item.reach_slug}` : item.gauge_id)
     const batchRes = await fetch(`${apiBase}/api/v1/gauges/batch`, {

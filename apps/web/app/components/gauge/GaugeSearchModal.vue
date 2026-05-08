@@ -411,10 +411,14 @@ async function loadMyGauges() {
 const adding = ref<string | null>(null)
 
 async function addUserReach(r: ReachSummary) {
-  if (!r.gauge_id) return  // user reach without a real gauge can't be watchlisted yet
+  if (!r.gauge_id && !r.custom_gauge_id) return
   adding.value = r.id
   try {
-    await addUserReachToWatchlist(r.gauge_id, r.slug, selectedDashboardId.value)
+    if (r.gauge_id) {
+      await addUserReachToWatchlist(r.gauge_id, r.slug, selectedDashboardId.value)
+    } else {
+      await addCustomGaugeToWatchlist(r.custom_gauge_id!, selectedDashboardId.value)
+    }
     emit('addedExternal')
     open.value = false
   } finally {

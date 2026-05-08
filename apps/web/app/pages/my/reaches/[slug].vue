@@ -10,7 +10,7 @@
     <!-- Sticky action bar (below AppHeader) — Save, Cancel, X, Add-to-dashboard, etc. -->
     <div v-if="reach" class="sticky top-[51px] z-10 flex items-center justify-between gap-2 px-4 py-2 bg-white/95 dark:bg-neutral-950/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800">
       <div class="flex items-center gap-1.5 min-w-0">
-        <UButton size="xs" variant="ghost" color="neutral" icon="i-heroicons-x-mark" :to="'/my/reaches'" title="Close">Close</UButton>
+        <UButton size="xs" variant="ghost" color="neutral" icon="i-heroicons-x-mark" :to="'/my/reaches'" title="Close"><span class="hidden sm:inline">Close</span></UButton>
         <span class="text-xs text-neutral-300 dark:text-neutral-700 hidden sm:inline">·</span>
         <div class="relative" data-add-dashboard-wrap>
           <div class="flex items-stretch rounded-md border border-neutral-200 dark:border-neutral-700 overflow-hidden">
@@ -46,10 +46,10 @@
         </div>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
-        <UButton size="xs" variant="ghost" color="neutral" icon="i-heroicons-share" @click="shareOpen = true">Share</UButton>
-        <UButton size="xs" variant="ghost" color="error" icon="i-heroicons-trash" @click="confirmDelete">Delete</UButton>
-        <UButton size="xs" variant="outline" color="neutral" :to="'/my/reaches'">Cancel</UButton>
-        <UButton size="xs" :disabled="!form.name.trim()" :loading="saving" icon="i-heroicons-check" @click="save">Save</UButton>
+        <UButton size="xs" variant="ghost" color="neutral" icon="i-heroicons-share" title="Share" @click="shareOpen = true"><span class="hidden sm:inline">Share</span></UButton>
+        <UButton size="xs" variant="ghost" color="error" icon="i-heroicons-trash" title="Delete" @click="confirmDelete"><span class="hidden sm:inline">Delete</span></UButton>
+        <UButton size="xs" variant="outline" color="neutral" icon="i-heroicons-x-circle" :to="'/my/reaches'" title="Cancel"><span class="hidden sm:inline">Cancel</span></UButton>
+        <UButton size="xs" :disabled="!form.name.trim()" :loading="saving" icon="i-heroicons-check" title="Save" @click="save"><span class="hidden sm:inline">Save</span></UButton>
       </div>
     </div>
 
@@ -106,7 +106,7 @@
     <div v-else-if="reach" class="flex-1 flex flex-col lg:flex-row lg:overflow-hidden">
 
       <!-- Map — mobile: half screen with side padding; desktop: sticky full-height column -->
-      <div class="px-4 pt-3 pb-1 lg:p-0 lg:flex-1 lg:sticky lg:top-[51px] lg:h-[calc(100vh-51px)]">
+      <div class="px-4 pt-3 pb-1 lg:p-0 lg:flex-1 lg:sticky lg:top-24 lg:h-[calc(100vh-96px)]">
         <div class="relative h-[50vh] lg:h-full">
           <NHDExplorerMap
             :upstream-flowlines="repinTributaries"
@@ -134,7 +134,7 @@
       </div>
 
       <!-- Form panel — mobile: natural scroll; desktop: fixed-height scrollable column -->
-      <div class="lg:w-95 lg:overflow-y-auto lg:h-[calc(100vh-51px)] p-4 pb-20 space-y-4">
+      <div class="lg:w-95 lg:overflow-y-auto lg:h-[calc(100vh-96px)] p-4 pb-20 space-y-4">
 
         <!-- Flow lines & gauge -->
         <div class="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 space-y-3">
