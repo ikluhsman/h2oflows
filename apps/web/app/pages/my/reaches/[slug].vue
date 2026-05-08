@@ -582,7 +582,8 @@ async function lookupRiverName(): Promise<void> {
   try {
     const params = new URLSearchParams({ comid })
     if (lat != null && lng != null) { params.set('lat', String(lat)); params.set('lng', String(lng)) }
-    const res = await fetch(`${apiBase}/api/v1/nldi/river-name?${params}`)
+    const headers = await authHeaders()
+    const res = await fetch(`${apiBase}/api/v1/nldi/river-name?${params}`, { headers })
     if (res.ok) {
       const data = await res.json()
       if (data.river_name) form.value.riverName = data.river_name

@@ -17,7 +17,7 @@
     <div
       v-if="store.gauges.length > 0"
       class="sticky z-10 bg-neutral-50/95 dark:bg-neutral-950/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800"
-      :class="isAuthenticated && db.loaded.value && db.dashboards.value.length ? 'top-[92px]' : 'top-[51px]'"
+      :class="isAuthenticated && db.loaded.value && db.dashboards.value.length ? 'top-[96px]' : 'top-[51px]'"
     >
       <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">

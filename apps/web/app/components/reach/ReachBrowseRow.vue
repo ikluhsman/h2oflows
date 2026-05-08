@@ -60,6 +60,7 @@ import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
 
 export interface ReachListItem {
   slug: string
+  name: string
   river_name: string | null
   common_name: string | null
   put_in_name: string | null
@@ -85,12 +86,12 @@ const liveCfs = ref<number | null>(null)
 
 const displayCfs = computed(() => liveCfs.value ?? props.reach.current_cfs)
 
-const displayName = computed(() =>
-  props.reach.common_name
-    ?? (props.reach.put_in_name && props.reach.take_out_name
-      ? `${props.reach.put_in_name} to ${props.reach.take_out_name}`
-      : props.reach.slug)
-)
+const displayName = computed(() => {
+  const r = props.reach
+  if (r.common_name) return r.common_name
+  if (r.put_in_name && r.take_out_name) return `${r.put_in_name} to ${r.take_out_name}`
+  return r.name || r.slug
+})
 
 const classDisplay = computed(() => classRange(props.reach.class_min, props.reach.class_max))
 </script>

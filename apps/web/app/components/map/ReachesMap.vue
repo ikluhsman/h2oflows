@@ -356,12 +356,9 @@ function filterVisible() {
 }
 
 function displayName(p: ReachFeature['properties']): string {
-  if (p.put_in_name && p.take_out_name) {
-    return p.common_name
-      ? `${p.put_in_name}–${p.take_out_name} (${p.common_name})`
-      : `${p.put_in_name}–${p.take_out_name}`
-  }
-  return p.common_name ?? p.name
+  if (p.common_name) return p.common_name
+  if (p.put_in_name && p.take_out_name) return `${p.put_in_name}–${p.take_out_name}`
+  return p.name || p.slug
 }
 
 function midpoint(f: ReachFeature): [number, number] | null {
