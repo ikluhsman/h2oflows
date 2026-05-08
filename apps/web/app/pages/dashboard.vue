@@ -246,13 +246,20 @@
                       <span class="flex-1 min-w-0 text-sm font-semibold text-neutral-800 dark:text-neutral-200 truncate">
                         {{ g.name ?? `${g.source.toUpperCase()} ${g.externalId}` }}
                       </span>
-                      <div class="w-24 shrink-0 hidden sm:block h-5 opacity-50 pointer-events-none">
+                      <div class="w-20 shrink-0 hidden sm:block h-5 opacity-50 pointer-events-none">
                         <GaugeSparkline :gauge-id="g.id" flow-status="unknown" color="#3b82f6" compact />
                       </div>
                       <span :class="viewMode === 'list' ? 'text-sm font-bold tabular-nums text-neutral-900 dark:text-white' : 'text-2xl font-bold tabular-nums text-neutral-900 dark:text-white leading-none'">
                         {{ g.currentCfs != null ? g.currentCfs.toLocaleString() : '—' }}
                       </span>
                       <span class="text-xs text-neutral-400">cfs</span>
+                      <button
+                        class="rounded p-1 text-neutral-300 dark:text-neutral-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"
+                        aria-label="Remove from dashboard"
+                        @click.stop="removeAndSync(g.id)"
+                      >
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/></svg>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -271,11 +278,11 @@
         </section>
 
         <!-- My Reaches section — all on primary; watchlist-filtered on secondary dashboards -->
-        <section v-if="activeUserReaches.length || hiddenReaches.size">
+        <section v-if="activeUserReaches.length > 0">
           <div class="flex items-center gap-2 mb-3">
             <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">My Reaches</h2>
             <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
-            <div v-if="hiddenReaches.size" class="relative" ref="reachAddWrap">
+            <div v-if="activeUserReaches.some(r => hiddenReaches.has(r.id))" class="relative" ref="reachAddWrap">
               <button
                 class="text-xs text-primary-500 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors flex items-center gap-1"
                 @click="reachAddOpen = !reachAddOpen"
@@ -392,11 +399,11 @@
         </section>
 
         <!-- Custom Gauges section — shows active-dashboard gauges on all tabs -->
-        <section v-if="activeCustomGauges.length || hiddenCustomGauges.size">
+        <section v-if="activeCustomGauges.length > 0">
           <div class="flex items-center gap-2 mb-3">
             <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">Custom Gauges</h2>
             <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
-            <div v-if="hiddenCustomGauges.size" class="relative" ref="gaugeAddWrap">
+            <div v-if="activeCustomGauges.some(g => hiddenCustomGauges.has(g.id))" class="relative" ref="gaugeAddWrap">
               <button
                 class="text-xs text-primary-500 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors flex items-center gap-1"
                 @click="gaugeAddOpen = !gaugeAddOpen"
@@ -1005,6 +1012,7 @@ async function onAddedExternal() {
     await activateDashboard(id)
     await refresh()
   }
+  await loadUserReaches()
 }
 
 const detailOpen  = ref(false)

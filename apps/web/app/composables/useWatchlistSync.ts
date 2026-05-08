@@ -153,7 +153,7 @@ export function useWatchlistSync() {
    * gauge from the My Reaches & Gauges tab in the search modal. The store is
    * not updated optimistically — caller should re-call loadForDashboard after.
    */
-  async function addCustomGaugeToWatchlist(customGaugeId: string, dashboardId: string | null) {
+  async function addCustomGaugeToWatchlist(customGaugeId: string, dashboardId: string | null, reachSlug?: string | null) {
     const token = await getToken()
     if (!token) return
     await fetch(`${apiBase}/api/v1/watchlist`, {
@@ -161,6 +161,7 @@ export function useWatchlistSync() {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         custom_gauge_id: customGaugeId,
+        reach_slug: reachSlug ?? null,
         dashboard_id: dashboardId ?? null,
       }),
     }).catch(() => {})

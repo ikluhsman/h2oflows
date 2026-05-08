@@ -106,7 +106,7 @@
     <div v-else-if="reach" class="flex-1 flex flex-col lg:flex-row lg:overflow-hidden">
 
       <!-- Map — mobile: half screen with side padding; desktop: sticky full-height column -->
-      <div class="px-4 pt-3 pb-1 lg:p-0 lg:flex-1 lg:sticky lg:top-24 lg:h-[calc(100vh-96px)]">
+      <div class="px-4 pt-3 pb-1 lg:p-4 lg:flex-1 lg:sticky lg:top-24 lg:h-[calc(100vh-96px)]">
         <div class="relative h-[50vh] lg:h-full">
           <NHDExplorerMap
             :upstream-flowlines="repinTributaries"
@@ -413,10 +413,16 @@ const slug = computed(() => route.params.slug as string)
 // ── Dashboard picker (for "Add to dashboard" button) ──────────────────────────
 const dashboardsAdd = useDashboards()
 const dashboardPickerOpen = ref(false)
-const { addUserReachToWatchlist } = useWatchlistSync()
+const { addUserReachToWatchlist, addCustomGaugeToWatchlist } = useWatchlistSync()
 async function addUserReachToDashboard(dashboardId: string | null) {
-  if (!reach.value?.gauge_id) return
-  await addUserReachToWatchlist(reach.value.gauge_id, slug.value, dashboardId)
+  if (!reach.value) return
+  if (reach.value.gauge_id) {
+    await addUserReachToWatchlist(reach.value.gauge_id, slug.value, dashboardId)
+  } else if (reach.value.custom_gauge_id) {
+    await addCustomGaugeToWatchlist(reach.value.custom_gauge_id, dashboardId, slug.value)
+  } else {
+    return
+  }
   dashboardPickerOpen.value = false
 }
 onMounted(() => {
@@ -941,7 +947,19 @@ async function save() {
       }),
     })
 
-    await load()
+    if (reach.value) {
+      reach.value = {
+        ...reach.value,
+        name:        form.value.name.trim(),
+        river_name:  form.value.riverName.trim() || null,
+        note:        form.value.note.trim()      || null,
+        flow_ranges: [
+          { label: 'low',     min_value: null,          max_value: r.low.max     },
+          { label: 'running', min_value: r.running.min, max_value: r.running.max },
+          { label: 'high',    min_value: r.high.min,    max_value: null          },
+        ],
+      }
+    }
   } catch (e: any) {
     saveError.value = e.message ?? 'Save failed.'
   } finally {
