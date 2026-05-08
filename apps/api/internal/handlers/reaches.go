@@ -43,6 +43,30 @@ func (c *jsonCache) get() ([]byte, bool) {
 	return c.payload, true
 }
 
+type statsCache struct {
+	mu        sync.Mutex
+	cachedAt  time.Time
+	reaches   int
+	rivers    int
+	reports   int
+}
+
+func (c *statsCache) get(ttl time.Duration) (reaches, rivers, reports int, ok bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if time.Since(c.cachedAt) < ttl {
+		return c.reaches, c.rivers, c.reports, true
+	}
+	return 0, 0, 0, false
+}
+
+func (c *statsCache) set(reaches, rivers, reports int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.reaches, c.rivers, c.reports = reaches, rivers, reports
+	c.cachedAt = time.Now()
+}
+
 // gaugeFetcher is the narrow poller interface ReachHandler needs for
 // on-demand fetching of stale primary gauges. Keeps this package free of a
 // hard dependency on the poller implementation.
@@ -57,6 +81,7 @@ type ReachHandler struct {
 	cache     *jsonCache // /reaches/map/all GeoJSON
 	listCache *jsonCache // /reaches lightweight JSON
 	poller    gaugeFetcher // nil = on-demand fetching disabled
+	sc        statsCache
 }
 
 func NewReachHandler(db *pgxpool.Pool, asker *ai.ReachAsker) *ReachHandler {
@@ -1757,17 +1782,31 @@ func (h *ReachHandler) Ask(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]string{"answer": answer})
 }
 
-// Stats handles GET /api/v1/stats
-//
-// Returns total reach and river counts from the DB.
+// Stats handles GET /api/v1/stats — cached 60 s.
 func (h *ReachHandler) Stats(w http.ResponseWriter, r *http.Request) {
-	var reachCount, riverCount int
-	h.db.QueryRow(r.Context(), `SELECT COUNT(*) FROM reaches`).Scan(&reachCount)
-	h.db.QueryRow(r.Context(), `SELECT COUNT(*) FROM rivers`).Scan(&riverCount)
-	jsonResponse(w, http.StatusOK, map[string]any{
-		"reaches": reachCount,
-		"rivers":  riverCount,
-	})
+	const ttl = 60 * time.Second
+	if reaches, rivers, reports, ok := h.sc.get(ttl); ok {
+		jsonResponse(w, http.StatusOK, buildStatsResponse(reaches, rivers, reports))
+		return
+	}
+
+	var reaches, rivers, reports int
+	h.db.QueryRow(r.Context(), `SELECT COUNT(*) FROM reaches`).Scan(&reaches)
+	h.db.QueryRow(r.Context(), `SELECT COUNT(*) FROM rivers`).Scan(&rivers)
+	h.db.QueryRow(r.Context(), `SELECT COUNT(*) FROM reports`).Scan(&reports)
+	h.sc.set(reaches, rivers, reports)
+	jsonResponse(w, http.StatusOK, buildStatsResponse(reaches, rivers, reports))
+}
+
+func buildStatsResponse(reaches, rivers, reports int) map[string]any {
+	m := map[string]any{
+		"reaches": reaches,
+		"rivers":  rivers,
+	}
+	if reports > 0 {
+		m["reports"] = reports
+	}
+	return m
 }
 
 // Required for the reach map endpoint — without a viewport bound the result

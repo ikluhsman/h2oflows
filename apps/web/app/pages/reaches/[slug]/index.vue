@@ -1,25 +1,25 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
 
     <AppHeader>
       <template v-if="reach">
-        <span class="text-gray-300 dark:text-gray-700 shrink-0">/</span>
-        <span class="text-sm font-medium truncate text-gray-700 dark:text-gray-200">{{ reach.common_name ?? reach.name }}</span>
+        <span class="text-neutral-300 dark:text-neutral-700 shrink-0">/</span>
+        <span class="text-sm font-medium truncate text-neutral-700 dark:text-neutral-200">{{ reach.common_name ?? reach.name }}</span>
       </template>
     </AppHeader>
 
     <!-- Upstream / downstream pagination -->
-    <div v-if="upstreamReach || downstreamReach" class="border-b border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950">
+    <div v-if="upstreamReach || downstreamReach" class="border-b border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-950">
       <div class="max-w-5xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
         <!-- Upstream (left) -->
         <NuxtLink
           v-if="upstreamReach"
           :to="`/reaches/${upstreamReach.slug}`"
-          class="flex items-center gap-1.5 min-w-0 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
+          class="flex items-center gap-1.5 min-w-0 text-neutral-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-gray-400 group-hover:text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-neutral-400 group-hover:text-primary-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           <div class="min-w-0">
-            <div class="text-[10px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">upstream</div>
+            <div class="text-[10px] text-neutral-400 uppercase tracking-wide leading-none mb-0.5">upstream</div>
             <div class="text-sm font-medium truncate">{{ upstreamReach.name }}</div>
           </div>
         </NuxtLink>
@@ -29,23 +29,23 @@
         <NuxtLink
           v-if="downstreamReach"
           :to="`/reaches/${downstreamReach.slug}`"
-          class="flex items-center gap-1.5 min-w-0 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors group text-right"
+          class="flex items-center gap-1.5 min-w-0 text-neutral-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors group text-right"
         >
           <div class="min-w-0">
-            <div class="text-[10px] text-gray-400 uppercase tracking-wide leading-none mb-0.5">downstream</div>
+            <div class="text-[10px] text-neutral-400 uppercase tracking-wide leading-none mb-0.5">downstream</div>
             <div class="text-sm font-medium truncate">{{ downstreamReach.name }}</div>
           </div>
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-gray-400 group-hover:text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0 text-neutral-400 group-hover:text-primary-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </NuxtLink>
         <div v-else class="flex-1" />
       </div>
     </div>
 
-    <div v-if="pending" class="max-w-5xl mx-auto px-3 py-12 text-center text-gray-400">
+    <div v-if="pending" class="max-w-5xl mx-auto px-3 py-12 text-center text-neutral-400">
       Loading…
     </div>
 
-    <div v-else-if="!reach" class="max-w-5xl mx-auto px-3 py-12 text-center text-gray-400">
+    <div v-else-if="!reach" class="max-w-5xl mx-auto px-3 py-12 text-center text-neutral-400">
       Reach not found.
     </div>
 
@@ -55,15 +55,15 @@
       <section>
         <div class="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <div v-if="reach.river_name" class="text-xs font-medium text-blue-500 uppercase tracking-wide mb-1">{{ reach.river_name }}</div>
+            <div v-if="reach.river_name" class="text-xs font-medium text-primary-500 uppercase tracking-wide mb-1">{{ reach.river_name }}</div>
             <h1 class="text-2xl font-bold">
               <template v-if="reach.put_in_name && reach.take_out_name">
                 {{ reach.put_in_name }} to {{ reach.take_out_name }}
-                <span v-if="reach.common_name" class="font-normal text-gray-400">({{ reach.common_name }})</span>
+                <span v-if="reach.common_name" class="font-normal text-neutral-400">({{ reach.common_name }})</span>
               </template>
               <template v-else>{{ reach.common_name ?? reach.name }}</template>
             </h1>
-            <p class="text-gray-500 text-sm mt-0.5">
+            <p class="text-neutral-500 text-sm mt-0.5">
               {{ reach.region }}
             </p>
             <!-- Permit / multi-day badges -->
@@ -77,7 +77,7 @@
               </span>
               <span
                 v-if="(reach as any).multi_day_days > 1"
-                class="inline-flex items-center gap-1 rounded-md bg-blue-100 dark:bg-blue-950/60 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-400"
+                class="inline-flex items-center gap-1 rounded-md bg-primary-100 dark:bg-primary-950/60 px-2 py-0.5 text-xs font-medium text-primary-700 dark:text-primary-400"
               >
                 <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
                 {{ (reach as any).multi_day_days }}-Day Trip
@@ -91,7 +91,7 @@
               <template v-if="allGauges.length > 0">
                 <button
                   v-if="!onDashboard(allGauges[0].id)"
-                  class="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:border-blue-400 dark:hover:border-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  class="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 text-sm font-semibold text-neutral-600 dark:text-neutral-300 hover:border-primary-400 dark:hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
                   @click="addToDashboard(allGauges[0])"
                 >
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -101,16 +101,16 @@
                 </button>
                 <div
                   v-else
-                  class="flex items-stretch rounded-xl border-2 border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-950/50 overflow-hidden"
+                  class="flex items-stretch rounded-xl border-2 border-primary-400 dark:border-primary-600 bg-primary-50 dark:bg-primary-950/50 overflow-hidden"
                 >
-                  <span class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-blue-600 dark:text-blue-400">
+                  <span class="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-primary-600 dark:text-primary-400">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                       <polyline points="20 6 9 17 4 12"/>
                     </svg>
                     On dashboard
                   </span>
                   <button
-                    class="flex items-center justify-center px-3 border-l-2 border-blue-400 dark:border-blue-600 text-blue-600 dark:text-blue-400 hover:bg-red-100 dark:hover:bg-red-950 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                    class="flex items-center justify-center px-3 border-l-2 border-primary-400 dark:border-primary-600 text-primary-600 dark:text-primary-400 hover:bg-red-100 dark:hover:bg-red-950 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                     aria-label="Remove from dashboard"
                     title="Remove from dashboard"
                     @click="confirmRemoveDashboard(allGauges[0].id)"
@@ -126,7 +126,7 @@
             <NuxtLink
               v-if="isDataAdmin"
               :to="`/reaches/${route.params.slug}/edit`"
-              class="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-gray-200 dark:border-gray-700 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+              class="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 text-sm font-semibold text-neutral-600 dark:text-neutral-300 hover:border-neutral-400 dark:hover:border-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
             >
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -135,7 +135,7 @@
             </NuxtLink>
 
             <button
-              class="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-blue-600 bg-blue-600 hover:bg-blue-700 hover:border-blue-700 text-white text-sm font-semibold transition-colors"
+              class="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-primary-600 bg-primary-600 hover:bg-primary-700 hover:border-primary-700 text-white text-sm font-semibold transition-colors"
               @click="openShareForm"
             >
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -149,39 +149,39 @@
 
       <!-- Quick stats — consolidated -->
       <section>
-        <div class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
+        <div class="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 px-4 py-3">
           <div class="grid grid-cols-3 gap-3" :class="allGauges.length > 0 ? 'sm:grid-cols-4' : ''">
             <div>
-              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Difficulty</div>
+              <div class="text-[10px] text-neutral-400 uppercase tracking-wide mb-1">Difficulty</div>
               <div class="flex items-center gap-1.5">
                 <span class="inline-block w-3 h-3 rounded-sm shrink-0" :class="difficultySwatchClass" :style="{ backgroundColor: difficultyColor }" />
                 <span class="text-lg sm:text-xl font-bold" :class="difficultyTextClass">{{ classLabel }}</span>
               </div>
             </div>
             <div>
-              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Length</div>
-              <div class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}</div>
+              <div class="text-[10px] text-neutral-400 uppercase tracking-wide mb-1">Length</div>
+              <div class="text-lg sm:text-xl font-bold text-neutral-800 dark:text-neutral-100">{{ reach.length_mi != null ? `${reach.length_mi} mi` : '—' }}</div>
             </div>
             <div>
-              <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Gradient</div>
-              <div class="text-lg sm:text-xl font-bold text-gray-800 dark:text-gray-100">{{ reach.gradient_fpm != null ? `${reach.gradient_fpm} ft/mi` : '—' }}</div>
+              <div class="text-[10px] text-neutral-400 uppercase tracking-wide mb-1">Gradient</div>
+              <div class="text-lg sm:text-xl font-bold text-neutral-800 dark:text-neutral-100">{{ reach.gradient_fpm != null ? `${reach.gradient_fpm} ft/mi` : '—' }}</div>
             </div>
-            <div v-if="allGauges.length > 0" class="col-span-3 sm:col-span-1 border-t sm:border-t-0 sm:border-l border-gray-200 dark:border-gray-700 pt-2 sm:pt-0 sm:pl-4">
+            <div v-if="allGauges.length > 0" class="col-span-3 sm:col-span-1 border-t sm:border-t-0 sm:border-l border-neutral-200 dark:border-neutral-700 pt-2 sm:pt-0 sm:pl-4">
               <div class="flex items-center gap-3">
                 <div class="min-w-0">
-                  <div class="text-[10px] text-gray-400 uppercase tracking-wide mb-1">Flow</div>
+                  <div class="text-[10px] text-neutral-400 uppercase tracking-wide mb-1">Flow</div>
                   <div class="flex items-center gap-2">
                     <span class="text-lg sm:text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status, allGauges[0].flow_band_label)">
                       {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
                     </span>
-                    <span class="text-xs text-gray-500">cfs</span>
+                    <span class="text-xs text-neutral-500">cfs</span>
                     <span :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', flowBadgeClass(allGauges[0].flow_status, allGauges[0].flow_band_label)]">
                       {{ flowBandLabel(allGauges[0].flow_status, allGauges[0].flow_band_label) }}
                     </span>
                   </div>
                 </div>
                 <button
-                  class="shrink-0 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors ml-auto"
+                  class="shrink-0 text-xs text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 font-medium transition-colors ml-auto"
                   @click="openGaugeModal(allGauges[0])"
                 >
                   View flow →
@@ -192,9 +192,164 @@
         </div>
       </section>
 
+      <!-- Community Reports -->
+      <section>
+        <div class="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+
+          <!-- Header row -->
+          <div class="flex items-center gap-2 px-4 py-3 border-b border-neutral-100 dark:border-neutral-800">
+            <h2 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300 shrink-0">
+              Reports
+              <span v-if="reportsFetchDone && reachReports.length > 0" class="ml-1.5 text-neutral-400 font-normal text-xs">({{ reachReports.length }})</span>
+            </h2>
+            <!-- Search toggle -->
+            <button
+              v-if="reportsFetchDone && reachReports.length > 0"
+              class="shrink-0 p-1 rounded text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+              :class="reportsSearchOpen ? 'text-primary-500 dark:text-primary-400' : ''"
+              title="Search reports"
+              @click="reportsSearchOpen = !reportsSearchOpen; if (!reportsSearchOpen) reportsQuery = ''"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            </button>
+            <input
+              v-if="reportsSearchOpen"
+              v-model="reportsQuery"
+              type="text"
+              placeholder="Search reports…"
+              class="flex-1 min-w-0 bg-transparent text-xs text-neutral-700 dark:text-neutral-300 placeholder-neutral-400 focus:outline-none"
+              autofocus
+            />
+            <div v-else class="flex-1" />
+            <NuxtLink
+              v-if="isAuthenticated"
+              :to="`/reports/new?reach=${(reach as any).slug}`"
+              class="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+              Add report
+            </NuxtLink>
+            <NuxtLink
+              v-else
+              to="/login"
+              class="shrink-0 text-xs text-neutral-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+            >Sign in to report</NuxtLink>
+          </div>
+
+          <!-- Loading -->
+          <div v-if="!reportsFetchDone" class="px-4 py-6 flex justify-center">
+            <div class="w-5 h-5 rounded-full border-2 border-primary-400 border-t-transparent animate-spin" />
+          </div>
+
+          <!-- Empty state -->
+          <div v-else-if="reachReports.length === 0" class="px-4 py-6 text-center text-sm text-neutral-400">
+            Be the first to file a report for this reach.
+          </div>
+
+          <!-- No search results -->
+          <div v-else-if="filteredReports.length === 0" class="px-4 py-6 text-center text-sm text-neutral-400">
+            No reports match "{{ reportsQuery }}".
+          </div>
+
+          <!-- Report list -->
+          <div v-else class="divide-y divide-neutral-100 dark:divide-neutral-800">
+            <div
+              v-for="rep in visibleReports"
+              :key="rep.id"
+              class="px-4 py-3 space-y-1"
+            >
+              <!-- Hazard badge -->
+              <div v-if="rep.hazard_warning" class="flex items-start gap-2 mb-1.5 rounded-md bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900 px-2.5 py-1.5">
+                <svg class="w-3.5 h-3.5 mt-0.5 shrink-0 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                <p class="text-xs text-red-700 dark:text-red-400">{{ rep.hazard_warning }}</p>
+              </div>
+              <div class="flex items-start justify-between gap-2">
+                <span class="text-sm font-medium text-neutral-800 dark:text-neutral-100">{{ rep.name }}</span>
+                <span class="text-xs text-neutral-400 shrink-0">{{ formatReportDate(rep.report_date) }}</span>
+              </div>
+              <p class="text-sm text-neutral-600 dark:text-neutral-400 line-clamp-3 leading-relaxed">{{ extractPreview(rep.content) }}</p>
+              <div class="flex items-center gap-2 pt-0.5">
+                <span v-if="rep.flow_cfs != null" class="text-xs text-neutral-400">{{ Math.round(rep.flow_cfs).toLocaleString() }} cfs</span>
+                <span v-if="rep.flow_band" class="text-xs font-medium capitalize" :class="reportBandClass(rep.flow_band)">{{ rep.flow_band }}</span>
+                <span v-if="rep.paddled" class="text-xs text-primary-500 dark:text-primary-400">• paddled</span>
+                <NuxtLink v-if="rep.url" :to="rep.url" class="text-xs text-primary-500 dark:text-primary-400 hover:underline ml-auto">Full report →</NuxtLink>
+              </div>
+            </div>
+          </div>
+
+          <!-- Show more / less -->
+          <div v-if="reportsFetchDone && filteredReports.length > reportsPageSize" class="px-4 py-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
+            <span class="text-xs text-neutral-400">{{ visibleReports.length }} of {{ filteredReports.length }}</span>
+            <button
+              class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium"
+              @click="reportsExpanded = !reportsExpanded"
+            >
+              {{ reportsExpanded ? 'Show fewer' : `Show all ${filteredReports.length}` }}
+            </button>
+          </div>
+
+          <!-- Load more (cursor pagination) -->
+          <div v-if="reportsNextCursor && !reportsExpanded && !reportsQuery" class="px-4 py-3 border-t border-neutral-100 dark:border-neutral-800 text-center">
+            <button
+              :disabled="reportsLoadingMore"
+              class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium disabled:opacity-50"
+              @click="loadMoreReports"
+            >
+              <span v-if="reportsLoadingMore" class="flex items-center gap-1 justify-center">
+                <span class="w-3 h-3 rounded-full border-2 border-primary-400 border-t-transparent animate-spin" />
+                Loading…
+              </span>
+              <span v-else>Load more reports</span>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- AI ask -->
+      <section>
+        <div class="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 overflow-hidden">
+          <form class="flex items-center gap-2 px-4 py-3" @submit.prevent="askQuestion">
+            <svg class="w-4 h-4 text-purple-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+            </svg>
+            <input
+              v-model="askQuery"
+              type="text"
+              placeholder="Ask about conditions, flow, access…"
+              class="flex-1 min-w-0 bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none"
+              :disabled="asking"
+              @keydown.esc="askQuery = ''; askAnswer = ''; askError = ''"
+            />
+            <button
+              v-if="askQuery"
+              type="button"
+              class="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+              @click="askQuery = ''; askAnswer = ''; askError = ''"
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+            <button
+              type="submit"
+              :disabled="asking || !askQuery.trim()"
+              class="shrink-0 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white text-xs font-semibold transition-colors"
+            >
+              <span v-if="asking" class="flex items-center gap-1">
+                <span class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              </span>
+              <span v-else>Ask</span>
+            </button>
+          </form>
+          <div v-if="askAnswer" class="px-4 pb-4 border-t border-neutral-100 dark:border-neutral-800 pt-3">
+            <div class="ask-answer text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed" v-html="askMd.render(askAnswer)" />
+          </div>
+          <p v-if="askError" class="px-4 pb-3 text-sm text-red-500 dark:text-red-400">{{ askError }}</p>
+        </div>
+      </section>
+
       <!-- Reach Description -->
       <section v-if="reach.description">
-        <div class="prose prose-sm dark:prose-invert max-w-none text-gray-700 dark:text-gray-300 whitespace-pre-line leading-relaxed">
+        <div class="prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300 whitespace-pre-line leading-relaxed">
           {{ reach.description }}
         </div>
       </section>
@@ -231,25 +386,25 @@
 
       <!-- Features tabbed panel -->
       <section v-if="allFeatures.length > 0">
-        <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+        <div class="border border-neutral-200 dark:border-neutral-700 rounded-xl overflow-hidden">
 
           <!-- Tab bar -->
-          <div class="flex overflow-x-auto border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-950">
+          <div class="flex overflow-x-auto border-b border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-950">
             <button
               v-for="tab in featureTabs"
               :key="tab.key"
               class="shrink-0 px-4 py-3 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap flex items-center gap-1.5"
               :class="featuresTab === tab.key
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
               @click="featuresTab = tab.key"
             >
               {{ tab.label }}
               <span
                 class="rounded-full px-1.5 py-px text-xs leading-none"
                 :class="featuresTab === tab.key
-                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500'"
+                  ? 'bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400'
+                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500'"
               >{{ tab.count }}</span>
             </button>
           </div>
@@ -259,13 +414,13 @@
             ref="featureListRef"
             class="overflow-hidden"
           >
-            <div v-if="filteredFeatures.length" class="divide-y divide-gray-100 dark:divide-gray-800">
+            <div v-if="filteredFeatures.length" class="divide-y divide-neutral-100 dark:divide-neutral-800">
               <div
                 v-for="feat in filteredFeatures"
                 :key="feat.key"
                 class="px-4 py-3 flex items-start gap-3 transition-colors"
                 :class="feat.lng != null && feat.lat != null
-                  ? 'cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/30'
+                  ? 'cursor-pointer hover:bg-primary-50 dark:hover:bg-primary-950/30'
                   : ''"
                 @click="onFeatureClick(feat)"
               >
@@ -280,14 +435,14 @@
                 <!-- Content -->
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-[10px] uppercase tracking-wider font-semibold text-gray-400 dark:text-gray-500">{{ featureTypeLabel(feat) }}</span>
-                    <span class="text-sm font-medium text-gray-800 dark:text-gray-100">{{ feat.name }}</span>
+                    <span class="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 dark:text-neutral-500">{{ featureTypeLabel(feat) }}</span>
+                    <span class="text-sm font-medium text-neutral-800 dark:text-neutral-100">{{ feat.name }}</span>
                     <span
                       v-if="(feat.type === 'rapid' || feat.type === 'wave' || feat.type === 'hazard') && feat.class_rating"
-                      class="text-xs font-mono font-medium text-gray-500 dark:text-gray-400"
-                    >{{ romanClass(feat.class_rating) }}<span v-if="feat.class_at_high && feat.class_at_high > feat.class_rating" class="text-gray-400">({{ romanClass(feat.class_at_high) }})</span></span>
+                      class="text-xs font-mono font-medium text-neutral-500 dark:text-neutral-400"
+                    >{{ romanClass(feat.class_rating) }}<span v-if="feat.class_at_high && feat.class_at_high > feat.class_rating" class="text-neutral-400">({{ romanClass(feat.class_at_high) }})</span></span>
                   </div>
-                  <p v-if="feat.description" class="text-sm text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">{{ feat.description }}</p>
+                  <p v-if="feat.description" class="text-sm text-neutral-600 dark:text-neutral-400 mt-1 leading-relaxed">{{ feat.description }}</p>
                   <p v-if="feat.portage_description" class="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
                     <span class="font-medium">Portage:</span> {{ feat.portage_description }}
                   </p>
@@ -301,7 +456,7 @@
                     :href="`https://www.google.com/maps/dir/?api=1&destination=${feat.lat},${feat.lng}`"
                     target="_blank"
                     rel="noopener"
-                    class="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 font-medium mt-1.5 transition-colors"
+                    class="inline-flex items-center gap-1 text-xs text-primary-500 hover:text-primary-600 dark:hover:text-primary-400 font-medium mt-1.5 transition-colors"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
                     Get directions
@@ -310,7 +465,7 @@
               </div>
             </div>
 
-            <div v-else class="px-4 py-8 text-center text-sm text-gray-400">
+            <div v-else class="px-4 py-8 text-center text-sm text-neutral-400">
               No features in this category
             </div>
           </div>
@@ -328,20 +483,20 @@
 
       <!-- Tributary / other related reaches -->
       <section v-if="tributaryReaches.length > 0">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Tributaries & Related</h2>
+        <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide mb-3">Tributaries & Related</h2>
         <div class="flex flex-wrap gap-2">
           <NuxtLink
             v-for="rel in tributaryReaches"
             :key="rel.slug"
             :to="`/reaches/${rel.slug}`"
-            class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 px-3 py-2 transition-colors"
+            class="flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 px-3 py-2 transition-colors"
           >
-            <span class="text-xs text-gray-400">
+            <span class="text-xs text-neutral-400">
               <template v-if="rel.relationship === 'tributary'">⤷</template>
               <template v-else>↔</template>
             </span>
             <span class="text-sm font-medium">{{ rel.name }}</span>
-            <span class="text-xs text-gray-400 capitalize">{{ rel.relationship }}</span>
+            <span class="text-xs text-neutral-400 capitalize">{{ rel.relationship }}</span>
           </NuxtLink>
         </div>
       </section>
@@ -351,7 +506,7 @@
     <!-- Scroll-to-top button -->
     <button
       ref="scrollTopBtn"
-      class="fixed bottom-20 sm:bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg flex items-center justify-center text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors opacity-0 pointer-events-none"
+      class="fixed bottom-20 sm:bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 shadow-lg flex items-center justify-center text-neutral-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors opacity-0 pointer-events-none"
       aria-label="Scroll to top"
       @click="scrollToTop"
     >
@@ -364,6 +519,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import MarkdownIt from 'markdown-it'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { gsap } from 'gsap'
 import { featurePanelIcon } from '~/utils/featureIcons'
@@ -375,7 +531,7 @@ import {
 
 const route  = useRoute()
 const config = useRuntimeConfig()
-const { isDataAdmin } = useAuth()
+const { isAuthenticated, isDataAdmin } = useAuth()
 const store  = useWatchlistStore()
 const { addAndSync, removeAndSync } = useWatchlistSync()
 
@@ -429,6 +585,129 @@ const { data: flowRanges } = await useAsyncData(
   },
   { default: () => [] }
 )
+
+// ---- Community Reports -------------------------------------------------------
+
+interface ReachReport {
+  id: string
+  slug: string
+  name: string
+  report_date: string
+  content: string
+  hazard_warning?: string
+  paddled: boolean
+  flow_cfs?: number
+  flow_band?: string
+  url?: string
+}
+
+const reachReports = ref<ReachReport[]>([])
+const reportsNextCursor = ref<string | null>(null)
+const reportsFetchDone = ref(false)
+const reportsLoadingMore = ref(false)
+const reportsPageSize = 3
+const reportsExpanded = ref(false)
+const reportsSearchOpen = ref(false)
+const reportsQuery = ref('')
+
+const filteredReports = computed(() => {
+  const q = reportsQuery.value.trim().toLowerCase()
+  if (!q) return reachReports.value
+  return reachReports.value.filter(r =>
+    r.content.toLowerCase().includes(q) ||
+    r.name.toLowerCase().includes(q) ||
+    (r.hazard_warning ?? '').toLowerCase().includes(q)
+  )
+})
+
+const visibleReports = computed(() =>
+  reportsExpanded.value ? filteredReports.value : filteredReports.value.slice(0, reportsPageSize)
+)
+
+function extractPreview(content: string): string {
+  const firstPara = content.split(/\n\n+/)[0].trim()
+  return firstPara
+    .replace(/#{1,6}\s+/g, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/~~([^~]+)~~/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/^\s*>\s*/gm, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\n/g, ' ')
+    .trim()
+}
+
+function formatReportDate(d: string): string {
+  const [y, m, day] = d.split('-').map(Number)
+  return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function reportBandClass(band: string): string {
+  if (band === 'low') return 'text-sky-600 dark:text-sky-400'
+  if (band === 'running') return 'text-emerald-600 dark:text-emerald-400'
+  if (band === 'high') return 'text-amber-600 dark:text-amber-400'
+  return 'text-neutral-400'
+}
+
+async function fetchReports(cursor?: string) {
+  const slug = (reach.value as any)?.slug ?? route.params.slug
+  const url = `${config.public.apiBase}/api/v1/reaches/${slug}/reports${cursor ? `?cursor=${cursor}` : ''}`
+  const data = await $fetch<{ reports: ReachReport[]; next_cursor: string | null }>(url).catch(() => null)
+  if (data) {
+    if (cursor) {
+      reachReports.value = [...reachReports.value, ...data.reports]
+    } else {
+      reachReports.value = data.reports
+    }
+    reportsNextCursor.value = data.next_cursor ?? null
+  }
+  reportsFetchDone.value = true
+}
+
+async function loadMoreReports() {
+  if (!reportsNextCursor.value) return
+  reportsLoadingMore.value = true
+  await fetchReports(reportsNextCursor.value)
+  reportsLoadingMore.value = false
+}
+
+onMounted(() => fetchReports())
+
+// ---- AI ask -----------------------------------------------------------------
+
+const askMd        = new MarkdownIt({ html: false, linkify: false, breaks: true })
+const askQuery     = ref('')
+const asking       = ref(false)
+const askAnswer    = ref('')
+const askError     = ref('')
+
+async function askQuestion() {
+  const q = askQuery.value.trim()
+  if (!q || !(reach.value as any)?.slug) return
+  asking.value  = true
+  askError.value  = ''
+  askAnswer.value = ''
+  try {
+    const res = await fetch(
+      `${config.public.apiBase}/api/v1/reaches/${(reach.value as any).slug}/ask`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) }
+    )
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      askError.value = d.error ?? `Error ${res.status}`
+      return
+    }
+    const data = await res.json()
+    askAnswer.value = data.answer ?? ''
+  } catch {
+    askError.value = 'Network error — try again.'
+  } finally {
+    asking.value = false
+  }
+}
 
 // ---- River features (upstream→downstream timeline) --------------------------
 
@@ -620,7 +899,7 @@ function featurePillClass(feat: RiverFeature): string {
   switch (feat.type) {
     case 'rapid':
     case 'hazard':
-      return 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+      return 'bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300'
     case 'put_in':
     case 'take_out':
     case 'access':
@@ -628,37 +907,37 @@ function featurePillClass(feat: RiverFeature): string {
     case 'camp':
       return 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
     case 'parking':
-      return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+      return 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
     default:
-      return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+      return 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300'
   }
 }
 
 function featurePinBg(feat: RiverFeature): string {
   if (feat.is_permanent_hazard) return 'bg-red-100 dark:bg-red-950'
   switch (feat.type) {
-    case 'rapid':   return 'bg-blue-100 dark:bg-blue-950'
+    case 'rapid':   return 'bg-primary-100 dark:bg-primary-950'
     case 'hazard':  return 'bg-red-100 dark:bg-red-950'
     case 'put_in':
     case 'take_out':
     case 'access':  return 'bg-emerald-100 dark:bg-emerald-950'
     case 'camp':    return 'bg-amber-100 dark:bg-amber-950'
-    case 'parking': return 'bg-gray-100 dark:bg-gray-800'
-    default:        return 'bg-gray-100 dark:bg-gray-800'
+    case 'parking': return 'bg-neutral-100 dark:bg-neutral-800'
+    default:        return 'bg-neutral-100 dark:bg-neutral-800'
   }
 }
 
 function featurePinIcon(feat: RiverFeature): string {
   if (feat.is_permanent_hazard) return 'text-red-500'
   switch (feat.type) {
-    case 'rapid':   return 'text-blue-500'
+    case 'rapid':   return 'text-primary-500'
     case 'hazard':  return 'text-red-500'
     case 'put_in':
     case 'take_out':
     case 'access':  return 'text-emerald-500'
     case 'camp':    return 'text-amber-500'
-    case 'parking': return 'text-gray-400'
-    default:        return 'text-gray-400'
+    case 'parking': return 'text-neutral-400'
+    default:        return 'text-neutral-400'
   }
 }
 
@@ -724,17 +1003,17 @@ const difficultyColor = computed(() => {
 // but uses Tailwind responsive classes so near-black stays readable on dark bg.
 const difficultyTextClass = computed(() => {
   const c = (reach.value as any)?.class_max
-  if (c == null) return 'text-gray-500 dark:text-gray-400'
+  if (c == null) return 'text-neutral-500 dark:text-neutral-400'
   if (c < 3.0)  return 'text-green-600 dark:text-green-400'
-  if (c < 4.0)  return 'text-blue-500 dark:text-blue-400'
-  if (c < 5.0)  return 'text-gray-900 dark:text-white'   // near-black swatch → white text
+  if (c < 4.0)  return 'text-primary-500 dark:text-primary-400'
+  if (c < 5.0)  return 'text-neutral-900 dark:text-white'   // near-black swatch → white text
   return 'text-red-600 dark:text-red-400'
 })
 
 // Near-black (class IV) swatch gets a subtle ring so it's visible on white card bg
 const difficultySwatchClass = computed(() => {
   const c = (reach.value as any)?.class_max
-  if (c != null && c >= 4.0 && c < 5.0) return 'ring-1 ring-gray-300 dark:ring-gray-600'
+  if (c != null && c >= 4.0 && c < 5.0) return 'ring-1 ring-neutral-300 dark:ring-neutral-600'
   return ''
 })
 
@@ -796,7 +1075,7 @@ const cfsClass = computed(() => ({
   'text-emerald-500': reach.value?.gauge.flow_status === 'runnable',
   'text-red-500':     reach.value?.gauge.flow_status === 'caution',
   'text-sky-500':     reach.value?.gauge.flow_status === 'flood',
-  'text-gray-300':    reach.value?.gauge.flow_status === 'unknown',
+  'text-neutral-300':    reach.value?.gauge.flow_status === 'unknown',
 }))
 
 const lastReadingRelative = computed(() => {
@@ -982,3 +1261,4 @@ function openShareForm() {
 }
 
 </script>
+

@@ -1,19 +1,34 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <AppHeader />
 
+    <!-- Dashboard tab bar (only when authenticated and dashboards loaded) -->
+    <DashboardTabBar
+      v-if="isAuthenticated && db.loaded.value && db.dashboards.value.length"
+      :dashboards="db.dashboards.value"
+      :active-dashboard-id="db.activeDashboardId.value"
+      @select="onSelectDashboard"
+      @new="newDashboardOpen = true"
+      @delete="onDeleteDashboard"
+      @rename="(slug, name) => db.rename(slug, name)"
+    />
+
     <!-- Sticky controls bar — only shown when gauges exist -->
-    <div v-if="store.gauges.length > 0" class="sticky top-[51px] z-10 bg-gray-50/95 dark:bg-gray-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
+    <div
+      v-if="store.gauges.length > 0"
+      class="sticky z-10 bg-neutral-50/95 dark:bg-neutral-950/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800"
+      :class="isAuthenticated && db.loaded.value && db.dashboards.value.length ? 'top-[92px]' : 'top-[51px]'"
+    >
       <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <!-- View mode toggle -->
-          <div class="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+          <div class="flex items-center gap-0.5 bg-neutral-100 dark:bg-neutral-800 rounded-lg p-1">
             <button
               v-for="m in VIEW_MODES" :key="m.key"
               class="p-1.5 rounded-md transition-colors"
               :class="viewMode === m.key
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+                ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
+                : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'"
               :title="m.label"
               @click="setViewMode(m.key)"
             >
@@ -34,8 +49,8 @@
             v-if="hasSharedGauges"
             class="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors"
             :class="groupByGauge
-              ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 shadow-sm'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'"
+              ? 'bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 shadow-sm'
+              : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'"
             title="Group by gauge"
             @click="groupByGauge = !groupByGauge"
           >
@@ -53,7 +68,7 @@
           </button>
           <!-- Expand / Collapse all -->
           <button
-            class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 font-medium transition-colors whitespace-nowrap"
+            class="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 font-medium transition-colors whitespace-nowrap"
             @click="toggleAllSections"
           >{{ allExpanded ? 'Collapse all' : 'Expand all' }}</button>
         </div>
@@ -69,7 +84,7 @@
       <div v-if="store.gauges.length === 0" class="mt-20 flex flex-col items-center gap-4 text-center">
         <div class="text-5xl">🌊</div>
         <h2 class="text-xl font-semibold">No reaches yet</h2>
-        <p class="text-gray-500 max-w-sm text-sm">
+        <p class="text-neutral-500 max-w-sm text-sm">
           Search for a reach or gauge and add it to your dashboard.
         </p>
         <UButton color="primary" @click="searchOpen = true">Find a gauge</UButton>
@@ -82,15 +97,15 @@
           <!-- State header: large, collapsible, h1+hr style -->
           <button class="flex items-center gap-3 w-full text-left mb-3" @click="toggleState(stateGroup.name)">
             <svg
-              class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0 transition-transform duration-200"
+              class="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500 shrink-0 transition-transform duration-200"
               :class="{ 'rotate-90': !collapsedStates.has(stateGroup.name) }"
               viewBox="0 0 20 20" fill="currentColor"
             >
               <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
             </svg>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white shrink-0">{{ stateGroup.name === '—' ? 'No State' : stateGroup.name }}</h1>
-            <div class="flex-1 h-px bg-gray-300 dark:bg-gray-700" />
-            <span class="text-sm text-gray-400 shrink-0">({{ stateGroup.reachCount }})</span>
+            <h1 class="text-2xl font-bold text-neutral-900 dark:text-white shrink-0">{{ stateGroup.name === '—' ? 'No State' : stateGroup.name }}</h1>
+            <div class="flex-1 h-px bg-neutral-300 dark:bg-neutral-700" />
+            <span class="text-sm text-neutral-400 shrink-0">({{ stateGroup.reachCount }})</span>
           </button>
 
           <template v-if="!collapsedStates.has(stateGroup.name)">
@@ -99,18 +114,18 @@
               <div class="flex items-center gap-2 w-full mb-3">
                 <button class="flex items-center gap-2 text-left shrink-0" @click="toggleBasin(stateGroup.name, basin.name)">
                   <svg
-                    class="w-3 h-3 text-gray-400 dark:text-gray-500 shrink-0 transition-transform duration-150"
+                    class="w-3 h-3 text-neutral-400 dark:text-neutral-500 shrink-0 transition-transform duration-150"
                     :class="{ 'rotate-90': !collapsedBasins.has(basinKey(stateGroup.name, basin.name)) }"
                     viewBox="0 0 20 20" fill="currentColor"
                   >
                     <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
                   </svg>
-                  <h2 class="text-sm font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">{{ basin.name }} Basin</h2>
-                  <span class="text-xs text-gray-400">({{ basin.reachCount }})</span>
+                  <h2 class="text-sm font-bold text-neutral-700 dark:text-neutral-200 uppercase tracking-wide">{{ basin.name }} Basin</h2>
+                  <span class="text-xs text-neutral-400">({{ basin.reachCount }})</span>
                 </button>
                 <NuxtLink
                   :to="`/basin/${slugifyBasin(basin.name)}`"
-                  class="p-0.5 rounded text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors shrink-0"
+                  class="p-0.5 rounded text-primary-500 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors shrink-0"
                   title="View basin map"
                 >
                   <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -122,7 +137,7 @@
                     <path d="M8 7 Q12 9 12 11.5"/>
                   </svg>
                 </NuxtLink>
-                <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700/60" />
+                <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-700/60" />
               </div>
 
               <template v-if="!collapsedBasins.has(basinKey(stateGroup.name, basin.name))">
@@ -131,12 +146,12 @@
                 <template v-for="river in basin.rivers" :key="river.name">
                   <!-- River section divider -->
                   <div class="flex items-center gap-2 mt-4 first:mt-0 mb-2">
-                    <svg class="w-4 h-4 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                    <svg class="w-4 h-4 text-primary-500/70 dark:text-primary-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
                       <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
                       <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
                     </svg>
-                    <span class="text-base font-semibold text-blue-600 dark:text-blue-400 shrink-0">{{ river.name }}</span>
-                    <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                    <span class="text-base font-semibold text-primary-600 dark:text-primary-400 shrink-0">{{ river.name }}</span>
+                    <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-700" />
                   </div>
                   <!-- Cards wrapper -->
                   <template v-if="groupByGauge">
@@ -159,6 +174,7 @@
                           v-if="viewMode === 'list'"
                           :reaches="split.ungrouped"
                           density="list"
+                          :hazard-slugs="hazardSlugs"
                           :class="split.gaugeGroups.length > 0 ? 'mt-3' : ''"
                           @open="(g, mode) => openGauge(g, mode)"
                           @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
@@ -169,6 +185,7 @@
                             :key="`${reach.id}::${reach.contextReachSlug}`"
                             :reaches="[reach]"
                             :density="viewMode"
+                            :hazard-slugs="hazardSlugs"
                             @open="(g, mode) => openGauge(g, mode)"
                             @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
                           />
@@ -182,6 +199,7 @@
                       v-if="viewMode === 'list'"
                       :reaches="river.reaches"
                       density="list"
+                      :hazard-slugs="hazardSlugs"
                       @open="(g, mode) => openGauge(g, mode)"
                       @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
                     />
@@ -192,6 +210,7 @@
                         :key="`${reach.id}::${reach.contextReachSlug}`"
                         :reaches="[reach]"
                         :density="viewMode"
+                        :hazard-slugs="hazardSlugs"
                         @open="(g, mode) => openGauge(g, mode)"
                         @remove="(g) => removeAndSync(g.id, g.contextReachSlug)"
                       />
@@ -203,37 +222,37 @@
               <!-- Standalone gauges (no reach context) -->
               <div v-if="basin.standaloneGauges.length > 0" class="mb-2 mt-1">
                 <div class="flex items-center gap-2 py-1">
-                  <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <svg class="w-3.5 h-3.5 text-neutral-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
                     <path d="M12 12 16 8"/>
                     <path d="M3 12a9 9 0 0 1 18 0"/>
                   </svg>
-                  <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">Standalone Gauges</span>
+                  <span class="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Standalone Gauges</span>
                 </div>
                 <div :class="reachContainerClass">
                   <div
                     v-for="g in basin.standaloneGauges"
                     :key="g.id"
-                    class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+                    class="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors"
                     :class="viewMode === 'list' ? 'px-3 py-1.5' : viewMode === 'comfortable' ? 'px-3 py-2.5' : 'px-4 py-3'"
                     @click="openGauge(g, 'gauge')"
                   >
                     <div class="flex items-center gap-3">
-                      <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <svg class="w-4 h-4 text-neutral-400 dark:text-neutral-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
                         <path d="M12 12 16 8"/>
                         <path d="M3 12a9 9 0 0 1 18 0"/>
                       </svg>
-                      <span class="flex-1 min-w-0 text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
+                      <span class="flex-1 min-w-0 text-sm font-semibold text-neutral-800 dark:text-neutral-200 truncate">
                         {{ g.name ?? `${g.source.toUpperCase()} ${g.externalId}` }}
                       </span>
                       <div class="w-24 shrink-0 hidden sm:block h-5 opacity-50 pointer-events-none">
                         <GaugeSparkline :gauge-id="g.id" flow-status="unknown" color="#3b82f6" compact />
                       </div>
-                      <span :class="viewMode === 'list' ? 'text-sm font-bold tabular-nums text-gray-900 dark:text-white' : 'text-2xl font-bold tabular-nums text-gray-900 dark:text-white leading-none'">
+                      <span :class="viewMode === 'list' ? 'text-sm font-bold tabular-nums text-neutral-900 dark:text-white' : 'text-2xl font-bold tabular-nums text-neutral-900 dark:text-white leading-none'">
                         {{ g.currentCfs != null ? g.currentCfs.toLocaleString() : '—' }}
                       </span>
-                      <span class="text-xs text-gray-400">cfs</span>
+                      <span class="text-xs text-neutral-400">cfs</span>
                     </div>
                   </div>
                 </div>
@@ -243,7 +262,7 @@
           </template>
         </section>
 
-        <section v-if="aggregateGauges.length >= 2" class="border border-gray-300 dark:border-gray-700 rounded-xl p-4">
+        <section v-if="aggregateGauges.length >= 2" class="border border-neutral-300 dark:border-neutral-700 rounded-xl p-4">
           <div class="flex items-center justify-between mb-4">
             <h3 class="font-semibold text-sm">{{ aggregateLabel }} · Flow Comparison</h3>
             <UButton size="xs" color="neutral" variant="ghost" icon="i-heroicons-x-mark" @click="closeAggregate" />
@@ -254,42 +273,42 @@
         <!-- My Reaches section -->
         <section v-if="userReaches.length || hiddenReaches.size">
           <div class="flex items-center gap-2 mb-3">
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">My Reaches</h2>
-            <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+            <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">My Reaches</h2>
+            <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
             <div v-if="hiddenReaches.size" class="relative" ref="reachAddWrap">
               <button
-                class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors flex items-center gap-1"
+                class="text-xs text-primary-500 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors flex items-center gap-1"
                 @click="reachAddOpen = !reachAddOpen"
               >
                 <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
                 Add
               </button>
-              <div v-if="reachAddOpen" class="absolute right-0 top-full mt-1 z-50 w-52 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden">
+              <div v-if="reachAddOpen" class="absolute right-0 top-full mt-1 z-50 w-52 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
                 <button
                   v-for="r in userReaches.filter(r => hiddenReaches.has(r.id))"
                   :key="r.id"
-                  class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+                  class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-950/30 transition-colors"
                   @click="showReach(r.id); reachAddOpen = false"
                 >{{ r.name }}</button>
               </div>
             </div>
-            <NuxtLink to="/my/reaches" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Manage</NuxtLink>
+            <NuxtLink to="/my/reaches" class="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors">Manage</NuxtLink>
           </div>
           <!-- List view -->
           <div v-if="viewMode === 'list'" class="space-y-1.5">
             <div
               v-for="r in userReaches.filter(r => !hiddenReaches.has(r.id))"
               :key="r.id"
-              class="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all duration-200 cursor-pointer"
+              class="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 transition-all duration-200 cursor-pointer"
               @click="openUserReach(r)"
             >
               <div class="min-w-0 flex-1 flex items-center gap-1.5">
                 <!-- My reach origin indicator — list -->
-                <svg class="w-3 h-3 shrink-0 hidden sm:block text-gray-400/40 dark:text-gray-500/30" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+                <svg class="w-3 h-3 shrink-0 hidden sm:block text-neutral-400/40 dark:text-neutral-500/30" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
                 <span class="text-sm font-medium truncate">{{ r.name }}</span>
                 <NuxtLink
                   :to="`/my/reaches/${r.slug}`"
-                  class="shrink-0 text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                  class="shrink-0 text-neutral-300 dark:text-neutral-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
                   title="Edit reach"
                   @click.stop
                 >
@@ -305,11 +324,11 @@
                   :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', reachBadgeClass(r)]"
                 >{{ reachStatusLabel(r) }}</span>
                 <span class="text-base font-bold tabular-nums min-w-14 text-right" :class="reachCfsClass(r)">
-                  {{ r.current_cfs != null ? r.current_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-gray-400 dark:text-gray-500 ml-0.5">cfs</span>
+                  {{ r.current_cfs != null ? r.current_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-neutral-400 dark:text-neutral-500 ml-0.5">cfs</span>
                 </span>
               </div>
               <button
-                class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"
+                class="rounded p-1 text-neutral-300 dark:text-neutral-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"
                 aria-label="Remove from dashboard"
                 @click.stop="hideReach(r.id)"
               >
@@ -322,7 +341,7 @@
             <div
               v-for="r in userReaches.filter(r => !hiddenReaches.has(r.id))"
               :key="r.id"
-              class="relative rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 transition-all duration-200 cursor-pointer overflow-hidden"
+              class="relative rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 transition-all duration-200 cursor-pointer overflow-hidden"
               @click="openUserReach(r)"
             >
               <!-- Name+badge (left) | CFS + link + remove (right) -->
@@ -335,22 +354,22 @@
                       :class="['shrink-0 inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', reachBadgeClass(r)]"
                     >{{ reachStatusLabel(r) }}</span>
                   </div>
-                  <span v-if="r.river_name" class="text-xs text-blue-400/70 truncate block mt-0.5">{{ r.river_name }}</span>
+                  <span v-if="r.river_name" class="text-xs text-primary-400/70 truncate block mt-0.5">{{ r.river_name }}</span>
                 </div>
                 <div class="shrink-0 flex items-center gap-1">
                   <span class="text-xl font-bold tabular-nums leading-none" :class="reachCfsClass(r)">
-                    {{ r.current_cfs != null ? r.current_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-0.5">cfs</span>
+                    {{ r.current_cfs != null ? r.current_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-neutral-500 dark:text-neutral-400 ml-0.5">cfs</span>
                   </span>
                   <NuxtLink
                     :to="`/my/reaches/${r.slug}`"
-                    class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                    class="rounded p-1 text-neutral-300 dark:text-neutral-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
                     title="Edit reach"
                     @click.stop
                   >
                     <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
                   </NuxtLink>
                   <button
-                    class="rounded p-1 transition-all duration-150 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400"
+                    class="rounded p-1 transition-all duration-150 text-neutral-300 dark:text-neutral-600 hover:text-red-400 dark:hover:text-red-400"
                     aria-label="Remove from dashboard"
                     @click.stop="hideReach(r.id)"
                   >
@@ -361,9 +380,9 @@
               <!-- Sparkline -->
               <GaugeSparkline v-if="r.gauge_id" :gauge-id="r.gauge_id" :flow-status="(r.flow_status as any)" :flow-band-label="r.flow_band ?? null" compact class="mb-1" />
               <!-- Last reading — full only -->
-              <p v-if="viewMode === 'full' && r.last_reading_at" class="text-xs text-gray-400 mt-0.5">{{ reachLastUpdated(r) }}</p>
+              <p v-if="viewMode === 'full' && r.last_reading_at" class="text-xs text-neutral-400 mt-0.5">{{ reachLastUpdated(r) }}</p>
               <!-- My reach origin badge -->
-              <div class="flex items-center gap-1 mt-1.5 text-gray-400/50 dark:text-gray-500/40">
+              <div class="flex items-center gap-1 mt-1.5 text-neutral-400/50 dark:text-neutral-500/40">
                 <svg class="w-3 h-3 shrink-0" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
                 <span class="text-[10px] font-medium">My reach</span>
               </div>
@@ -374,46 +393,46 @@
         <!-- Custom Gauges section -->
         <section v-if="customGauges.length || hiddenCustomGauges.size">
           <div class="flex items-center gap-2 mb-3">
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Custom Gauges</h2>
-            <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+            <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">Custom Gauges</h2>
+            <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
             <div v-if="hiddenCustomGauges.size" class="relative" ref="gaugeAddWrap">
               <button
-                class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors flex items-center gap-1"
+                class="text-xs text-primary-500 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors flex items-center gap-1"
                 @click="gaugeAddOpen = !gaugeAddOpen"
               >
                 <svg class="w-3 h-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/></svg>
                 Add
               </button>
-              <div v-if="gaugeAddOpen" class="absolute right-0 top-full mt-1 z-50 w-52 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden">
+              <div v-if="gaugeAddOpen" class="absolute right-0 top-full mt-1 z-50 w-52 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
                 <button
                   v-for="cg in customGauges.filter(g => hiddenCustomGauges.has(g.id))"
                   :key="cg.id"
-                  class="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+                  class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-950/30 transition-colors"
                   @click="showCustomGauge(cg.id); gaugeAddOpen = false"
                 >{{ cg.name }}</button>
               </div>
             </div>
-            <NuxtLink to="/my/gauges" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Manage</NuxtLink>
+            <NuxtLink to="/my/gauges" class="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors">Manage</NuxtLink>
           </div>
           <!-- List view -->
           <div v-if="viewMode === 'list'" class="space-y-1.5">
             <div
               v-for="cg in customGauges.filter(g => !hiddenCustomGauges.has(g.id))"
               :key="cg.id"
-              class="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 transition-all duration-200 cursor-pointer"
+              class="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 transition-all duration-200 cursor-pointer"
               @click="router.push(`/my/gauges/${cg.slug}`)"
             >
               <div class="min-w-0 flex-1 flex items-center gap-1.5">
                 <!-- Calculated origin indicator — list -->
-                <svg class="w-3.5 h-3.5 text-gray-400/40 dark:text-gray-500/30 shrink-0 hidden sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/></svg>
+                <svg class="w-3.5 h-3.5 text-neutral-400/40 dark:text-neutral-500/30 shrink-0 hidden sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/></svg>
                 <span class="text-sm font-medium truncate">{{ cg.name }}</span>
                 <span v-if="cg.any_input_unhealthy" class="hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 shrink-0">Stale</span>
               </div>
-              <span class="text-base font-bold tabular-nums text-gray-900 dark:text-white shrink-0">
-                {{ cg.last_value_cfs != null ? cg.last_value_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-gray-400 ml-0.5">{{ cg.unit }}</span>
+              <span class="text-base font-bold tabular-nums text-neutral-900 dark:text-white shrink-0">
+                {{ cg.last_value_cfs != null ? cg.last_value_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-neutral-400 ml-0.5">{{ cg.unit }}</span>
               </span>
               <button
-                class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"
+                class="rounded p-1 text-neutral-300 dark:text-neutral-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"
                 aria-label="Remove from dashboard"
                 @click.stop="hideCustomGauge(cg.id)"
               >
@@ -426,26 +445,26 @@
             <div
               v-for="cg in customGauges.filter(g => !hiddenCustomGauges.has(g.id))"
               :key="cg.id"
-              class="relative rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 transition-all duration-200 cursor-pointer overflow-hidden"
+              class="relative rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 transition-all duration-200 cursor-pointer overflow-hidden"
               @click="router.push(`/my/gauges/${cg.slug}`)"
             >
               <!-- Name/icon (left) | value + remove (right) -->
               <div class="flex items-start gap-3">
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg class="w-3.5 h-3.5 text-neutral-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/>
                     </svg>
                     <span class="text-sm font-medium truncate block">{{ cg.name }}</span>
                   </div>
-                  <p v-if="viewMode === 'full' && cg.description" class="text-xs text-gray-400 truncate mt-0.5">{{ cg.description }}</p>
+                  <p v-if="viewMode === 'full' && cg.description" class="text-xs text-neutral-400 truncate mt-0.5">{{ cg.description }}</p>
                 </div>
                 <div class="shrink-0 flex items-center gap-1.5">
-                  <span class="text-xl font-bold tabular-nums leading-none text-gray-900 dark:text-white">
-                    {{ cg.last_value_cfs != null ? cg.last_value_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-gray-500 dark:text-gray-400 ml-0.5">{{ cg.unit }}</span>
+                  <span class="text-xl font-bold tabular-nums leading-none text-neutral-900 dark:text-white">
+                    {{ cg.last_value_cfs != null ? cg.last_value_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-neutral-500 dark:text-neutral-400 ml-0.5">{{ cg.unit }}</span>
                   </span>
                   <button
-                    class="rounded-lg p-1.5 transition-all duration-150 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                    class="rounded-lg p-1.5 transition-all duration-150 text-neutral-300 dark:text-neutral-600 hover:text-red-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
                     aria-label="Remove from dashboard"
                     @click.stop="hideCustomGauge(cg.id)"
                   >
@@ -455,7 +474,7 @@
               </div>
               <!-- Calculated origin badge + stale indicator -->
               <div class="flex items-center gap-2 mt-1.5">
-                <div class="flex items-center gap-1 text-gray-400/50 dark:text-gray-500/40">
+                <div class="flex items-center gap-1 text-neutral-400/50 dark:text-neutral-500/40">
                   <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/></svg>
                   <span class="text-[10px] font-medium">Calculated</span>
                 </div>
@@ -468,10 +487,10 @@
         <!-- Dashboard map -->
         <section>
           <div class="flex items-center gap-2 mb-3">
-            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Gauge Map</h2>
-            <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+            <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">Gauge Map</h2>
+            <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
             <button
-              class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              class="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
               @click="mapVisible = !mapVisible"
             >{{ mapVisible ? 'Hide' : 'Show' }}</button>
           </div>
@@ -493,6 +512,28 @@
       v-model:open="customGaugeModalOpen"
       v-bind="customGaugeModalProps"
     />
+
+    <!-- New dashboard modal -->
+    <Teleport to="body">
+      <div v-if="newDashboardOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="newDashboardOpen = false">
+        <div class="absolute inset-0 bg-black/40" @click="newDashboardOpen = false" />
+        <div class="relative w-full max-w-xs bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xl p-5 space-y-4">
+          <h3 class="text-sm font-semibold">New dashboard</h3>
+          <input
+            v-model="newDashboardName"
+            type="text"
+            placeholder="Dashboard name"
+            class="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
+            @keydown.enter="createDashboard"
+            @keydown.esc="newDashboardOpen = false"
+          />
+          <div class="flex gap-2 justify-end">
+            <button class="px-3 py-1.5 text-sm rounded-lg border border-neutral-200 dark:border-neutral-700" @click="newDashboardOpen = false">Cancel</button>
+            <button class="px-3 py-1.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700" @click="createDashboard">Create</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -510,23 +551,72 @@ store.deduplicate()
 const { refresh } = useWatchlistRefresh()
 const { isAuthenticated, getToken } = useAuth()
 const { apiBase } = useRuntimeConfig().public
-const { addAndSync, removeAndSync, loadFromServer, pushLocalToServer } = useWatchlistSync()
+const { addAndSync, removeAndSync, loadFromServer, loadForDashboard, pushLocalToServer } = useWatchlistSync()
+const db = useDashboards()
+
+// ── Dashboard tab management ──────────────────────────────────────────────────
+const newDashboardOpen = ref(false)
+const newDashboardName = ref('')
+
+async function onSelectDashboard(id: string) {
+  if (id === db.activeDashboardId.value) return
+  db.setActive(id)
+  await loadForDashboard(id)
+  await refresh()
+}
+
+async function onDeleteDashboard(slug: string) {
+  const target = db.dashboards.value.find(d => d.slug === slug)
+  if (!target) return
+  const wasActive = target.id === db.activeDashboardId.value
+  await db.remove(slug)
+  if (wasActive && db.activeDashboard.value) {
+    await loadForDashboard(db.activeDashboard.value.id)
+    await refresh()
+  }
+}
+
+async function createDashboard() {
+  const name = newDashboardName.value.trim()
+  if (!name) return
+  const created = await db.create(name)
+  if (created) {
+    newDashboardName.value = ''
+    newDashboardOpen.value = false
+    await onSelectDashboard(created.id)
+  }
+}
 
 // ── Server sync ───────────────────────────────────────────────────────────────
 let serverSynced = false
 async function syncWithServer() {
   if (serverSynced) return
   serverSynced = true
-  await loadFromServer()
-  await pushLocalToServer()
+  await db.load()
+  const activeId = db.activeDashboard.value?.id
+  if (activeId) {
+    await loadForDashboard(activeId)
+  } else {
+    await loadFromServer()
+    await pushLocalToServer()
+  }
 }
 
 watch(isAuthenticated, (val) => { if (val) { syncWithServer(); loadUserReaches(); loadCustomGauges() } })
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
+// ── Active hazards ────────────────────────────────────────────────────────────
+const hazardSlugs = ref(new Set<string>())
+
+async function loadActiveHazards() {
+  const data = await $fetch<{ slug: string }[]>(`${apiBase}/api/v1/reaches/active-hazards`).catch(() => [])
+  hazardSlugs.value = new Set((data ?? []).map(h => h.slug))
+}
+
 onMounted(() => {
   if (isAuthenticated.value) { syncWithServer(); loadUserReaches(); loadCustomGauges() }
   refresh()
+  loadActiveHazards()
   refreshTimer = setInterval(refresh, 60_000)
 })
 
@@ -860,7 +950,7 @@ onMounted(() => {
 watch(mapVisible, val => localStorage.setItem(MAP_VIS_KEY, String(val)))
 
 function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
-  addAndSync(gauge)
+  addAndSync(gauge, db.activeDashboard.value?.id ?? null)
 }
 
 const detailOpen  = ref(false)

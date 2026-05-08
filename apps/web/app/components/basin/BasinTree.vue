@@ -15,7 +15,7 @@
           fill="none"
           stroke="currentColor"
           stroke-width="1.5"
-          class="text-gray-300 dark:text-gray-600"
+          class="text-neutral-300 dark:text-neutral-600"
         />
 
         <!-- Nodes -->
@@ -66,10 +66,10 @@
         </g>
       </svg>
 
-      <p v-else-if="reaches.length > 0" class="text-sm text-gray-400 italic py-2">
+      <p v-else-if="reaches.length > 0" class="text-sm text-neutral-400 italic py-2">
         Building tree…
       </p>
-      <p v-else class="text-sm text-gray-400 italic py-2">
+      <p v-else class="text-sm text-neutral-400 italic py-2">
         No reaches loaded yet.
       </p>
     </div>

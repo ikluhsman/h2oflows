@@ -1,21 +1,21 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <AppHeader>
       <template v-if="report">
-        <span class="text-gray-300 dark:text-gray-700 shrink-0">/</span>
-        <span class="text-sm font-medium truncate text-gray-700 dark:text-gray-200">Trip report</span>
+        <span class="text-neutral-300 dark:text-neutral-700 shrink-0">/</span>
+        <span class="text-sm font-medium truncate text-neutral-700 dark:text-neutral-200">Trip report</span>
       </template>
     </AppHeader>
 
     <main class="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
       <!-- Loading -->
-      <div v-if="pending" class="flex items-center justify-center h-60 text-gray-400 text-sm">Loading…</div>
+      <div v-if="pending" class="flex items-center justify-center h-60 text-neutral-400 text-sm">Loading…</div>
 
       <!-- Not found -->
       <div v-else-if="!report" class="flex flex-col items-center justify-center h-60 gap-3 text-center">
-        <p class="text-gray-500 text-sm">This trip report wasn't found or isn't published yet.</p>
-        <NuxtLink to="/" class="text-blue-600 hover:underline text-sm">Back to h2oflows</NuxtLink>
+        <p class="text-neutral-500 text-sm">This trip report wasn't found or isn't published yet.</p>
+        <NuxtLink to="/" class="text-primary-600 hover:underline text-sm">Back to h2oflows</NuxtLink>
       </div>
 
       <template v-else>
@@ -23,7 +23,7 @@
         <!-- Reach link -->
         <NuxtLink
           :to="`/reaches/${report.reach_slug}`"
-          class="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors font-medium"
+          class="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300 transition-colors font-medium"
         >
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
           {{ report.reach_name }}
@@ -31,10 +31,10 @@
 
         <!-- Title + meta -->
         <div class="space-y-1">
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
+          <h1 class="text-2xl font-bold text-neutral-900 dark:text-white">
             {{ report.title ?? 'Trip Report' }}
           </h1>
-          <div class="flex items-center flex-wrap gap-3 text-sm text-gray-500 dark:text-gray-400">
+          <div class="flex items-center flex-wrap gap-3 text-sm text-neutral-500 dark:text-neutral-400">
             <span>{{ observedLabel }}</span>
             <span v-if="report.cfs_at_time != null" :class="cfsClass">
               {{ report.cfs_at_time.toLocaleString() }} cfs
@@ -50,24 +50,24 @@
         <!-- Body -->
         <div
           v-if="report.body"
-          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 px-5 py-4 text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap"
+          class="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 px-5 py-4 text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-wrap"
         >{{ report.body }}</div>
         <div
           v-else
-          class="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-5 py-4 text-sm text-gray-400 italic"
+          class="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-100 dark:border-neutral-800 px-5 py-4 text-sm text-neutral-400 italic"
         >No description provided.</div>
 
         <!-- Photos placeholder -->
-        <div class="bg-gray-100 dark:bg-gray-800/50 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 px-5 py-6 text-center text-sm text-gray-400">
+        <div class="bg-neutral-100 dark:bg-neutral-800/50 rounded-xl border border-dashed border-neutral-200 dark:border-neutral-700 px-5 py-6 text-center text-sm text-neutral-400">
           Photo uploads coming soon
         </div>
 
         <!-- CTA -->
-        <div class="border-t border-gray-100 dark:border-gray-800 pt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
-          <p class="text-xs text-gray-400">Know this reach? Share conditions with the community.</p>
+        <div class="border-t border-neutral-100 dark:border-neutral-800 pt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 justify-between">
+          <p class="text-xs text-neutral-400">Know this reach? Share conditions with the community.</p>
           <NuxtLink
             :to="`/reaches/${report.reach_slug}`"
-            class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-semibold transition-colors"
+            class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white px-3 py-1.5 text-xs font-semibold transition-colors"
           >
             View {{ report.reach_name }}
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -118,7 +118,7 @@ const impressionClass = computed(() => {
     case 'low': return 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
     case 'good':    return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
     case 'high':    return 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300'
-    default:        return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+    default:        return 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400'
   }
 })
 

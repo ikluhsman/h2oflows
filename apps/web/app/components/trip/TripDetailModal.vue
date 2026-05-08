@@ -4,12 +4,12 @@
       <div class="flex items-center justify-between gap-3 w-full min-w-0">
         <div class="min-w-0">
           <h2 class="font-semibold truncate">{{ title }}</h2>
-          <p class="text-xs text-gray-400 mt-0.5">{{ dateLabel }}</p>
+          <p class="text-xs text-neutral-400 mt-0.5">{{ dateLabel }}</p>
         </div>
         <!-- Stats chips -->
-        <div class="flex items-center gap-2 shrink-0 text-xs text-gray-500">
+        <div class="flex items-center gap-2 shrink-0 text-xs text-neutral-500">
           <span v-if="detail?.duration_min != null">{{ durationLabel }}</span>
-          <span v-if="detail?.distance_mi   != null" class="text-gray-300 dark:text-gray-600">·</span>
+          <span v-if="detail?.distance_mi   != null" class="text-neutral-300 dark:text-neutral-600">·</span>
           <span v-if="detail?.distance_mi   != null">{{ detail.distance_mi.toFixed(1) }} mi</span>
           <!-- AI generate button in header for quick access -->
           <UButton
@@ -31,50 +31,50 @@
     </template>
 
     <template #body>
-      <div v-if="loading" class="flex items-center justify-center h-40 text-gray-400 text-sm">Loading…</div>
+      <div v-if="loading" class="flex items-center justify-center h-40 text-neutral-400 text-sm">Loading…</div>
       <div v-else-if="detail" class="space-y-4">
 
         <!-- Track map -->
         <div
           v-if="detail.track"
           ref="mapContainer"
-          class="w-full rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800"
+          class="w-full rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800"
           style="height: 240px;"
         />
-        <div v-else class="w-full rounded-lg bg-gray-50 dark:bg-gray-800 flex items-center justify-center text-xs text-gray-400" style="height: 80px;">
+        <div v-else class="w-full rounded-lg bg-neutral-50 dark:bg-neutral-800 flex items-center justify-center text-xs text-neutral-400" style="height: 80px;">
           No GPS track recorded
         </div>
 
         <!-- Flow at time -->
         <div v-if="detail.start_cfs != null" class="flex items-center gap-3 text-sm">
-          <span class="text-gray-500">Flow at put-in</span>
+          <span class="text-neutral-500">Flow at put-in</span>
           <span class="font-semibold tabular-nums">{{ detail.start_cfs.toLocaleString() }} cfs</span>
-          <span v-if="detail.end_cfs != null" class="text-gray-400">→ {{ detail.end_cfs.toLocaleString() }} cfs at take-out</span>
+          <span v-if="detail.end_cfs != null" class="text-neutral-400">→ {{ detail.end_cfs.toLocaleString() }} cfs at take-out</span>
         </div>
 
         <!-- GPS points count -->
-        <p v-if="detail.point_count > 0" class="text-xs text-gray-400">
+        <p v-if="detail.point_count > 0" class="text-xs text-neutral-400">
           {{ detail.point_count.toLocaleString() }} GPS points · {{ detail.track ? 'track available' : 'processing…' }}
         </p>
 
         <!-- AI description result — shown after generation -->
         <div
           v-if="aiDesc"
-          class="rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30 p-3 space-y-2"
+          class="rounded-lg border border-primary-100 dark:border-primary-900 bg-primary-50 dark:bg-primary-950/30 p-3 space-y-2"
         >
-          <p class="text-xs font-medium text-blue-600 dark:text-blue-400">AI suggestion</p>
-          <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{{ aiDesc }}</p>
-          <p class="text-xs text-gray-400">Title applied above — description is for reference only.</p>
+          <p class="text-xs font-medium text-primary-600 dark:text-primary-400">AI suggestion</p>
+          <p class="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed">{{ aiDesc }}</p>
+          <p class="text-xs text-neutral-400">Title applied above — description is for reference only.</p>
         </div>
 
         <!-- Title editor -->
-        <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">Title</label>
+        <div class="border-t border-neutral-100 dark:border-neutral-800 pt-4">
+          <label class="block text-xs font-medium text-neutral-500 mb-1.5">Title</label>
           <input
             v-model="titleEdit"
             type="text"
             placeholder="Give this trip a name…"
-            class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 py-2 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm px-3 py-2 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
           <div class="mt-2 flex justify-end">
             <UButton
@@ -87,13 +87,13 @@
         </div>
 
         <!-- Notes editor -->
-        <div class="border-t border-gray-100 dark:border-gray-800 pt-4">
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">Notes</label>
+        <div class="border-t border-neutral-100 dark:border-neutral-800 pt-4">
+          <label class="block text-xs font-medium text-neutral-500 mb-1.5">Notes</label>
           <textarea
             v-model="notesEdit"
             rows="3"
             placeholder="Add notes about this trip…"
-            class="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm px-3 py-2 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            class="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm px-3 py-2 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
           />
           <div class="mt-2 flex justify-end">
             <UButton
@@ -106,16 +106,16 @@
         </div>
 
         <!-- Share consent toggle -->
-        <div class="border-t border-gray-100 dark:border-gray-800 pt-4 flex items-start justify-between gap-4">
+        <div class="border-t border-neutral-100 dark:border-neutral-800 pt-4 flex items-start justify-between gap-4">
           <div class="min-w-0">
             <p class="text-sm font-medium">Share anonymously</p>
-            <p class="text-xs text-gray-400 mt-0.5 leading-relaxed">
+            <p class="text-xs text-neutral-400 mt-0.5 leading-relaxed">
               Help improve reach data by sharing this trip's GPS track and flow readings with the H2OFlows community. No personal information is included.
             </p>
           </div>
           <button
             class="shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
-            :class="consentValue ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'"
+            :class="consentValue ? 'bg-primary-600' : 'bg-neutral-200 dark:bg-neutral-700'"
             @click="toggleConsent"
           >
             <span
@@ -126,14 +126,14 @@
         </div>
 
         <!-- Reach link -->
-        <div v-if="detail.reach_slug" class="border-t border-gray-100 dark:border-gray-800 pt-4">
+        <div v-if="detail.reach_slug" class="border-t border-neutral-100 dark:border-neutral-800 pt-4">
           <NuxtLink
             :to="`/reaches/${detail.reach_slug}`"
-            class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
             @click="open = false"
           >
             <span class="text-sm font-medium">{{ detail.reach_name }}</span>
-            <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            <svg class="w-3.5 h-3.5 text-neutral-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
           </NuxtLink>
         </div>
       </div>

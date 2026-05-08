@@ -3,8 +3,8 @@
     <template #header>
       <div class="flex items-start justify-between gap-3 w-full">
         <div class="min-w-0 flex-1">
-          <h2 class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ reachName }}</h2>
-          <p class="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+          <h2 class="text-lg font-bold text-neutral-900 dark:text-white truncate leading-tight">{{ reachName }}</h2>
+          <p class="text-xs text-neutral-400 mt-0.5 flex items-center gap-1">
             <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/>
             </svg>
@@ -12,7 +12,7 @@
           </p>
         </div>
         <button
-          class="shrink-0 p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          class="shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
           aria-label="Close"
           @click="open = false"
         >
@@ -27,10 +27,10 @@
       <div class="space-y-3">
         <!-- Current value + badge -->
         <div class="flex items-baseline gap-2 flex-wrap">
-          <span class="text-3xl font-bold tabular-nums leading-none text-gray-900 dark:text-white">
+          <span class="text-3xl font-bold tabular-nums leading-none text-neutral-900 dark:text-white">
             {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
           </span>
-          <span class="text-sm text-gray-500">cfs</span>
+          <span class="text-sm text-neutral-500">cfs</span>
           <span
             v-if="flowBand"
             :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', flowBandBadgeClass(flowBand, flowStatus)]"
@@ -39,12 +39,12 @@
 
         <!-- Time window toggle -->
         <div class="flex justify-end">
-          <div class="flex text-xs rounded overflow-hidden border border-gray-200 dark:border-gray-700">
+          <div class="flex text-xs rounded overflow-hidden border border-neutral-200 dark:border-neutral-700">
             <button
               v-for="h in ([12, 24, 48] as const)"
               :key="h"
               class="px-2 py-1 transition-colors"
-              :class="hours === h ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+              :class="hours === h ? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200' : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'"
               @click="hours = h; load()"
             >{{ h }}h</button>
           </div>
@@ -55,19 +55,19 @@
           <div ref="container" class="w-full h-full" />
           <div
             v-if="loading"
-            class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm bg-white/70 dark:bg-gray-900/70"
+            class="absolute inset-0 flex items-center justify-center text-neutral-400 text-sm bg-white/70 dark:bg-neutral-900/70"
           >Loading…</div>
           <div
             v-else-if="readings.length === 0"
-            class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm"
+            class="absolute inset-0 flex items-center justify-center text-neutral-400 text-sm"
           >No readings in this window</div>
         </div>
 
         <!-- Link to reach detail page -->
-        <div class="pt-1 border-t border-gray-100 dark:border-gray-800">
+        <div class="pt-1 border-t border-neutral-100 dark:border-neutral-800">
           <NuxtLink
             :to="`/my/reaches/${reachSlug}`"
-            class="inline-flex items-center gap-1 text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+            class="inline-flex items-center gap-1 text-sm text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 font-medium transition-colors"
             @click="open = false"
           >
             Edit reach

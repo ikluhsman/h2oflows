@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <AppHeader />
 
     <main class="max-w-3xl mx-auto px-4 py-6 pb-20 sm:pb-6 space-y-4">
@@ -7,7 +7,7 @@
       <!-- Page header -->
       <div>
         <h1 class="text-xl font-bold tracking-tight">Rivers</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+        <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
           Browse Colorado's whitewater by basin and river.
         </p>
       </div>
@@ -24,13 +24,13 @@
       </div>
 
       <!-- Loading state -->
-      <div v-if="loading" class="py-12 text-center text-sm text-gray-400">Loading reaches…</div>
+      <div v-if="loading" class="py-12 text-center text-sm text-neutral-400">Loading reaches…</div>
 
       <!-- Error state -->
       <div v-else-if="error" class="py-12 text-center text-sm text-red-400">{{ error }}</div>
 
       <!-- Empty search -->
-      <div v-else-if="query.length >= 2 && filteredBasins.length === 0" class="py-12 text-center text-sm text-gray-400">
+      <div v-else-if="query.length >= 2 && filteredBasins.length === 0" class="py-12 text-center text-sm text-neutral-400">
         No results for "{{ query }}"
       </div>
 
@@ -43,15 +43,15 @@
             @click="toggleBasin(basin.name)"
           >
             <svg
-              class="w-3 h-3 text-gray-400 transition-transform duration-200"
+              class="w-3 h-3 text-neutral-400 transition-transform duration-200"
               :class="{ 'rotate-90': !collapsed.basins.has(basin.name) }"
               viewBox="0 0 20 20" fill="currentColor"
             >
               <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
             </svg>
-            <h2 class="text-sm font-semibold text-gray-900 dark:text-white uppercase tracking-wide">{{ basin.name }}</h2>
-            <span class="text-xs text-gray-400">({{ basin.reachCount }})</span>
-            <div class="flex-1 h-px bg-gray-200 dark:bg-gray-800" />
+            <h2 class="text-sm font-semibold text-neutral-900 dark:text-white uppercase tracking-wide">{{ basin.name }}</h2>
+            <span class="text-xs text-neutral-400">({{ basin.reachCount }})</span>
+            <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
           </button>
 
           <template v-if="!collapsed.basins.has(basin.name)">
@@ -62,20 +62,20 @@
                 @click="toggleRiver(basin.name, river.name)"
               >
                 <svg
-                  class="w-2.5 h-2.5 text-gray-400 transition-transform duration-200"
+                  class="w-2.5 h-2.5 text-neutral-400 transition-transform duration-200"
                   :class="{ 'rotate-90': !collapsed.rivers.has(`${basin.name}::${river.name}`) }"
                   viewBox="0 0 20 20" fill="currentColor"
                 >
                   <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
                 </svg>
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ river.name }}</span>
-                <span class="text-xs text-gray-400">({{ river.reaches.length }})</span>
+                <span class="text-sm font-medium text-neutral-700 dark:text-neutral-300">{{ river.name }}</span>
+                <span class="text-xs text-neutral-400">({{ river.reaches.length }})</span>
               </button>
 
               <!-- Reach rows -->
               <div
                 v-if="!collapsed.rivers.has(`${basin.name}::${river.name}`)"
-                class="ml-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden divide-y divide-gray-100 dark:divide-gray-800"
+                class="ml-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden divide-y divide-neutral-100 dark:divide-neutral-800"
               >
                 <ReachBrowseRow
                   v-for="reach in river.reaches"

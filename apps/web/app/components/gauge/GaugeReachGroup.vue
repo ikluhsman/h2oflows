@@ -2,23 +2,23 @@
   <!-- ─── LIST density ────────────────────────────────────────────────────── -->
   <div
     v-if="density === 'list'"
-    class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden"
+    class="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden"
   >
     <!-- Gauge station header row -->
     <div
       v-if="!hideGaugeHeader"
-      class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+      class="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
       @click="$emit('open', leadGauge, 'gauge')"
     >
       <div class="min-w-0 flex-1 flex items-center gap-1.5">
-        <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
+        <svg class="w-4 h-4 text-neutral-400 dark:text-neutral-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
           <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/>
           <path d="M12 12 16 8"/>
           <path d="M3 12a9 9 0 0 1 18 0"/>
         </svg>
         <div class="min-w-0">
-          <span class="text-sm font-medium text-gray-600 dark:text-gray-400 truncate block">{{ gaugeName }}</span>
-          <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+          <span class="text-sm font-medium text-neutral-600 dark:text-neutral-400 truncate block">{{ gaugeName }}</span>
+          <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-neutral-400 dark:text-neutral-500 truncate block leading-tight">{{ riverDisplayName }}</span>
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
@@ -31,12 +31,12 @@
             @latest-cfs="liveCfs = $event"
           />
         </div>
-        <span class="w-16 shrink-0 text-right text-base font-bold tabular-nums text-gray-900 dark:text-white">
+        <span class="w-16 shrink-0 text-right text-base font-bold tabular-nums text-neutral-900 dark:text-white">
           {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
         </span>
-        <span class="text-xs font-normal text-gray-400 dark:text-gray-500 shrink-0">cfs</span>
+        <span class="text-xs font-normal text-neutral-400 dark:text-neutral-500 shrink-0">cfs</span>
         <button
-          class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+          class="shrink-0 p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           aria-label="Remove gauge group"
           @click.stop="$emit('remove-group')"
         >
@@ -48,21 +48,21 @@
     </div>
 
     <!-- Reach sub-rows -->
-    <div v-if="reachItems.length > 0" :class="hideGaugeHeader ? '' : 'border-t border-gray-100 dark:border-gray-800'">
+    <div v-if="reachItems.length > 0" :class="hideGaugeHeader ? '' : 'border-t border-neutral-100 dark:border-neutral-800'">
       <div
         v-for="item in reachItems"
         :key="item.contextReachSlug!"
-        class="flex items-center gap-2 pl-5 pr-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0 cursor-pointer"
+        class="flex items-center gap-2 pl-5 pr-3 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors border-b border-neutral-100/50 dark:border-neutral-800/50 last:border-b-0 cursor-pointer"
         @click.stop="$emit('open', item, 'reach')"
       >
         <!-- Name + link button side-by-side -->
         <div class="flex items-center gap-1 min-w-0 flex-1">
-          <span class="min-w-0 text-sm text-gray-700 dark:text-gray-300 truncate">
+          <span class="min-w-0 text-sm text-neutral-700 dark:text-neutral-300 truncate">
             {{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}
           </span>
           <NuxtLink
             :to="`/reaches/${item.contextReachSlug}`"
-            class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            class="shrink-0 p-0.5 rounded text-neutral-300 dark:text-neutral-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
             aria-label="View reach page"
             title="View reach page"
             @click.stop
@@ -77,7 +77,7 @@
           :class="['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(item), displayFlowStatus(item))]"
         >{{ flowBandLabel(displayFlowBandLabel(item), displayFlowStatus(item)) }}</span>
         <button
-          class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+          class="shrink-0 p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           aria-label="Remove"
           @click.stop="removeAndSync(item.id, item.contextReachSlug)"
         >
@@ -87,7 +87,7 @@
         </button>
       </div>
     </div>
-    <div v-else class="border-t border-gray-100 dark:border-gray-800 pl-8 pr-3 py-1.5 text-xs text-gray-400 italic">
+    <div v-else class="border-t border-neutral-100 dark:border-neutral-800 pl-8 pr-3 py-1.5 text-xs text-neutral-400 italic">
       No related reaches
     </div>
   </div>
@@ -95,7 +95,7 @@
   <!-- ─── CARD densities (compact / comfortable / full) ──────────────────── -->
   <div
     v-else
-    class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden cursor-pointer transition-all duration-200 hover:border-gray-300 dark:hover:border-gray-600"
+    class="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden cursor-pointer transition-all duration-200 hover:border-neutral-300 dark:hover:border-neutral-600"
     @click="$emit('open', leadGauge, 'gauge')"
   >
     <!-- Gauge header section -->
@@ -104,16 +104,16 @@
       <!-- Compact: simple horizontal row -->
       <template v-if="density === 'compact'">
         <div class="flex items-center gap-1.5 mb-2">
-          <svg class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
+          <svg class="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
             <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 12 16 8"/><path d="M3 12a9 9 0 0 1 18 0"/>
           </svg>
-          <span class="min-w-0 text-xs font-medium text-gray-600 dark:text-gray-400 truncate">{{ gaugeName }}</span>
+          <span class="min-w-0 text-xs font-medium text-neutral-600 dark:text-neutral-400 truncate">{{ gaugeName }}</span>
         </div>
         <div class="flex items-baseline gap-2 mb-2">
-          <span class="text-xl font-bold tabular-nums leading-none text-gray-900 dark:text-white">
+          <span class="text-xl font-bold tabular-nums leading-none text-neutral-900 dark:text-white">
             {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
           </span>
-          <span class="text-xs text-gray-500">cfs</span>
+          <span class="text-xs text-neutral-500">cfs</span>
         </div>
       </template>
 
@@ -123,12 +123,12 @@
           <!-- Left -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1.5 mb-1">
-              <svg class="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
+              <svg class="w-4 h-4 text-neutral-400 dark:text-neutral-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge">
                 <path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"/><path d="M12 12 16 8"/><path d="M3 12a9 9 0 0 1 18 0"/>
               </svg>
               <div class="min-w-0">
-                <span class="text-sm font-medium text-gray-600 dark:text-gray-400 truncate block leading-tight">{{ gaugeName }}</span>
-                <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+                <span class="text-sm font-medium text-neutral-600 dark:text-neutral-400 truncate block leading-tight">{{ gaugeName }}</span>
+                <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-neutral-400 dark:text-neutral-500 truncate block leading-tight">{{ riverDisplayName }}</span>
               </div>
             </div>
             <div class="opacity-60" :class="density === 'full' ? 'h-14' : 'h-6'">
@@ -143,10 +143,10 @@
           </div>
           <!-- Right: CFS -->
           <div class="text-right shrink-0">
-            <div class="font-bold tabular-nums leading-none text-gray-900 dark:text-white" :class="density === 'comfortable' ? 'text-2xl' : 'text-3xl'">
+            <div class="font-bold tabular-nums leading-none text-neutral-900 dark:text-white" :class="density === 'comfortable' ? 'text-2xl' : 'text-3xl'">
               {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
             </div>
-            <div class="text-xs text-gray-400 mt-0.5">cfs</div>
+            <div class="text-xs text-neutral-400 mt-0.5">cfs</div>
             <TrendArrow v-if="currentCfs != null" :gauge-id="leadGauge.id" class="text-base justify-end mt-0.5" />
           </div>
         </div>
@@ -154,21 +154,21 @@
     </div>
 
     <!-- Reach sub-list -->
-    <div :class="hideGaugeHeader ? '' : 'border-t border-gray-100 dark:border-gray-800'">
+    <div :class="hideGaugeHeader ? '' : 'border-t border-neutral-100 dark:border-neutral-800'">
       <div
         v-for="item in reachItems"
         :key="item.contextReachSlug!"
-        class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0 cursor-pointer"
+        class="flex items-center gap-1.5 px-3 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors border-b border-neutral-100/50 dark:border-neutral-800/50 last:border-b-0 cursor-pointer"
         @click.stop="$emit('open', item, 'reach')"
       >
         <!-- Name + link button side-by-side -->
         <div class="flex items-center gap-1 min-w-0 flex-1">
-          <span class="min-w-0 text-sm text-gray-700 dark:text-gray-300 truncate">
+          <span class="min-w-0 text-sm text-neutral-700 dark:text-neutral-300 truncate">
             {{ item.contextReachCommonName ?? item.contextReachFullName ?? item.name }}
           </span>
           <NuxtLink
             :to="`/reaches/${item.contextReachSlug}`"
-            class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+            class="shrink-0 p-0.5 rounded text-neutral-300 dark:text-neutral-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
             aria-label="View reach page"
             title="View reach page"
             @click.stop
@@ -183,7 +183,7 @@
           :class="['inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(item), displayFlowStatus(item))]"
         >{{ flowBandLabel(displayFlowBandLabel(item), displayFlowStatus(item)) }}</span>
         <button
-          class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+          class="shrink-0 p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           aria-label="Remove"
           @click.stop="removeAndSync(item.id, item.contextReachSlug)"
         >
@@ -192,7 +192,7 @@
           </svg>
         </button>
       </div>
-      <div v-if="reachItems.length === 0" class="px-3 py-1.5 text-xs text-gray-400 italic">
+      <div v-if="reachItems.length === 0" class="px-3 py-1.5 text-xs text-neutral-400 italic">
         No related reaches
       </div>
     </div>

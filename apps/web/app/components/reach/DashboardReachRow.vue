@@ -1,6 +1,6 @@
 <template>
   <div
-    class="rounded-2xl border border-gray-200 dark:border-gray-700/60 bg-white dark:bg-gray-900 shadow-sm overflow-hidden cursor-pointer active:opacity-80 transition-opacity"
+    class="rounded-2xl border border-neutral-200 dark:border-neutral-700/60 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden cursor-pointer active:opacity-80 transition-opacity"
     @click="$emit('openGauge', gauge)"
   >
     <!-- ── LIST mode: single compact row ──────────────────────────────────── -->
@@ -9,12 +9,12 @@
         <!-- Reach name + river name + link button (link lives next to name) -->
         <div class="flex items-center gap-1 min-w-0 flex-1">
           <div class="min-w-0">
-            <span class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate block">{{ reachName }}</span>
-            <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+            <span class="text-sm font-medium text-neutral-800 dark:text-neutral-200 truncate block">{{ reachName }}</span>
+            <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-neutral-400 dark:text-neutral-500 truncate block leading-tight">{{ riverDisplayName }}</span>
           </div>
           <NuxtLink
             :to="`/reaches/${gauge.contextReachSlug}`"
-            class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+            class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-primary-500 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors"
             aria-label="View reach detail"
             @click.stop
           >
@@ -36,10 +36,10 @@
         </div>
         <span class="text-sm font-bold tabular-nums shrink-0 w-16 text-right" :class="cfsColorClass">
           {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
-          <span class="text-xs font-normal text-gray-400">cfs</span>
+          <span class="text-xs font-normal text-neutral-400">cfs</span>
         </span>
         <button
-          class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+          class="shrink-0 p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           aria-label="Remove from dashboard"
           @click.stop="$emit('removeGauge', gauge)"
         >
@@ -54,19 +54,19 @@
     <template v-else-if="view === 'compact'">
       <div class="px-4 pt-3 pb-1">
         <div class="flex items-center gap-2">
-          <svg class="w-3.5 h-3.5 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <svg class="w-3.5 h-3.5 text-primary-500/70 dark:text-primary-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
             <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
           </svg>
           <!-- Reach name + river name + link (link lives next to name) -->
           <div class="flex items-center gap-1 min-w-0 flex-1">
             <div class="min-w-0">
-              <span class="text-sm font-semibold text-gray-900 dark:text-white truncate block leading-tight">{{ reachName }}</span>
-              <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+              <span class="text-sm font-semibold text-neutral-900 dark:text-white truncate block leading-tight">{{ reachName }}</span>
+              <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-neutral-400 dark:text-neutral-500 truncate block leading-tight">{{ riverDisplayName }}</span>
             </div>
             <NuxtLink
               :to="`/reaches/${gauge.contextReachSlug}`"
-              class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+              class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-primary-500 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors"
               aria-label="View reach detail"
               @click.stop
             >
@@ -82,9 +82,9 @@
           <span class="text-lg font-bold tabular-nums shrink-0" :class="cfsColorClass">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
           </span>
-          <span class="text-xs text-gray-400 shrink-0">cfs</span>
+          <span class="text-xs text-neutral-400 shrink-0">cfs</span>
           <button
-            class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+            class="shrink-0 p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
             aria-label="Remove from dashboard"
             @click.stop="$emit('removeGauge', gauge)"
           >
@@ -97,7 +97,7 @@
           :href="gaugeSourceUrl"
           target="_blank"
           rel="noopener"
-          class="text-[11px] font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+          class="text-[11px] font-medium text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 transition-colors"
           @click.stop
         >{{ gaugeSourceLabel }}</a>
       </div>
@@ -110,18 +110,18 @@
     <template v-else>
       <div class="px-4 pt-3 pb-1">
         <div class="flex items-center gap-2">
-          <svg class="w-3.5 h-3.5 text-blue-500/70 dark:text-blue-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <svg class="w-3.5 h-3.5 text-primary-500/70 dark:text-primary-400/70 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
             <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
             <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" opacity="0.6"/>
           </svg>
           <div class="flex items-center gap-1 min-w-0 flex-1">
             <div class="min-w-0">
-              <span class="text-sm font-semibold text-gray-900 dark:text-white truncate block leading-tight">{{ reachName }}</span>
-              <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-gray-400 dark:text-gray-500 truncate block leading-tight">{{ riverDisplayName }}</span>
+              <span class="text-sm font-semibold text-neutral-900 dark:text-white truncate block leading-tight">{{ reachName }}</span>
+              <span v-if="riverDisplayName && !hideRiverName" class="text-xs text-neutral-400 dark:text-neutral-500 truncate block leading-tight">{{ riverDisplayName }}</span>
             </div>
             <NuxtLink
               :to="`/reaches/${gauge.contextReachSlug}`"
-              class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-blue-500 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+              class="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium text-primary-500 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/40 transition-colors"
               aria-label="View reach detail"
               @click.stop
             >
@@ -137,9 +137,9 @@
           <span class="text-[22px] font-bold tabular-nums shrink-0 leading-none" :class="cfsColorClass">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
           </span>
-          <span class="text-xs text-gray-400 shrink-0">cfs</span>
+          <span class="text-xs text-neutral-400 shrink-0">cfs</span>
           <button
-            class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+            class="shrink-0 p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
             aria-label="Remove from dashboard"
             @click.stop="$emit('removeGauge', gauge)"
           >
@@ -153,10 +153,10 @@
             :href="gaugeSourceUrl"
             target="_blank"
             rel="noopener"
-            class="text-[11px] font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 transition-colors truncate"
+            class="text-[11px] font-medium text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 transition-colors truncate"
             @click.stop
           >{{ gaugeSourceLabel }}</a>
-          <span v-if="lastReadingRelative" class="text-[10px] text-gray-400 truncate">{{ lastReadingRelative }}</span>
+          <span v-if="lastReadingRelative" class="text-[10px] text-neutral-400 truncate">{{ lastReadingRelative }}</span>
         </div>
       </div>
       <div class="px-4 pb-4 pointer-events-none opacity-50 h-20">
@@ -215,7 +215,7 @@ const cfsColorClass = computed(() => {
   if (s === 'runnable') return 'text-emerald-500 dark:text-emerald-400'
   if (s === 'flood')    return 'text-sky-500 dark:text-sky-400'
   if (s === 'caution')  return 'text-red-500 dark:text-red-400'
-  return 'text-gray-900 dark:text-white'
+  return 'text-neutral-900 dark:text-white'
 })
 
 const sparklineColor = computed(() => {

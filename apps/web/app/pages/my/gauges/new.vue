@@ -1,20 +1,20 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <AppHeader />
 
     <main class="max-w-2xl mx-auto px-4 py-6 space-y-5">
       <div class="flex items-center gap-3">
-        <NuxtLink to="/my/gauges" class="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+        <NuxtLink to="/my/gauges" class="text-sm text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300">
           ← Custom Gauges
         </NuxtLink>
       </div>
 
-      <h1 class="text-xl font-bold text-gray-900 dark:text-white">New Custom Gauge</h1>
+      <h1 class="text-xl font-bold text-neutral-900 dark:text-white">New Custom Gauge</h1>
 
       <form class="space-y-5" @submit.prevent="submit">
 
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-4">
-          <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Details</h2>
+        <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 space-y-4">
+          <h2 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Details</h2>
 
           <UFormField label="Name" required>
             <UInput v-model="form.name" placeholder="e.g. Upper Animas Total" class="w-full" required />
@@ -29,9 +29,9 @@
           </UFormField>
         </div>
 
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-3">
-          <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Formula</h2>
-          <p class="text-xs text-gray-400">Add gauges and set each one to + (add) or − (subtract).</p>
+        <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 space-y-3">
+          <h2 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Formula</h2>
+          <p class="text-xs text-neutral-400">Add gauges and set each one to + (add) or − (subtract).</p>
           <CustomGaugeFormulaBuilder v-model="form.inputs" />
         </div>
 

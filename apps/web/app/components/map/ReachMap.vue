@@ -2,46 +2,46 @@
   <!-- Map only — feature list lives in the reach page's features panel below -->
   <div
     :class="isFullscreen
-      ? 'fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-950'
-      : 'rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 h-100 sm:h-140'"
+      ? 'fixed inset-0 z-50 flex flex-col bg-white dark:bg-neutral-950'
+      : 'rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-700 h-100 sm:h-140'"
   >
 
     <!-- MapLibre container — ref is on THIS element so MapLibre reads its own clientHeight -->
     <div
       ref="container"
-      class="relative w-full h-full bg-gray-100 dark:bg-gray-800"
+      class="relative w-full h-full bg-neutral-100 dark:bg-neutral-800"
     >
       <div
         v-if="!mapReady && hasCoords"
-        class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm pointer-events-none z-10"
+        class="absolute inset-0 flex items-center justify-center text-neutral-400 text-sm pointer-events-none z-10"
       >
         Loading map…
       </div>
       <div
         v-if="!hasCoords"
-        class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm z-10"
+        class="absolute inset-0 flex items-center justify-center text-neutral-400 text-sm z-10"
       >
         No GPS data for this reach yet
       </div>
       <!-- Bottom-left controls -->
       <div v-if="mapReady" class="absolute bottom-7 left-2 z-10 flex gap-1">
-        <div class="flex rounded-md shadow overflow-hidden border border-gray-200 dark:border-gray-600 text-xs font-medium">
+        <div class="flex rounded-md shadow overflow-hidden border border-neutral-200 dark:border-neutral-600 text-xs font-medium">
           <button
             v-for="opt in BASEMAP_OPTIONS" :key="opt.value"
             class="px-2 py-1 transition-colors"
             :class="basemap === opt.value
-              ? 'bg-blue-600 text-white'
-              : 'bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
+              ? 'bg-primary-600 text-white'
+              : 'bg-white/90 dark:bg-neutral-800/90 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700'"
             @click="setBasemap(opt.value)"
           >{{ opt.label }}</button>
         </div>
         <button
           v-if="allFeatures.length > 0 || centerline"
-          class="text-xs bg-white/90 dark:bg-gray-800/90 rounded-md px-2 py-1 shadow border border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          class="text-xs bg-white/90 dark:bg-neutral-800/90 rounded-md px-2 py-1 shadow border border-neutral-200 dark:border-neutral-600 font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
           @click="exportKml"
         >⬇ KML</button>
         <button
-          class="text-xs bg-white/90 dark:bg-gray-800/90 rounded-md px-2 py-1 shadow border border-gray-200 dark:border-gray-600 font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+          class="text-xs bg-white/90 dark:bg-neutral-800/90 rounded-md px-2 py-1 shadow border border-neutral-200 dark:border-neutral-600 font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
           @click="toggleFullscreen"
         >
           <svg v-if="!isFullscreen" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
@@ -55,7 +55,7 @@
   <!-- Selected feature detail card -->
   <div
     v-if="selectedFeature"
-    class="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 px-3 py-3"
+    class="border-t border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/50 px-3 py-3"
   >
     <div class="flex gap-2.5 items-start">
       <span
@@ -66,19 +66,19 @@
       <!-- Content -->
       <div class="flex-1 min-w-0">
         <div class="flex items-center gap-2 flex-wrap">
-          <p class="text-sm font-semibold text-gray-800 dark:text-gray-100 leading-tight">{{ selectedFeature.title }}</p>
-          <span v-if="selectedFeature.classLabel" class="text-xs font-mono text-gray-500 dark:text-gray-400">Class {{ selectedFeature.classLabel }}</span>
+          <p class="text-sm font-semibold text-neutral-800 dark:text-neutral-100 leading-tight">{{ selectedFeature.title }}</p>
+          <span v-if="selectedFeature.classLabel" class="text-xs font-mono text-neutral-500 dark:text-neutral-400">Class {{ selectedFeature.classLabel }}</span>
         </div>
-        <p v-if="selectedFeature.subtitle" class="text-xs text-gray-400 mt-0.5">{{ selectedFeature.subtitle }}</p>
-        <p v-if="selectedFeature.desc" class="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed line-clamp-3">{{ selectedFeature.desc }}</p>
-        <p v-else-if="!selectedFeature.gaugeId && !selectedFeature.directionsUrl" class="text-xs text-gray-400 mt-1 italic">No description available.</p>
+        <p v-if="selectedFeature.subtitle" class="text-xs text-neutral-400 mt-0.5">{{ selectedFeature.subtitle }}</p>
+        <p v-if="selectedFeature.desc" class="text-xs text-neutral-600 dark:text-neutral-400 mt-1 leading-relaxed line-clamp-3">{{ selectedFeature.desc }}</p>
+        <p v-else-if="!selectedFeature.gaugeId && !selectedFeature.directionsUrl" class="text-xs text-neutral-400 mt-1 italic">No description available.</p>
         <!-- Access directions link -->
         <div v-if="selectedFeature.directionsUrl" class="flex items-center gap-3 mt-2">
           <a
             :href="selectedFeature.directionsUrl"
             target="_blank"
             rel="noopener"
-            class="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+            class="flex items-center gap-1 text-xs text-primary-500 hover:text-primary-600 dark:hover:text-primary-400 font-medium transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
             Get directions
@@ -96,7 +96,7 @@
           </button>
           <button
             v-else
-            class="flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 font-medium transition-colors"
+            class="flex items-center gap-1 text-xs text-neutral-400 hover:text-red-500 font-medium transition-colors"
             @click="removeFromDashboardSidebar(selectedFeature.gaugeId)"
           >
             <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -109,7 +109,7 @@
             :href="selectedFeature.sourceUrl"
             target="_blank"
             rel="noopener"
-            class="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            class="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             View source
@@ -117,7 +117,7 @@
         </div>
       </div>
       <button
-        class="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xl leading-none"
+        class="shrink-0 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 text-xl leading-none"
         @click="selectedId = null"
       >×</button>
     </div>

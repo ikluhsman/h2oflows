@@ -2,21 +2,21 @@
   <!-- ─── LIST density ────────────────────────────────────────────────────── -->
   <div
     v-if="density === 'list'"
-    class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden"
+    class="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden"
   >
     <div
       v-for="reach in reaches"
       :key="`${reach.id}::${reach.contextReachSlug}`"
-      class="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0 cursor-pointer"
+      class="flex items-center gap-2 px-3 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors border-b border-neutral-100/50 dark:border-neutral-800/50 last:border-b-0 cursor-pointer"
       @click="$emit('open', reach, 'reach')"
     >
       <div class="flex items-center gap-1 min-w-0 flex-1">
-        <span class="min-w-0 text-sm text-gray-700 dark:text-gray-300 truncate">
+        <span class="min-w-0 text-sm text-neutral-700 dark:text-neutral-300 truncate">
           {{ reachLabel(reach) }}
         </span>
         <NuxtLink
           :to="`/reaches/${reach.contextReachSlug}`"
-          class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+          class="shrink-0 p-0.5 rounded text-neutral-300 dark:text-neutral-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
           aria-label="View reach page"
           @click.stop
         >
@@ -28,16 +28,25 @@
       <div class="w-36 shrink-0 hidden sm:block h-6 opacity-60 pointer-events-none">
         <GaugeSparkline :gauge-id="reach.id" flow-status="unknown" :color="sparklineColor(reach)" compact @latest-cfs="(v) => setLiveCfs(reach, v)" />
       </div>
+      <NuxtLink
+        v-if="hazardSlugs?.has(reach.contextReachSlug ?? '')"
+        :to="`/reaches/${reach.contextReachSlug}`"
+        class="shrink-0 text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
+        title="Hazard reported on this reach"
+        @click.stop
+      >
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0zM12 9v4m0 4h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </NuxtLink>
       <span
         v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
         :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
       >{{ flowBandLabel(displayFlowBandLabel(reach), displayFlowStatus(reach)) }}</span>
       <span class="w-16 shrink-0 text-right text-sm font-bold tabular-nums" :class="cfsColorClass(reach)">
         {{ displayCfs(reach) != null ? displayCfs(reach)!.toLocaleString() : '—' }}
-        <span class="text-xs font-normal text-gray-400">cfs</span>
+        <span class="text-xs font-normal text-neutral-400">cfs</span>
       </span>
       <button
-        class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+        class="shrink-0 p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
         aria-label="Remove"
         @click.stop="$emit('remove', reach)"
       >
@@ -51,12 +60,12 @@
   <!-- ─── CARD densities (compact / comfortable / full) ──────────────────── -->
   <div
     v-else
-    class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden"
+    class="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden"
   >
     <div
       v-for="reach in reaches"
       :key="`${reach.id}::${reach.contextReachSlug}`"
-      class="border-b border-gray-100/50 dark:border-gray-800/50 last:border-b-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors"
+      class="border-b border-neutral-100/50 dark:border-neutral-800/50 last:border-b-0 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors"
       :class="density === 'compact' ? 'px-2.5 py-2' : density === 'comfortable' ? 'px-3 py-2.5' : 'px-4 py-3'"
       @click="$emit('open', reach, 'reach')"
     >
@@ -64,16 +73,25 @@
       <template v-if="density === 'compact'">
         <div class="flex items-center gap-2">
           <div class="flex items-center gap-1 min-w-0 flex-1">
-            <span class="min-w-0 text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{{ reachLabel(reach) }}</span>
+            <span class="min-w-0 text-sm font-semibold text-neutral-800 dark:text-neutral-100 truncate">{{ reachLabel(reach) }}</span>
             <NuxtLink
               :to="`/reaches/${reach.contextReachSlug}`"
-              class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+              class="shrink-0 p-0.5 rounded text-neutral-300 dark:text-neutral-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
               aria-label="View reach page"
               @click.stop
             >
               <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11"/>
               </svg>
+            </NuxtLink>
+            <NuxtLink
+              v-if="hazardSlugs?.has(reach.contextReachSlug ?? '')"
+              :to="`/reaches/${reach.contextReachSlug}`"
+              class="shrink-0 text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
+              title="Hazard reported on this reach"
+              @click.stop
+            >
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </NuxtLink>
           </div>
           <span
@@ -83,9 +101,9 @@
           <span class="text-lg font-bold tabular-nums shrink-0 leading-none" :class="cfsColorClass(reach)">
             {{ displayCfs(reach) != null ? displayCfs(reach)!.toLocaleString() : '—' }}
           </span>
-          <span class="text-xs text-gray-400 shrink-0">cfs</span>
+          <span class="text-xs text-neutral-400 shrink-0">cfs</span>
           <button
-            class="shrink-0 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+            class="shrink-0 p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
             aria-label="Remove"
             @click.stop="$emit('remove', reach)"
           >
@@ -102,18 +120,27 @@
           <!-- Left -->
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1">
-              <span class="min-w-0 font-semibold text-gray-800 dark:text-gray-100 truncate" :class="density === 'comfortable' ? 'text-base' : 'text-base'">
+              <span class="min-w-0 font-semibold text-neutral-800 dark:text-neutral-100 truncate" :class="density === 'comfortable' ? 'text-base' : 'text-base'">
                 {{ reachLabel(reach) }}
               </span>
               <NuxtLink
                 :to="`/reaches/${reach.contextReachSlug}`"
-                class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-colors"
+                class="shrink-0 p-0.5 rounded text-neutral-300 dark:text-neutral-600 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
                 aria-label="View reach page"
                 @click.stop
               >
                 <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11"/>
                 </svg>
+              </NuxtLink>
+              <NuxtLink
+                v-if="hazardSlugs?.has(reach.contextReachSlug ?? '')"
+                :to="`/reaches/${reach.contextReachSlug}`"
+                class="shrink-0 text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
+                title="Hazard reported on this reach"
+                @click.stop
+              >
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
               </NuxtLink>
               <span
                 v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
@@ -130,10 +157,10 @@
               <div class="font-bold tabular-nums leading-none" :class="[density === 'comfortable' ? 'text-2xl' : 'text-3xl', cfsColorClass(reach)]">
                 {{ displayCfs(reach) != null ? displayCfs(reach)!.toLocaleString() : '—' }}
               </div>
-              <div class="text-xs text-gray-400 mt-0.5">cfs</div>
+              <div class="text-xs text-neutral-400 mt-0.5">cfs</div>
             </div>
             <button
-              class="mt-0.5 p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+              class="mt-0.5 p-1.5 rounded-lg text-neutral-400 dark:text-neutral-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
               aria-label="Remove"
               @click.stop="$emit('remove', reach)"
             >
@@ -156,6 +183,7 @@ import { flowBandBadgeClass, flowBandLabel, flowBandSolidColor, flowBandCfsClass
 const props = defineProps<{
   reaches: WatchedGauge[]
   density?: 'compact' | 'comfortable' | 'full' | 'list'
+  hazardSlugs?: Set<string>
 }>()
 
 const emit = defineEmits<{

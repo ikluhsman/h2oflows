@@ -1,5 +1,5 @@
 <template>
-  <header class="sticky top-0 z-20 shrink-0 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm">
+  <header class="sticky top-0 z-20 shrink-0 border-b border-neutral-200 dark:border-neutral-800 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-sm">
     <div class="max-w-5xl mx-auto px-4 h-[50px] flex items-center gap-2">
 
       <!-- Logo -->
@@ -15,8 +15,8 @@
         to="/dashboard"
         class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md transition-colors"
         :class="route.path === '/dashboard'
-          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
-          : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
+          ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50'
+          : 'text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-neutral-50 dark:hover:bg-neutral-900'"
         title="Flow Dashboard"
       >
         <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -30,8 +30,8 @@
         to="/explore"
         class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md transition-colors"
         :class="route.path === '/explore'
-          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
-          : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900'"
+          ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50'
+          : 'text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-neutral-50 dark:hover:bg-neutral-900'"
         title="Explore Rivers"
       >
         <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -40,9 +40,25 @@
         <span class="hidden sm:inline text-xs font-medium">Explore</span>
       </NuxtLink>
 
+      <!-- Report shortcut -->
+      <NuxtLink
+        v-if="isAuthenticated"
+        to="/reports/new"
+        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md transition-colors"
+        :class="route.path === '/reports/new'
+          ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50'
+          : 'text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-neutral-50 dark:hover:bg-neutral-900'"
+        title="File a Report"
+      >
+        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        <span class="hidden sm:inline text-xs font-medium">Report</span>
+      </NuxtLink>
+
       <!-- AI Ask button — left side (icon always visible, text desktop only) -->
       <button
-        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+        class="shrink-0 flex items-center gap-1 p-1.5 rounded-md text-neutral-500 dark:text-neutral-400 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors"
         title="Ask AI anything"
         @click="askOpen = true"
       >
@@ -62,7 +78,7 @@
 
       <!-- Find a gauge button — right side -->
       <button
-        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors"
         title="Find a gauge"
         @click="gaugeSearchOpen = true"
       >
@@ -75,7 +91,7 @@
 
       <!-- Hamburger — mobile only -->
       <button
-        class="sm:hidden shrink-0 p-1.5 rounded-md text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        class="sm:hidden shrink-0 p-1.5 rounded-md text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
         aria-label="Open menu"
         @click="menuOpen = !menuOpen"
       >
@@ -94,8 +110,8 @@
           <button
             class="flex items-center justify-center w-7 h-7 rounded-full transition-colors"
             :class="isAuthenticated
-              ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900'
-              : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'"
+              ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-600 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900'
+              : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400 dark:text-neutral-500 hover:bg-neutral-200 dark:hover:bg-neutral-700'"
             :title="isAuthenticated ? `Signed in as ${user?.email ?? user?.user_metadata?.user_name ?? 'you'}` : 'Sign in'"
             @click="userMenuOpen = !userMenuOpen"
           >
@@ -105,24 +121,75 @@
           </button>
           <div
             v-if="userMenuOpen"
-            class="absolute right-0 top-full mt-1 w-44 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-40"
+            class="absolute right-0 top-full mt-1 w-52 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg py-1 z-40"
           >
             <template v-if="isAuthenticated">
-              <p class="px-3 py-1.5 text-xs text-gray-400 truncate">{{ user?.email ?? user?.user_metadata?.user_name }}</p>
-              <div class="border-t border-gray-100 dark:border-gray-800" />
+              <p class="px-3 py-1.5 text-xs text-neutral-400 truncate">{{ user?.email ?? user?.user_metadata?.user_name }}</p>
+              <div class="border-t border-neutral-100 dark:border-neutral-800" />
             </template>
-            <button
-              class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
-              @click="toggleColorMode"
+            <!-- Appearance: palette + dark mode -->
+            <div class="px-3 py-2 space-y-1.5">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">Appearance</p>
+              <!-- 5×2 palette grid: col = primary color, row = neutral (slate/stone) -->
+              <div class="space-y-1">
+                <div v-for="neutralLabel in ['Slate', 'Stone']" :key="neutralLabel" class="flex items-center gap-1">
+                  <span class="text-[9px] text-neutral-400 w-8 shrink-0">{{ neutralLabel }}</span>
+                  <div class="flex items-center gap-1">
+                    <button
+                      v-for="p in PALETTES.filter(p => p.neutral === neutralLabel.toLowerCase())"
+                      :key="p.id"
+                      :title="p.label"
+                      class="w-6 h-6 rounded-full overflow-hidden border-2 transition-all shrink-0"
+                      :class="themeStore.paletteId === p.id
+                        ? 'border-neutral-900 dark:border-white scale-110'
+                        : 'border-transparent hover:scale-105'"
+                      @click="applyPalette(p.id)"
+                    >
+                      <div class="flex h-full w-full">
+                        <div class="w-1/2 h-full" :style="{ background: p.neutralSwatch }" />
+                        <div class="w-1/2 h-full" :style="{ background: p.primarySwatch }" />
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <!-- Light / Dark / System -->
+              <div class="flex items-center gap-1 pt-0.5">
+                <span class="text-[9px] text-neutral-400 w-8 shrink-0">Mode</span>
+                <div class="flex items-center gap-1">
+                  <button
+                    v-for="mode in colorModes"
+                    :key="mode.value"
+                    :title="mode.label"
+                    class="flex items-center justify-center w-7 h-7 rounded-md transition-colors"
+                    :class="colorMode.preference === mode.value
+                      ? 'bg-neutral-200 dark:bg-neutral-700 text-neutral-900 dark:text-white'
+                      : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'"
+                    @click="colorMode.preference = mode.value"
+                  >
+                    <svg v-if="mode.value === 'light'" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    <svg v-else-if="mode.value === 'dark'" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                    <svg v-else class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="border-t border-neutral-100 dark:border-neutral-800" />
+            <NuxtLink
+              v-if="isAuthenticated"
+              to="/my/reports"
+              class="w-full text-left px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors flex items-center gap-2"
+              @click="userMenuOpen = false"
             >
-              <svg v-if="colorMode.value === 'dark'" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-              <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-              {{ colorMode.value === 'dark' ? 'Light mode' : 'Dark mode' }}
-            </button>
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+              My Reports
+            </NuxtLink>
             <NuxtLink
               v-if="isAuthenticated"
               to="/my/reaches"
-              class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              class="w-full text-left px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors flex items-center gap-2"
               @click="userMenuOpen = false"
             >
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -133,7 +200,7 @@
             <NuxtLink
               v-if="isAuthenticated"
               to="/my/gauges"
-              class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              class="w-full text-left px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors flex items-center gap-2"
               @click="userMenuOpen = false"
             >
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -144,7 +211,7 @@
             <NuxtLink
               v-if="isDataAdmin"
               to="/admin"
-              class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors flex items-center gap-2"
+              class="w-full text-left px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors flex items-center gap-2"
               @click="userMenuOpen = false"
             >
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -152,17 +219,17 @@
               </svg>
               Admin
             </NuxtLink>
-            <div class="border-t border-gray-100 dark:border-gray-800" />
+            <div class="border-t border-neutral-100 dark:border-neutral-800" />
             <template v-if="isAuthenticated">
               <button
-                class="w-full text-left px-3 py-1.5 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                class="w-full text-left px-3 py-1.5 text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                 @click="userMenuOpen = false; handleSignOut()"
               >Sign out</button>
             </template>
             <template v-else>
               <NuxtLink
                 to="/login"
-                class="block px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                class="block px-3 py-1.5 text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                 @click="userMenuOpen = false"
               >Sign in</NuxtLink>
             </template>
@@ -171,14 +238,14 @@
     </div>
 
     <!-- Mobile menu dropdown -->
-    <div v-if="menuOpen" class="sm:hidden border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 px-4 py-3 flex flex-col gap-1">
+    <div v-if="menuOpen" class="sm:hidden border-t border-neutral-100 dark:border-neutral-800 bg-white dark:bg-neutral-950 px-4 py-3 flex flex-col gap-1">
       <!-- Dashboard + Map — mobile -->
       <NuxtLink
         to="/dashboard"
         class="text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors"
         :class="route.path === '/dashboard'
-          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'"
+          ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50'
+          : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900'"
         @click="menuOpen = false"
       >
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -190,8 +257,8 @@
         to="/explore"
         class="text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors"
         :class="route.path === '/explore'
-          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
-          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900'"
+          ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50'
+          : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900'"
         @click="menuOpen = false"
       >
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -199,10 +266,26 @@
         </svg>
         Explore
       </NuxtLink>
-      <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2 flex flex-col gap-1">
+      <!-- Report — mobile (auth only) -->
+      <NuxtLink
+        v-if="isAuthenticated"
+        to="/reports/new"
+        class="text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors"
+        :class="route.path === '/reports/new'
+          ? 'text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/50'
+          : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900'"
+        @click="menuOpen = false"
+      >
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+        Report
+      </NuxtLink>
+
+      <div class="border-t border-neutral-100 dark:border-neutral-800 mt-1 pt-2 flex flex-col gap-1">
         <!-- Ask — mobile -->
         <button
-          class="w-full text-left px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center gap-2"
+          class="w-full text-left px-3 py-2 rounded-md text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors flex items-center gap-2"
           @click="menuOpen = false; askOpen = true"
         >
           <svg class="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -212,25 +295,25 @@
         </button>
         <!-- Find a gauge — mobile -->
         <button
-          class="w-full text-left px-3 py-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors flex items-center gap-2"
+          class="w-full text-left px-3 py-2 rounded-md text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors flex items-center gap-2"
           @click="menuOpen = false; gaugeSearchOpen = true"
         >
-          <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg class="w-4 h-4 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/>
           </svg>
           Find a gauge
         </button>
       </div>
-      <div class="border-t border-gray-100 dark:border-gray-800 mt-1 pt-2">
+      <div class="border-t border-neutral-100 dark:border-neutral-800 mt-1 pt-2">
         <button
           v-if="isAuthenticated"
-          class="w-full text-left px-3 py-2 rounded-md text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+          class="w-full text-left px-3 py-2 rounded-md text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors"
           @click="handleSignOut"
         >Sign out</button>
         <NuxtLink
           v-else
           to="/login"
-          class="block px-3 py-2 rounded-md text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+          class="block px-3 py-2 rounded-md text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950 transition-colors"
           @click="menuOpen = false"
         >Sign in</NuxtLink>
       </div>
@@ -255,8 +338,8 @@
         class="fixed inset-0 z-50 flex items-start justify-center pt-[10vh] px-4 bg-black/20 backdrop-blur-sm"
         @click.self="closeAsk"
       >
-        <div class="w-full max-w-xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-          <form class="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800" @submit.prevent="askQuestion">
+        <div class="w-full max-w-xl bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+          <form class="flex items-center gap-2 px-4 py-3 border-b border-neutral-100 dark:border-neutral-800" @submit.prevent="askQuestion">
             <svg class="w-4 h-4 text-purple-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
             </svg>
@@ -265,13 +348,13 @@
               v-model="askQuery"
               type="text"
               placeholder='Ask anything — e.g. "Browns Canyon at 800 cfs?"'
-              class="flex-1 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
+              class="flex-1 bg-transparent text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none"
               :disabled="asking"
             />
             <button
               v-if="askQuery"
               type="button"
-              class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              class="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
               @click="askQuery = ''; askResult = null"
             >
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -279,7 +362,7 @@
             <button
               type="submit"
               :disabled="asking || !askQuery.trim()"
-              class="shrink-0 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-semibold transition-colors"
+              class="shrink-0 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white text-xs font-semibold transition-colors"
             >
               <span v-if="asking" class="flex items-center gap-1">
                 <span class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"/>
@@ -292,27 +375,27 @@
             <div
               v-for="result in (askResult.results ?? [])"
               :key="result.reach_slug"
-              class="rounded-lg border border-gray-100 dark:border-gray-800 p-3 space-y-1"
+              class="rounded-lg border border-neutral-100 dark:border-neutral-800 p-3 space-y-1"
             >
               <div class="flex items-center justify-between gap-2">
-                <span class="text-xs font-semibold uppercase tracking-wide text-blue-500">{{ result.reach_name }}</span>
+                <span class="text-xs font-semibold uppercase tracking-wide text-primary-500">{{ result.reach_name }}</span>
                 <button
                   type="button"
-                  class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0"
+                  class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium shrink-0"
                   @click="goToReachOnMap(result.reach_slug)"
                 >Show on map →</button>
               </div>
-              <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap">{{ result.answer }}</p>
+              <div class="ask-answer text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed" v-html="md.render(result.answer)" />
             </div>
-            <p v-if="!askResult.results?.length && askResult.answer" class="text-sm text-gray-500 leading-relaxed">{{ askResult.answer }}</p>
+            <div v-if="!askResult.results?.length && askResult.answer" class="ask-answer text-sm text-neutral-500 leading-relaxed" v-html="md.render(askResult.answer)" />
           </div>
-          <p v-else-if="!asking && !askResult" class="px-4 py-3 text-xs text-gray-400">
+          <p v-else-if="!asking && !askResult" class="px-4 py-3 text-xs text-neutral-400">
             Try: "What's Foxton like at 300 cfs?" or "Best beginner runs near Denver"
           </p>
           <p v-if="askError" class="px-4 py-3 text-sm text-red-400">{{ askError }}</p>
 
-          <div class="px-4 py-2.5 border-t border-gray-100 dark:border-gray-800 flex justify-end">
-            <button class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" @click="closeAsk">Close</button>
+          <div class="px-4 py-2.5 border-t border-neutral-100 dark:border-neutral-800 flex justify-end">
+            <button class="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300" @click="closeAsk">Close</button>
           </div>
         </div>
       </div>
@@ -322,17 +405,33 @@
 
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import MarkdownIt from 'markdown-it'
 import type { WatchedGauge } from '~/stores/watchlist'
+import { PALETTES } from '../../app.config'
+import type { PaletteId } from '../../app.config'
+import { useThemeStore } from '~/stores/theme'
 
 const { user, isAuthenticated, isDataAdmin, signOut } = useAuth()
 const router = useRouter()
 const route = useRoute()
 const colorMode = useColorMode()
+const appConfig = useAppConfig()
+const themeStore = useThemeStore()
 const menuOpen = ref(false)
 const userMenuOpen = ref(false)
 
-function toggleColorMode() {
-  colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
+const colorModes = [
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+  { value: 'system', label: 'System' },
+]
+
+function applyPalette(id: PaletteId) {
+  const palette = PALETTES.find(p => p.id === id)
+  if (!palette) return
+  themeStore.paletteId = id
+  appConfig.ui.colors.primary = palette.primary
+  appConfig.ui.colors.neutral = palette.neutral
 }
 
 const { apiBase } = useRuntimeConfig().public
@@ -362,6 +461,7 @@ function handleGaugeAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>)
 }
 
 // ── Global Ask ────────────────────────────────────────────────────────────────
+const md          = new MarkdownIt({ html: false, linkify: false, breaks: true })
 const askOpen     = ref(false)
 const askInputRef = ref<HTMLInputElement>()
 const askQuery    = ref('')
@@ -407,3 +507,4 @@ async function askQuestion() {
   }
 }
 </script>
+

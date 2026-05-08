@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen flex flex-col overflow-hidden bg-white dark:bg-gray-950">
+  <div class="h-screen flex flex-col overflow-hidden bg-white dark:bg-neutral-950">
 
     <!-- Demo banner -->
     <div v-if="showDemoBanner" class="shrink-0 bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800 px-4 py-2 flex items-center justify-between gap-4 text-sm">
@@ -17,23 +17,23 @@
 
       <!-- ── Left panel: basin → river → reach tree ────────────────────────── -->
       <aside
-        class="shrink-0 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 flex flex-col overflow-hidden transition-all"
+        class="shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 flex flex-col overflow-hidden transition-all"
         :class="listVisible
           ? 'absolute sm:relative inset-0 sm:inset-auto z-30 sm:z-auto w-full sm:w-80'
           : 'hidden sm:flex sm:w-80'"
       >
         <!-- Search + mobile map toggle -->
-        <div class="px-3 py-2.5 sm:border-b border-gray-100 dark:border-gray-800 shrink-0 flex items-center gap-2">
+        <div class="px-3 py-2.5 sm:border-b border-neutral-100 dark:border-neutral-800 shrink-0 flex items-center gap-2">
           <input
             v-model="query"
             type="search"
             placeholder="Search reaches, rivers, basins…"
-            class="flex-1 text-sm bg-gray-100 dark:bg-gray-900 rounded-md px-3 py-1.5 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            class="flex-1 text-sm bg-neutral-100 dark:bg-neutral-900 rounded-md px-3 py-1.5 text-neutral-800 dark:text-neutral-200 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
           <!-- New reach button (admin only) -->
           <button
             v-if="isDataAdmin"
-            class="shrink-0 flex items-center gap-1 p-1.5 rounded-md text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+            class="shrink-0 flex items-center gap-1 p-1.5 rounded-md text-neutral-400 hover:text-primary-500 dark:hover:text-primary-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors"
             title="New reach"
             @click="authorModalOpen = true"
           >
@@ -43,7 +43,7 @@
           </button>
           <!-- Back to map (mobile only, shown when list is visible) -->
           <button
-            class="sm:hidden shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
+            class="sm:hidden shrink-0 flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-950/50 transition-colors"
             aria-label="Show map"
             @click="listVisible = false"
           >
@@ -55,9 +55,9 @@
         </div>
 
         <!-- Loading / error / empty states -->
-        <div v-if="loading" class="flex-1 flex items-center justify-center text-sm text-gray-400">Loading…</div>
+        <div v-if="loading" class="flex-1 flex items-center justify-center text-sm text-neutral-400">Loading…</div>
         <div v-else-if="loadError" class="flex-1 flex items-center justify-center text-sm text-red-400">{{ loadError }}</div>
-        <div v-else-if="query.length >= 2 && filteredStates.length === 0" class="flex-1 flex items-center justify-center text-sm text-gray-400">
+        <div v-else-if="query.length >= 2 && filteredStates.length === 0" class="flex-1 flex items-center justify-center text-sm text-neutral-400">
           No results for "{{ query }}"
         </div>
 
@@ -66,36 +66,36 @@
           <div v-for="stateGroup in filteredStates" :key="stateGroup.name">
             <!-- State header -->
             <button
-              class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700"
+              class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors bg-neutral-50 dark:bg-neutral-900/50 border-b border-neutral-200 dark:border-neutral-700"
               @click="toggleState(stateGroup.name)"
             >
               <svg
-                class="w-3 h-3 text-gray-500 shrink-0 transition-transform duration-150"
+                class="w-3 h-3 text-neutral-500 shrink-0 transition-transform duration-150"
                 :class="{ 'rotate-90': !collapsed.states.has(stateGroup.name) }"
                 viewBox="0 0 20 20" fill="currentColor"
               >
                 <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
               </svg>
-              <span class="text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-widest flex-1 text-left">{{ stateGroup.name === '—' ? 'No State' : stateGroup.name }}</span>
-              <span class="text-xs text-gray-400">{{ stateGroup.totalCount }}</span>
+              <span class="text-xs font-bold text-neutral-700 dark:text-neutral-200 uppercase tracking-widest flex-1 text-left">{{ stateGroup.name === '—' ? 'No State' : stateGroup.name }}</span>
+              <span class="text-xs text-neutral-400">{{ stateGroup.totalCount }}</span>
             </button>
 
             <template v-if="!collapsed.states.has(stateGroup.name)">
               <div v-for="basin in stateGroup.basins" :key="basin.name">
                 <!-- Basin header -->
                 <button
-                  class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors border-b border-gray-100 dark:border-gray-800/50"
+                  class="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-neutral-50 dark:hover:bg-neutral-900/50 transition-colors border-b border-neutral-100 dark:border-neutral-800/50"
                   @click="toggleBasin(`${stateGroup.name}::${basin.name}`)"
                 >
                   <svg
-                    class="w-3 h-3 text-gray-400 shrink-0 transition-transform duration-150"
+                    class="w-3 h-3 text-neutral-400 shrink-0 transition-transform duration-150"
                     :class="{ 'rotate-90': !collapsed.basins.has(`${stateGroup.name}::${basin.name}`) }"
                     viewBox="0 0 20 20" fill="currentColor"
                   >
                     <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
                   </svg>
-                  <span class="text-xs font-semibold text-gray-600 dark:text-gray-300 flex-1 text-left">{{ basin.name }} Basin</span>
-                  <span class="text-xs text-gray-400">{{ basin.reachCount }}</span>
+                  <span class="text-xs font-semibold text-neutral-600 dark:text-neutral-300 flex-1 text-left">{{ basin.name }} Basin</span>
+                  <span class="text-xs text-neutral-400">{{ basin.reachCount }}</span>
                 </button>
 
                 <template v-if="!collapsed.basins.has(`${stateGroup.name}::${basin.name}`)">
@@ -103,22 +103,22 @@
                     <!-- River header -->
                     <div class="flex items-center group/river">
                       <button
-                        class="flex items-center gap-2 pl-6 pr-2 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors flex-1 min-w-0"
+                        class="flex items-center gap-2 pl-6 pr-2 py-1.5 text-left hover:bg-neutral-50 dark:hover:bg-neutral-900/50 transition-colors flex-1 min-w-0"
                         @click="toggleRiver(stateGroup.name, basin.name, river.name)"
                       >
                         <svg
-                          class="w-2.5 h-2.5 text-gray-400 shrink-0 transition-transform duration-150"
+                          class="w-2.5 h-2.5 text-neutral-400 shrink-0 transition-transform duration-150"
                           :class="{ 'rotate-90': !collapsed.rivers.has(`${stateGroup.name}::${basin.name}::${river.name}`) }"
                           viewBox="0 0 20 20" fill="currentColor"
                         >
                           <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
                         </svg>
-                        <span class="text-xs font-semibold text-gray-600 dark:text-gray-400 flex-1 text-left truncate">{{ river.name }}</span>
-                        <span class="text-xs text-gray-400 shrink-0">{{ river.reaches.length }}</span>
+                        <span class="text-xs font-semibold text-neutral-600 dark:text-neutral-400 flex-1 text-left truncate">{{ river.name }}</span>
+                        <span class="text-xs text-neutral-400 shrink-0">{{ river.reaches.length }}</span>
                       </button>
                       <!-- Bulk add all reaches in this river -->
                       <button
-                        class="shrink-0 px-2 py-1.5 opacity-60 sm:opacity-0 sm:group-hover/river:opacity-100 hover:opacity-100 transition-opacity text-gray-400 hover:text-blue-500 dark:hover:text-blue-400"
+                        class="shrink-0 px-2 py-1.5 opacity-60 sm:opacity-0 sm:group-hover/river:opacity-100 hover:opacity-100 transition-opacity text-neutral-400 hover:text-primary-500 dark:hover:text-primary-400"
                         :aria-label="`Add all ${river.name} reaches to dashboard`"
                         @click.stop="addAllRiverReaches(river.reaches)"
                       >
@@ -136,8 +136,8 @@
                         :ref="(el) => setReachRef(reach.slug, el as HTMLElement | null)"
                         class="flex items-center gap-2 pl-10 pr-2 py-1.5 cursor-pointer transition-colors group"
                         :class="hoveredSlug === reach.slug
-                          ? 'bg-blue-50 dark:bg-blue-950/40'
-                          : 'hover:bg-gray-50 dark:hover:bg-gray-900/60'"
+                          ? 'bg-primary-50 dark:bg-primary-950/40'
+                          : 'hover:bg-neutral-50 dark:hover:bg-neutral-900/60'"
                         @mouseenter="hoveredSlug = reach.slug"
                         @mouseleave="hoveredSlug = null"
                         @click="onReachRowClick(reach)"
@@ -148,7 +148,7 @@
                           :style="{ background: flowStatusColor(reach.flow_status) }"
                         />
                         <!-- Name -->
-                        <span class="flex-1 min-w-0 text-sm text-gray-800 dark:text-gray-200 truncate">
+                        <span class="flex-1 min-w-0 text-sm text-neutral-800 dark:text-neutral-200 truncate">
                           {{ reach.common_name ?? reach.put_in_name ?? reach.slug }}
                         </span>
                         <!-- CFS -->
@@ -157,14 +157,14 @@
                           class="text-xs font-medium tabular-nums shrink-0"
                           :style="{ color: flowStatusColor(reach.flow_status) }"
                         >{{ reach.current_cfs.toLocaleString() }}</span>
-                        <span v-else class="text-xs text-gray-300 dark:text-gray-600 shrink-0">—</span>
+                        <span v-else class="text-xs text-neutral-300 dark:text-neutral-600 shrink-0">—</span>
                         <!-- Add to dashboard -->
                         <button
                           v-if="reach.gauge_id"
                           class="shrink-0 p-0.5 rounded transition-opacity"
                           :class="isOnDashboard(reach)
-                            ? 'text-blue-500 dark:text-blue-400 opacity-100'
-                            : 'text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100'"
+                            ? 'text-primary-500 dark:text-primary-400 opacity-100'
+                            : 'text-neutral-400 dark:text-neutral-500 hover:text-primary-500 dark:hover:text-primary-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100'"
                           :aria-label="isOnDashboard(reach) ? 'On dashboard' : 'Add to dashboard'"
                           @click.stop="toggleDashboard(reach)"
                         >
@@ -178,7 +178,7 @@
                         <!-- Reach page link -->
                         <NuxtLink
                           :to="`/reaches/${reach.slug}`"
-                          class="shrink-0 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400 transition-opacity opacity-60 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100"
+                          class="shrink-0 p-0.5 rounded text-neutral-300 dark:text-neutral-600 hover:text-primary-500 dark:hover:text-primary-400 transition-opacity opacity-60 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100"
                           aria-label="View reach"
                           @click.stop
                         >
@@ -212,7 +212,7 @@
         <!-- Mobile: open list (only shown when map is visible) -->
         <button
           v-if="!listVisible"
-          class="sm:hidden absolute top-2 left-2 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium shadow-md bg-white/95 dark:bg-gray-900/95 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200"
+          class="sm:hidden absolute top-2 left-2 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium shadow-md bg-white/95 dark:bg-neutral-900/95 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200"
           @click="listVisible = true"
         >
           <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
@@ -244,13 +244,13 @@
     >
       <div
         v-if="authorModalOpen"
-        class="fixed inset-0 z-50 flex flex-col bg-gray-50 dark:bg-gray-950 overflow-y-auto"
+        class="fixed inset-0 z-50 flex flex-col bg-neutral-50 dark:bg-neutral-950 overflow-y-auto"
       >
         <!-- Modal header -->
-        <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
-          <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100">New reach</h2>
+        <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800">
+          <h2 class="text-sm font-semibold text-neutral-800 dark:text-neutral-100">New reach</h2>
           <button
-            class="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            class="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
             @click="authorModalOpen = false"
           >
             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">

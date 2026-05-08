@@ -1,29 +1,29 @@
 <template>
-  <div class="relative w-full h-full bg-gray-100 dark:bg-gray-900">
+  <div class="relative w-full h-full bg-neutral-100 dark:bg-neutral-900">
     <div ref="container" class="w-full h-full" />
 
-    <div v-if="!mapReady" class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm pointer-events-none">
+    <div v-if="!mapReady" class="absolute inset-0 flex items-center justify-center text-neutral-400 text-sm pointer-events-none">
       Loading map…
     </div>
 
     <div v-if="mapReady" :class="['absolute left-2 z-10 flex items-center gap-1.5', props.embedded ? 'bottom-2' : 'bottom-20 sm:bottom-8']">
-      <div class="flex rounded-md shadow overflow-hidden border border-gray-200 dark:border-gray-600 text-xs font-medium">
+      <div class="flex rounded-md shadow overflow-hidden border border-neutral-200 dark:border-neutral-600 text-xs font-medium">
         <button
           v-for="opt in BASEMAP_OPTIONS" :key="opt.value"
           class="px-2 py-1 transition-colors"
           :class="basemap === opt.value
-            ? 'bg-blue-600 text-white'
-            : 'bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
+            ? 'bg-primary-600 text-white'
+            : 'bg-white/90 dark:bg-neutral-800/90 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700'"
           @click="setBasemap(opt.value)"
         >{{ opt.label }}</button>
       </div>
       <button
         class="flex items-center gap-1 px-2 py-1 rounded-md shadow border text-xs font-medium transition-colors"
         :class="locating
-          ? 'bg-blue-50 dark:bg-blue-950 border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400'
+          ? 'bg-primary-50 dark:bg-primary-950 border-primary-300 dark:border-primary-700 text-primary-600 dark:text-primary-400'
           : locateError
             ? 'bg-red-50 dark:bg-red-950 border-red-300 dark:border-red-700 text-red-600 dark:text-red-400'
-            : 'bg-white/90 dark:bg-gray-800/90 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
+            : 'bg-white/90 dark:bg-neutral-800/90 border-neutral-200 dark:border-neutral-600 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700'"
         :disabled="locating"
         :title="locateError || 'Zoom to my location'"
         @click="locateMe"
@@ -34,11 +34,11 @@
     </div>
 
     <!-- Difficulty legend -->
-    <div v-if="mapReady" :class="['absolute right-2 z-10 bg-white/90 dark:bg-gray-900/90 backdrop-blur rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs space-y-1.5 shadow', props.embedded ? 'bottom-2' : 'bottom-20 sm:bottom-8']">
-      <p class="font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide text-[10px] mb-1">Difficulty</p>
+    <div v-if="mapReady" :class="['absolute right-2 z-10 bg-white/90 dark:bg-neutral-900/90 backdrop-blur rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-xs space-y-1.5 shadow', props.embedded ? 'bottom-2' : 'bottom-20 sm:bottom-8']">
+      <p class="font-semibold text-neutral-600 dark:text-neutral-400 uppercase tracking-wide text-[10px] mb-1">Difficulty</p>
       <div v-for="d in DIFFICULTY_LEGEND" :key="d.label" class="flex items-center gap-2">
         <span class="shrink-0" v-html="d.symbol" />
-        <span class="text-gray-700 dark:text-gray-300">{{ d.label }}</span>
+        <span class="text-neutral-700 dark:text-neutral-300">{{ d.label }}</span>
       </div>
     </div>
   </div>

@@ -114,6 +114,9 @@ func main() {
 	reaches.StartCacheRefresh(pollerCtx, pollInterval.USGS)
 	trips         := handlers.NewTripHandler(pool, describer)
 	contributions := handlers.NewContributionHandler(pool)
+	reports       := handlers.NewReportHandler(pool, devFallbackID)
+	preferences   := handlers.NewPreferencesHandler(pool, devFallbackID)
+	dashboards    := handlers.NewDashboardHandler(pool, devFallbackID)
 	var importEmbedder *ai.Embedder
 	if cfg.VoyageAPIKey != "" {
 		importEmbedder = ai.NewEmbedder(cfg.VoyageAPIKey)
@@ -162,6 +165,7 @@ func main() {
 		r.Get("/reaches/basin/{slug}/map", reaches.BasinMap)
 		r.Get("/reaches/basin/{slug}/network", reaches.BasinNetwork)
 		r.Get("/reaches", reaches.List)
+		r.Get("/reaches/active-hazards", reports.ActiveHazards)
 		r.Get("/reaches/{slug}", reaches.Get)
 		r.Get("/reaches/{slug}/conditions", reaches.GetConditions)
 		r.Get("/reaches/{slug}/hazards", reaches.GetHazards)
@@ -266,6 +270,23 @@ func main() {
 		r.Get("/trip-reports/{slug}", contributions.GetTripReport)
 		r.Patch("/trip-reports/{slug}", contributions.PatchTripReport)
 		r.Delete("/trip-reports/{slug}", contributions.DeleteTripReport)
+
+		// Reports (unified: trip reports, hazard warnings, conditions).
+		r.Post("/reaches/{slug}/reports", reports.Create)
+		r.Get("/reaches/{slug}/reports", reports.ListByReach)
+		r.Get("/reports/{id}", reports.Get)
+		r.Get("/me/reports", reports.ListMine)
+		r.Patch("/me/reports/{slug}", reports.Update)
+		r.Delete("/me/reports/{slug}", reports.Delete)
+		r.Post("/me/reports/{slug}/aw-sync", reports.AWSync)
+		r.Get("/me/preferences", preferences.Get)
+		r.Patch("/me/preferences", preferences.Update)
+		r.Get("/me/dashboards", dashboards.List)
+		r.Post("/me/dashboards", dashboards.Create)
+		r.Get("/me/dashboards/{slug}", dashboards.Get)
+		r.Patch("/me/dashboards/{slug}", dashboards.Update)
+		r.Delete("/me/dashboards/{slug}", dashboards.Delete)
+		r.Patch("/me/dashboards-reorder", dashboards.Reorder)
 		r.Post("/proximity-events", contributions.CreateProximityEvent)
 
 		r.Post("/trips", trips.Create)

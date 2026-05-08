@@ -1,14 +1,14 @@
 <template>
-  <div class="relative rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800">
-    <div ref="container" class="w-full bg-gray-100 dark:bg-gray-900" :style="{ height: props.mapHeight ?? '480px' }" />
+  <div class="relative rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800">
+    <div ref="container" class="w-full bg-neutral-100 dark:bg-neutral-900" :style="{ height: props.mapHeight ?? '480px' }" />
 
     <!-- Loading overlay -->
-    <div v-if="!mapReady" class="absolute inset-0 flex items-center justify-center text-sm text-gray-400 pointer-events-none">
+    <div v-if="!mapReady" class="absolute inset-0 flex items-center justify-center text-sm text-neutral-400 pointer-events-none">
       Loading map…
     </div>
 
     <!-- Pick-mode crosshair hint -->
-    <div v-if="mapReady && pickMode && !comidSelectMode" class="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow pointer-events-none">
+    <div v-if="mapReady && pickMode && !comidSelectMode" class="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-primary-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow pointer-events-none">
       Click the map to snap to NHD
     </div>
 
@@ -31,20 +31,20 @@
       <span v-else-if="!selectedDownComID" class="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
         Click a flow line to set the reach end
       </span>
-      <span v-else class="bg-gray-800 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
+      <span v-else class="bg-neutral-800 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow">
         Both flow lines selected — adjust or continue
       </span>
     </div>
 
     <!-- Basemap switcher -->
     <div v-if="mapReady" class="absolute bottom-7 left-2 z-10">
-      <div class="flex rounded-md shadow overflow-hidden border border-gray-200 dark:border-gray-600 text-xs font-medium">
+      <div class="flex rounded-md shadow overflow-hidden border border-neutral-200 dark:border-neutral-600 text-xs font-medium">
         <button
           v-for="opt in BASEMAP_OPTIONS" :key="opt.value"
           class="px-2 py-1 transition-colors"
           :class="basemap === opt.value
-            ? 'bg-blue-600 text-white'
-            : 'bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
+            ? 'bg-primary-600 text-white'
+            : 'bg-white/90 dark:bg-neutral-800/90 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700'"
           @click="setBasemap(opt.value)"
         >{{ opt.label }}</button>
       </div>

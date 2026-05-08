@@ -12,7 +12,7 @@ export function useWatchlistSync() {
   const { apiBase } = useRuntimeConfig().public
   const { getToken } = useAuth()
 
-  async function addAndSync(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
+  async function addAndSync(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dashboardId?: string | null) {
     store.addGauge(gauge)
     const token = await getToken()
     if (token) {
@@ -22,6 +22,7 @@ export function useWatchlistSync() {
         body: JSON.stringify({
           gauge_id: gauge.id,
           reach_slug: gauge.contextReachSlug ?? null,
+          dashboard_id: dashboardId ?? null,
         }),
       }).catch(() => {})
     }
@@ -37,6 +38,35 @@ export function useWatchlistSync() {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       }).catch(() => {})
+    }
+  }
+
+  /**
+   * Clears the local store then loads the server watchlist for the given dashboard.
+   * Used when switching dashboard tabs.
+   */
+  async function loadForDashboard(dashboardId: string) {
+    const token = await getToken()
+    if (!token) return
+    store.clearGauges()
+    const res = await fetch(`${apiBase}/api/v1/watchlist?dashboard_id=${encodeURIComponent(dashboardId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => null)
+    if (!res?.ok) return
+    const data = await res.json()
+    const serverItems: { gauge_id: string; reach_slug: string | null }[] =
+      data.items ?? []
+    if (serverItems.length === 0) return
+    const batchIds = serverItems.map(item => item.reach_slug ? `${item.gauge_id}:${item.reach_slug}` : item.gauge_id)
+    const batchRes = await fetch(`${apiBase}/api/v1/gauges/batch`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: batchIds }),
+    }).catch(() => null)
+    if (!batchRes?.ok) return
+    const batchData = await batchRes.json()
+    for (const f of batchData.features ?? []) {
+      store.addGauge(featureToWatchedGauge(f.properties, f.geometry?.coordinates as [number, number] | undefined))
     }
   }
 
@@ -103,7 +133,7 @@ export function useWatchlistSync() {
     }
   }
 
-  return { addAndSync, removeAndSync, loadFromServer, pushLocalToServer }
+  return { addAndSync, removeAndSync, loadFromServer, loadForDashboard, pushLocalToServer }
 }
 
 // Shared helper: map a batch API feature properties object to a WatchedGauge shape.

@@ -1,37 +1,37 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <AppHeader />
 
     <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
 
       <!-- Not authorized -->
       <div v-if="!isDataAdmin && authReady" class="mt-20 flex flex-col items-center gap-3 text-center">
-        <svg class="w-10 h-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <svg class="w-10 h-10 text-neutral-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
         <h2 class="text-lg font-semibold">Access restricted</h2>
-        <p class="text-sm text-gray-500">You need data admin or site admin permissions to view this page.</p>
+        <p class="text-sm text-neutral-500">You need data admin or site admin permissions to view this page.</p>
       </div>
 
       <!-- Loading auth -->
       <div v-else-if="!authReady" class="mt-20 flex justify-center">
-        <div class="w-6 h-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+        <div class="w-6 h-6 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" />
       </div>
 
       <!-- Admin UI -->
       <template v-else>
         <div class="flex items-center justify-between">
-          <h1 class="text-xl font-bold text-gray-900 dark:text-white">Admin</h1>
+          <h1 class="text-xl font-bold text-neutral-900 dark:text-white">Admin</h1>
         </div>
 
         <!-- Tabs -->
-        <div class="flex gap-1 border-b border-gray-200 dark:border-gray-800">
+        <div class="flex gap-1 border-b border-neutral-200 dark:border-neutral-800">
           <button
             v-for="tab in visibleTabs" :key="tab.key"
             class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors"
             :class="activeTab === tab.key
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+              ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+              : 'border-transparent text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
             @click="activeTab = tab.key"
           >{{ tab.label }}</button>
         </div>
@@ -39,7 +39,7 @@
         <!-- Rivers tab -->
         <div v-if="activeTab === 'rivers'">
           <div class="flex items-center justify-between mb-3">
-            <p class="text-sm text-gray-500">
+            <p class="text-sm text-neutral-500">
               {{ rivers.length }} rivers
               <template v-if="unassignedReaches.length"> · <span class="text-amber-500">{{ unassignedReaches.length }} unassigned</span></template>
             </p>
@@ -52,7 +52,7 @@
           <UInput v-model="riverSearch" icon="i-heroicons-magnifying-glass" placeholder="Search reaches…" class="mb-3" />
 
           <div v-if="riversLoading" class="space-y-2">
-            <div v-for="i in 5" :key="i" class="h-12 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            <div v-for="i in 5" :key="i" class="h-12 rounded-lg bg-neutral-100 dark:bg-neutral-800 animate-pulse" />
           </div>
 
           <!-- Needs review -->
@@ -68,39 +68,39 @@
               </svg>
             </div>
             <div v-if="needsReviewExpanded" class="divide-y divide-amber-100 dark:divide-amber-900/40">
-              <div v-for="rv in needsReviewRivers" :key="rv.id" class="flex items-center gap-3 px-4 py-2 bg-white dark:bg-gray-900/60 text-sm">
+              <div v-for="rv in needsReviewRivers" :key="rv.id" class="flex items-center gap-3 px-4 py-2 bg-white dark:bg-neutral-900/60 text-sm">
                 <span class="flex-1 truncate font-medium">{{ rv.name }}</span>
-                <span v-if="rv.state_abbr" class="text-xs font-mono text-gray-400">{{ rv.state_abbr }}</span>
-                <span v-if="rv.basin" class="text-xs text-gray-400">{{ rv.basin }}</span>
+                <span v-if="rv.state_abbr" class="text-xs font-mono text-neutral-400">{{ rv.state_abbr }}</span>
+                <span v-if="rv.basin" class="text-xs text-neutral-400">{{ rv.basin }}</span>
                 <UButton size="xs" variant="ghost" color="neutral" @click="openEditRiverBySlug(rv.slug)">Edit</UButton>
               </div>
             </div>
           </div>
 
-          <div v-if="!riversLoading" class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div v-if="!riversLoading" class="divide-y divide-neutral-100 dark:divide-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
             <template v-for="stateGroup in groupedByStateBasin" :key="stateGroup.state">
               <!-- State header -->
-              <div class="px-4 py-1.5 bg-gray-100 dark:bg-gray-800/80 border-t border-gray-200 dark:border-gray-700 first:border-t-0">
-                <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              <div class="px-4 py-1.5 bg-neutral-100 dark:bg-neutral-800/80 border-t border-neutral-200 dark:border-neutral-700 first:border-t-0">
+                <p class="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wide">
                   {{ stateGroup.state === '—' ? 'No state' : stateGroup.state }}
                 </p>
               </div>
 
               <template v-for="basinGroup in stateGroup.basins" :key="basinGroup.basin + stateGroup.state">
                 <!-- Basin sub-header -->
-                <div class="px-6 py-1 bg-gray-50 dark:bg-gray-900/60 border-t border-gray-100 dark:border-gray-800">
-                  <p class="text-xs text-gray-400 dark:text-gray-500">{{ basinGroup.basin === '—' ? 'No basin' : basinGroup.basin }}</p>
+                <div class="px-6 py-1 bg-neutral-50 dark:bg-neutral-900/60 border-t border-neutral-100 dark:border-neutral-800">
+                  <p class="text-xs text-neutral-400 dark:text-neutral-500">{{ basinGroup.basin === '—' ? 'No basin' : basinGroup.basin }}</p>
                 </div>
 
               <template v-for="river in basinGroup.rivers.filter(r => isRiverVisible(r.river_id))" :key="river.river_id + stateGroup.state">
                 <!-- River row -->
                 <div
-                  class="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors"
+                  class="flex items-center gap-3 px-4 py-2.5 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 cursor-pointer transition-colors"
                   @click="toggleRiverGroup(stateGroup.state, river.river_id)"
                 >
                   <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ river.river_name }}</p>
-                    <p class="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap">
+                    <p class="text-sm font-medium text-neutral-900 dark:text-white truncate">{{ river.river_name }}</p>
+                    <p class="text-xs text-neutral-400 flex items-center gap-1.5 flex-wrap">
                       <span>{{ river.reaches.length }} reach{{ river.reaches.length !== 1 ? 'es' : '' }}<template v-if="river.river_basin"> · {{ river.river_basin }}</template></span>
                       <template v-if="riverHealthMap.get(river.river_slug) as any">
                         <span v-if="(riverHealthMap.get(river.river_slug)?.gauges_unreachable ?? 0) > 0" class="inline-flex items-center gap-0.5 text-red-500 dark:text-red-400 font-medium">
@@ -115,7 +115,7 @@
                     </p>
                   </div>
                   <svg
-                    class="w-4 h-4 text-gray-400 shrink-0 transition-transform"
+                    class="w-4 h-4 text-neutral-400 shrink-0 transition-transform"
                     :class="isRiverExpanded(stateGroup.state, river.river_id) ? 'rotate-90' : ''"
                     viewBox="0 0 20 20" fill="currentColor"
                   >
@@ -124,10 +124,10 @@
                 </div>
 
                 <!-- Expanded reaches -->
-                <div v-if="isRiverExpanded(stateGroup.state, river.river_id)" class="bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
+                <div v-if="isRiverExpanded(stateGroup.state, river.river_id)" class="bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-100 dark:border-neutral-800">
                   <!-- River actions bar -->
-                  <div class="flex items-center justify-between px-6 py-2 border-b border-gray-100 dark:border-gray-800">
-                    <span class="text-xs text-gray-400 font-mono">{{ river.river_slug }}</span>
+                  <div class="flex items-center justify-between px-6 py-2 border-b border-neutral-100 dark:border-neutral-800">
+                    <span class="text-xs text-neutral-400 font-mono">{{ river.river_slug }}</span>
                     <div class="flex items-center gap-2">
                       <UButton size="xs" variant="ghost" color="neutral" @click.stop="openEditRiverBySlug(river.river_slug)">Edit</UButton>
                       <UButton size="xs" variant="ghost" color="neutral" icon="i-heroicons-arrows-up-down" :loading="reorderingRiver === river.river_slug" @click.stop="reorderReaches(river.river_slug)">Re-order</UButton>
@@ -135,22 +135,22 @@
                     </div>
                   </div>
                   <!-- Reach rows -->
-                  <div class="divide-y divide-gray-100 dark:divide-gray-800">
+                  <div class="divide-y divide-neutral-100 dark:divide-neutral-800">
                     <div
                       v-for="(reach, reachIdx) in river.reaches" :key="reach.id"
-                      class="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-gray-900/60"
+                      class="flex items-center gap-2 px-6 py-2.5 bg-white dark:bg-neutral-900/60"
                     >
                       <!-- Up/down order buttons -->
                       <div class="flex flex-col gap-0.5 shrink-0">
                         <button
-                          class="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-20 disabled:cursor-default"
+                          class="w-4 h-4 flex items-center justify-center text-neutral-300 hover:text-neutral-500 dark:hover:text-neutral-400 disabled:opacity-20 disabled:cursor-default"
                           :disabled="reachIdx === 0"
                           @click.stop="moveReach(stateGroup.state, river.river_id, reachIdx, -1)"
                         >
                           <svg viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3"><path d="M8 4l-5 5h10z"/></svg>
                         </button>
                         <button
-                          class="w-4 h-4 flex items-center justify-center text-gray-300 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-20 disabled:cursor-default"
+                          class="w-4 h-4 flex items-center justify-center text-neutral-300 hover:text-neutral-500 dark:hover:text-neutral-400 disabled:opacity-20 disabled:cursor-default"
                           :disabled="reachIdx === river.reaches.length - 1"
                           @click.stop="moveReach(stateGroup.state, river.river_id, reachIdx, 1)"
                         >
@@ -160,37 +160,37 @@
 
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium truncate">{{ reach.common_name ?? reach.name }}</p>
-                        <p class="text-xs text-gray-400 truncate">{{ reach.slug }}</p>
+                        <p class="text-xs text-neutral-400 truncate">{{ reach.slug }}</p>
                       </div>
 
                       <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                        <span v-if="reach.state_abbr" class="text-xs font-mono px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">{{ reach.state_abbr }}</span>
+                        <span v-if="reach.state_abbr" class="text-xs font-mono px-1.5 py-0.5 rounded bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400">{{ reach.state_abbr }}</span>
                         <span
                           class="text-xs px-1.5 py-0.5 rounded"
                           :class="reach.has_centerline
                             ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
-                            : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
+                            : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400'"
                         >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
                         <UButton size="xs" variant="outline" color="error" @click.stop="deleteReachFromGroup(stateGroup.state, river.river_id, reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
-                        <NuxtLink :to="`/reaches/${reach.slug}/edit`" class="text-xs text-blue-500 hover:underline">Edit</NuxtLink>
+                        <NuxtLink :to="`/reaches/${reach.slug}/edit`" class="text-xs text-primary-500 hover:underline">Edit</NuxtLink>
                       </div>
                     </div>
-                    <div v-if="river.reaches.length === 0" class="px-6 py-4 text-center text-sm text-gray-400">No reaches in this state</div>
+                    <div v-if="river.reaches.length === 0" class="px-6 py-4 text-center text-sm text-neutral-400">No reaches in this state</div>
                   </div>
                 </div>
               </template>
               </template>  <!-- end basin loop -->
             </template>
 
-            <div v-if="groupedByStateBasin.length === 0 && !riversLoading" class="px-4 py-8 text-center text-sm text-gray-400">
+            <div v-if="groupedByStateBasin.length === 0 && !riversLoading" class="px-4 py-8 text-center text-sm text-neutral-400">
               {{ riverSearch ? 'No reaches match your search' : 'No reaches yet' }}
             </div>
 
             <!-- Pagination -->
-            <div v-if="totalPages > 1 || totalRivers > 10" class="flex items-center justify-between px-4 py-2.5 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/40 text-xs text-gray-500">
+            <div v-if="totalPages > 1 || totalRivers > 10" class="flex items-center justify-between px-4 py-2.5 border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/40 text-xs text-neutral-500">
               <div class="flex items-center gap-2">
                 <span>Show</span>
-                <select v-model="pageSize" class="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-0.5 text-xs" @change="currentPage = 1">
+                <select v-model="pageSize" class="rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-1.5 py-0.5 text-xs" @change="currentPage = 1">
                   <option :value="10">10</option>
                   <option :value="50">50</option>
                   <option :value="100">100</option>
@@ -198,16 +198,16 @@
                 <span>per page · {{ totalRivers }} rivers total</span>
               </div>
               <div class="flex items-center gap-1">
-                <button class="px-2 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30" :disabled="currentPage <= 1" @click="currentPage--">‹</button>
+                <button class="px-2 py-0.5 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 disabled:opacity-30" :disabled="currentPage <= 1" @click="currentPage--">‹</button>
                 <span>{{ currentPage }} / {{ totalPages }}</span>
-                <button class="px-2 py-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-30" :disabled="currentPage >= totalPages" @click="currentPage++">›</button>
+                <button class="px-2 py-0.5 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 disabled:opacity-30" :disabled="currentPage >= totalPages" @click="currentPage++">›</button>
               </div>
             </div>
 
             <!-- Unassigned reaches group -->
             <template v-if="unassignedReaches.length">
               <div
-                class="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/30 cursor-pointer transition-colors border-t border-gray-100 dark:border-gray-800"
+                class="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/30 cursor-pointer transition-colors border-t border-neutral-100 dark:border-neutral-800"
                 @click="unassignedExpanded = !unassignedExpanded"
               >
                 <div class="flex-1 min-w-0">
@@ -219,14 +219,14 @@
                   <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd"/>
                 </svg>
               </div>
-              <div v-if="unassignedExpanded" class="bg-gray-50 dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800">
+              <div v-if="unassignedExpanded" class="bg-neutral-50 dark:bg-neutral-950 border-t border-neutral-100 dark:border-neutral-800 divide-y divide-neutral-100 dark:divide-neutral-800">
                 <div
                   v-for="reach in unassignedReaches" :key="reach.id"
-                  class="flex items-center gap-3 px-6 py-2.5 bg-white dark:bg-gray-900/60"
+                  class="flex items-center gap-3 px-6 py-2.5 bg-white dark:bg-neutral-900/60"
                 >
                   <div class="flex-1 min-w-0">
                     <p class="text-sm font-medium truncate">{{ reach.common_name ?? reach.name }}</p>
-                    <p class="text-xs text-gray-400 truncate">
+                    <p class="text-xs text-neutral-400 truncate">
                       {{ reach.slug }}
                       <span v-if="reach.river_name" class="text-amber-500"> · {{ reach.river_name }}</span>
                     </p>
@@ -236,10 +236,10 @@
                       class="text-xs px-1.5 py-0.5 rounded"
                       :class="reach.has_centerline
                         ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-400'"
+                        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-400'"
                     >{{ reach.has_centerline ? 'Line ✓' : 'No line' }}</span>
                     <UButton size="xs" variant="outline" color="error" @click="deleteReachFromGroup('', '', reach.slug, reach.common_name ?? reach.name)">Delete</UButton>
-                    <NuxtLink :to="`/reaches/${reach.slug}/edit`" class="text-xs text-blue-500 hover:underline">Edit</NuxtLink>
+                    <NuxtLink :to="`/reaches/${reach.slug}/edit`" class="text-xs text-primary-500 hover:underline">Edit</NuxtLink>
                   </div>
                 </div>
               </div>
@@ -250,23 +250,23 @@
         <!-- Users tab (site admin only) -->
         <div v-if="activeTab === 'users'">
           <div class="flex items-center justify-between mb-4">
-            <p class="text-sm text-gray-500">Role assignments</p>
+            <p class="text-sm text-neutral-500">Role assignments</p>
             <UButton size="xs" icon="i-heroicons-plus" @click="assignRoleOpen = true">Assign role</UButton>
           </div>
 
           <div v-if="rolesLoading" class="space-y-2">
-            <div v-for="i in 3" :key="i" class="h-12 rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
+            <div v-for="i in 3" :key="i" class="h-12 rounded-lg bg-neutral-100 dark:bg-neutral-800 animate-pulse" />
           </div>
 
-          <div v-else class="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div v-else class="divide-y divide-neutral-100 dark:divide-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 overflow-hidden">
             <div
               v-for="ur in userRoles" :key="ur.id"
-              class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-900"
+              class="flex items-center gap-3 px-4 py-3 bg-white dark:bg-neutral-900"
             >
               <div class="flex-1 min-w-0">
-                <p class="text-xs font-mono text-gray-500 truncate">{{ ur.user_id }}</p>
-                <p class="text-xs text-gray-400">
-                  <span class="font-medium text-gray-700 dark:text-gray-300">{{ ur.role }}</span>
+                <p class="text-xs font-mono text-neutral-500 truncate">{{ ur.user_id }}</p>
+                <p class="text-xs text-neutral-400">
+                  <span class="font-medium text-neutral-700 dark:text-neutral-300">{{ ur.role }}</span>
                   <template v-if="ur.river_name"> · {{ ur.river_name }}</template>
                 </p>
               </div>
@@ -275,7 +275,7 @@
                 @click="revokeRole(ur.id)"
               >Revoke</button>
             </div>
-            <div v-if="userRoles.length === 0" class="px-4 py-8 text-center text-sm text-gray-400">No role assignments</div>
+            <div v-if="userRoles.length === 0" class="px-4 py-8 text-center text-sm text-neutral-400">No role assignments</div>
           </div>
         </div>
       </template>
@@ -300,8 +300,8 @@
           <UFormField label="GNIS ID (optional)">
             <div class="flex items-center gap-2">
               <UInput v-model="newRiver.gnis_id" placeholder="00179365" class="max-w-40" @blur="lookupGNIS(newRiver.gnis_id, newRiver)" />
-              <span v-if="gnisLookupLoading" class="text-xs text-gray-400 animate-pulse">Looking up…</span>
-              <span v-else-if="gnisLookupMsg" class="text-xs text-gray-500">{{ gnisLookupMsg }}</span>
+              <span v-if="gnisLookupLoading" class="text-xs text-neutral-400 animate-pulse">Looking up…</span>
+              <span v-else-if="gnisLookupMsg" class="text-xs text-neutral-500">{{ gnisLookupMsg }}</span>
             </div>
           </UFormField>
         </div>
@@ -324,7 +324,7 @@
           <UFormField label="Basin">
             <div class="flex items-center gap-2">
               <UInput v-model="editingRiver.basin" placeholder="South Platte" class="flex-1" :disabled="editingRiver.basin_locked" />
-              <span v-if="editingRiver.basin_locked" class="text-xs text-gray-400 shrink-0">locked</span>
+              <span v-if="editingRiver.basin_locked" class="text-xs text-neutral-400 shrink-0">locked</span>
             </div>
           </UFormField>
           <UFormField label="State *">
@@ -339,8 +339,8 @@
           <UFormField label="GNIS ID (optional)">
             <div class="flex items-center gap-2">
               <UInput v-model="editingRiver.gnis_id" placeholder="00179365" class="max-w-40" @blur="lookupGNIS(editingRiver!.gnis_id, editingRiver!)" />
-              <span v-if="gnisLookupLoading" class="text-xs text-gray-400 animate-pulse">Looking up…</span>
-              <span v-else-if="gnisLookupMsg" class="text-xs text-gray-500">{{ gnisLookupMsg }}</span>
+              <span v-if="gnisLookupLoading" class="text-xs text-neutral-400 animate-pulse">Looking up…</span>
+              <span v-else-if="gnisLookupMsg" class="text-xs text-neutral-500">{{ gnisLookupMsg }}</span>
             </div>
           </UFormField>
         </div>
@@ -365,12 +365,12 @@
       >
         <div
           v-if="authorModalOpen"
-          class="fixed inset-0 z-50 flex flex-col bg-gray-50 dark:bg-gray-950 overflow-y-auto"
+          class="fixed inset-0 z-50 flex flex-col bg-neutral-50 dark:bg-neutral-950 overflow-y-auto"
         >
-          <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-white/90 dark:bg-gray-950/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
-            <h2 class="text-sm font-semibold text-gray-800 dark:text-gray-100">New reach</h2>
+          <div class="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-white/90 dark:bg-neutral-950/90 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800">
+            <h2 class="text-sm font-semibold text-neutral-800 dark:text-neutral-100">New reach</h2>
             <button
-              class="p-1.5 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              class="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
               @click="authorModalOpen = false"
             >
               <svg class="w-4 h-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -393,13 +393,13 @@
             <UInput v-model="newRole.user_id" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
           </UFormField>
           <UFormField label="Role">
-            <select v-model="newRole.role" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+            <select v-model="newRole.role" class="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm">
               <option value="data_admin">data_admin</option>
               <option value="site_admin">site_admin</option>
             </select>
           </UFormField>
           <UFormField label="River (optional — leave blank for global)">
-            <select v-model="newRole.river_id" class="w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm">
+            <select v-model="newRole.river_id" class="w-full rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm">
               <option value="">Global (all rivers)</option>
               <option v-for="r in rivers" :key="r.id" :value="r.id">{{ r.name }}</option>
             </select>

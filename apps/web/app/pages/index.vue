@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex flex-col bg-white dark:bg-gray-950">
+  <div class="min-h-screen flex flex-col bg-white dark:bg-neutral-950">
 
     <!-- Demo banner -->
     <div v-if="showDemoBanner" class="bg-amber-50 dark:bg-amber-950 border-b border-amber-200 dark:border-amber-800 px-4 py-2.5 flex items-center justify-between gap-4 text-sm">
@@ -26,56 +26,63 @@
         </div>
 
         <!-- Wordmark -->
-        <p class="text-2xl font-extrabold tracking-tight text-blue-600 dark:text-blue-400 mb-4">h2oflows</p>
+        <p class="text-2xl font-extrabold tracking-tight text-primary-600 dark:text-primary-400 mb-4">h2oflows</p>
 
         <!-- Badge -->
-        <div class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 rounded-full px-3 py-1 mb-5">
+        <div class="inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950 rounded-full px-3 py-1 mb-5">
           <span class="relative flex h-1.5 w-1.5">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"/>
-            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"/>
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"/>
+            <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary-500"/>
           </span>
           Live Gauges · Paddler-Powered
         </div>
 
         <!-- Headline -->
-        <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white leading-tight mb-3 text-center">
+        <h1 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-neutral-900 dark:text-white leading-tight mb-3 text-center">
           Know before<br>you go.
         </h1>
 
         <!-- Feature pills — plain text -->
-        <div class="flex items-center gap-2 sm:gap-3 mb-6 text-sm font-medium text-gray-500 dark:text-gray-400">
+        <div class="flex items-center gap-2 sm:gap-3 mb-6 text-sm font-medium text-neutral-500 dark:text-neutral-400">
           <span>Live Streamflows</span>
-          <span class="text-gray-300 dark:text-gray-700">·</span>
+          <span class="text-neutral-300 dark:text-neutral-700">·</span>
           <span>Shared Beta</span>
-          <span class="text-gray-300 dark:text-gray-700">·</span>
+          <span class="text-neutral-300 dark:text-neutral-700">·</span>
           <span>Flow Insights</span>
         </div>
 
         <!-- DB stats -->
-        <div v-if="dbStats" class="flex items-center gap-4 mb-6 text-sm text-gray-500 dark:text-gray-400">
+        <div v-if="dbStats" class="flex items-center gap-4 mb-6 text-sm text-neutral-500 dark:text-neutral-400">
           <span class="flex items-center gap-1.5">
-            <span class="font-semibold text-gray-800 dark:text-gray-200">{{ dbStats.reaches.toLocaleString() }}</span>
+            <span class="font-semibold text-neutral-800 dark:text-neutral-200">{{ dbStats.reaches.toLocaleString() }}</span>
             reaches
           </span>
-          <span class="text-gray-300 dark:text-gray-700">·</span>
+          <span class="text-neutral-300 dark:text-neutral-700">·</span>
           <span class="flex items-center gap-1.5">
-            <span class="font-semibold text-gray-800 dark:text-gray-200">{{ dbStats.rivers.toLocaleString() }}</span>
+            <span class="font-semibold text-neutral-800 dark:text-neutral-200">{{ dbStats.rivers.toLocaleString() }}</span>
             rivers
           </span>
+          <template v-if="dbStats.reports && dbStats.reports > 0">
+            <span class="text-neutral-300 dark:text-neutral-700">·</span>
+            <span class="flex items-center gap-1.5">
+              <span class="font-semibold text-neutral-800 dark:text-neutral-200">{{ dbStats.reports.toLocaleString() }}</span>
+              reports
+            </span>
+          </template>
         </div>
 
         <!-- Primary nav buttons -->
         <div class="flex items-center gap-3 mb-8">
           <NuxtLink
             to="/dashboard"
-            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-colors shadow-sm"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold transition-colors shadow-sm"
           >
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             Dashboard
           </NuxtLink>
           <NuxtLink
             to="/explore"
-            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-semibold transition-colors shadow-sm"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 text-sm font-semibold transition-colors shadow-sm"
           >
             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
             Explore
@@ -86,7 +93,7 @@
         <div class="w-full max-w-xl mb-4">
           <form @submit.prevent="askQuestion" class="flex gap-2 mb-3">
             <div class="relative flex-1">
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-blue-400 dark:text-blue-500 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-400 dark:text-primary-500 pointer-events-none" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M15.98 1.804a1 1 0 00-1.96 0l-.24 1.192a1 1 0 01-.784.785l-1.192.238a1 1 0 000 1.962l1.192.238a1 1 0 01.785.785l.238 1.192a1 1 0 001.962 0l.238-1.192a1 1 0 01.785-.785l1.192-.238a1 1 0 000-1.962l-1.192-.238a1 1 0 01-.785-.785l-.238-1.192zM6.949 5.684a1 1 0 00-1.898 0l-.683 2.051a1 1 0 01-.633.633l-2.051.683a1 1 0 000 1.898l2.051.683a1 1 0 01.633.633l.683 2.051a1 1 0 001.898 0l.683-2.051a1 1 0 01.633-.633l2.051-.683a1 1 0 000-1.898l-2.051-.683a1 1 0 01-.633-.633L6.95 5.684zM13.949 13.684a1 1 0 00-1.898 0l-.184.551a1 1 0 01-.632.633l-.551.183a1 1 0 000 1.898l.551.183a1 1 0 01.633.633l.183.551a1 1 0 001.898 0l.184-.551a1 1 0 01.632-.633l.551-.183a1 1 0 000-1.898l-.551-.184a1 1 0 01-.633-.632l-.183-.551z"/>
               </svg>
               <input
@@ -94,7 +101,7 @@
                 v-model="searchQuery"
                 type="text"
                 placeholder='Ask anything — e.g. "Browns Canyon at 800 cfs?"'
-                class="w-full pl-9 pr-4 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full pl-9 pr-4 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
                 :disabled="searching"
               />
             </div>
@@ -102,7 +109,7 @@
               v-if="!searching"
               type="submit"
               :disabled="!searchQuery.trim()"
-              class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors shrink-0"
+              class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors shrink-0"
             >
               <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M15.98 1.804a1 1 0 00-1.96 0l-.24 1.192a1 1 0 01-.784.785l-1.192.238a1 1 0 000 1.962l1.192.238a1 1 0 01.785.785l.238 1.192a1 1 0 001.962 0l.238-1.192a1 1 0 01.785-.785l1.192-.238a1 1 0 000-1.962l-1.192-.238a1 1 0 01-.785-.785l-.238-1.192zM6.949 5.684a1 1 0 00-1.898 0l-.683 2.051a1 1 0 01-.633.633l-2.051.683a1 1 0 000 1.898l2.051.683a1 1 0 01.633.633l.683 2.051a1 1 0 001.898 0l.683-2.051a1 1 0 01.633-.633l2.051-.683a1 1 0 000-1.898l-2.051-.683a1 1 0 01-.633-.633L6.95 5.684zM13.949 13.684a1 1 0 00-1.898 0l-.184.551a1 1 0 01-.632.633l-.551.183a1 1 0 000 1.898l.551.183a1 1 0 01.633.633l.183.551a1 1 0 001.898 0l.184-.551a1 1 0 01.632-.633l.551-.183a1 1 0 000-1.898l-.551-.184a1 1 0 01-.633-.632l-.183-.551z"/>
@@ -112,32 +119,32 @@
             <button
               v-else
               type="button"
-              class="px-4 py-2.5 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 text-sm font-semibold transition-colors shrink-0 flex items-center gap-1.5"
+              class="px-4 py-2.5 rounded-lg bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-700 dark:hover:bg-neutral-600 text-neutral-700 dark:text-neutral-200 text-sm font-semibold transition-colors shrink-0 flex items-center gap-1.5"
               @click="cancelSearch"
             >
-              <span class="w-3.5 h-3.5 border-2 border-gray-400 border-t-gray-700 dark:border-t-gray-200 rounded-full animate-spin"/>
+              <span class="w-3.5 h-3.5 border-2 border-neutral-400 border-t-neutral-700 dark:border-t-neutral-200 rounded-full animate-spin"/>
               Stop
             </button>
           </form>
 
-          <p v-if="searching" class="text-sm text-gray-400 dark:text-gray-500 animate-pulse text-center -mt-1 mb-2">{{ loadingVerb }}…</p>
+          <p v-if="searching" class="text-sm text-neutral-400 dark:text-neutral-500 animate-pulse text-center -mt-1 mb-2">{{ loadingVerb }}…</p>
 
           <!-- Answer cards — one per matched reach -->
           <div v-if="searchResult && searchResult.results.length > 0" class="mb-3 flex flex-col gap-2">
             <div
               v-for="result in searchResult.results"
               :key="result.reach_slug"
-              class="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-4 text-left"
+              class="rounded-xl border border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 p-4 text-left"
             >
               <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-semibold uppercase tracking-wide text-blue-500">{{ result.reach_name }}</span>
-                <NuxtLink :to="`/reaches/${result.reach_slug}`" class="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium shrink-0">View reach →</NuxtLink>
+                <span class="text-xs font-semibold uppercase tracking-wide text-primary-500">{{ result.reach_name }}</span>
+                <NuxtLink :to="`/reaches/${result.reach_slug}`" class="text-xs text-primary-600 dark:text-primary-400 hover:underline font-medium shrink-0">View reach →</NuxtLink>
               </div>
-              <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap mb-3">{{ result.answer }}</p>
+              <p class="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-wrap mb-3">{{ result.answer }}</p>
               <div class="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-xs font-semibold transition-colors"
                   @click="zoomMapToReach(result.reach_slug)"
                 >
                   <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
@@ -145,7 +152,7 @@
                 </button>
                 <button
                   v-if="result.primary_gauge_id"
-                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold transition-colors"
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 text-xs font-semibold transition-colors"
                   @click="addGaugeById(result.primary_gauge_id!)"
                 >
                   <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -154,12 +161,12 @@
               </div>
             </div>
           </div>
-          <p v-else-if="searchResult && searchResult.answer" class="mb-3 text-sm text-gray-500 dark:text-gray-400">{{ searchResult.answer }}</p>
+          <p v-else-if="searchResult && searchResult.answer" class="mb-3 text-sm text-neutral-500 dark:text-neutral-400">{{ searchResult.answer }}</p>
           <p v-if="searchError" class="mb-3 text-sm text-red-500">{{ searchError }}</p>
         </div>
 
         <!-- Framed reach map -->
-        <div ref="mapWrapRef" class="relative w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm" style="height: 420px;">
+        <div ref="mapWrapRef" class="relative w-full rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-700 shadow-sm" style="height: 420px;">
           <ClientOnly>
             <ReachesMap
               ref="mapRef"
@@ -174,7 +181,7 @@
           </ClientOnly>
           <NuxtLink
             to="/explore"
-            class="absolute top-3 right-12 z-10 inline-flex items-center justify-center w-9 h-9 rounded-md bg-white/95 dark:bg-gray-900/95 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-900 hover:text-blue-600 dark:hover:text-blue-400 shadow-sm transition-colors"
+            class="absolute top-3 right-12 z-10 inline-flex items-center justify-center w-9 h-9 rounded-md bg-white/95 dark:bg-neutral-900/95 border border-neutral-200 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-white dark:hover:bg-neutral-900 hover:text-primary-600 dark:hover:text-primary-400 shadow-sm transition-colors"
             title="Open full screen map"
             aria-label="Open full screen map"
           >
@@ -186,7 +193,7 @@
         <div class="flex flex-col items-center gap-3 mt-10">
           <div class="flex items-center gap-4">
             <!-- Apple App Store -->
-            <a href="#" class="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-black text-white hover:bg-gray-800 transition-colors">
+            <a href="#" class="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-black text-white hover:bg-neutral-800 transition-colors">
               <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 21.99 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 21.99C7.79 22.03 6.8 20.68 5.96 19.47C4.25 16.97 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.89C10.1 6.87 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
               </svg>
@@ -196,7 +203,7 @@
               </div>
             </a>
             <!-- Google Play Store -->
-            <a href="#" class="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-black text-white hover:bg-gray-800 transition-colors">
+            <a href="#" class="inline-flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-black text-white hover:bg-neutral-800 transition-colors">
               <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 01-.61-.92V2.734a1 1 0 01.609-.92zm10.89 10.893l2.302 2.302-10.937 6.333 8.635-8.635zm3.199-3.199l2.608 1.51a.999.999 0 010 1.764l-2.608 1.509-2.544-2.544 2.544-2.239zM5.864 2.658L16.8 8.99l-2.302 2.302-8.634-8.634z"/>
               </svg>
@@ -206,19 +213,19 @@
               </div>
             </a>
           </div>
-          <p class="text-xs text-gray-400 dark:text-gray-500">Mobile apps coming soon</p>
+          <p class="text-xs text-neutral-400 dark:text-neutral-500">Mobile apps coming soon</p>
         </div>
 
       </div>
     </main>
 
     <!-- Footer -->
-    <footer class="shrink-0 px-6 py-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs text-gray-400">
+    <footer class="shrink-0 px-6 py-4 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-400">
       <span>H2OFlows</span>
       <div class="flex items-center gap-4">
         <span>Data: USGS · OSM</span>
-        <a href="https://github.com/ikluhsman/h2oflows/issues" target="_blank" rel="noopener noreferrer" class="hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Support</a>
-        <a href="https://github.com/ikluhsman/h2oflows" target="_blank" rel="noopener noreferrer" class="hover:text-gray-600 dark:hover:text-gray-300 transition-colors" title="View on GitHub">
+        <a href="https://github.com/ikluhsman/h2oflows/issues" target="_blank" rel="noopener noreferrer" class="hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors">Support</a>
+        <a href="https://github.com/ikluhsman/h2oflows" target="_blank" rel="noopener noreferrer" class="hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors" title="View on GitHub">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2C6.477 2 2 6.484 2 12.021c0 4.428 2.865 8.185 6.839 9.504.5.092.682-.217.682-.483 0-.237-.009-.868-.013-1.703-2.782.605-3.369-1.342-3.369-1.342-.454-1.154-1.11-1.462-1.11-1.462-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844a9.59 9.59 0 012.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.021C22 6.484 17.522 2 12 2z"/>
           </svg>
@@ -237,7 +244,7 @@ const searchInputRef = ref<HTMLInputElement | null>(null)
 
 // ── DB stats ──────────────────────────────────────────────────────────────────
 
-const { data: dbStats } = await useAsyncData<{ reaches: number; rivers: number }>(
+const { data: dbStats } = await useAsyncData<{ reaches: number; rivers: number; reports?: number }>(
   'db-stats',
   () => $fetch(`${useRuntimeConfig().public.apiBase}/api/v1/stats`),
   { default: () => null as any, server: false }

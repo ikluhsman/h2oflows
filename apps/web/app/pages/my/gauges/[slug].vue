@@ -1,32 +1,32 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <AppHeader />
 
     <main class="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
-      <NuxtLink to="/my/gauges" class="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+      <NuxtLink to="/my/gauges" class="text-sm text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300">
         ← Custom Gauges
       </NuxtLink>
 
       <div v-if="loading" class="space-y-4">
-        <div class="h-8 w-48 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
-        <div class="h-40 rounded-xl bg-gray-100 dark:bg-gray-800 animate-pulse" />
+        <div class="h-8 w-48 rounded bg-neutral-200 dark:bg-neutral-700 animate-pulse" />
+        <div class="h-40 rounded-xl bg-neutral-100 dark:bg-neutral-800 animate-pulse" />
       </div>
 
       <template v-else-if="gauge">
         <!-- Hero -->
         <div class="flex items-start justify-between gap-4">
           <div>
-            <h1 class="text-xl font-bold text-gray-900 dark:text-white">{{ gauge.name }}</h1>
-            <p v-if="gauge.description" class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{{ gauge.description }}</p>
+            <h1 class="text-xl font-bold text-neutral-900 dark:text-white">{{ gauge.name }}</h1>
+            <p v-if="gauge.description" class="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">{{ gauge.description }}</p>
           </div>
           <div class="text-right shrink-0">
-            <p v-if="gauge.last_value_cfs != null" class="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">
+            <p v-if="gauge.last_value_cfs != null" class="text-2xl font-bold tabular-nums text-neutral-900 dark:text-white">
               {{ gauge.last_value_cfs.toLocaleString() }}
-              <span class="text-sm font-normal text-gray-400">{{ gauge.unit }}</span>
+              <span class="text-sm font-normal text-neutral-400">{{ gauge.unit }}</span>
             </p>
-            <p v-else class="text-gray-400">—</p>
-            <p v-if="gauge.last_value_at" class="text-xs text-gray-400 mt-0.5">
+            <p v-else class="text-neutral-400">—</p>
+            <p v-if="gauge.last_value_at" class="text-xs text-neutral-400 mt-0.5">
               Updated {{ new Date(gauge.last_value_at).toLocaleTimeString() }}
             </p>
           </div>
@@ -34,8 +34,8 @@
 
         <!-- Edit form -->
         <form class="space-y-5" @submit.prevent="save">
-          <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-4">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Details</h2>
+          <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 space-y-4">
+            <h2 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Details</h2>
 
             <UFormField label="Name" required>
               <UInput v-model="form.name" class="w-full" required />
@@ -50,8 +50,8 @@
             </UFormField>
           </div>
 
-          <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 space-y-3">
-            <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Formula</h2>
+          <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-5 space-y-3">
+            <h2 class="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Formula</h2>
             <CustomGaugeFormulaBuilder v-model="form.inputs" />
           </div>
 
@@ -71,7 +71,7 @@
         </form>
       </template>
 
-      <div v-else class="mt-20 text-center text-gray-400">Gauge not found.</div>
+      <div v-else class="mt-20 text-center text-neutral-400">Gauge not found.</div>
 
       <!-- Share toast -->
       <div

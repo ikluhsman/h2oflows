@@ -8,22 +8,22 @@
             <NuxtLink
               v-if="reachSlugForLink"
               :to="`/reaches/${reachSlugForLink}`"
-              class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight hover:text-blue-600 dark:hover:text-blue-400 transition-colors block"
+              class="text-lg font-bold text-neutral-900 dark:text-white truncate leading-tight hover:text-primary-600 dark:hover:text-primary-400 transition-colors block"
               @click="open = false"
             >{{ reachTitle }}</NuxtLink>
-            <h2 v-else class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ reachTitle }}</h2>
-            <p class="text-xs text-gray-400 truncate mt-0.5">
+            <h2 v-else class="text-lg font-bold text-neutral-900 dark:text-white truncate leading-tight">{{ reachTitle }}</h2>
+            <p class="text-xs text-neutral-400 truncate mt-0.5">
               {{ gaugeName }} ·
-              <a :href="sourceUrl" target="_blank" rel="noopener" class="hover:text-blue-400 underline underline-offset-2">
+              <a :href="sourceUrl" target="_blank" rel="noopener" class="hover:text-primary-400 underline underline-offset-2">
                 {{ gauge.source.toUpperCase() }} {{ gauge.externalId }}
               </a>
             </p>
           </template>
           <!-- Gauge mode (default): gauge name as title, no reach context -->
           <template v-else>
-            <h2 class="text-lg font-bold text-gray-900 dark:text-white truncate leading-tight">{{ gaugeName }}</h2>
-            <p class="text-xs text-gray-400 truncate mt-0.5">
-              <a :href="sourceUrl" target="_blank" rel="noopener" class="hover:text-blue-400 underline underline-offset-2">
+            <h2 class="text-lg font-bold text-neutral-900 dark:text-white truncate leading-tight">{{ gaugeName }}</h2>
+            <p class="text-xs text-neutral-400 truncate mt-0.5">
+              <a :href="sourceUrl" target="_blank" rel="noopener" class="hover:text-primary-400 underline underline-offset-2">
                 {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
               </a>
               <span v-if="gauge.watershedName"> · {{ gauge.watershedName }}</span>
@@ -32,7 +32,7 @@
         </div>
         <!-- Close button only in header -->
         <button
-          class="shrink-0 p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          class="shrink-0 p-1 rounded-md text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
           aria-label="Close"
           @click="open = false"
         >
@@ -47,10 +47,10 @@
       <div class="space-y-3">
         <!-- CFS + trend arrow — left-aligned, prominent -->
         <div class="flex items-baseline gap-2 flex-wrap">
-          <span class="text-3xl font-bold tabular-nums leading-none text-gray-900 dark:text-white">
+          <span class="text-3xl font-bold tabular-nums leading-none text-neutral-900 dark:text-white">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
           </span>
-          <span class="text-sm text-gray-500">cfs</span>
+          <span class="text-sm text-neutral-500">cfs</span>
           <TrendArrow v-if="displayCfs != null" :gauge-id="gauge.id" class="text-lg" />
           <!-- Flow band badge — reach mode only -->
           <span
@@ -77,7 +77,7 @@
           </button>
           <button
             v-else
-            class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white transition-colors"
             @click="toggleDashboard"
           >
             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -100,15 +100,15 @@
         />
 
         <!-- Last updated -->
-        <p v-if="gauge.lastReadingAt" class="text-xs text-gray-500">
+        <p v-if="gauge.lastReadingAt" class="text-xs text-neutral-500">
           Last reading {{ lastReadingRelative }}
         </p>
 
         <!-- View this reach — reach mode only -->
-        <div v-if="mode === 'reach' && reachSlugForLink" class="pt-1 border-t border-gray-100 dark:border-gray-800">
+        <div v-if="mode === 'reach' && reachSlugForLink" class="pt-1 border-t border-neutral-100 dark:border-neutral-800">
           <NuxtLink
             :to="`/reaches/${reachSlugForLink}`"
-            class="inline-flex items-center gap-1 text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+            class="inline-flex items-center gap-1 text-sm text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 font-medium transition-colors"
             @click="open = false"
           >
             View {{ reachTitle ?? 'reach' }} details
