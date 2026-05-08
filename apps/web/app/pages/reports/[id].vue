@@ -72,10 +72,23 @@
 
       <!-- Content -->
       <div class="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 px-5 py-4">
-        <div class="report-content text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed" v-html="renderedContent" />
+        <div class="report-prose" v-html="renderedContent" />
+      </div>
+
+      <!-- Share row -->
+      <div class="flex justify-end">
+        <button
+          class="inline-flex items-center gap-1.5 text-sm text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+          @click="shareOpen = true"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          Share
+        </button>
       </div>
 
     </main>
+
+    <ShareReportModal v-if="report" :report="report" :open="shareOpen" @close="shareOpen = false" />
   </div>
 </template>
 
@@ -99,6 +112,7 @@ interface Report {
   paddled: boolean
   flow_cfs?: number
   flow_band?: string
+  aw_synced_at?: string
   created_at: string
   reach_name: string
   reach_slug: string
@@ -114,6 +128,8 @@ const renderedContent = computed(() =>
   report.value ? md.render(report.value.content || '') : ''
 )
 
+const shareOpen = ref(false)
+
 function formatDate(d: string): string {
   const [y, m, day] = d.split('-').map(Number)
   return new Date(y, m - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -125,39 +141,14 @@ function bandBadgeClass(band: string): string {
   if (band === 'high') return 'text-amber-600 dark:text-amber-400'
   return 'text-neutral-500'
 }
-</script>
 
-<style>
-.report-content > * + * { margin-top: 0.5em; }
-.report-content strong { font-weight: 600; }
-.report-content em { font-style: italic; }
-.report-content s { text-decoration: line-through; }
-.report-content ul { list-style-type: disc; padding-left: 1.4em; }
-.report-content ol { list-style-type: decimal; padding-left: 1.4em; }
-.report-content li + li { margin-top: 0.2em; }
-.report-content blockquote {
-  border-left: 3px solid #d1d5db;
-  padding-left: 0.75em;
-  color: #6b7280;
-  font-style: italic;
-}
-.dark .report-content blockquote { border-left-color: #4b5563; color: #9ca3af; }
-.report-content code {
-  background: #f3f4f6;
-  border-radius: 3px;
-  padding: 0.1em 0.3em;
-  font-size: 0.85em;
-  font-family: ui-monospace, monospace;
-}
-.dark .report-content code { background: #1f2937; }
-.report-content pre {
-  background: #f3f4f6;
-  border-radius: 6px;
-  padding: 0.75em 1em;
-  overflow-x: auto;
-}
-.dark .report-content pre { background: #111827; }
-.report-content pre code { background: transparent; padding: 0; }
-.report-content a { color: #2563eb; text-decoration: underline; }
-.dark .report-content a { color: #60a5fa; }
-</style>
+useHead(() => ({
+  title: report.value ? `${report.value.name} — H2OFlows` : 'Report — H2OFlows',
+  meta: [
+    { name: 'description', content: report.value ? `${report.value.reach_name} report by ${report.value.handle || 'a paddler'}` : '' },
+    { property: 'og:title', content: report.value?.name ?? 'H2OFlows Report' },
+    { property: 'og:description', content: report.value ? `${report.value.reach_name}${report.value.flow_cfs != null ? ` @ ${Math.round(report.value.flow_cfs).toLocaleString()} cfs` : ''} — ${report.value.report_date}` : '' },
+    { property: 'og:type', content: 'article' },
+  ],
+}))
+</script>

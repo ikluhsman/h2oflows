@@ -115,6 +115,7 @@ func main() {
 	trips         := handlers.NewTripHandler(pool, describer)
 	contributions := handlers.NewContributionHandler(pool)
 	reports       := handlers.NewReportHandler(pool, devFallbackID)
+	preferences   := handlers.NewPreferencesHandler(pool, devFallbackID)
 	var importEmbedder *ai.Embedder
 	if cfg.VoyageAPIKey != "" {
 		importEmbedder = ai.NewEmbedder(cfg.VoyageAPIKey)
@@ -276,6 +277,9 @@ func main() {
 		r.Get("/me/reports", reports.ListMine)
 		r.Patch("/me/reports/{slug}", reports.Update)
 		r.Delete("/me/reports/{slug}", reports.Delete)
+		r.Post("/me/reports/{slug}/aw-sync", reports.AWSync)
+		r.Get("/me/preferences", preferences.Get)
+		r.Patch("/me/preferences", preferences.Update)
 		r.Post("/proximity-events", contributions.CreateProximityEvent)
 
 		r.Post("/trips", trips.Create)

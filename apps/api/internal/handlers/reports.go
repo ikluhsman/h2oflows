@@ -452,6 +452,7 @@ func (h *ReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 		Paddled       bool     `json:"paddled"`
 		FlowCFS       *float64 `json:"flow_cfs,omitempty"`
 		FlowBand      *string  `json:"flow_band,omitempty"`
+		AWsyncedAt    *string  `json:"aw_synced_at,omitempty"`
 		CreatedAt     string   `json:"created_at"`
 		ReachName     string   `json:"reach_name"`
 		ReachSlug     string   `json:"reach_slug"`
@@ -459,12 +460,13 @@ func (h *ReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	var d detail
 	var createdAt time.Time
+	var awSyncedAt *time.Time
 	err := h.db.QueryRow(ctx, `
 		SELECT
 			rp.id, rp.slug, COALESCE(up.handle, '') AS handle,
 			rp.name, rp.report_date::TEXT, rp.report_time::TEXT,
 			rp.content, rp.hazard_warning, rp.paddled,
-			rp.flow_cfs, rp.flow_band, rp.created_at,
+			rp.flow_cfs, rp.flow_band, rp.aw_synced_at, rp.created_at,
 			COALESCE(re.name, '') AS reach_name,
 			COALESCE(re.slug, '') AS reach_slug
 		FROM reports rp
@@ -475,7 +477,7 @@ func (h *ReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 		&d.ID, &d.Slug, &d.Handle,
 		&d.Name, &d.ReportDate, &d.ReportTime,
 		&d.Content, &d.HazardWarning, &d.Paddled,
-		&d.FlowCFS, &d.FlowBand, &createdAt,
+		&d.FlowCFS, &d.FlowBand, &awSyncedAt, &createdAt,
 		&d.ReachName, &d.ReachSlug,
 	)
 	if err != nil {
@@ -483,6 +485,10 @@ func (h *ReportHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d.CreatedAt = createdAt.Format(time.RFC3339)
+	if awSyncedAt != nil {
+		s := awSyncedAt.Format(time.RFC3339)
+		d.AWsyncedAt = &s
+	}
 	jsonResponse(w, http.StatusOK, d)
 }
 
@@ -543,6 +549,34 @@ func (h *ReportHandler) Update(w http.ResponseWriter, r *http.Request) {
 		ownerID, slug)
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "update failed")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		errorResponse(w, http.StatusNotFound, "report not found")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// ── POST /me/reports/{slug}/aw-sync ──────────────────────────────────────────
+
+func (h *ReportHandler) AWSync(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	ownerID, ok := h.ownerID(r)
+	if !ok {
+		errorResponse(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(),
+		`UPDATE reports SET aw_synced_at = NOW(), updated_at = NOW()
+		 WHERE owner_id = $1 AND slug = $2`,
+		ownerID, slug,
+	)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "sync stamp failed")
 		return
 	}
 	if tag.RowsAffected() == 0 {
