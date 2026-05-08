@@ -80,29 +80,30 @@ export function flowBandSolidColor(band?: string | null, status?: string | null)
 // running = primary brand color; low = warm danger; high = cool flood
 
 export const PALETTE_FLOW_SOLID: Record<string, { low: string; running: string; high: string }> = {
-  blue:    { low: '#ef4444', running: '#34d399', high: '#38bdf8' },
-  sky:     { low: '#f472b6', running: '#0ea5e9', high: '#818cf8' },
-  teal:    { low: '#ef4444', running: '#2dd4bf', high: '#8b5cf6' },
-  emerald: { low: '#fbbf24', running: '#10b981', high: '#0ea5e9' },
-  indigo:  { low: '#f472b6', running: '#818cf8', high: '#2dd4bf' },
-  orange:  { low: '#ef4444', running: '#f97316', high: '#60a5fa' },
-  fuchsia: { low: '#fbbf24', running: '#d946ef', high: '#38bdf8' },
-  rose:    { low: '#f97316', running: '#f43f5e', high: '#818cf8' },
-  lime:    { low: '#ef4444', running: '#84cc16', high: '#22d3ee' },
+  //        low (red family)    running (green family)   high (blue family)
+  blue:    { low: '#ef4444',   running: '#34d399',      high: '#818cf8' },  // red-500, emerald-400, indigo-400
+  sky:     { low: '#f43f5e',   running: '#34d399',      high: '#6366f1' },  // rose-500, emerald-400, indigo-500
+  teal:    { low: '#ef4444',   running: '#10b981',      high: '#6366f1' },  // red-500, emerald-500, indigo-500
+  emerald: { low: '#ef4444',   running: '#10b981',      high: '#38bdf8' },  // red-500, emerald-500, sky-400
+  indigo:  { low: '#f43f5e',   running: '#4ade80',      high: '#22d3ee' },  // rose-500, green-400, cyan-400
+  orange:  { low: '#dc2626',   running: '#84cc16',      high: '#60a5fa' },  // red-600, lime-500, blue-400
+  fuchsia: { low: '#ef4444',   running: '#4ade80',      high: '#22d3ee' },  // red-500, green-400, cyan-400
+  rose:    { low: '#dc2626',   running: '#34d399',      high: '#818cf8' },  // red-600, emerald-400, indigo-400
+  lime:    { low: '#ef4444',   running: '#84cc16',      high: '#22d3ee' },  // red-500, lime-500, cyan-400
 }
 
 // ── Badge pill classes per palette (pre-declared so Tailwind includes them) ─
 
 export const PALETTE_BADGE_CLASS: Record<string, { low: string; running: string; high: string }> = {
-  blue:    { low: 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400',         running: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400', high: 'bg-sky-100 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400' },
-  sky:     { low: 'bg-pink-100 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400',     running: 'bg-sky-100 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400',                 high: 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400' },
-  teal:    { low: 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400',         running: 'bg-teal-100 dark:bg-teal-950/50 text-teal-700 dark:text-teal-400',             high: 'bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-400' },
-  emerald: { low: 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400', running: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400', high: 'bg-sky-100 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400' },
-  indigo:  { low: 'bg-pink-100 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400',     running: 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400',     high: 'bg-teal-100 dark:bg-teal-950/50 text-teal-700 dark:text-teal-400' },
-  orange:  { low: 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400',         running: 'bg-orange-100 dark:bg-orange-950/50 text-orange-700 dark:text-orange-400',     high: 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400' },
-  fuchsia: { low: 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400', running: 'bg-fuchsia-100 dark:bg-fuchsia-950/50 text-fuchsia-700 dark:text-fuchsia-400', high: 'bg-sky-100 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400' },
-  rose:    { low: 'bg-orange-100 dark:bg-orange-950/50 text-orange-700 dark:text-orange-400', running: 'bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-400',         high: 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400' },
-  lime:    { low: 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400',         running: 'bg-lime-100 dark:bg-lime-950/50 text-lime-700 dark:text-lime-400',             high: 'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400' },
+  blue:    { low: 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400',         running: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400', high: 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400' },
+  sky:     { low: 'bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400',     running: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400', high: 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400' },
+  teal:    { low: 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400',         running: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400', high: 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400' },
+  emerald: { low: 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400',         running: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400', high: 'bg-sky-100 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400' },
+  indigo:  { low: 'bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400',     running: 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-400',         high: 'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400' },
+  orange:  { low: 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400',         running: 'bg-lime-100 dark:bg-lime-950/50 text-lime-700 dark:text-lime-500',             high: 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400' },
+  fuchsia: { low: 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400',         running: 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-400',         high: 'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400' },
+  rose:    { low: 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-500',         running: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400', high: 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-400' },
+  lime:    { low: 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400',         running: 'bg-lime-100 dark:bg-lime-950/50 text-lime-700 dark:text-lime-500',             high: 'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400' },
 }
 
 export function flowBandPaletteBadgeClass(band?: string | null, status?: string | null, primary?: string | null): string {
