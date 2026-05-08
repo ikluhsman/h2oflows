@@ -94,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onUnmounted } from 'vue'
+import { ref, watch, nextTick, onUnmounted, onMounted } from 'vue'
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 import { flowBandLabel } from '~/utils/flowBand'
@@ -154,7 +154,7 @@ function buildChart() {
 
   chart = new uPlot(
     {
-      width:   container.value.clientWidth,
+      width:   container.value.clientWidth || 400,
       height:  200,
       padding: [8, 0, 0, 0],
       cursor:  { show: true },
@@ -186,6 +186,12 @@ watch(open, async (v) => {
     chart = null
     readings.value = []
   }
+})
+
+// If UModal renders body lazily, container ref becomes non-null after load() resolves.
+// Rebuild chart whenever the container element mounts.
+watch(container, (el) => {
+  if (el && !loading.value && readings.value.length > 0) buildChart()
 })
 
 onUnmounted(() => { chart?.destroy() })

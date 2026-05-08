@@ -81,7 +81,7 @@
     <main class="max-w-5xl mx-auto px-2 sm:px-4 py-6 pb-20 sm:pb-6 space-y-8">
 
       <!-- Empty state -->
-      <div v-if="store.gauges.length === 0 && activeCustomGauges.length === 0 && userReaches.length === 0" class="mt-20 flex flex-col items-center gap-4 text-center">
+      <div v-if="store.gauges.length === 0 && activeCustomGauges.length === 0 && activeUserReaches.length === 0" class="mt-20 flex flex-col items-center gap-4 text-center">
         <div class="text-5xl">🌊</div>
         <h2 class="text-xl font-semibold">No reaches yet</h2>
         <p class="text-neutral-500 max-w-sm text-sm">
@@ -91,7 +91,7 @@
       </div>
 
       <!-- Reaches grouped by basin → river -->
-      <template v-if="store.gauges.length > 0 || activeCustomGauges.length > 0 || userReaches.length > 0">
+      <template v-if="store.gauges.length > 0 || activeCustomGauges.length > 0 || activeUserReaches.length > 0">
 
         <section v-for="stateGroup in byStateTree" :key="stateGroup.name" class="mb-4">
           <!-- State header: large, collapsible, h1+hr style -->
@@ -270,8 +270,8 @@
           <AggregateGraph :gauges="aggregateGauges" />
         </section>
 
-        <!-- My Reaches section — only on primary dashboard (not scoped to specific dashboards) -->
-        <section v-if="(userReaches.length || hiddenReaches.size) && isDefaultDashboard">
+        <!-- My Reaches section — all on primary; watchlist-filtered on secondary dashboards -->
+        <section v-if="activeUserReaches.length || hiddenReaches.size">
           <div class="flex items-center gap-2 mb-3">
             <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">My Reaches</h2>
             <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
@@ -285,7 +285,7 @@
               </button>
               <div v-if="reachAddOpen" class="absolute right-0 top-full mt-1 z-50 w-52 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
                 <button
-                  v-for="r in userReaches.filter(r => hiddenReaches.has(r.id))"
+                  v-for="r in activeUserReaches.filter(r => hiddenReaches.has(r.id))"
                   :key="r.id"
                   class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-950/30 transition-colors"
                   @click="showReach(r.id); reachAddOpen = false"
@@ -297,7 +297,7 @@
           <!-- List view -->
           <div v-if="viewMode === 'list'" class="space-y-1.5">
             <div
-              v-for="r in userReaches.filter(r => !hiddenReaches.has(r.id))"
+              v-for="r in activeUserReaches.filter(r => !hiddenReaches.has(r.id))"
               :key="r.id"
               class="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 transition-all duration-200 cursor-pointer"
               @click="openUserReach(r)"
@@ -339,7 +339,7 @@
           <!-- Card views (comfortable / full) -->
           <div v-else :class="cardGridClass">
             <div
-              v-for="r in userReaches.filter(r => !hiddenReaches.has(r.id))"
+              v-for="r in activeUserReaches.filter(r => !hiddenReaches.has(r.id))"
               :key="r.id"
               class="relative rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 transition-all duration-200 cursor-pointer overflow-hidden"
               @click="openUserReach(r)"
@@ -379,6 +379,7 @@
               </div>
               <!-- Sparkline -->
               <GaugeSparkline v-if="r.gauge_id" :gauge-id="r.gauge_id" :flow-status="(r.flow_status as any)" :flow-band-label="r.flow_band ?? null" compact class="mb-1" />
+              <CustomGaugeSparkline v-else-if="r.custom_gauge_slug" :gauge-slug="r.custom_gauge_slug" compact class="mb-1" />
               <!-- Last reading — full only -->
               <p v-if="viewMode === 'full' && r.last_reading_at" class="text-xs text-neutral-400 mt-0.5">{{ reachLastUpdated(r) }}</p>
               <!-- My reach origin badge -->
@@ -761,14 +762,20 @@ if (import.meta.client) {
 // ── Custom gauges ─────────────────────────────────────────────────────────────
 interface CustomGaugeSummary { id: string; slug: string; name: string; description: string | null; unit: string; last_value_cfs: number | null; any_input_unhealthy: boolean }
 const customGauges = ref<CustomGaugeSummary[]>([])
-// IDs of custom gauges pinned to the currently active (non-primary) dashboard.
+// IDs of custom gauges and reach slugs pinned to the currently active (non-primary) dashboard.
 const dashboardCustomGaugeIds = ref<string[]>([])
+const dashboardReachSlugs     = ref<string[]>([])
 
-// Custom gauges visible on the active dashboard: all on primary, watchlist-filtered on others.
+// Items visible on the active dashboard: all on primary, watchlist-filtered on others.
 const activeCustomGauges = computed(() =>
   isDefaultDashboard.value
     ? customGauges.value
     : customGauges.value.filter(cg => dashboardCustomGaugeIds.value.includes(cg.id))
+)
+const activeUserReaches = computed(() =>
+  isDefaultDashboard.value
+    ? userReaches.value
+    : userReaches.value.filter(r => dashboardReachSlugs.value.includes(r.slug))
 )
 
 async function loadCustomGauges() {
@@ -782,10 +789,11 @@ async function loadCustomGauges() {
   customGauges.value = data.items ?? []
 }
 
-// Wrapper: load dashboard watchlist + update dashboardCustomGaugeIds.
+// Wrapper: load dashboard watchlist + update per-dashboard filter lists.
 async function activateDashboard(id: string) {
-  const ids = await loadForDashboard(id)
-  dashboardCustomGaugeIds.value = ids
+  const { customGaugeIds, reachSlugs } = await loadForDashboard(id)
+  dashboardCustomGaugeIds.value = customGaugeIds
+  dashboardReachSlugs.value = reachSlugs
 }
 onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 

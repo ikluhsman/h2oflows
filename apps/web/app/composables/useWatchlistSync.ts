@@ -46,21 +46,25 @@ export function useWatchlistSync() {
    * Returns the list of custom_gauge_ids on this dashboard so the caller can
    * filter the custom gauges section accordingly.
    */
-  async function loadForDashboard(dashboardId: string): Promise<string[]> {
+  async function loadForDashboard(dashboardId: string): Promise<{ customGaugeIds: string[]; reachSlugs: string[] }> {
     const token = await getToken()
-    if (!token) return []
+    if (!token) return { customGaugeIds: [], reachSlugs: [] }
     store.clearGauges()
     const res = await fetch(`${apiBase}/api/v1/watchlist?dashboard_id=${encodeURIComponent(dashboardId)}`, {
       headers: { Authorization: `Bearer ${token}` },
     }).catch(() => null)
-    if (!res?.ok) return []
+    if (!res?.ok) return { customGaugeIds: [], reachSlugs: [] }
     const data = await res.json()
     const allItems: { gauge_id: string | null; custom_gauge_id: string | null; reach_slug: string | null }[] = data.items ?? []
 
-    // Collect custom gauge ids so the caller can control their section display.
     const customGaugeIds = allItems
       .filter(item => item.custom_gauge_id != null)
       .map(item => item.custom_gauge_id as string)
+
+    // reach_slug items (gauge_id + reach_slug) represent user reaches on this dashboard.
+    const reachSlugs = allItems
+      .filter(item => item.reach_slug != null)
+      .map(item => item.reach_slug as string)
 
     const serverItems = allItems.filter(item => item.gauge_id != null) as { gauge_id: string; reach_slug: string | null }[]
     if (serverItems.length > 0) {
@@ -78,7 +82,7 @@ export function useWatchlistSync() {
       }
     }
 
-    return customGaugeIds
+    return { customGaugeIds, reachSlugs }
   }
 
   /**
