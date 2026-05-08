@@ -2,8 +2,23 @@
   <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <AppHeader />
 
+    <!-- Dashboard tab bar (only when authenticated and dashboards loaded) -->
+    <DashboardTabBar
+      v-if="isAuthenticated && db.loaded.value && db.dashboards.value.length"
+      :dashboards="db.dashboards.value"
+      :active-dashboard-id="db.activeDashboardId.value"
+      @select="onSelectDashboard"
+      @new="newDashboardOpen = true"
+      @delete="onDeleteDashboard"
+      @rename="(slug, name) => db.rename(slug, name)"
+    />
+
     <!-- Sticky controls bar — only shown when gauges exist -->
-    <div v-if="store.gauges.length > 0" class="sticky top-[51px] z-10 bg-neutral-50/95 dark:bg-neutral-950/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800">
+    <div
+      v-if="store.gauges.length > 0"
+      class="sticky z-10 bg-neutral-50/95 dark:bg-neutral-950/95 backdrop-blur-sm border-b border-neutral-200 dark:border-neutral-800"
+      :class="isAuthenticated && db.loaded.value && db.dashboards.value.length ? 'top-[92px]' : 'top-[51px]'"
+    >
       <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <!-- View mode toggle -->
@@ -497,6 +512,28 @@
       v-model:open="customGaugeModalOpen"
       v-bind="customGaugeModalProps"
     />
+
+    <!-- New dashboard modal -->
+    <Teleport to="body">
+      <div v-if="newDashboardOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="newDashboardOpen = false">
+        <div class="absolute inset-0 bg-black/40" @click="newDashboardOpen = false" />
+        <div class="relative w-full max-w-xs bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xl p-5 space-y-4">
+          <h3 class="text-sm font-semibold">New dashboard</h3>
+          <input
+            v-model="newDashboardName"
+            type="text"
+            placeholder="Dashboard name"
+            class="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
+            @keydown.enter="createDashboard"
+            @keydown.esc="newDashboardOpen = false"
+          />
+          <div class="flex gap-2 justify-end">
+            <button class="px-3 py-1.5 text-sm rounded-lg border border-neutral-200 dark:border-neutral-700" @click="newDashboardOpen = false">Cancel</button>
+            <button class="px-3 py-1.5 text-sm rounded-lg bg-primary-600 text-white hover:bg-primary-700" @click="createDashboard">Create</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -514,15 +551,55 @@ store.deduplicate()
 const { refresh } = useWatchlistRefresh()
 const { isAuthenticated, getToken } = useAuth()
 const { apiBase } = useRuntimeConfig().public
-const { addAndSync, removeAndSync, loadFromServer, pushLocalToServer } = useWatchlistSync()
+const { addAndSync, removeAndSync, loadFromServer, loadForDashboard, pushLocalToServer } = useWatchlistSync()
+const db = useDashboards()
+
+// ── Dashboard tab management ──────────────────────────────────────────────────
+const newDashboardOpen = ref(false)
+const newDashboardName = ref('')
+
+async function onSelectDashboard(id: string) {
+  if (id === db.activeDashboardId.value) return
+  db.setActive(id)
+  await loadForDashboard(id)
+  await refresh()
+}
+
+async function onDeleteDashboard(slug: string) {
+  const target = db.dashboards.value.find(d => d.slug === slug)
+  if (!target) return
+  const wasActive = target.id === db.activeDashboardId.value
+  await db.remove(slug)
+  if (wasActive && db.activeDashboard.value) {
+    await loadForDashboard(db.activeDashboard.value.id)
+    await refresh()
+  }
+}
+
+async function createDashboard() {
+  const name = newDashboardName.value.trim()
+  if (!name) return
+  const created = await db.create(name)
+  if (created) {
+    newDashboardName.value = ''
+    newDashboardOpen.value = false
+    await onSelectDashboard(created.id)
+  }
+}
 
 // ── Server sync ───────────────────────────────────────────────────────────────
 let serverSynced = false
 async function syncWithServer() {
   if (serverSynced) return
   serverSynced = true
-  await loadFromServer()
-  await pushLocalToServer()
+  await db.load()
+  const activeId = db.activeDashboard.value?.id
+  if (activeId) {
+    await loadForDashboard(activeId)
+  } else {
+    await loadFromServer()
+    await pushLocalToServer()
+  }
 }
 
 watch(isAuthenticated, (val) => { if (val) { syncWithServer(); loadUserReaches(); loadCustomGauges() } })
@@ -873,7 +950,7 @@ onMounted(() => {
 watch(mapVisible, val => localStorage.setItem(MAP_VIS_KEY, String(val)))
 
 function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>) {
-  addAndSync(gauge)
+  addAndSync(gauge, db.activeDashboard.value?.id ?? null)
 }
 
 const detailOpen  = ref(false)

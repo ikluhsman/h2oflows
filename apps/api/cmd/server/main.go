@@ -116,6 +116,7 @@ func main() {
 	contributions := handlers.NewContributionHandler(pool)
 	reports       := handlers.NewReportHandler(pool, devFallbackID)
 	preferences   := handlers.NewPreferencesHandler(pool, devFallbackID)
+	dashboards    := handlers.NewDashboardHandler(pool, devFallbackID)
 	var importEmbedder *ai.Embedder
 	if cfg.VoyageAPIKey != "" {
 		importEmbedder = ai.NewEmbedder(cfg.VoyageAPIKey)
@@ -280,6 +281,12 @@ func main() {
 		r.Post("/me/reports/{slug}/aw-sync", reports.AWSync)
 		r.Get("/me/preferences", preferences.Get)
 		r.Patch("/me/preferences", preferences.Update)
+		r.Get("/me/dashboards", dashboards.List)
+		r.Post("/me/dashboards", dashboards.Create)
+		r.Get("/me/dashboards/{slug}", dashboards.Get)
+		r.Patch("/me/dashboards/{slug}", dashboards.Update)
+		r.Delete("/me/dashboards/{slug}", dashboards.Delete)
+		r.Patch("/me/dashboards-reorder", dashboards.Reorder)
 		r.Post("/proximity-events", contributions.CreateProximityEvent)
 
 		r.Post("/trips", trips.Create)

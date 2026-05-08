@@ -168,6 +168,10 @@ export const useWatchlistStore = defineStore('watchlist', {
       })
     },
 
+    clearGauges() {
+      this.gauges = []
+    },
+
     removeGauge(gaugeId: string, contextReachSlug?: string | null) {
       // If removing a specific (gauge, reach) pair
       const slug = contextReachSlug !== undefined ? (contextReachSlug ?? null) : null
