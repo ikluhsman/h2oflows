@@ -22,6 +22,24 @@
           ? 'absolute sm:relative inset-0 sm:inset-auto z-30 sm:z-auto w-full sm:w-80'
           : 'hidden sm:flex sm:w-80'"
       >
+        <!-- Mode toggle (authenticated only) -->
+        <div v-if="isAuthenticated" class="px-3 pt-2 pb-1 shrink-0 flex gap-1">
+          <button
+            class="flex-1 text-xs font-medium py-1 rounded-md transition-colors"
+            :class="mode === 'curated'
+              ? 'bg-primary-500 text-white'
+              : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'"
+            @click="mode = 'curated'"
+          >H2OFlows</button>
+          <button
+            class="flex-1 text-xs font-medium py-1 rounded-md transition-colors"
+            :class="mode === 'user'
+              ? 'bg-primary-500 text-white'
+              : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'"
+            @click="mode = 'user'"
+          >My Reaches</button>
+        </div>
+
         <!-- Search + mobile map toggle -->
         <div class="px-3 py-2.5 sm:border-b border-neutral-100 dark:border-neutral-800 shrink-0 flex items-center gap-2">
           <input
@@ -54,15 +72,30 @@
           </button>
         </div>
 
-        <!-- Loading / error / empty states -->
-        <div v-if="loading" class="flex-1 flex items-center justify-center text-sm text-neutral-400">Loading…</div>
-        <div v-else-if="loadError" class="flex-1 flex items-center justify-center text-sm text-red-400">{{ loadError }}</div>
-        <div v-else-if="query.length >= 2 && filteredStates.length === 0" class="flex-1 flex items-center justify-center text-sm text-neutral-400">
-          No results for "{{ query }}"
-        </div>
+        <!-- ── Curated reaches states ──────────────────────────────────────── -->
+        <template v-if="mode === 'curated'">
+          <div v-if="loading" class="flex-1 flex items-center justify-center text-sm text-neutral-400">Loading…</div>
+          <div v-else-if="loadError" class="flex-1 flex items-center justify-center text-sm text-red-400">{{ loadError }}</div>
+          <div v-else-if="query.length >= 2 && filteredStates.length === 0" class="flex-1 flex items-center justify-center text-sm text-neutral-400">
+            No results for "{{ query }}"
+          </div>
+        </template>
 
-        <!-- Tree -->
-        <div v-else class="flex-1 overflow-y-auto">
+        <!-- ── My Reaches states ───────────────────────────────────────────── -->
+        <template v-else>
+          <div v-if="userReachesLoading" class="flex-1 flex items-center justify-center text-sm text-neutral-400">Loading…</div>
+          <div v-else-if="userReachesError" class="flex-1 flex items-center justify-center text-sm text-red-400">{{ userReachesError }}</div>
+          <div v-else-if="userReaches.length === 0" class="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center text-sm text-neutral-400">
+            <span>No saved reaches yet.</span>
+            <NuxtLink to="/my/reaches/new" class="text-primary-500 hover:underline">Create your first reach →</NuxtLink>
+          </div>
+          <div v-else-if="query.length >= 2 && userRiverGroups.length === 0" class="flex-1 flex items-center justify-center text-sm text-neutral-400">
+            No results for "{{ query }}"
+          </div>
+        </template>
+
+        <!-- Tree (curated mode) -->
+        <div v-if="mode === 'curated' && !loading && !loadError && !(query.length >= 2 && filteredStates.length === 0)" class="flex-1 overflow-y-auto">
           <div v-for="stateGroup in filteredStates" :key="stateGroup.name">
             <!-- State header -->
             <button
@@ -194,6 +227,55 @@
             </template>
           </div>
         </div>
+
+        <!-- My Reaches list (user mode) -->
+        <div
+          v-if="mode === 'user' && !userReachesLoading && !userReachesError && userReaches.length > 0 && !(query.length >= 2 && userRiverGroups.length === 0)"
+          class="flex-1 overflow-y-auto"
+        >
+          <div v-for="group in userRiverGroups" :key="group.name">
+            <!-- River header -->
+            <div class="flex items-center gap-2 px-3 py-1.5 border-b border-neutral-100 dark:border-neutral-800/50 bg-neutral-50 dark:bg-neutral-900/50">
+              <span class="text-xs font-semibold text-neutral-600 dark:text-neutral-300 flex-1 truncate">{{ group.name }}</span>
+              <span class="text-xs text-neutral-400 shrink-0">{{ group.reaches.length }}</span>
+            </div>
+            <!-- Reach rows -->
+            <div
+              v-for="reach in group.reaches"
+              :key="reach.slug"
+              :ref="(el) => setReachRef(reach.slug, el as HTMLElement | null)"
+              class="flex items-center gap-2 pl-6 pr-2 py-1.5 cursor-pointer transition-colors group"
+              :class="hoveredSlug === reach.slug
+                ? 'bg-primary-50 dark:bg-primary-950/40'
+                : 'hover:bg-neutral-50 dark:hover:bg-neutral-900/60'"
+              @mouseenter="hoveredSlug = reach.slug"
+              @mouseleave="hoveredSlug = null"
+              @click="mapRef?.flyToSlug(reach.slug); listVisible = false"
+            >
+              <span
+                class="w-2 h-2 rounded-full shrink-0"
+                :style="{ background: bandSolid(null, reach.flow_status) }"
+              />
+              <span class="flex-1 min-w-0 text-sm text-neutral-800 dark:text-neutral-200 truncate">{{ reach.name }}</span>
+              <span
+                v-if="reach.current_cfs != null"
+                class="text-xs font-medium tabular-nums shrink-0"
+                :style="{ color: bandSolid(null, reach.flow_status) }"
+              >{{ reach.current_cfs.toLocaleString() }}</span>
+              <span v-else class="text-xs text-neutral-300 dark:text-neutral-600 shrink-0">—</span>
+              <NuxtLink
+                :to="`/my/reaches/${reach.slug}`"
+                class="shrink-0 p-0.5 rounded text-neutral-300 dark:text-neutral-600 hover:text-primary-500 dark:hover:text-primary-400 transition-opacity opacity-60 sm:opacity-0 sm:group-hover:opacity-100 hover:opacity-100"
+                aria-label="View reach"
+                @click.stop
+              >
+                <svg class="w-3 h-3" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M11 3H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5M13 3h4m0 0v4m0-4L9 11" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </NuxtLink>
+            </div>
+          </div>
+        </div>
       </aside>
 
       <!-- ── Right panel: map ──────────────────────────────────────────────── -->
@@ -202,6 +284,8 @@
           <ReachesMap
             ref="mapRef"
             :hovered-slug="hoveredSlug"
+            :source-url="mapSourceUrl"
+            :source-headers="mapSourceHeaders"
             @reaches-updated="onReachesUpdated"
             @zoom-updated="(z) => mapZoom = z"
             @hover-changed="onMapHover"
@@ -283,7 +367,18 @@ const route = useRoute()
 let pendingFocusSlug: string | null = (route.query.focus as string) || null
 const watchlistStore = useWatchlistStore()
 const { addAndSync, removeAndSync } = useWatchlistSync()
-const { isDataAdmin } = useAuth()
+const { isDataAdmin, isAuthenticated, getToken } = useAuth()
+
+// ── Mode toggle ───────────────────────────────────────────────────────────────
+const mode = ref<'curated' | 'user'>('curated')
+const mapToken = ref<string | null>(null)
+
+const mapSourceUrl = computed(() =>
+  mode.value === 'user' ? `${apiBase}/api/v1/me/reaches/map/all` : null
+)
+const mapSourceHeaders = computed((): Record<string, string> =>
+  mapToken.value ? { Authorization: `Bearer ${mapToken.value}` } : {}
+)
 
 // ── New reach modal (admin only) ──────────────────────────────────────────────
 const authorModalOpen = ref(false)
@@ -319,6 +414,40 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+// ── User reaches ─────────────────────────────────────────────────────────────
+interface UserReachSummary {
+  id: string; slug: string; name: string
+  river_name: string | null
+  current_cfs: number | null
+  flow_status: string
+}
+interface UserRiverGroup { name: string; reaches: UserReachSummary[] }
+
+const userReachesLoading = ref(false)
+const userReachesError  = ref('')
+const userReaches       = ref<UserReachSummary[]>([])
+
+async function loadUserReaches() {
+  userReachesLoading.value = true
+  userReachesError.value = ''
+  try {
+    const token = await getToken()
+    mapToken.value = token
+    if (!token) { userReachesError.value = 'Sign in to view your reaches.'; return }
+    const res = await fetch(`${apiBase}/api/v1/me/reaches`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) throw new Error(`${res.status}`)
+    userReaches.value = await res.json()
+  } catch {
+    userReachesError.value = 'Failed to load your reaches.'
+  } finally {
+    userReachesLoading.value = false
+  }
+}
+
+watch(mode, m => { if (m === 'user') loadUserReaches() })
 
 // ── Search ────────────────────────────────────────────────────────────────────
 const query = ref('')
@@ -393,6 +522,25 @@ const filteredStates = computed(() => {
   return buildTree(filtered)
 })
 
+const userRiverGroups = computed((): UserRiverGroup[] => {
+  const q = query.value.trim().toLowerCase()
+  const items = q.length >= 2
+    ? userReaches.value.filter(r =>
+        r.name.toLowerCase().includes(q) ||
+        (r.river_name?.toLowerCase().includes(q) ?? false)
+      )
+    : userReaches.value
+  const grouped = new Map<string, UserReachSummary[]>()
+  for (const r of items) {
+    const key = r.river_name ?? 'No River'
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key)!.push(r)
+  }
+  return [...grouped.entries()]
+    .sort(([a], [b]) => a === 'No River' ? 1 : b === 'No River' ? -1 : a.localeCompare(b))
+    .map(([name, reaches]) => ({ name, reaches }))
+})
+
 // ── Collapse state ────────────────────────────────────────────────────────────
 const collapsed = ref<{ states: Set<string>; basins: Set<string>; rivers: Set<string> }>({
   states: new Set(),
@@ -420,7 +568,7 @@ function toggleRiver(state: string, basin: string, river: string) {
 }
 
 // ── Two-way interaction: list ↔ map ───────────────────────────────────────────
-const mapRef      = ref<{ flyToSlug: (slug: string) => void } | null>(null)
+const mapRef      = ref<{ flyToSlug: (slug: string) => void; reloadSource: () => Promise<void> } | null>(null)
 const hoveredSlug = ref<string | null>(null)
 const mapReaches  = ref<MapReachItem[]>([])
 const mapZoom     = ref(4)
@@ -452,7 +600,7 @@ function onMapHover(slug: string | null) {
 
 // Map reach click → navigate to reach page
 function onReachClick(slug: string) {
-  navigateTo(`/reaches/${slug}`)
+  navigateTo(mode.value === 'user' ? `/my/reaches/${slug}` : `/reaches/${slug}`)
 }
 
 // List row click → fly map to reach, hide list on mobile

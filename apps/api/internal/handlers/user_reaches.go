@@ -81,6 +81,143 @@ type userReachDetail struct {
 	FlowRanges            []userReachFlowRange `json:"flow_ranges"`
 }
 
+// ── MapAll ────────────────────────────────────────────────────────────────────
+
+// GET /api/v1/me/reaches/map/all
+//
+// Returns GeoJSON FeatureCollection of the owner's user reaches. Uses stored
+// centerline when present; falls back to a 2-point LineString from put_in →
+// take_out so every reach renders on the map.
+func (h *UserReachHandler) MapAll(w http.ResponseWriter, r *http.Request) {
+	ownerID, ok := h.ownerID(r)
+	if !ok {
+		errorResponse(w, http.StatusUnauthorized, "authentication required")
+		return
+	}
+
+	rows, err := h.db.Query(r.Context(), `
+		SELECT
+			ur.id, ur.slug, ur.name, ur.river_name,
+			ST_AsGeoJSON(ur.centerline::geometry)  AS centerline_json,
+			ST_X(ur.put_in::geometry)              AS put_in_lng,
+			ST_Y(ur.put_in::geometry)              AS put_in_lat,
+			ST_X(ur.take_out::geometry)            AS take_out_lng,
+			ST_Y(ur.take_out::geometry)            AS take_out_lat,
+			COALESCE(lr.value, cg.last_value_cfs)  AS current_cfs,
+			CASE
+				WHEN COALESCE(lr.value, cg.last_value_cfs) IS NULL OR fr.label IS NULL THEN 'unknown'
+				WHEN fr.label = 'running' THEN 'runnable'
+				WHEN fr.label = 'low'     THEN 'caution'
+				WHEN fr.label = 'high'    THEN 'flood'
+				ELSE 'unknown'
+			END AS flow_status,
+			ur.primary_gauge_id::text AS gauge_id
+		FROM user_reaches ur
+		LEFT JOIN custom_gauges cg ON cg.id = ur.custom_gauge_id
+		LEFT JOIN LATERAL (
+			SELECT value FROM gauge_readings
+			WHERE gauge_id = ur.primary_gauge_id
+			  AND timestamp > NOW() - INTERVAL '48 hours'
+			ORDER BY timestamp DESC LIMIT 1
+		) lr ON TRUE
+		LEFT JOIN LATERAL (
+			SELECT label FROM user_reach_flow_ranges
+			WHERE user_reach_id = ur.id
+			  AND (min_value IS NULL OR COALESCE(lr.value, cg.last_value_cfs) >= min_value)
+			  AND (max_value IS NULL OR COALESCE(lr.value, cg.last_value_cfs) <  max_value)
+			ORDER BY min_value ASC NULLS FIRST
+			LIMIT 1
+		) fr ON TRUE
+		WHERE ur.owner_id = $1
+	`, ownerID)
+	if err != nil {
+		errorResponse(w, http.StatusInternalServerError, "query failed")
+		return
+	}
+	defer rows.Close()
+
+	type featureProps struct {
+		ID          string   `json:"id"`
+		Slug        string   `json:"slug"`
+		Name        string   `json:"name"`
+		RiverName   *string  `json:"river_name"`
+		CommonName  *string  `json:"common_name"`
+		ClassMax    *float64 `json:"class_max"`
+		FlowStatus  string   `json:"flow_status"`
+		CurrentCFS  *float64 `json:"current_cfs"`
+		GaugeID     *string  `json:"gauge_id"`
+		IsUserReach bool     `json:"is_user_reach"`
+	}
+	type feature struct {
+		Type       string          `json:"type"`
+		Geometry   json.RawMessage `json:"geometry"`
+		Properties featureProps    `json:"properties"`
+	}
+
+	features := make([]feature, 0)
+	for rows.Next() {
+		var (
+			id, slug, name  string
+			riverName       *string
+			centerlineJSON  *string
+			putInLng, putInLat   float64
+			takeOutLng, takeOutLat float64
+			currentCFS      *float64
+			flowStatus      string
+			gaugeID         *string
+		)
+		if err := rows.Scan(
+			&id, &slug, &name, &riverName,
+			&centerlineJSON,
+			&putInLng, &putInLat, &takeOutLng, &takeOutLat,
+			&currentCFS, &flowStatus, &gaugeID,
+		); err != nil {
+			continue
+		}
+
+		var geom json.RawMessage
+		if centerlineJSON != nil && *centerlineJSON != "" {
+			geom = json.RawMessage(*centerlineJSON)
+		} else {
+			// Synthesize a 2-point LineString from put_in → take_out.
+			type lineString struct {
+				Type        string      `json:"type"`
+				Coordinates [][2]float64 `json:"coordinates"`
+			}
+			raw, _ := json.Marshal(lineString{
+				Type:        "LineString",
+				Coordinates: [][2]float64{{putInLng, putInLat}, {takeOutLng, takeOutLat}},
+			})
+			geom = json.RawMessage(raw)
+		}
+
+		features = append(features, feature{
+			Type:     "Feature",
+			Geometry: geom,
+			Properties: featureProps{
+				ID:          id,
+				Slug:        slug,
+				Name:        name,
+				RiverName:   riverName,
+				CommonName:  nil,
+				ClassMax:    nil,
+				FlowStatus:  flowStatus,
+				CurrentCFS:  currentCFS,
+				GaugeID:     gaugeID,
+				IsUserReach: true,
+			},
+		})
+	}
+
+	type featureCollection struct {
+		Type     string    `json:"type"`
+		Features []feature `json:"features"`
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "private, no-cache")
+	_ = json.NewEncoder(w).Encode(featureCollection{Type: "FeatureCollection", Features: features})
+}
+
 // ── List ─────────────────────────────────────────────────────────────────────
 
 // GET /api/v1/me/reaches

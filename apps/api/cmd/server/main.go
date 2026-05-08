@@ -193,6 +193,7 @@ func main() {
 		r.Get("/me/reaches", userReaches.List)
 		r.Post("/me/reaches", userReaches.Create)
 		r.Post("/me/reaches/import", userReaches.Import)
+		r.Get("/me/reaches/map/all", userReaches.MapAll)
 		r.Get("/me/reaches/{slug}", userReaches.Get)
 		r.Patch("/me/reaches/{slug}", userReaches.Update)
 		r.Delete("/me/reaches/{slug}", userReaches.Delete)

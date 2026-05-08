@@ -58,7 +58,12 @@ export interface ReachListItem {
   current_cfs: number | null
 }
 
-const props = defineProps<{ hoveredSlug?: string | null; embedded?: boolean }>()
+const props = defineProps<{
+  hoveredSlug?: string | null
+  embedded?: boolean
+  sourceUrl?: string | null
+  sourceHeaders?: Record<string, string>
+}>()
 const emit  = defineEmits<{
   (e: 'reaches-updated', reaches: ReachListItem[]): void
   (e: 'bounds-updated', bbox: string): void
@@ -86,7 +91,7 @@ function flyToSlug(slug: string) {
   )
 }
 
-defineExpose({ flyToSlug })
+defineExpose({ flyToSlug, reloadSource })
 
 const { apiBase } = useRuntimeConfig().public
 const container   = ref<HTMLDivElement>()
@@ -314,7 +319,8 @@ let allServerFeatures: ReachFeature[] = []
 async function loadAllReaches() {
   if (!map) return
   try {
-    const res = await fetch(`${apiBase}/api/v1/reaches/map/all`)
+    const url = props.sourceUrl ?? `${apiBase}/api/v1/reaches/map/all`
+    const res = await fetch(url, props.sourceHeaders ? { headers: props.sourceHeaders } : undefined)
     if (!res.ok) return
     const fc = await res.json()
     allServerFeatures = fc.features ?? []
@@ -323,6 +329,13 @@ async function loadAllReaches() {
   } catch (e) {
     console.warn('[ReachesMap] fetch:', e)
   }
+}
+
+/** Reload features from the current source (called when sourceUrl/sourceHeaders change). */
+async function reloadSource() {
+  allServerFeatures = []
+  loadedFeatures = []
+  await loadAllReaches()
 }
 
 /** Filter already-loaded features to the current viewport and update layers. */
@@ -493,20 +506,28 @@ function relativeTime(iso: string): string {
   return `${Math.floor(m / 60)}h ${m % 60}m ago`
 }
 
+// Reload features when the data source changes (e.g. toggling curated ↔ user mode)
+watch(() => props.sourceUrl, () => {
+  if (map) reloadSource()
+})
+
 // Sync hover highlight from parent (sidebar hovering a row)
 watch(() => props.hoveredSlug, slug => {
   if (!map || !map.getLayer('reach-highlight')) return
   map.setFilter('reach-highlight', ['==', ['get', 'slug'], slug ?? ''])
 })
 
-// Line colors: I-II green, III blue, IV near-black, V red (expert warning)
-// Icon colors: all black for IV+V — only the line changes for V
+// Line colors: user reaches default blue; curated: I-II green, III blue, IV near-black, V red
 function difficultyColorExpr(): maplibregl.ExpressionSpecification {
-  return ['step', ['coalesce', ['get', 'class_max'], 0],
-    '#16a34a',       // 0–2.9  I–II+  green
-    3.0, '#3b82f6',  // 3.0–3.9 III   blue
-    4.0, '#1f2937',  // 4.0–4.9 IV    near-black
-    5.0, '#dc2626',  // 5.0+    V     red
+  return ['case',
+    ['boolean', ['coalesce', ['get', 'is_user_reach'], false], false],
+    '#3b82f6',  // user reach (no class rating) → blue-500
+    ['step', ['coalesce', ['get', 'class_max'], 0],
+      '#16a34a',       // 0–2.9  I–II+  green
+      3.0, '#3b82f6',  // 3.0–3.9 III   blue
+      4.0, '#1f2937',  // 4.0–4.9 IV    near-black
+      5.0, '#dc2626',  // 5.0+    V     red
+    ],
   ] as any
 }
 </script>
