@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
-    <p class="text-sm text-gray-400">Signing in…</p>
+  <div class="min-h-screen flex items-center justify-center bg-neutral-50 dark:bg-neutral-950">
+    <p class="text-sm text-neutral-400">Signing in…</p>
   </div>
 </template>
 

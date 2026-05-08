@@ -33,8 +33,8 @@ onMounted(async () => {
 const arrowGlyph = computed(() => ({ rising: '↑', falling: '↓', flat: '→' }[trend.value]))
 const arrowClass = computed(() => ({
   'text-red-500':    trend.value === 'rising',
-  'text-blue-400':   trend.value === 'falling',
-  'text-gray-400':   trend.value === 'flat',
+  'text-primary-400':   trend.value === 'falling',
+  'text-neutral-400':   trend.value === 'flat',
   'text-sm font-semibold': props.size === 'sm',
   'text-xl font-bold': props.size === 'lg',
 }))

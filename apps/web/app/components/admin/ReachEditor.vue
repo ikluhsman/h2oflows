@@ -2,7 +2,7 @@
   <div>
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-12">
-      <div class="w-6 h-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+      <div class="w-6 h-6 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" />
     </div>
 
     <!-- Error -->
@@ -12,41 +12,41 @@
 
     <!-- Editor -->
     <div v-else-if="repinReach" class="space-y-4">
-      <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100">
-        {{ repinReach.name }}<span v-if="repinReach.river_name" class="text-gray-400 font-normal"> · {{ repinReach.river_name }}</span>
+      <h3 class="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+        {{ repinReach.name }}<span v-if="repinReach.river_name" class="text-neutral-400 font-normal"> · {{ repinReach.river_name }}</span>
       </h3>
 
       <!-- Metadata form -->
-      <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-3">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Metadata</p>
+      <div class="rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 bg-white dark:bg-neutral-900 space-y-3">
+        <p class="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Metadata</p>
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Reach name <span class="text-red-400">*</span></label>
-          <input v-model="repinForm.name" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+          <label class="block text-xs text-neutral-500 mb-1">Reach name <span class="text-red-400">*</span></label>
+          <input v-model="repinForm.name" class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm" />
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Slug</label>
+          <label class="block text-xs text-neutral-500 mb-1">Slug</label>
           <div class="flex items-center gap-2">
-            <input v-model="repinForm.slug" class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-xs font-mono" />
-            <span v-if="repinSlugChecking" class="text-xs text-gray-400 shrink-0">checking…</span>
+            <input v-model="repinForm.slug" class="flex-1 rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-xs font-mono" />
+            <span v-if="repinSlugChecking" class="text-xs text-neutral-400 shrink-0">checking…</span>
             <span v-else-if="repinForm.slug && repinSlugAvailable === true" class="text-xs text-green-600 dark:text-green-400 shrink-0">available</span>
             <span v-else-if="repinForm.slug && repinSlugAvailable === false" class="text-xs text-red-500 shrink-0">taken</span>
           </div>
-          <p class="text-xs text-gray-400 mt-0.5">Changing the slug will break existing links.</p>
+          <p class="text-xs text-neutral-400 mt-0.5">Changing the slug will break existing links.</p>
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Common name</label>
-          <input v-model="repinForm.commonName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+          <label class="block text-xs text-neutral-500 mb-1">Common name</label>
+          <input v-model="repinForm.commonName" class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm" />
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1">River</label>
+          <label class="block text-xs text-neutral-500 mb-1">River</label>
           <div class="space-y-1.5">
             <!-- Current assignment + auto-assign -->
             <div class="flex items-center gap-2 flex-wrap">
-              <span v-if="currentRiverName" class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs text-blue-800 dark:text-blue-200 font-medium">
+              <span v-if="currentRiverName" class="flex items-center gap-1 px-2 py-0.5 rounded-md bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-xs text-primary-800 dark:text-primary-200 font-medium">
                 {{ currentRiverName }}
-                <button class="ml-0.5 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300" @click="repinRiverId = ''; repinForm.riverName = ''; riverSearch = ''">✕</button>
+                <button class="ml-0.5 text-primary-400 hover:text-primary-600 dark:hover:text-primary-300" @click="repinRiverId = ''; repinForm.riverName = ''; riverSearch = ''">✕</button>
               </span>
-              <span v-else class="text-xs text-gray-400 italic">Unassigned</span>
+              <span v-else class="text-xs text-neutral-400 italic">Unassigned</span>
               <UButton size="xs" variant="outline" color="neutral" :loading="repinRiverNameFetching" :disabled="!repinUpComID && !repinAnchorSnap && !repinAnchorComID" @click="fetchRiverName">Auto-assign from NLDI</UButton>
             </div>
             <!-- River search -->
@@ -54,22 +54,22 @@
               <input
                 v-model="riverSearch"
                 placeholder="Search rivers to assign…"
-                class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
+                class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm"
                 @focus="showRiverDropdown = true"
                 @blur="hideRiverDropdown()"
               />
               <div
                 v-if="showRiverDropdown && riverSearchResults.length"
-                class="absolute z-20 left-0 right-0 mt-0.5 rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg max-h-48 overflow-y-auto"
+                class="absolute z-20 left-0 right-0 mt-0.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg max-h-48 overflow-y-auto"
               >
                 <button
                   v-for="rv in riverSearchResults"
                   :key="rv.id"
-                  class="w-full text-left px-3 py-1.5 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center gap-2"
+                  class="w-full text-left px-3 py-1.5 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800 flex items-center gap-2"
                   @mousedown.prevent="selectRiver(rv)"
                 >
                   <span class="flex-1 truncate">{{ rv.name }}</span>
-                  <span v-if="rv.state_abbr" class="text-xs text-gray-400 shrink-0">{{ rv.state_abbr }}</span>
+                  <span v-if="rv.state_abbr" class="text-xs text-neutral-400 shrink-0">{{ rv.state_abbr }}</span>
                 </button>
               </div>
             </div>
@@ -77,22 +77,22 @@
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">Class min</label>
-            <input v-model.number="repinForm.classMin" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+            <label class="block text-xs text-neutral-500 mb-1">Class min</label>
+            <input v-model.number="repinForm.classMin" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm" />
           </div>
           <div>
-            <label class="block text-xs text-gray-500 mb-1">Class max</label>
-            <input v-model.number="repinForm.classMax" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
+            <label class="block text-xs text-neutral-500 mb-1">Class max</label>
+            <input v-model.number="repinForm.classMax" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm" />
           </div>
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs text-gray-500 mb-1">Multi-day (days)</label>
-            <input v-model.number="repinForm.multiDay" type="number" min="1" max="30" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" />
-            <p class="text-xs text-gray-400 mt-0.5">1 = single day</p>
+            <label class="block text-xs text-neutral-500 mb-1">Multi-day (days)</label>
+            <input v-model.number="repinForm.multiDay" type="number" min="1" max="30" class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm" />
+            <p class="text-xs text-neutral-400 mt-0.5">1 = single day</p>
           </div>
           <div class="flex items-start pt-5">
-            <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700 dark:text-gray-300">
+            <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-neutral-700 dark:text-neutral-300">
               <input type="checkbox" v-model="repinForm.permitRequired" class="rounded" />
               Permit required
             </label>
@@ -106,15 +106,15 @@
       </div>
 
       <!-- Description editor -->
-      <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-2">
+      <div class="rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 bg-white dark:bg-neutral-900 space-y-2">
         <div class="flex items-center justify-between">
-          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</p>
+          <p class="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Description</p>
           <UButton size="xs" variant="outline" color="neutral" :loading="repinDescGenerating" @click="generateDescription">Generate with AI</UButton>
         </div>
         <textarea
           v-model="repinDescEdit"
           rows="5"
-          class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm resize-y"
+          class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm resize-y"
           placeholder="No description yet — click Generate to create one with AI, or type directly."
         />
         <div class="flex items-center gap-3">
@@ -125,29 +125,29 @@
       </div>
 
       <!-- Flow bands editor -->
-      <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-3">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow bands</p>
+      <div class="rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 bg-white dark:bg-neutral-900 space-y-3">
+        <p class="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Flow bands</p>
         <div class="space-y-2">
           <div v-for="band in repinFlowBandsDef" :key="band.key" class="flex items-center gap-2 text-xs">
             <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="`background:${band.dot}`" />
-            <span class="w-20 shrink-0 text-gray-600 dark:text-gray-400">{{ band.label }}</span>
+            <span class="w-20 shrink-0 text-neutral-600 dark:text-neutral-400">{{ band.label }}</span>
             <template v-if="band.showMin">
               <input
                 v-model.number="repinFlowBands[band.key].min"
                 type="number" min="0" placeholder="min cfs"
-                class="w-24 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-1 text-xs"
+                class="w-24 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-1.5 py-1 text-xs"
               />
             </template>
             <span v-else class="w-24" />
-            <span class="text-gray-400">–</span>
+            <span class="text-neutral-400">–</span>
             <template v-if="band.showMax">
               <input
                 v-model.number="repinFlowBands[band.key].max"
                 type="number" min="0" placeholder="max cfs"
-                class="w-24 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-1 text-xs"
+                class="w-24 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-1.5 py-1 text-xs"
               />
             </template>
-            <span v-else class="w-24 text-gray-400 italic">no limit</span>
+            <span v-else class="w-24 text-neutral-400 italic">no limit</span>
           </div>
         </div>
         <div class="flex items-center gap-3 pt-1">
@@ -158,8 +158,8 @@
       </div>
 
       <!-- Flow lines & gauge -->
-      <div class="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-3">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow Lines &amp; Gauge</p>
+      <div class="rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 bg-white dark:bg-neutral-900 space-y-3">
+        <p class="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Flow Lines &amp; Gauge</p>
 
         <div class="flex flex-wrap items-center gap-2">
           <UButton
@@ -168,21 +168,21 @@
             :variant="repinPickMode ? 'solid' : 'outline'"
             @click="repinPickMode = !repinPickMode"
           >{{ repinPickMode ? 'Cancel' : 'Re-anchor' }}</UButton>
-          <span v-if="repinAnchorSnapping" class="text-xs text-blue-600 dark:text-blue-400 animate-pulse">Snapping to NHD…</span>
+          <span v-if="repinAnchorSnapping" class="text-xs text-primary-600 dark:text-primary-400 animate-pulse">Snapping to NHD…</span>
           <span v-if="repinAnchorError" class="text-xs text-red-500">{{ repinAnchorError }}</span>
         </div>
 
-        <div v-if="repinAnchorSnap" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs">
-          <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
-          <span class="font-medium text-blue-800 dark:text-blue-200">Anchor ComID {{ repinAnchorSnap.comid }}</span>
-          <span v-if="repinAnchorSnap.name" class="text-blue-600 dark:text-blue-300">{{ repinAnchorSnap.name }}</span>
+        <div v-if="repinAnchorSnap" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-xs">
+          <span class="w-2.5 h-2.5 rounded-full bg-primary-600 shrink-0" />
+          <span class="font-medium text-primary-800 dark:text-primary-200">Anchor ComID {{ repinAnchorSnap.comid }}</span>
+          <span v-if="repinAnchorSnap.name" class="text-primary-600 dark:text-primary-300">{{ repinAnchorSnap.name }}</span>
         </div>
 
         <div v-if="repinAnchorSnap || repinDownstream" class="flex items-center gap-2 text-xs flex-wrap">
-          <span class="text-gray-500 shrink-0">Click map for:</span>
+          <span class="text-neutral-500 shrink-0">Click map for:</span>
           <button
             class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
-            :class="repinComIDEditMode === 'up' && !repinGaugeSelectMode ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+            :class="repinComIDEditMode === 'up' && !repinGaugeSelectMode ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
             @click="repinGaugeSelectMode = false; repinComIDEditMode = 'up'"
           >
             <span class="w-2 h-2 rounded-full bg-green-500 shrink-0" />
@@ -190,7 +190,7 @@
           </button>
           <button
             class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
-            :class="repinComIDEditMode === 'down' && !repinGaugeSelectMode ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+            :class="repinComIDEditMode === 'down' && !repinGaugeSelectMode ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
             @click="repinGaugeSelectMode = false; repinComIDEditMode = 'down'"
           >
             <span class="w-2 h-2 rounded-full bg-red-500 shrink-0" />
@@ -198,7 +198,7 @@
           </button>
           <button
             class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            :class="repinGaugeSelectMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+            :class="repinGaugeSelectMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium' : 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
             :disabled="!repinGauges && !repinUpComID"
             @click="repinGaugeSelectMode = !repinGaugeSelectMode; if (!repinGaugeSelectMode) repinPendingGauge = null"
           >
@@ -209,7 +209,7 @@
           </button>
           <button
             v-if="repinPrimaryGauge && !repinGaugeSelectMode"
-            class="px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 text-gray-400 hover:text-red-500 hover:border-red-400 transition-colors text-xs disabled:opacity-50"
+            class="px-2 py-1 rounded-md border border-neutral-200 dark:border-neutral-700 text-neutral-400 hover:text-red-500 hover:border-red-400 transition-colors text-xs disabled:opacity-50"
             :disabled="repinGaugeSaving"
             title="Clear gauge"
             @click="clearGauge"
@@ -228,7 +228,7 @@
         <p v-if="repinGaugeError" class="text-xs text-red-500">{{ repinGaugeError }}</p>
         <p v-if="repinGaugeSelectMode" class="text-xs text-amber-600 dark:text-amber-400">Click an amber dot on the map to assign a primary gauge.</p>
 
-        <p v-if="repinFlowlinesLoading" class="text-xs text-blue-500 animate-pulse">Loading downstream mainstem…</p>
+        <p v-if="repinFlowlinesLoading" class="text-xs text-primary-500 animate-pulse">Loading downstream mainstem…</p>
 
         <NHDExplorerMap
           :upstream-flowlines="repinTributaries"

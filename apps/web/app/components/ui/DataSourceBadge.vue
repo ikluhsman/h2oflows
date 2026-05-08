@@ -68,7 +68,7 @@ const icon = computed(() => {
 
 const badgeClass = computed(() => {
   if (props.source === 'usgs' || props.source === 'dwr') {
-    return 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-300'
+    return 'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-300'
   }
   if (props.verified) {
     if (props.source === 'community') {
@@ -82,7 +82,7 @@ const badgeClass = computed(() => {
   if (props.source === 'community') {
     return 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-300'
   }
-  return 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+  return 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'
 })
 
 const tooltipText = computed(() => {

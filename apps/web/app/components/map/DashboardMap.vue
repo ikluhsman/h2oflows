@@ -1,24 +1,24 @@
 <template>
-  <div class="relative w-full rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-900" style="height: 420px;">
+  <div class="relative w-full rounded-xl overflow-hidden bg-neutral-100 dark:bg-neutral-900" style="height: 420px;">
     <div ref="container" class="w-full h-full" />
 
-    <div v-if="!mapReady" class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm pointer-events-none">
+    <div v-if="!mapReady" class="absolute inset-0 flex items-center justify-center text-neutral-400 text-sm pointer-events-none">
       Loading map…
     </div>
 
-    <div v-if="mapReady" class="absolute bottom-7 left-2 z-10 flex rounded-md shadow overflow-hidden border border-gray-200 dark:border-gray-600 text-xs font-medium">
+    <div v-if="mapReady" class="absolute bottom-7 left-2 z-10 flex rounded-md shadow overflow-hidden border border-neutral-200 dark:border-neutral-600 text-xs font-medium">
       <button
         v-for="opt in BASEMAP_OPTIONS" :key="opt.value"
         class="px-2 py-1 transition-colors"
         :class="basemap === opt.value
-          ? 'bg-blue-600 text-white'
-          : 'bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
+          ? 'bg-primary-600 text-white'
+          : 'bg-white/90 dark:bg-neutral-800/90 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700'"
         @click="setBasemap(opt.value)"
       >{{ opt.label }}</button>
     </div>
 
     <div v-if="mapReady && gauges.length === 0" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <p class="text-sm text-gray-400 bg-white/80 dark:bg-gray-900/80 rounded-lg px-4 py-2">
+      <p class="text-sm text-neutral-400 bg-white/80 dark:bg-neutral-900/80 rounded-lg px-4 py-2">
         Add gauges above to see them on the map.
       </p>
     </div>

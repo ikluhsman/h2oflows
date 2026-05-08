@@ -2,19 +2,19 @@
   <div class="pb-20">
     <!-- Step 1: pick anchor -->
     <template v-if="!anchorSnap && !anchorSnapping">
-      <div class="mb-3 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-3 py-2.5 text-xs text-blue-800 dark:text-blue-200">
+      <div class="mb-3 rounded-lg bg-primary-50 dark:bg-primary-950/60 border border-primary-200 dark:border-primary-800 px-3 py-2.5 text-xs text-primary-800 dark:text-primary-200">
         <span class="font-medium">Tap the river on the map</span> near the reach start point. We'll snap to the nearest NHD flowline.
       </div>
     </template>
     <template v-else-if="anchorSnapping">
-      <div class="mb-3 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 animate-pulse">
+      <div class="mb-3 rounded-lg bg-primary-50 dark:bg-primary-950/60 border border-primary-200 dark:border-primary-800 px-3 py-2 text-xs text-primary-700 dark:text-primary-300 animate-pulse">
         Snapping to NHD…
       </div>
     </template>
     <template v-else-if="anchorSnap">
-      <div class="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs">
-        <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
-        <span class="flex-1 font-medium text-blue-800 dark:text-blue-200">
+      <div class="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-xs">
+        <span class="w-2.5 h-2.5 rounded-full bg-primary-600 shrink-0" />
+        <span class="flex-1 font-medium text-primary-800 dark:text-primary-200">
           <template v-if="anchorSnap.name">{{ anchorSnap.name }}</template>
           <template v-else>ComID {{ anchorSnap.comid }}</template>
         </span>
@@ -24,19 +24,19 @@
     </template>
 
     <!-- Step 2: guide text for ComID selection -->
-    <div v-if="anchorSnap && !upComID && !gaugeSelectMode" class="mb-3 rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+    <div v-if="anchorSnap && !upComID && !gaugeSelectMode" class="mb-3 rounded-lg bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-xs text-neutral-600 dark:text-neutral-300">
       Click the <strong>put-in</strong> flowline segment on the map.
     </div>
-    <div v-else-if="upComID && !downComID && !gaugeSelectMode" class="mb-3 rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+    <div v-else-if="upComID && !downComID && !gaugeSelectMode" class="mb-3 rounded-lg bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-xs text-neutral-600 dark:text-neutral-300">
       Now click the <strong>take-out</strong> flowline segment.
     </div>
 
     <!-- ComID + gauge slot selector -->
     <div v-if="tributaries" class="flex items-center gap-2 mb-3 text-xs flex-wrap">
-      <span class="text-gray-500 shrink-0">Click for:</span>
+      <span class="text-neutral-500 shrink-0">Click for:</span>
       <button
         class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
-        :class="comIDSlot === 'up' && !gaugeSelectMode ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+        :class="comIDSlot === 'up' && !gaugeSelectMode ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
         @click="comIDSlot = 'up'; gaugeSelectMode = false"
       >
         <span class="w-2 h-2 rounded-full bg-green-500 shrink-0" />
@@ -44,7 +44,7 @@
       </button>
       <button
         class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
-        :class="comIDSlot === 'down' && !gaugeSelectMode ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+        :class="comIDSlot === 'down' && !gaugeSelectMode ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
         @click="comIDSlot = 'down'; gaugeSelectMode = false"
       >
         <span class="w-2 h-2 rounded-full bg-red-500 shrink-0" />
@@ -52,13 +52,13 @@
       </button>
       <button
         class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
-        :class="gaugeSelectMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+        :class="gaugeSelectMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium' : 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
         @click="gaugeSelectMode = !gaugeSelectMode; if (!gaugeSelectMode) pendingGauge = null"
       >
         <span class="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
         <template v-if="gaugeSelectMode">Cancel gauge</template>
         <template v-else-if="pendingGauge">Gauge · <span class="font-mono">{{ pendingGauge.externalId }}</span></template>
-        <template v-else>Gauge <span class="text-gray-400 font-normal">(optional)</span></template>
+        <template v-else>Gauge <span class="text-neutral-400 font-normal">(optional)</span></template>
       </button>
     </div>
 
@@ -91,15 +91,15 @@
         @gauge-select="onGaugeSelect"
       />
     </ClientOnly>
-    <p v-if="downstreamLoading" class="text-xs text-blue-500 dark:text-blue-400 mt-1 animate-pulse">Loading downstream mainstem…</p>
+    <p v-if="downstreamLoading" class="text-xs text-primary-500 dark:text-primary-400 mt-1 animate-pulse">Loading downstream mainstem…</p>
 
     <!-- Preview centerline controls -->
     <div v-if="upComID && downComID" class="flex items-center gap-2 mt-1 flex-wrap">
       <UButton size="xs" variant="outline" color="neutral" :loading="previewLoading" @click="fetchPreviewCenterline">
         {{ previewCenterline ? 'Refresh preview' : 'Preview centerline' }}
       </UButton>
-      <span v-if="previewCenterline" class="text-xs text-blue-600 dark:text-blue-400">Dashed line shows trimmed reach</span>
-      <span v-if="riverNameFetching" class="text-xs text-gray-400 animate-pulse">Looking up river…</span>
+      <span v-if="previewCenterline" class="text-xs text-primary-600 dark:text-primary-400">Dashed line shows trimmed reach</span>
+      <span v-if="riverNameFetching" class="text-xs text-neutral-400 animate-pulse">Looking up river…</span>
     </div>
 
     <!-- River name auto-detected -->
@@ -109,21 +109,21 @@
     </div>
 
     <!-- Reach form — shown once both ComIDs selected -->
-    <div v-if="upComID && downComID" class="mt-4 space-y-3 rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
-      <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100">Reach details</h3>
+    <div v-if="upComID && downComID" class="mt-4 space-y-3 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 bg-white dark:bg-neutral-900">
+      <h3 class="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Reach details</h3>
 
       <!-- River name -->
       <div>
-        <label class="block text-xs text-gray-500 mb-1">River name <span class="text-gray-300">(from NHD)</span></label>
+        <label class="block text-xs text-neutral-500 mb-1">River name <span class="text-neutral-300">(from NHD)</span></label>
         <div class="flex items-center gap-2">
           <input
             v-model="form.riverName"
             :readonly="!riverNameOverride"
-            class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
-            :class="riverNameOverride ? '' : 'text-gray-400 dark:text-gray-500 cursor-default'"
+            class="flex-1 rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm"
+            :class="riverNameOverride ? '' : 'text-neutral-400 dark:text-neutral-500 cursor-default'"
             placeholder="Auto-filled from NHD"
           />
-          <button class="text-xs text-blue-500 hover:text-blue-400 shrink-0" @click="riverNameOverride = !riverNameOverride">
+          <button class="text-xs text-primary-500 hover:text-primary-400 shrink-0" @click="riverNameOverride = !riverNameOverride">
             {{ riverNameOverride ? 'Lock' : 'Override' }}
           </button>
         </div>
@@ -131,43 +131,43 @@
 
       <!-- Reach name -->
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Reach name <span class="text-red-400">*</span></label>
-        <input v-model="form.name" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Upper Canyon" />
+        <label class="block text-xs text-neutral-500 mb-1">Reach name <span class="text-red-400">*</span></label>
+        <input v-model="form.name" class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm" placeholder="e.g. Upper Canyon" />
       </div>
 
       <!-- Notes -->
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Notes <span class="text-gray-300">(optional)</span></label>
+        <label class="block text-xs text-neutral-500 mb-1">Notes <span class="text-neutral-300">(optional)</span></label>
         <textarea
           v-model="form.note"
           rows="2"
-          class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm resize-y"
+          class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm resize-y"
           placeholder="Beta, access notes, hazards…"
         />
       </div>
 
       <!-- Flow bands -->
-      <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-3 space-y-2">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow bands (CFS) <span class="font-normal text-gray-400 normal-case">optional</span></p>
+      <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/50 p-3 space-y-2">
+        <p class="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Flow bands (CFS) <span class="font-normal text-neutral-400 normal-case">optional</span></p>
         <div class="space-y-2">
           <div v-for="band in flowBands" :key="band.key" class="flex items-center gap-3">
             <span class="w-16 text-xs font-medium" :class="band.labelClass">{{ band.label }}</span>
             <input
               v-model.number="form.flowRanges[band.key].min"
               type="number" min="0"
-              class="w-24 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-1 text-xs"
+              class="w-24 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-1.5 py-1 text-xs"
               :placeholder="band.showMin ? 'min' : '—'"
               :disabled="!band.showMin"
             />
-            <span class="text-gray-400 text-xs">–</span>
+            <span class="text-neutral-400 text-xs">–</span>
             <input
               v-model.number="form.flowRanges[band.key].max"
               type="number" min="0"
-              class="w-24 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-1 text-xs"
+              class="w-24 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-1.5 py-1 text-xs"
               :placeholder="band.showMax ? 'max' : '—'"
               :disabled="!band.showMax"
             />
-            <span class="text-xs text-gray-400">cfs</span>
+            <span class="text-xs text-neutral-400">cfs</span>
           </div>
         </div>
       </div>
@@ -240,7 +240,7 @@ const form = ref({
 })
 
 const flowBands = [
-  { key: 'low',     label: 'Too Low',  labelClass: 'text-gray-400',    showMin: false, showMax: true  },
+  { key: 'low',     label: 'Too Low',  labelClass: 'text-neutral-400',    showMin: false, showMax: true  },
   { key: 'running', label: 'Runnable', labelClass: 'text-emerald-500', showMin: true,  showMax: true  },
   { key: 'high',    label: 'High',     labelClass: 'text-sky-400',     showMin: true,  showMax: false },
 ] as const

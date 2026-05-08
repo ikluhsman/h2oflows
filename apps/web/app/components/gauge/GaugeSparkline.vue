@@ -2,15 +2,15 @@
   <div class="w-full" @click.stop>
     <!-- Window toggle — hidden in compact mode -->
     <div v-if="!compact" class="flex justify-end mb-0.5">
-      <div class="flex text-xs rounded overflow-hidden border border-gray-200 dark:border-gray-700">
+      <div class="flex text-xs rounded overflow-hidden border border-neutral-200 dark:border-neutral-700">
         <button
           class="px-1.5 py-0.5 transition-colors"
-          :class="hours === 12 ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+          :class="hours === 12 ? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200' : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'"
           @click="hours = 12"
         >12h</button>
         <button
           class="px-1.5 py-0.5 transition-colors"
-          :class="hours === 24 ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+          :class="hours === 24 ? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200' : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'"
           @click="hours = 24"
         >24h</button>
       </div>
@@ -18,8 +18,8 @@
 
     <!-- Chart area -->
     <div class="relative w-full" :class="compact ? 'h-6' : 'h-10'">
-      <span v-if="compact" class="absolute top-0 right-0 text-[9px] leading-none text-gray-400 dark:text-gray-500 font-mono z-10 pointer-events-none">{{ hours }}h</span>
-      <div v-if="loading" class="w-full h-full rounded animate-pulse bg-gray-100 dark:bg-gray-800" />
+      <span v-if="compact" class="absolute top-0 right-0 text-[9px] leading-none text-neutral-400 dark:text-neutral-500 font-mono z-10 pointer-events-none">{{ hours }}h</span>
+      <div v-if="loading" class="w-full h-full rounded animate-pulse bg-neutral-100 dark:bg-neutral-800" />
 
       <template v-else-if="points.length >= 2">
         <svg viewBox="0 0 100 40" preserveAspectRatio="none" class="w-full h-full overflow-visible">
@@ -27,8 +27,8 @@
           <path :d="linePath" :stroke="strokeColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
         </svg>
         <!-- Labels outside the scaled SVG so they render at normal proportions -->
-        <span class="absolute top-0 left-0 text-[9px] leading-none text-gray-400 font-mono">{{ maxLabel }}</span>
-        <span class="absolute bottom-0 left-0 text-[9px] leading-none text-gray-400 font-mono">{{ minLabel }}</span>
+        <span class="absolute top-0 left-0 text-[9px] leading-none text-neutral-400 font-mono">{{ maxLabel }}</span>
+        <span class="absolute bottom-0 left-0 text-[9px] leading-none text-neutral-400 font-mono">{{ minLabel }}</span>
       </template>
 
       <svg v-else viewBox="0 0 100 40" preserveAspectRatio="none" class="w-full h-full opacity-20">

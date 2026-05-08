@@ -1,25 +1,25 @@
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+  <div class="min-h-screen flex flex-col items-center justify-center bg-neutral-50 dark:bg-neutral-950 px-4">
     <div class="w-full max-w-sm">
 
       <!-- Logo -->
       <div class="flex flex-col items-center mb-8 gap-3">
-        <svg class="w-10 h-10 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="w-10 h-10 text-primary-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M2 12c2-4 4-6 6-6s4 6 6 6 4-6 6-6" stroke-linecap="round"/>
           <path d="M2 18c2-4 4-6 6-6s4 6 6 6 4-6 6-6" stroke-linecap="round" opacity="0.4"/>
         </svg>
         <div class="text-center">
           <h1 class="text-xl font-bold tracking-tight">H2OFlows</h1>
-          <p class="text-sm text-gray-500 mt-1">Sign in to sync trips and save your dashboard</p>
+          <p class="text-sm text-neutral-500 mt-1">Sign in to sync trips and save your dashboard</p>
         </div>
       </div>
 
       <!-- Card -->
-      <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm p-6 space-y-4">
+      <div class="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-sm p-6 space-y-4">
 
         <!-- Google OAuth -->
         <button
-          class="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+          class="w-full flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-sm font-medium text-neutral-800 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors disabled:opacity-50"
           :disabled="loading"
           @click="signInWithProvider('google')"
         >
@@ -34,9 +34,9 @@
         </button>
 
         <div class="relative flex items-center gap-3">
-          <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700"/>
-          <span class="text-xs text-gray-400">or</span>
-          <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700"/>
+          <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-700"/>
+          <span class="text-xs text-neutral-400">or</span>
+          <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-700"/>
         </div>
 
         <!-- Email / password -->
@@ -48,7 +48,7 @@
               placeholder="Email"
               autocomplete="email"
               required
-              class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
           <div>
@@ -58,7 +58,7 @@
               placeholder="Password"
               autocomplete="current-password"
               required
-              class="w-full px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-full px-3 py-2.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
@@ -67,7 +67,7 @@
           <button
             type="submit"
             :disabled="loading || !email || !password"
-            class="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+            class="w-full py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
           >
             <span v-if="loading">Signing in…</span>
             <span v-else>Sign in</span>
@@ -75,15 +75,15 @@
         </form>
 
         <!-- Sign up link -->
-        <p class="text-xs text-center text-gray-400">
+        <p class="text-xs text-center text-neutral-400">
           Don't have an account?
-          <button class="text-blue-500 hover:text-blue-600 font-medium" @click="signUpWithEmail">Sign up</button>
+          <button class="text-primary-500 hover:text-primary-600 font-medium" @click="signUpWithEmail">Sign up</button>
         </p>
       </div>
 
       <!-- Back to explore -->
       <div class="mt-6 text-center">
-        <NuxtLink to="/explore" class="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+        <NuxtLink to="/explore" class="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300">
           ← Back to explore
         </NuxtLink>
       </div>

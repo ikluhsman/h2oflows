@@ -1,20 +1,20 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <div class="min-h-screen bg-neutral-50 dark:bg-neutral-950">
     <AppHeader />
 
     <div class="flex justify-center px-4 mt-16">
       <div class="w-full max-w-md space-y-5">
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 space-y-4">
-          <h1 class="text-lg font-bold text-gray-900 dark:text-white">Import Custom Gauge</h1>
+        <div class="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-6 space-y-4">
+          <h1 class="text-lg font-bold text-neutral-900 dark:text-white">Import Custom Gauge</h1>
 
           <!-- Auth not ready -->
           <div v-if="!authReady" class="flex justify-center py-4">
-            <div class="w-6 h-6 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+            <div class="w-6 h-6 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" />
           </div>
 
           <!-- Not authenticated -->
           <div v-else-if="!isAuthenticated" class="space-y-3">
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="text-sm text-neutral-500 dark:text-neutral-400">
               Sign in to import this custom gauge formula to your account.
             </p>
             <UButton block @click="router.push('/login')">Sign in to import</UButton>
@@ -33,7 +33,7 @@
 
           <!-- Ready -->
           <div v-else class="space-y-4">
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <p class="text-sm text-neutral-500 dark:text-neutral-400">
               Import a shared custom gauge formula into your account.
             </p>
             <div v-if="importError" class="rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-3 text-sm text-red-600 dark:text-red-400">

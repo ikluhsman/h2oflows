@@ -98,7 +98,7 @@ interface BarMonth {
 }
 
 function barClass(m: BarMonth) {
-  if (m.offline) return 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-600'
+  if (m.offline) return 'bg-neutral-200 dark:bg-neutral-700 text-neutral-400 dark:text-neutral-600'
   if (m.dim)     return m.month === nowMonth ? 'bg-indigo-300 dark:bg-indigo-600' : 'bg-indigo-100 dark:bg-indigo-900'
   return m.month === nowMonth ? 'bg-indigo-500 dark:bg-indigo-400' : 'bg-indigo-200 dark:bg-indigo-800'
 }

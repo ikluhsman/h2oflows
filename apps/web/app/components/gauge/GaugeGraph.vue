@@ -2,12 +2,12 @@
   <div class="space-y-3">
     <!-- Time window toggle -->
     <div class="flex justify-end">
-      <div class="flex text-xs rounded overflow-hidden border border-gray-200 dark:border-gray-700">
+      <div class="flex text-xs rounded overflow-hidden border border-neutral-200 dark:border-neutral-700">
         <button
           v-for="h in ([12, 24, 48] as const)"
           :key="h"
           class="px-2 py-1 transition-colors"
-          :class="hours === h ? 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'"
+          :class="hours === h ? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200' : 'text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300'"
           @click="hours = h"
         >{{ h }}h</button>
       </div>
@@ -20,22 +20,22 @@
       <!-- Hover tooltip -->
       <div
         ref="tooltipEl"
-        class="absolute pointer-events-none text-xs bg-gray-900/90 text-white rounded px-1.5 py-0.5 whitespace-nowrap translate-x-2 -translate-y-full"
+        class="absolute pointer-events-none text-xs bg-neutral-900/90 text-white rounded px-1.5 py-0.5 whitespace-nowrap translate-x-2 -translate-y-full"
         style="display:none; z-index:10"
       />
       <div
         v-if="loading"
-        class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm bg-white/70 dark:bg-gray-900/70"
+        class="absolute inset-0 flex items-center justify-center text-neutral-400 text-sm bg-white/70 dark:bg-neutral-900/70"
       >Loading…</div>
       <div
         v-else-if="readings.length === 0"
-        class="absolute inset-0 flex items-center justify-center text-gray-400 text-sm"
+        class="absolute inset-0 flex items-center justify-center text-neutral-400 text-sm"
       >No readings in this window</div>
     </div>
 
     <!-- Flow range legend -->
     <div v-if="flowRanges.length > 0" class="space-y-1">
-      <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-700 dark:text-gray-300">
+      <div class="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-neutral-700 dark:text-neutral-300">
         <span
           v-for="fr in flowRanges"
           :key="fr.label"
@@ -43,7 +43,7 @@
         >
           <span class="inline-block w-2.5 h-2.5 rounded-sm flex-shrink-0" :style="{ background: bandColorSolid(fr.label) }" />
           <span class="font-medium">{{ labelDisplay(fr.label) }}</span>
-          <span class="text-gray-500 dark:text-gray-400">
+          <span class="text-neutral-500 dark:text-neutral-400">
             {{ fr.min_value != null ? fr.min_value.toLocaleString() : '—' }}–{{ fr.max_value != null ? fr.max_value.toLocaleString() : '∞' }} cfs
           </span>
         </span>

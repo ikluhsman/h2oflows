@@ -31,7 +31,7 @@
     <!-- Sparkline + CFS -->
     <div class="flex items-center gap-2 shrink-0">
       <!-- H2OFlows origin indicator — list view -->
-      <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block text-blue-400/40 dark:text-blue-500/30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <svg class="w-3.5 h-3.5 shrink-0 hidden sm:block text-primary-400/40 dark:text-primary-500/30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
         <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
         <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
       </svg>
@@ -40,12 +40,12 @@
       </div>
       <span class="text-base font-bold tabular-nums min-w-14 text-right" :class="cfsClass">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
-        <span class="text-xs font-normal text-gray-400 dark:text-gray-500">cfs</span>
+        <span class="text-xs font-normal text-neutral-400 dark:text-neutral-500">cfs</span>
       </span>
     </div>
 
     <button
-      class="rounded p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"
+      class="rounded p-1 text-neutral-300 dark:text-neutral-600 hover:text-red-400 dark:hover:text-red-400 transition-colors shrink-0"
       aria-label="Remove gauge"
       @click.stop="removeAndSync(gauge.id, gauge.contextReachSlug)"
     >
@@ -73,28 +73,28 @@
         <UTooltip :text="displayName" :delay-duration="500">
           <span class="font-medium truncate block" :class="density === 'compact' ? 'text-xs' : 'text-sm'">{{ displayName }}</span>
         </UTooltip>
-        <span v-if="density === 'full' && (gauge.contextReachRiverName ?? gauge.riverName)" class="text-xs text-blue-400/70 truncate block">{{ gauge.contextReachRiverName ?? gauge.riverName }}</span>
+        <span v-if="density === 'full' && (gauge.contextReachRiverName ?? gauge.riverName)" class="text-xs text-primary-400/70 truncate block">{{ gauge.contextReachRiverName ?? gauge.riverName }}</span>
         <!-- Permit / multi-day micro-icons (full density only) -->
         <span v-if="density === 'full' && (gauge.contextReachPermitRequired || gauge.contextReachMultiDayDays > 1)" class="inline-flex items-center gap-1.5 mt-0.5">
           <UTooltip v-if="gauge.contextReachPermitRequired" text="Permit Required">
             <svg class="w-3 h-3 text-amber-500 dark:text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M12 7V5a2 2 0 00-2-2H9a2 2 0 00-2 2v6"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>
           </UTooltip>
           <UTooltip v-if="gauge.contextReachMultiDayDays > 1" :text="`${gauge.contextReachMultiDayDays}-Day Trip`">
-            <svg class="w-3 h-3 text-blue-400 dark:text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            <svg class="w-3 h-3 text-primary-400 dark:text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
           </UTooltip>
         </span>
         <!-- Full: reach full name + gauge source/id as subtitle -->
         <p v-if="!hideReachSubtitle && density === 'full'" class="text-xs truncate mt-0.5">
-          <span v-if="contextFullName" class="text-gray-400">{{ contextFullName }}</span>
-          <span v-if="contextFullName && gauge.externalId" class="text-gray-300 dark:text-gray-600"> · </span>
-          <span class="text-gray-400 dark:text-gray-500">{{ gauge.source.toUpperCase() }} {{ gauge.externalId }}</span>
+          <span v-if="contextFullName" class="text-neutral-400">{{ contextFullName }}</span>
+          <span v-if="contextFullName && gauge.externalId" class="text-neutral-300 dark:text-neutral-600"> · </span>
+          <span class="text-neutral-400 dark:text-neutral-500">{{ gauge.source.toUpperCase() }} {{ gauge.externalId }}</span>
         </p>
       </div>
 
       <!-- Remove button -->
       <UTooltip text="Remove gauge">
         <button
-          class="rounded-lg transition-all duration-150 text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+          class="rounded-lg transition-all duration-150 text-neutral-300 dark:text-neutral-600 hover:text-red-400 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
           :class="density === 'compact' ? 'p-1' : 'p-1.5'"
           aria-label="Remove gauge"
           @click.stop="removeAndSync(gauge.id, gauge.contextReachSlug)"
@@ -111,7 +111,7 @@
       <span class="font-bold tabular-nums leading-none" :class="[cfsClass, density === 'compact' ? 'text-xl' : 'text-2xl']">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
       </span>
-      <span class="text-xs text-gray-500">cfs</span>
+      <span class="text-xs text-neutral-500">cfs</span>
       <!-- Trending arrow — shown in comfortable + full -->
       <TrendArrow v-if="currentCfs != null && density !== 'compact'" :gauge-id="gauge.id" class="text-lg" />
       <!-- Badge inline with CFS on sm+ for comfortable + full -->
@@ -162,13 +162,13 @@
     </div>
 
     <!-- Last updated — full only, when no subtitle already shows source info -->
-    <p v-if="density === 'full' && !contextFullName" class="text-xs text-gray-400 mt-1 truncate">
+    <p v-if="density === 'full' && !contextFullName" class="text-xs text-neutral-400 mt-1 truncate">
       {{ gauge.source.toUpperCase() }} · {{ gauge.externalId }}
     </p>
-    <p v-if="density === 'full' && lastUpdatedLabel" class="text-xs text-gray-400 mt-0.5">{{ lastUpdatedLabel }}</p>
+    <p v-if="density === 'full' && lastUpdatedLabel" class="text-xs text-neutral-400 mt-0.5">{{ lastUpdatedLabel }}</p>
 
     <!-- H2OFlows origin badge — comfortable + full -->
-    <div class="flex items-center gap-1 mt-1.5 text-blue-400/50 dark:text-blue-500/40">
+    <div class="flex items-center gap-1 mt-1.5 text-primary-400/50 dark:text-primary-500/40">
       <svg class="w-3 h-3 shrink-0" viewBox="0 0 32 32" fill="none" aria-hidden="true">
         <path d="M4 14c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
         <path d="M4 22c3-6 6-9 8-9s5 9 8 9 5-9 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.6"/>
@@ -182,7 +182,7 @@
       :text="`Also: ${sharedWith.join(', ')}`"
       placement="bottom"
     >
-      <div class="flex items-center gap-1 mt-2 pt-1.5 border-t border-gray-100 dark:border-gray-800 text-slate-400 dark:text-slate-500">
+      <div class="flex items-center gap-1 mt-2 pt-1.5 border-t border-neutral-100 dark:border-neutral-800 text-slate-400 dark:text-slate-500">
         <svg class="w-3 h-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
         <span class="text-[10px] font-medium">Shared gauge</span>
       </div>
@@ -246,7 +246,7 @@ const cfsClass         = computed(() => flowBandCfsClass(displayFlowBand.value, 
 // --- Card chrome ------------------------------------------------------------
 
 const cardClass = computed(() => ({
-  'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900': true,
+  'border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900': true,
 }))
 
 // --- Last updated -----------------------------------------------------------

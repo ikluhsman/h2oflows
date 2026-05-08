@@ -2,20 +2,20 @@
   <div>
     <!-- Step 1: anchor not yet set -->
     <template v-if="!authorAnchorSnap && !authorAnchorSnapping">
-      <div class="mb-3 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-3 py-2.5 text-xs text-blue-800 dark:text-blue-200">
+      <div class="mb-3 rounded-lg bg-primary-50 dark:bg-primary-950/60 border border-primary-200 dark:border-primary-800 px-3 py-2.5 text-xs text-primary-800 dark:text-primary-200">
         <span class="font-medium">Tap the river on the map</span> near the reach start point. We'll snap to the nearest NHD flowline.
       </div>
     </template>
     <template v-else-if="authorAnchorSnapping">
-      <div class="mb-3 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 animate-pulse">
+      <div class="mb-3 rounded-lg bg-primary-50 dark:bg-primary-950/60 border border-primary-200 dark:border-primary-800 px-3 py-2 text-xs text-primary-700 dark:text-primary-300 animate-pulse">
         Snapping to NHD…
       </div>
     </template>
     <!-- Anchor snapped — show controls -->
     <template v-else-if="authorAnchorSnap">
-      <div class="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-xs">
-        <span class="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
-        <span class="flex-1 font-medium text-blue-800 dark:text-blue-200">
+      <div class="mb-3 flex items-center gap-3 px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-950 border border-primary-200 dark:border-primary-800 text-xs">
+        <span class="w-2.5 h-2.5 rounded-full bg-primary-600 shrink-0" />
+        <span class="flex-1 font-medium text-primary-800 dark:text-primary-200">
           <template v-if="authorAnchorSnap.name">{{ authorAnchorSnap.name }}</template>
           <template v-else>ComID {{ authorAnchorSnap.comid }}</template>
         </span>
@@ -25,19 +25,19 @@
     </template>
 
     <!-- Step 2: anchor snapped, prompt for ComID selection -->
-    <div v-if="authorAnchorSnap && !authorUpComID" class="mb-3 rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+    <div v-if="authorAnchorSnap && !authorUpComID" class="mb-3 rounded-lg bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-xs text-neutral-600 dark:text-neutral-300">
       Click the upstream (put-in) flowline segment on the map. Try satellite view to find the boat ramp.
     </div>
-    <div v-else-if="authorUpComID && !authorDownComID" class="mb-3 rounded-lg bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+    <div v-else-if="authorUpComID && !authorDownComID" class="mb-3 rounded-lg bg-neutral-50 dark:bg-neutral-800/60 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-xs text-neutral-600 dark:text-neutral-300">
       Now click the downstream (take-out) flowline segment.
     </div>
 
     <!-- ComID slot selector -->
     <div v-if="authorTributaries" class="flex items-center gap-3 mb-3 text-xs flex-wrap">
-      <span class="text-gray-500 shrink-0">Click flowline for:</span>
+      <span class="text-neutral-500 shrink-0">Click flowline for:</span>
       <button
         class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
-        :class="authorComIDSlot === 'up' ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+        :class="authorComIDSlot === 'up' ? 'border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 font-medium' : 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
         @click="authorComIDSlot = 'up'; authorGaugeSelectMode = false"
       >
         <span class="w-2 h-2 rounded-full bg-green-500 shrink-0" />
@@ -45,7 +45,7 @@
       </button>
       <button
         class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors"
-        :class="authorComIDSlot === 'down' ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+        :class="authorComIDSlot === 'down' ? 'border-red-500 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 font-medium' : 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
         @click="authorComIDSlot = 'down'; authorGaugeSelectMode = false"
       >
         <span class="w-2 h-2 rounded-full bg-red-500 shrink-0" />
@@ -53,7 +53,7 @@
       </button>
       <button
         class="flex items-center gap-1.5 px-2 py-1 rounded-md border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        :class="authorGaugeSelectMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'"
+        :class="authorGaugeSelectMode ? 'border-amber-500 bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 font-medium' : 'border-neutral-200 dark:border-neutral-700 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300'"
         :disabled="!authorGauges && !authorAnchorSnap"
         @click="authorGaugeSelectMode = !authorGaugeSelectMode; if (!authorGaugeSelectMode) authorPendingGauge = null"
       >
@@ -92,13 +92,13 @@
       @comid-select="onComIDSelect"
       @gauge-select="onGaugeSelect"
     />
-    <p v-if="authorDownstreamLoading" class="text-xs text-blue-500 dark:text-blue-400 mt-1 animate-pulse">Loading downstream mainstem…</p>
+    <p v-if="authorDownstreamLoading" class="text-xs text-primary-500 dark:text-primary-400 mt-1 animate-pulse">Loading downstream mainstem…</p>
     <div v-if="authorUpComID && authorDownComID" class="flex items-center gap-2 mt-1 flex-wrap">
       <UButton size="xs" variant="outline" color="neutral" :loading="authorPreviewLoading" @click="previewCenterline">
         {{ authorPreviewCenterline ? 'Refresh preview' : 'Preview centerline' }}
       </UButton>
-      <span v-if="authorPreviewCenterline" class="text-xs text-blue-600 dark:text-blue-400">Dashed line shows trimmed reach</span>
-      <span v-if="authorRiverNameFetching" class="text-xs text-gray-400 animate-pulse">Looking up river…</span>
+      <span v-if="authorPreviewCenterline" class="text-xs text-primary-600 dark:text-primary-400">Dashed line shows trimmed reach</span>
+      <span v-if="authorRiverNameFetching" class="text-xs text-neutral-400 animate-pulse">Looking up river…</span>
     </div>
 
     <!-- "Looks like [river name]" hint — appears once river name is auto-detected -->
@@ -108,8 +108,8 @@
     </div>
 
     <!-- Reach form — shown once both ComIDs selected -->
-    <div v-if="authorUpComID && authorDownComID" class="mt-4 space-y-3 rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900">
-      <h3 class="text-sm font-semibold text-gray-800 dark:text-gray-100">New reach details</h3>
+    <div v-if="authorUpComID && authorDownComID" class="mt-4 space-y-3 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 bg-white dark:bg-neutral-900">
+      <h3 class="text-sm font-semibold text-neutral-800 dark:text-neutral-100">New reach details</h3>
 
       <!-- ComID summary -->
       <div class="grid grid-cols-2 gap-2 text-xs">
@@ -131,13 +131,13 @@
 
       <!-- River name -->
       <div>
-        <label class="block text-xs text-gray-500 mb-1">River name <span class="text-gray-300">(from NHD)</span></label>
+        <label class="block text-xs text-neutral-500 mb-1">River name <span class="text-neutral-300">(from NHD)</span></label>
         <div class="flex items-center gap-2">
           <input
             v-model="authorForm.riverName"
             :readonly="!authorRiverNameOverride"
-            class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
-            :class="authorRiverNameOverride ? '' : 'text-gray-400 dark:text-gray-500 cursor-default'"
+            class="flex-1 rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm"
+            :class="authorRiverNameOverride ? '' : 'text-neutral-400 dark:text-neutral-500 cursor-default'"
             placeholder="Auto-filled from anchor snap"
           />
           <UButton
@@ -148,71 +148,71 @@
             :disabled="!authorAnchorSnap && !authorUpComID"
             @click="fetchRiverName"
           >Lookup from NLDI</UButton>
-          <button class="text-xs text-blue-500 hover:text-blue-400 shrink-0" @click="authorRiverNameOverride = !authorRiverNameOverride">
+          <button class="text-xs text-primary-500 hover:text-primary-400 shrink-0" @click="authorRiverNameOverride = !authorRiverNameOverride">
             {{ authorRiverNameOverride ? 'Lock' : 'Override' }}
           </button>
         </div>
       </div>
 
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Reach name <span class="text-red-400">*</span></label>
-        <input v-model="authorForm.name" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Lees Ferry to Diamond Creek" />
+        <label class="block text-xs text-neutral-500 mb-1">Reach name <span class="text-red-400">*</span></label>
+        <input v-model="authorForm.name" class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm" placeholder="e.g. Lees Ferry to Diamond Creek" />
       </div>
 
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Slug</label>
+        <label class="block text-xs text-neutral-500 mb-1">Slug</label>
         <div class="flex items-center gap-2">
           <input
             v-model="authorForm.slug"
-            class="flex-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-xs font-mono"
+            class="flex-1 rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-xs font-mono"
             placeholder="auto-generated from river + reach name"
             @input="authorSlugManual = true"
           />
-          <span v-if="authorSlugChecking" class="text-xs text-gray-400 shrink-0">checking…</span>
+          <span v-if="authorSlugChecking" class="text-xs text-neutral-400 shrink-0">checking…</span>
           <span v-else-if="authorForm.slug && authorSlugAvailable === true" class="text-xs text-green-600 dark:text-green-400 shrink-0">available</span>
           <span v-else-if="authorForm.slug && authorSlugAvailable === false" class="text-xs text-red-500 shrink-0">taken</span>
         </div>
       </div>
 
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Common name</label>
-        <input v-model="authorForm.commonName" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="e.g. Grand Canyon" />
+        <label class="block text-xs text-neutral-500 mb-1">Common name</label>
+        <input v-model="authorForm.commonName" class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm" placeholder="e.g. Grand Canyon" />
       </div>
 
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Class min</label>
-          <input v-model.number="authorForm.classMin" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="3" />
+          <label class="block text-xs text-neutral-500 mb-1">Class min</label>
+          <input v-model.number="authorForm.classMin" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm" placeholder="3" />
         </div>
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Class max</label>
-          <input v-model.number="authorForm.classMax" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm" placeholder="5" />
+          <label class="block text-xs text-neutral-500 mb-1">Class max</label>
+          <input v-model.number="authorForm.classMax" type="number" min="1" max="6" step="0.5" class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm" placeholder="5" />
         </div>
       </div>
 
       <div>
-        <label class="block text-xs text-gray-500 mb-1">Description</label>
+        <label class="block text-xs text-neutral-500 mb-1">Description</label>
         <textarea
           v-model="authorForm.description"
           rows="4"
-          class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm resize-y"
+          class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm resize-y"
           placeholder="Overview of the reach — character, season, access notes…"
         />
       </div>
 
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="block text-xs text-gray-500 mb-1">Multi-day (days)</label>
+          <label class="block text-xs text-neutral-500 mb-1">Multi-day (days)</label>
           <input
             v-model.number="authorForm.multiDay"
             type="number" min="1" max="30"
-            class="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm"
+            class="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm"
             placeholder="1"
           />
-          <p class="text-xs text-gray-400 mt-0.5">1 = single day</p>
+          <p class="text-xs text-neutral-400 mt-0.5">1 = single day</p>
         </div>
         <div class="flex items-start pt-5">
-          <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700 dark:text-gray-300">
+          <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-neutral-700 dark:text-neutral-300">
             <input type="checkbox" v-model="authorForm.permitRequired" class="rounded" />
             Permit required
           </label>
@@ -220,27 +220,27 @@
       </div>
 
       <!-- Flow ranges -->
-      <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 p-3 space-y-2">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Flow ranges (CFS)</p>
+      <div class="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900/50 p-3 space-y-2">
+        <p class="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Flow ranges (CFS)</p>
         <div class="grid grid-cols-2 gap-2 text-xs">
           <div v-for="band in authorFlowBands" :key="band.key" class="space-y-1">
             <div class="flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: band.dot }" />
-              <span class="font-medium text-gray-600 dark:text-gray-300">{{ band.label }}</span>
+              <span class="font-medium text-neutral-600 dark:text-neutral-300">{{ band.label }}</span>
             </div>
             <div class="flex items-center gap-1">
               <input
                 v-model.number="authorForm.flowRanges[band.key].min"
                 type="number" min="0"
-                class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-1 text-xs"
+                class="w-full rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-1.5 py-1 text-xs"
                 :placeholder="band.showMin ? 'min' : '—'"
                 :disabled="!band.showMin"
               />
-              <span class="text-gray-300 shrink-0">–</span>
+              <span class="text-neutral-300 shrink-0">–</span>
               <input
                 v-model.number="authorForm.flowRanges[band.key].max"
                 type="number" min="0"
-                class="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 py-1 text-xs"
+                class="w-full rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-1.5 py-1 text-xs"
                 :placeholder="band.showMax ? 'max' : '—'"
                 :disabled="!band.showMax"
               />
@@ -256,14 +256,14 @@
       <div v-if="authorGnisConfirm" class="rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 p-3 space-y-2">
         <p class="text-xs font-semibold text-amber-800 dark:text-amber-200">Confirm river assignment</p>
         <div class="flex items-center gap-2">
-          <label class="text-xs text-gray-600 dark:text-gray-300 shrink-0">River name</label>
+          <label class="text-xs text-neutral-600 dark:text-neutral-300 shrink-0">River name</label>
           <input
             v-model="authorForm.riverName"
-            class="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs"
+            class="flex-1 rounded border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-2 py-1 text-xs"
             placeholder="River name"
           />
         </div>
-        <p class="text-xs text-gray-400">{{ authorGnisId ? `GNIS ${authorGnisId} · ` : 'No GNIS match · ' }}River will be created if it doesn't exist.</p>
+        <p class="text-xs text-neutral-400">{{ authorGnisId ? `GNIS ${authorGnisId} · ` : 'No GNIS match · ' }}River will be created if it doesn't exist.</p>
         <div class="flex gap-2 justify-end">
           <UButton size="xs" variant="ghost" color="neutral" @click="authorGnisConfirm = false">Back</UButton>
           <UButton size="xs" :loading="authorSaving" :disabled="!authorForm.name.trim()" @click="submit">Confirm &amp; save</UButton>

@@ -5,7 +5,7 @@
       <div
         v-for="(inp, i) in modelValue"
         :key="inp.gauge_id"
-        class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2"
+        class="flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2"
       >
         <!-- Sign toggle -->
         <button
@@ -22,13 +22,13 @@
 
         <!-- Gauge info -->
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ inp.gauge_name }}</p>
-          <p class="text-xs text-gray-400 truncate">{{ inp.external_id }} · {{ inp.source }}</p>
+          <p class="text-sm font-medium text-neutral-900 dark:text-white truncate">{{ inp.gauge_name }}</p>
+          <p class="text-xs text-neutral-400 truncate">{{ inp.external_id }} · {{ inp.source }}</p>
         </div>
 
         <!-- Remove -->
         <button
-          class="shrink-0 p-1 rounded text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+          class="shrink-0 p-1 rounded text-neutral-300 dark:text-neutral-600 hover:text-red-500 dark:hover:text-red-400 transition-colors"
           type="button"
           @click="removeAt(i)"
         >
@@ -40,7 +40,7 @@
     </div>
 
     <!-- Formula preview -->
-    <p v-if="modelValue.length" class="text-xs text-gray-400 font-mono px-1">
+    <p v-if="modelValue.length" class="text-xs text-neutral-400 font-mono px-1">
       {{ formulaPreview }}
     </p>
 
@@ -61,22 +61,22 @@
       <!-- Results dropdown -->
       <div
         v-if="showDropdown && results.length"
-        class="absolute z-50 left-0 right-0 mt-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg max-h-56 overflow-y-auto"
+        class="absolute z-50 left-0 right-0 mt-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg max-h-56 overflow-y-auto"
       >
         <button
           v-for="g in results"
           :key="g.id"
           type="button"
-          class="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-colors"
+          class="w-full text-left px-3 py-2 hover:bg-primary-50 dark:hover:bg-primary-950/30 transition-colors"
           @click="addGauge(g)"
         >
-          <p class="text-sm font-medium text-gray-900 dark:text-white">{{ g.name }}</p>
-          <p class="text-xs text-gray-400">{{ g.external_id }} · {{ g.source }}</p>
+          <p class="text-sm font-medium text-neutral-900 dark:text-white">{{ g.name }}</p>
+          <p class="text-xs text-neutral-400">{{ g.external_id }} · {{ g.source }}</p>
         </button>
       </div>
     </div>
 
-    <p v-if="!modelValue.length" class="text-xs text-gray-400">
+    <p v-if="!modelValue.length" class="text-xs text-neutral-400">
       Search and add at least one gauge. Use the +/− toggle to add or subtract each reading.
     </p>
   </div>
