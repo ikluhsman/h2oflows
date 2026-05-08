@@ -541,9 +541,11 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
 import { cleanBasinName, slugifyBasin } from '~/utils/basin'
-import { flowBandBadgeClass, flowBandCfsClass, flowBandLabel } from '~/utils/flowBand'
+import { flowBandCfsClass, flowBandLabel } from '~/utils/flowBand'
 
 definePageMeta({ ssr: false })
+
+const { bandBadgeClass } = useFlowBandPalette()
 
 const router = useRouter()
 const store = useWatchlistStore()
@@ -639,7 +641,7 @@ function reachCfsClass(r: UserReachSummary): string {
   return flowBandCfsClass(r.flow_band, r.flow_status)
 }
 function reachBadgeClass(r: UserReachSummary): string {
-  return flowBandBadgeClass(r.flow_band, r.flow_status)
+  return bandBadgeClass(r.flow_band, r.flow_status)
 }
 function reachStatusLabel(r: UserReachSummary): string {
   return flowBandLabel(r.flow_band, r.flow_status)

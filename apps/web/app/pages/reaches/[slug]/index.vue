@@ -548,9 +548,10 @@ import { gsap } from 'gsap'
 import { featurePanelIcon } from '~/utils/featureIcons'
 import {
   flowBandLabel as flowBandLabelFn,
-  flowBandBadgeClass,
   flowBandCfsClass,
 } from '~/utils/flowBand'
+
+const { bandBadgeClass } = useFlowBandPalette()
 
 const route  = useRoute()
 const config = useRuntimeConfig()
@@ -1255,7 +1256,7 @@ function stripRapidClass(name: string | null): string | null {
 }
 
 function flowBadgeClass(status: string, band?: string | null): string {
-  return flowBandBadgeClass(band, status)
+  return bandBadgeClass(band, status)
 }
 
 function flowBandLabel(status: string, band?: string | null): string {

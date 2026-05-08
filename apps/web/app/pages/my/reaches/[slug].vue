@@ -72,7 +72,7 @@
             <span
               v-if="reach.flow_band"
               class="text-xs font-medium px-2 py-0.5 rounded-full shrink-0 mb-0.5"
-              :class="flowBandBadgeClass(reach.flow_band)"
+              :class="bandBadgeClass(reach.flow_band)"
             >{{ flowBandLabel(reach.flow_band) }}</span>
           </div>
         </template>
@@ -397,9 +397,11 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
+import { flowBandLabel } from '~/utils/flowBand'
 
 definePageMeta({ ssr: false })
+
+const { bandBadgeClass } = useFlowBandPalette()
 
 const route  = useRoute()
 const router = useRouter()

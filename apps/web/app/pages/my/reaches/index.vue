@@ -58,7 +58,7 @@
                 <span
                   v-if="reach.flow_band"
                   class="text-xs font-medium px-2 py-0.5 rounded-full"
-                  :class="flowBandBadgeClass(reach.flow_band)"
+                  :class="bandBadgeClass(reach.flow_band)"
                 >{{ flowBandLabel(reach.flow_band) }}</span>
                 <span v-if="reach.cfs != null" class="text-sm font-mono text-neutral-700 dark:text-neutral-300">
                   {{ reach.cfs.toLocaleString() }} cfs
@@ -76,7 +76,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
+import { flowBandLabel } from '~/utils/flowBand'
+
+const { bandBadgeClass } = useFlowBandPalette()
 
 const { isAuthenticated, getToken } = useAuth()
 const { apiBase } = useRuntimeConfig().public

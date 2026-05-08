@@ -55,7 +55,7 @@
           <!-- Flow band badge — reach mode only -->
           <span
             v-if="mode === 'reach' && (gauge.flowStatus !== 'unknown' || gauge.flowBandLabel)"
-            :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+            :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', bandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
         </div>
 
@@ -127,7 +127,9 @@
 import { ref, computed, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
 import { useWatchlistStore } from '~/stores/watchlist'
-import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
+import { flowBandLabel } from '~/utils/flowBand'
+
+const { bandBadgeClass } = useFlowBandPalette()
 
 const open = defineModel<boolean>('open', { default: false })
 const props = defineProps<{

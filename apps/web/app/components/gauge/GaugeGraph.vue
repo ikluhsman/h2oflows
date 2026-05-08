@@ -120,6 +120,8 @@ const readings   = ref<Reading[]>([])
 const flowRanges = ref<FlowRange[]>([])
 let chart: uPlot | null = null
 
+const { bandSolid } = useFlowBandPalette()
+
 const { apiBase } = useRuntimeConfig().public
 
 // ---- Data fetching ----------------------------------------------------------
@@ -245,7 +247,7 @@ function bandColor(label: string): string {
 
 // bandColorSolid returns a fully opaque swatch color for the legend.
 function bandColorSolid(label: string): string {
-  return flowBandSolidColor(label)
+  return bandSolid(label)
 }
 
 function drawBands(u: uPlot, ranges: FlowRange[]) {
@@ -311,12 +313,12 @@ function lineColor(ranges: FlowRange[], cfs: number | null): string {
     (fr.min_value == null || cfs >= fr.min_value) &&
     (fr.max_value == null || cfs <  fr.max_value)
   )
-  if (match) return flowBandSolidColor(match.label)
+  if (match) return bandSolid(match.label)
   // No exact match — infer from position relative to known ranges.
   const mins = ranges.filter(r => r.min_value != null).map(r => r.min_value!)
   const maxs = ranges.filter(r => r.max_value != null).map(r => r.max_value!)
-  if (mins.length > 0 && cfs < Math.min(...mins)) return flowBandSolidColor('low')
-  if (maxs.length > 0 && cfs >= Math.max(...maxs)) return flowBandSolidColor('high')
+  if (mins.length > 0 && cfs < Math.min(...mins)) return bandSolid('low')
+  if (maxs.length > 0 && cfs >= Math.max(...maxs)) return bandSolid('high')
   return '#6b7280'
 }
 

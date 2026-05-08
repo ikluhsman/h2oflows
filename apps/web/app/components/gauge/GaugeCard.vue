@@ -204,6 +204,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'open'): void }>()
 
 const { removeAndSync } = useWatchlistSync()
+const { bandBadgeClass } = useFlowBandPalette()
 
 const { pattern: diurnal } = useDiurnalCache(props.gauge.id)
 
@@ -239,7 +240,7 @@ const contextFullName = computed(() => props.gauge.contextReachFullName ?? null)
 
 // --- Flow status ------------------------------------------------------------
 
-const statusBadgeClass = computed(() => flowBandBadgeClass(displayFlowBand.value, displayFlowStatus.value))
+const statusBadgeClass = computed(() => bandBadgeClass(displayFlowBand.value, displayFlowStatus.value))
 const statusLabel      = computed(() => flowBandLabel(displayFlowBand.value, displayFlowStatus.value))
 const cfsClass         = computed(() => flowBandCfsClass(displayFlowBand.value, displayFlowStatus.value))
 

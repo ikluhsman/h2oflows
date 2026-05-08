@@ -78,7 +78,7 @@
             <span
               v-if="reach.flow_status !== 'unknown'"
               class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0"
-              :class="flowBandBadgeClass(null, reach.flow_status)"
+              :class="bandBadgeClass(null, reach.flow_status)"
             >{{ flowBandLabel(null, reach.flow_status) }}</span>
           </div>
           <div v-if="mapData.length === 0 && reachSlugs.length > 0" class="px-4 py-6 text-center text-sm text-neutral-400">
@@ -116,10 +116,12 @@ import { useRoute, useRouter } from '#app'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { cleanBasinName, slugifyBasin } from '~/utils/basin'
 import { classColor, classRange } from '~/utils/classRating'
-import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
+import { flowBandLabel } from '~/utils/flowBand'
 import type { BasinReach, BasinNetwork } from '~/components/basin/BasinMap.vue'
 
 definePageMeta({ ssr: false })
+
+const { bandBadgeClass } = useFlowBandPalette()
 
 const route  = useRoute()
 const router = useRouter()

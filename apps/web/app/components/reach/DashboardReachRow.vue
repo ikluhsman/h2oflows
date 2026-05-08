@@ -31,7 +31,7 @@
         <div class="shrink-0 w-20 flex justify-end">
           <span
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
-            :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+            :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', bandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
         </div>
         <span class="text-sm font-bold tabular-nums shrink-0 w-16 text-right" :class="cfsColorClass">
@@ -77,7 +77,7 @@
           </div>
           <span
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
-            :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+            :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', bandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
           <span class="text-lg font-bold tabular-nums shrink-0" :class="cfsColorClass">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
@@ -132,7 +132,7 @@
           </div>
           <span
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
-            :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', flowBandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
+            :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', bandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
           <span class="text-[22px] font-bold tabular-nums shrink-0 leading-none" :class="cfsColorClass">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
@@ -169,7 +169,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
-import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
+import { flowBandLabel } from '~/utils/flowBand'
+
+const { bandBadgeClass } = useFlowBandPalette()
 
 const props = defineProps<{
   gauge: WatchedGauge

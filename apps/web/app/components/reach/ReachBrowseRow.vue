@@ -40,7 +40,7 @@
     >
       <span
         v-if="reach.flow_status !== 'unknown' || reach.flow_label"
-        :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', flowBandBadgeClass(reach.flow_label, reach.flow_status)]"
+        :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', bandBadgeClass(reach.flow_label, reach.flow_status)]"
       >{{ flowBandLabel(reach.flow_label, reach.flow_status) }}</span>
       <span class="text-sm font-bold tabular-nums text-neutral-900 dark:text-white">
         {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
@@ -56,7 +56,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { classRange } from '~/utils/classRating'
-import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
+import { flowBandLabel } from '~/utils/flowBand'
 
 export interface ReachListItem {
   slug: string
@@ -77,6 +77,8 @@ export interface ReachListItem {
   gauge_source: string | null
   gauge_name: string | null
 }
+
+const { bandBadgeClass } = useFlowBandPalette()
 
 const props = defineProps<{ reach: ReachListItem }>()
 

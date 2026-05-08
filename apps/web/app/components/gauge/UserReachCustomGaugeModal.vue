@@ -33,7 +33,7 @@
           <span class="text-sm text-neutral-500">cfs</span>
           <span
             v-if="flowBand"
-            :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', flowBandBadgeClass(flowBand, flowStatus)]"
+            :class="['inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium', bandBadgeClass(flowBand, flowStatus)]"
           >{{ flowBandLabel(flowBand, flowStatus) }}</span>
         </div>
 
@@ -85,7 +85,9 @@
 import { ref, watch, nextTick, onUnmounted } from 'vue'
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
-import { flowBandBadgeClass, flowBandLabel } from '~/utils/flowBand'
+import { flowBandLabel } from '~/utils/flowBand'
+
+const { bandBadgeClass } = useFlowBandPalette()
 
 const open = defineModel<boolean>('open', { default: false })
 

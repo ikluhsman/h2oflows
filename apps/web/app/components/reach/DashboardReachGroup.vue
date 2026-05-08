@@ -39,7 +39,7 @@
       </NuxtLink>
       <span
         v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
-        :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
+        :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', bandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
       >{{ flowBandLabel(displayFlowBandLabel(reach), displayFlowStatus(reach)) }}</span>
       <span class="w-16 shrink-0 text-right text-sm font-bold tabular-nums" :class="cfsColorClass(reach)">
         {{ displayCfs(reach) != null ? displayCfs(reach)!.toLocaleString() : '—' }}
@@ -96,7 +96,7 @@
           </div>
           <span
             v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
-            :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
+            :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', bandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
           >{{ flowBandLabel(displayFlowBandLabel(reach), displayFlowStatus(reach)) }}</span>
           <span class="text-lg font-bold tabular-nums shrink-0 leading-none" :class="cfsColorClass(reach)">
             {{ displayCfs(reach) != null ? displayCfs(reach)!.toLocaleString() : '—' }}
@@ -144,7 +144,7 @@
               </NuxtLink>
               <span
                 v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
-                :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', flowBandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
+                :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', bandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
               >{{ flowBandLabel(displayFlowBandLabel(reach), displayFlowStatus(reach)) }}</span>
             </div>
             <div class="mt-1.5 opacity-60 pointer-events-none" :class="density === 'full' ? 'h-14' : 'h-6'">
@@ -178,7 +178,7 @@
 <script setup lang="ts">
 import { reactive, onMounted, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
-import { flowBandBadgeClass, flowBandLabel, flowBandSolidColor, flowBandCfsClass } from '~/utils/flowBand'
+import { flowBandLabel, flowBandCfsClass } from '~/utils/flowBand'
 
 const props = defineProps<{
   reaches: WatchedGauge[]
@@ -191,6 +191,7 @@ const emit = defineEmits<{
   (e: 'remove', gauge: WatchedGauge): void
 }>()
 
+const { bandBadgeClass, bandSolid } = useFlowBandPalette()
 const liveCfsMap = reactive<Record<string, number>>({})
 const { prefetch, bandForCfs, statusForBand } = useReachFlowBand()
 
@@ -228,7 +229,7 @@ function reachLabel(reach: WatchedGauge): string {
 }
 
 function sparklineColor(reach: WatchedGauge): string {
-  return flowBandSolidColor(displayFlowBandLabel(reach))
+  return bandSolid(displayFlowBandLabel(reach))
 }
 
 function cfsColorClass(reach: WatchedGauge): string {
