@@ -270,8 +270,8 @@
           <AggregateGraph :gauges="aggregateGauges" />
         </section>
 
-        <!-- My Reaches section -->
-        <section v-if="userReaches.length || hiddenReaches.size">
+        <!-- My Reaches section — only on primary dashboard (not scoped to specific dashboards) -->
+        <section v-if="(userReaches.length || hiddenReaches.size) && isDefaultDashboard">
           <div class="flex items-center gap-2 mb-3">
             <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">My Reaches</h2>
             <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
@@ -390,8 +390,8 @@
           </div>
         </section>
 
-        <!-- Custom Gauges section -->
-        <section v-if="customGauges.length || hiddenCustomGauges.size">
+        <!-- Custom Gauges section — only on primary dashboard -->
+        <section v-if="(customGauges.length || hiddenCustomGauges.size) && isDefaultDashboard">
           <div class="flex items-center gap-2 mb-3">
             <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">Custom Gauges</h2>
             <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
@@ -619,6 +619,12 @@ onMounted(() => {
   loadActiveHazards()
   refreshTimer = setInterval(refresh, 60_000)
 })
+
+// My Reaches and Custom Gauges are not dashboard-scoped in the backend, so show
+// them only on the primary dashboard to avoid cluttering every custom dashboard.
+const isDefaultDashboard = computed(() =>
+  db.dashboards.value.length <= 1 || db.activeDashboard.value?.id === db.dashboards.value[0]?.id
+)
 
 // ── User reaches ──────────────────────────────────────────────────────────────
 interface UserReachSummary {

@@ -11,6 +11,8 @@ const dashboards = ref<Dashboard[]>([])
 const activeDashboardId = ref<string | null>(null)
 const loaded = ref(false)
 
+const ACTIVE_DB_KEY = 'h2oflow_active_dashboard_id'
+
 export function useDashboards() {
   const { apiBase } = useRuntimeConfig().public
   const { getToken } = useAuth()
@@ -28,14 +30,21 @@ export function useDashboards() {
     if (!res?.ok) return
     const data = await res.json()
     dashboards.value = data.dashboards ?? []
-    if (dashboards.value.length && !activeDashboardId.value) {
-      activeDashboardId.value = dashboards.value[0].id
+    if (dashboards.value.length) {
+      // Restore last-selected dashboard; fall back to first if it no longer exists.
+      const saved = import.meta.client ? localStorage.getItem(ACTIVE_DB_KEY) : null
+      if (saved && dashboards.value.some(d => d.id === saved)) {
+        activeDashboardId.value = saved
+      } else {
+        activeDashboardId.value = dashboards.value[0].id
+      }
     }
     loaded.value = true
   }
 
   function setActive(id: string) {
     activeDashboardId.value = id
+    if (import.meta.client) localStorage.setItem(ACTIVE_DB_KEY, id)
   }
 
   async function create(name: string): Promise<Dashboard | null> {
@@ -74,7 +83,12 @@ export function useDashboards() {
     dashboards.value = dashboards.value.filter(d => d.slug !== slug)
     // If active dashboard deleted, switch to first remaining
     if (removed && activeDashboardId.value === removed.id) {
-      activeDashboardId.value = dashboards.value[0]?.id ?? null
+      const newId = dashboards.value[0]?.id ?? null
+      activeDashboardId.value = newId
+      if (import.meta.client) {
+        if (newId) localStorage.setItem(ACTIVE_DB_KEY, newId)
+        else localStorage.removeItem(ACTIVE_DB_KEY)
+      }
     }
   }
 
