@@ -43,33 +43,42 @@ export function useWatchlistSync() {
 
   /**
    * Clears the local store then loads the server watchlist for the given dashboard.
-   * Used when switching dashboard tabs.
+   * Returns the list of custom_gauge_ids on this dashboard so the caller can
+   * filter the custom gauges section accordingly.
    */
-  async function loadForDashboard(dashboardId: string) {
+  async function loadForDashboard(dashboardId: string): Promise<string[]> {
     const token = await getToken()
-    if (!token) return
+    if (!token) return []
     store.clearGauges()
     const res = await fetch(`${apiBase}/api/v1/watchlist?dashboard_id=${encodeURIComponent(dashboardId)}`, {
       headers: { Authorization: `Bearer ${token}` },
     }).catch(() => null)
-    if (!res?.ok) return
+    if (!res?.ok) return []
     const data = await res.json()
-    // Filter to gauge items only — custom_gauge items have gauge_id: null and are
-    // displayed via loadCustomGauges(), not the batch endpoint.
-    const allItems: { gauge_id: string | null; reach_slug: string | null }[] = data.items ?? []
+    const allItems: { gauge_id: string | null; custom_gauge_id: string | null; reach_slug: string | null }[] = data.items ?? []
+
+    // Collect custom gauge ids so the caller can control their section display.
+    const customGaugeIds = allItems
+      .filter(item => item.custom_gauge_id != null)
+      .map(item => item.custom_gauge_id as string)
+
     const serverItems = allItems.filter(item => item.gauge_id != null) as { gauge_id: string; reach_slug: string | null }[]
-    if (serverItems.length === 0) return
-    const batchIds = serverItems.map(item => item.reach_slug ? `${item.gauge_id}:${item.reach_slug}` : item.gauge_id)
-    const batchRes = await fetch(`${apiBase}/api/v1/gauges/batch`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: batchIds }),
-    }).catch(() => null)
-    if (!batchRes?.ok) return
-    const batchData = await batchRes.json()
-    for (const f of batchData.features ?? []) {
-      store.addGauge(featureToWatchedGauge(f.properties, f.geometry?.coordinates as [number, number] | undefined))
+    if (serverItems.length > 0) {
+      const batchIds = serverItems.map(item => item.reach_slug ? `${item.gauge_id}:${item.reach_slug}` : item.gauge_id)
+      const batchRes = await fetch(`${apiBase}/api/v1/gauges/batch`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: batchIds }),
+      }).catch(() => null)
+      if (batchRes?.ok) {
+        const batchData = await batchRes.json()
+        for (const f of batchData.features ?? []) {
+          store.addGauge(featureToWatchedGauge(f.properties, f.geometry?.coordinates as [number, number] | undefined))
+        }
+      }
     }
+
+    return customGaugeIds
   }
 
   /**

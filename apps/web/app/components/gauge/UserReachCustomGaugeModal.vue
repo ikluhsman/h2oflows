@@ -63,14 +63,26 @@
           >No readings in this window</div>
         </div>
 
-        <!-- Link to reach detail page -->
+        <!-- Link to reach detail page (user reach) or gauge page (standalone) -->
         <div class="pt-1 border-t border-neutral-100 dark:border-neutral-800">
           <NuxtLink
+            v-if="reachSlug"
             :to="`/my/reaches/${reachSlug}`"
             class="inline-flex items-center gap-1 text-sm text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 font-medium transition-colors"
             @click="open = false"
           >
             Edit reach
+            <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 10h10M11 6l4 4-4 4"/>
+            </svg>
+          </NuxtLink>
+          <NuxtLink
+            v-else
+            :to="`/my/gauges/${gaugeSlug}`"
+            class="inline-flex items-center gap-1 text-sm text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 font-medium transition-colors"
+            @click="open = false"
+          >
+            Edit gauge
             <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M5 10h10M11 6l4 4-4 4"/>
             </svg>

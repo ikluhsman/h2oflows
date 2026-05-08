@@ -81,7 +81,7 @@
     <main class="max-w-5xl mx-auto px-2 sm:px-4 py-6 pb-20 sm:pb-6 space-y-8">
 
       <!-- Empty state -->
-      <div v-if="store.gauges.length === 0" class="mt-20 flex flex-col items-center gap-4 text-center">
+      <div v-if="store.gauges.length === 0 && activeCustomGauges.length === 0 && userReaches.length === 0" class="mt-20 flex flex-col items-center gap-4 text-center">
         <div class="text-5xl">🌊</div>
         <h2 class="text-xl font-semibold">No reaches yet</h2>
         <p class="text-neutral-500 max-w-sm text-sm">
@@ -91,7 +91,7 @@
       </div>
 
       <!-- Reaches grouped by basin → river -->
-      <template v-else>
+      <template v-if="store.gauges.length > 0 || activeCustomGauges.length > 0 || userReaches.length > 0">
 
         <section v-for="stateGroup in byStateTree" :key="stateGroup.name" class="mb-4">
           <!-- State header: large, collapsible, h1+hr style -->
@@ -390,8 +390,8 @@
           </div>
         </section>
 
-        <!-- Custom Gauges section — only on primary dashboard -->
-        <section v-if="(customGauges.length || hiddenCustomGauges.size) && isDefaultDashboard">
+        <!-- Custom Gauges section — shows active-dashboard gauges on all tabs -->
+        <section v-if="activeCustomGauges.length || hiddenCustomGauges.size">
           <div class="flex items-center gap-2 mb-3">
             <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">Custom Gauges</h2>
             <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
@@ -405,7 +405,7 @@
               </button>
               <div v-if="gaugeAddOpen" class="absolute right-0 top-full mt-1 z-50 w-52 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg overflow-hidden">
                 <button
-                  v-for="cg in customGauges.filter(g => hiddenCustomGauges.has(g.id))"
+                  v-for="cg in activeCustomGauges.filter(g => hiddenCustomGauges.has(g.id))"
                   :key="cg.id"
                   class="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 dark:hover:bg-primary-950/30 transition-colors"
                   @click="showCustomGauge(cg.id); gaugeAddOpen = false"
@@ -417,10 +417,10 @@
           <!-- List view -->
           <div v-if="viewMode === 'list'" class="space-y-1.5">
             <div
-              v-for="cg in customGauges.filter(g => !hiddenCustomGauges.has(g.id))"
+              v-for="cg in activeCustomGauges.filter(g => !hiddenCustomGauges.has(g.id))"
               :key="cg.id"
               class="flex items-center gap-2 sm:gap-3 px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 transition-all duration-200 cursor-pointer"
-              @click="router.push(`/my/gauges/${cg.slug}`)"
+              @click="openStandaloneCustomGauge(cg)"
             >
               <div class="min-w-0 flex-1 flex items-center gap-1.5">
                 <!-- Calculated origin indicator — list -->
@@ -443,10 +443,10 @@
           <!-- Card views (comfortable / full) -->
           <div v-else :class="cardGridClass">
             <div
-              v-for="cg in customGauges.filter(g => !hiddenCustomGauges.has(g.id))"
+              v-for="cg in activeCustomGauges.filter(g => !hiddenCustomGauges.has(g.id))"
               :key="cg.id"
               class="relative rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 transition-all duration-200 cursor-pointer overflow-hidden"
-              @click="router.push(`/my/gauges/${cg.slug}`)"
+              @click="openStandaloneCustomGauge(cg)"
             >
               <!-- Name/icon (left) | value + remove (right) -->
               <div class="flex items-start gap-3">
@@ -471,6 +471,10 @@
                     <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 112 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/></svg>
                   </button>
                 </div>
+              </div>
+              <!-- Sparkline -->
+              <div class="mt-2">
+                <CustomGaugeSparkline :gauge-slug="cg.slug" compact />
               </div>
               <!-- Calculated origin badge + stale indicator -->
               <div class="flex items-center gap-2 mt-1.5">
@@ -563,7 +567,7 @@ const newDashboardName = ref('')
 async function onSelectDashboard(id: string) {
   if (id === db.activeDashboardId.value) return
   db.setActive(id)
-  await loadForDashboard(id)
+  await activateDashboard(id)
   await refresh()
 }
 
@@ -573,7 +577,7 @@ async function onDeleteDashboard(slug: string) {
   const wasActive = target.id === db.activeDashboardId.value
   await db.remove(slug)
   if (wasActive && db.activeDashboard.value) {
-    await loadForDashboard(db.activeDashboard.value.id)
+    await activateDashboard(db.activeDashboard.value.id)
     await refresh()
   }
 }
@@ -597,7 +601,7 @@ async function syncWithServer() {
   await db.load()
   const activeId = db.activeDashboard.value?.id
   if (activeId) {
-    await loadForDashboard(activeId)
+    await activateDashboard(activeId)
   } else {
     await loadFromServer()
     await pushLocalToServer()
@@ -654,13 +658,26 @@ function reachLastUpdated(r: UserReachSummary): string {
   return `Updated ${Math.floor(hours / 24)}d ago`
 }
 
-// Custom gauge modal state
+// Custom gauge modal state (used for user reaches backed by custom gauges AND standalone cards)
 const customGaugeModalOpen  = ref(false)
 const customGaugeModalProps = ref<{
   reachName: string; reachSlug: string
   gaugeName: string; gaugeSlug: string
   currentCfs: number | null; flowBand: string | null; flowStatus: string
 } | null>(null)
+
+function openStandaloneCustomGauge(cg: CustomGaugeSummary) {
+  customGaugeModalProps.value = {
+    reachName:  cg.name,
+    reachSlug:  '',           // empty = standalone (no reach link in modal)
+    gaugeName:  cg.name,
+    gaugeSlug:  cg.slug,
+    currentCfs: cg.last_value_cfs,
+    flowBand:   null,
+    flowStatus: 'unknown',
+  }
+  customGaugeModalOpen.value = true
+}
 
 // Click a user reach card → open appropriate modal or navigate.
 function openUserReach(r: UserReachSummary) {
@@ -744,6 +761,16 @@ if (import.meta.client) {
 // ── Custom gauges ─────────────────────────────────────────────────────────────
 interface CustomGaugeSummary { id: string; slug: string; name: string; description: string | null; unit: string; last_value_cfs: number | null; any_input_unhealthy: boolean }
 const customGauges = ref<CustomGaugeSummary[]>([])
+// IDs of custom gauges pinned to the currently active (non-primary) dashboard.
+const dashboardCustomGaugeIds = ref<string[]>([])
+
+// Custom gauges visible on the active dashboard: all on primary, watchlist-filtered on others.
+const activeCustomGauges = computed(() =>
+  isDefaultDashboard.value
+    ? customGauges.value
+    : customGauges.value.filter(cg => dashboardCustomGaugeIds.value.includes(cg.id))
+)
+
 async function loadCustomGauges() {
   const token = await getToken()
   if (!token) return
@@ -753,6 +780,12 @@ async function loadCustomGauges() {
   if (!res?.ok) return
   const data = await res.json()
   customGauges.value = data.items ?? []
+}
+
+// Wrapper: load dashboard watchlist + update dashboardCustomGaugeIds.
+async function activateDashboard(id: string) {
+  const ids = await loadForDashboard(id)
+  dashboardCustomGaugeIds.value = ids
 }
 onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 
@@ -961,7 +994,7 @@ function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dash
 async function onAddedExternal() {
   const id = db.activeDashboard.value?.id
   if (id) {
-    await loadForDashboard(id)
+    await activateDashboard(id)
     await refresh()
   }
 }
