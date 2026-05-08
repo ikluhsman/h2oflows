@@ -120,7 +120,7 @@ const readings   = ref<Reading[]>([])
 const flowRanges = ref<FlowRange[]>([])
 let chart: uPlot | null = null
 
-const { bandSolid } = useFlowBandPalette()
+const { bandSolid, bandFill } = useFlowBandPalette()
 
 const { apiBase } = useRuntimeConfig().public
 
@@ -242,7 +242,7 @@ function buildChart() {
 
 // bandColor returns the translucent fill used on the chart bands.
 function bandColor(label: string): string {
-  return FLOW_BAND_FILL[label] ?? 'rgba(156,163,175,0.10)'
+  return bandFill(label) ?? 'rgba(156,163,175,0.10)'
 }
 
 // bandColorSolid returns a fully opaque swatch color for the legend.
@@ -262,7 +262,7 @@ function drawBands(u: uPlot, ranges: FlowRange[]) {
   ctx.clip()
 
   for (const fr of ranges) {
-    const color = FLOW_BAND_FILL[fr.label]
+    const color = bandFill(fr.label)
     if (!color) continue
 
     // Convert CFS values to canvas Y coordinates.

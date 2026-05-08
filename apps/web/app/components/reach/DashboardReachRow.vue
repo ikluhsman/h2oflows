@@ -34,7 +34,7 @@
             :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', bandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
         </div>
-        <span class="text-sm font-bold tabular-nums shrink-0 w-16 text-right" :class="cfsColorClass">
+        <span class="text-sm font-bold tabular-nums shrink-0 w-16 text-right" :style="{ color: cfsColor }">
           {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
           <span class="text-xs font-normal text-neutral-400">cfs</span>
         </span>
@@ -79,7 +79,7 @@
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
             :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', bandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
-          <span class="text-lg font-bold tabular-nums shrink-0" :class="cfsColorClass">
+          <span class="text-lg font-bold tabular-nums shrink-0" :style="{ color: cfsColor }">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
           </span>
           <span class="text-xs text-neutral-400 shrink-0">cfs</span>
@@ -134,7 +134,7 @@
             v-if="gauge.flowStatus !== 'unknown' || gauge.flowBandLabel"
             :class="['shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold', bandBadgeClass(gauge.flowBandLabel, gauge.flowStatus)]"
           >{{ flowBandLabel(gauge.flowBandLabel, gauge.flowStatus) }}</span>
-          <span class="text-[22px] font-bold tabular-nums shrink-0 leading-none" :class="cfsColorClass">
+          <span class="text-[22px] font-bold tabular-nums shrink-0 leading-none" :style="{ color: cfsColor }">
             {{ displayCfs != null ? displayCfs.toLocaleString() : '—' }}
           </span>
           <span class="text-xs text-neutral-400 shrink-0">cfs</span>
@@ -171,7 +171,7 @@ import { ref, computed } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
 import { flowBandLabel } from '~/utils/flowBand'
 
-const { bandBadgeClass } = useFlowBandPalette()
+const { bandBadgeClass, bandSolid } = useFlowBandPalette()
 
 const props = defineProps<{
   gauge: WatchedGauge
@@ -212,21 +212,9 @@ const gaugeSourceUrl = computed(() => {
   return `https://waterdata.usgs.gov/monitoring-location/${id}/`
 })
 
-const cfsColorClass = computed(() => {
-  const s = props.gauge.flowStatus
-  if (s === 'runnable') return 'text-emerald-500 dark:text-emerald-400'
-  if (s === 'flood')    return 'text-sky-500 dark:text-sky-400'
-  if (s === 'caution')  return 'text-red-500 dark:text-red-400'
-  return 'text-neutral-900 dark:text-white'
-})
+const cfsColor = computed(() => bandSolid(props.gauge.flowBandLabel, props.gauge.flowStatus))
 
-const sparklineColor = computed(() => {
-  const s = props.gauge.flowStatus
-  if (s === 'runnable') return '#34d399'
-  if (s === 'flood')    return '#38bdf8'
-  if (s === 'caution')  return '#ef4444'
-  return '#3b82f6'
-})
+const sparklineColor = computed(() => bandSolid(props.gauge.flowBandLabel, props.gauge.flowStatus))
 
 const lastReadingRelative = computed(() => {
   const t = props.gauge.lastReadingAt

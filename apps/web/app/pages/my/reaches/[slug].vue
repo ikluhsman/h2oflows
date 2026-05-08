@@ -63,7 +63,7 @@
         <template v-if="reach.gauge_name || reach.current_cfs != null">
           <div class="flex items-end gap-3 shrink-0">
             <div class="text-right">
-              <p v-if="reach.current_cfs != null" class="text-2xl font-bold font-mono leading-none" :class="cfsColorClass">
+              <p v-if="reach.current_cfs != null" class="text-2xl font-bold font-mono leading-none" :style="{ color: cfsColor }">
                 {{ reach.current_cfs.toLocaleString() }}<span class="text-xs font-normal text-neutral-400 ml-1">cfs</span>
               </p>
               <p v-else class="text-sm text-neutral-400">No reading</p>
@@ -401,7 +401,7 @@ import { flowBandLabel } from '~/utils/flowBand'
 
 definePageMeta({ ssr: false })
 
-const { bandBadgeClass } = useFlowBandPalette()
+const { bandBadgeClass, bandSolid } = useFlowBandPalette()
 
 const route  = useRoute()
 const router = useRouter()
@@ -555,12 +555,7 @@ const anyPickMode = computed(() =>
   repinPickMode.value || repinGaugeSelectMode.value || repinComIDEditMode.value !== null,
 )
 
-const cfsColorClass = computed(() => {
-  const b = reach.value?.flow_band
-  if (b === 'running') return 'text-emerald-500'
-  if (b === 'high')    return 'text-sky-400'
-  return 'text-neutral-700 dark:text-neutral-200'
-})
+const cfsColor = computed(() => bandSolid(reach.value?.flow_band ?? null))
 
 const sharePayload = computed(() => {
   const r = reach.value

@@ -194,7 +194,7 @@
                 <div class="min-w-0">
                   <div class="text-[10px] text-neutral-400 uppercase tracking-wide mb-1">Flow</div>
                   <div class="flex items-center gap-2">
-                    <span class="text-lg sm:text-xl font-bold tabular-nums" :class="cfsColorClass(allGauges[0].flow_status, allGauges[0].flow_band_label)">
+                    <span class="text-lg sm:text-xl font-bold tabular-nums" :style="{ color: bandSolid(allGauges[0].flow_band_label, allGauges[0].flow_status) }">
                       {{ allGauges[0].current_cfs != null ? allGauges[0].current_cfs.toLocaleString() : '—' }}
                     </span>
                     <span class="text-xs text-neutral-500">cfs</span>
@@ -546,12 +546,9 @@ import MarkdownIt from 'markdown-it'
 import { useWatchlistStore } from '~/stores/watchlist'
 import { gsap } from 'gsap'
 import { featurePanelIcon } from '~/utils/featureIcons'
-import {
-  flowBandLabel as flowBandLabelFn,
-  flowBandCfsClass,
-} from '~/utils/flowBand'
+import { flowBandLabel as flowBandLabelFn } from '~/utils/flowBand'
 
-const { bandBadgeClass } = useFlowBandPalette()
+const { bandBadgeClass, bandSolid } = useFlowBandPalette()
 
 const route  = useRoute()
 const config = useRuntimeConfig()
@@ -1107,12 +1104,7 @@ useSeoMeta({
   ogDescription:   () => metaDesc.value,
 })
 
-const cfsClass = computed(() => ({
-  'text-emerald-500': reach.value?.gauge.flow_status === 'runnable',
-  'text-red-500':     reach.value?.gauge.flow_status === 'caution',
-  'text-sky-500':     reach.value?.gauge.flow_status === 'flood',
-  'text-neutral-300':    reach.value?.gauge.flow_status === 'unknown',
-}))
+const cfsColor = computed(() => bandSolid(reach.value?.gauge.flow_band_label ?? null, reach.value?.gauge.flow_status ?? null))
 
 const lastReadingRelative = computed(() => {
   const t = reach.value?.gauge.last_reading_at
@@ -1263,9 +1255,6 @@ function flowBandLabel(status: string, band?: string | null): string {
   return flowBandLabelFn(band, status)
 }
 
-function cfsColorClass(status: string, band?: string | null): string {
-  return flowBandCfsClass(band, status)
-}
 
 function relativeTime(t: string | null): string {
   if (!t) return ''

@@ -63,7 +63,7 @@
         <div class="flex items-center gap-2">
           <button
             v-if="isOnDashboard"
-            class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors group"
+            class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 dark:hover:text-red-400 transition-colors group"
             @click="toggleDashboard"
           >
             <svg class="w-4 h-4 group-hover:hidden" viewBox="0 0 20 20" fill="currentColor">

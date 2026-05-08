@@ -38,7 +38,7 @@
       <div class="w-32 shrink-0 hidden sm:block">
         <GaugeSparkline :gauge-id="gauge.id" :flow-status="displayFlowStatus" :flow-band-label="displayFlowBand" :reach-slug="gauge.contextReachSlug ?? gauge.reachSlug" compact @latest-cfs="liveCfs = $event" @live-flow-band="liveFlowBand = $event" />
       </div>
-      <span class="text-base font-bold tabular-nums min-w-14 text-right" :class="cfsClass">
+      <span class="text-base font-bold tabular-nums min-w-14 text-right" :style="{ color: cfsColor }">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
         <span class="text-xs font-normal text-neutral-400 dark:text-neutral-500">cfs</span>
       </span>
@@ -108,7 +108,7 @@
 
     <!-- Current flow reading -->
     <div class="relative flex items-baseline gap-2 flex-wrap" :class="density === 'compact' ? 'mb-6' : 'mb-1.5'">
-      <span class="font-bold tabular-nums leading-none" :class="[cfsClass, density === 'compact' ? 'text-xl' : 'text-2xl']">
+      <span class="font-bold tabular-nums leading-none" :class="density === 'compact' ? 'text-xl' : 'text-2xl'" :style="{ color: cfsColor }">
         {{ currentCfs != null ? currentCfs.toLocaleString() : '—' }}
       </span>
       <span class="text-xs text-neutral-500">cfs</span>
@@ -204,7 +204,7 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'open'): void }>()
 
 const { removeAndSync } = useWatchlistSync()
-const { bandBadgeClass } = useFlowBandPalette()
+const { bandBadgeClass, bandSolid } = useFlowBandPalette()
 
 const { pattern: diurnal } = useDiurnalCache(props.gauge.id)
 
@@ -242,7 +242,7 @@ const contextFullName = computed(() => props.gauge.contextReachFullName ?? null)
 
 const statusBadgeClass = computed(() => bandBadgeClass(displayFlowBand.value, displayFlowStatus.value))
 const statusLabel      = computed(() => flowBandLabel(displayFlowBand.value, displayFlowStatus.value))
-const cfsClass         = computed(() => flowBandCfsClass(displayFlowBand.value, displayFlowStatus.value))
+const cfsColor         = computed(() => bandSolid(displayFlowBand.value, displayFlowStatus.value))
 
 // --- Card chrome ------------------------------------------------------------
 

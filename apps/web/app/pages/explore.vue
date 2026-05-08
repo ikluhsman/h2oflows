@@ -145,7 +145,7 @@
                         <!-- Flow dot -->
                         <span
                           class="w-2 h-2 rounded-full shrink-0"
-                          :style="{ background: flowStatusColor(reach.flow_status) }"
+                          :style="{ background: bandSolid(null, reach.flow_status) }"
                         />
                         <!-- Name -->
                         <span class="flex-1 min-w-0 text-sm text-neutral-800 dark:text-neutral-200 truncate">
@@ -155,7 +155,7 @@
                         <span
                           v-if="reach.current_cfs != null"
                           class="text-xs font-medium tabular-nums shrink-0"
-                          :style="{ color: flowStatusColor(reach.flow_status) }"
+                          :style="{ color: bandSolid(null, reach.flow_status) }"
                         >{{ reach.current_cfs.toLocaleString() }}</span>
                         <span v-else class="text-xs text-neutral-300 dark:text-neutral-600 shrink-0">—</span>
                         <!-- Add to dashboard -->
@@ -276,6 +276,7 @@ import { useWatchlistStore } from '~/stores/watchlist'
 
 definePageMeta({ ssr: false })
 
+const { bandSolid } = useFlowBandPalette()
 const { apiBase } = useRuntimeConfig().public
 const router = useRouter()
 const route = useRoute()
@@ -460,10 +461,6 @@ function onReachRowClick(reach: ReachListItem) {
   listVisible.value = false
 }
 
-function flowStatusColor(status: string): string {
-  const map: Record<string, string> = { runnable: '#22c55e', caution: '#ef4444', flood: '#38bdf8' }
-  return map[status] ?? '#9ca3af'
-}
 
 // ── Mobile list/map toggle ────────────────────────────────────────────────────
 const listVisible = ref(false)

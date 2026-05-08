@@ -323,7 +323,7 @@
                   v-if="r.flow_status !== 'unknown' || r.flow_band"
                   :class="['hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium shrink-0', reachBadgeClass(r)]"
                 >{{ reachStatusLabel(r) }}</span>
-                <span class="text-base font-bold tabular-nums min-w-14 text-right" :class="reachCfsClass(r)">
+                <span class="text-base font-bold tabular-nums min-w-14 text-right" :style="{ color: bandSolid(r.flow_band, r.flow_status) }">
                   {{ r.current_cfs != null ? r.current_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-neutral-400 dark:text-neutral-500 ml-0.5">cfs</span>
                 </span>
               </div>
@@ -357,7 +357,7 @@
                   <span v-if="r.river_name" class="text-xs text-primary-400/70 truncate block mt-0.5">{{ r.river_name }}</span>
                 </div>
                 <div class="shrink-0 flex items-center gap-1">
-                  <span class="text-xl font-bold tabular-nums leading-none" :class="reachCfsClass(r)">
+                  <span class="text-xl font-bold tabular-nums leading-none" :style="{ color: bandSolid(r.flow_band, r.flow_status) }">
                     {{ r.current_cfs != null ? r.current_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-neutral-500 dark:text-neutral-400 ml-0.5">cfs</span>
                   </span>
                   <NuxtLink
@@ -541,11 +541,11 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useWatchlistStore, type WatchedGauge } from '~/stores/watchlist'
 import { cleanBasinName, slugifyBasin } from '~/utils/basin'
-import { flowBandCfsClass, flowBandLabel } from '~/utils/flowBand'
+import { flowBandLabel } from '~/utils/flowBand'
 
 definePageMeta({ ssr: false })
 
-const { bandBadgeClass } = useFlowBandPalette()
+const { bandBadgeClass, bandSolid } = useFlowBandPalette()
 
 const router = useRouter()
 const store = useWatchlistStore()
@@ -637,9 +637,6 @@ interface UserReachSummary {
   custom_gauge_id: string | null; custom_gauge_slug: string | null; custom_gauge_name: string | null
 }
 
-function reachCfsClass(r: UserReachSummary): string {
-  return flowBandCfsClass(r.flow_band, r.flow_status)
-}
 function reachBadgeClass(r: UserReachSummary): string {
   return bandBadgeClass(r.flow_band, r.flow_status)
 }

@@ -41,7 +41,7 @@
         v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
         :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', bandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
       >{{ flowBandLabel(displayFlowBandLabel(reach), displayFlowStatus(reach)) }}</span>
-      <span class="w-16 shrink-0 text-right text-sm font-bold tabular-nums" :class="cfsColorClass(reach)">
+      <span class="w-16 shrink-0 text-right text-sm font-bold tabular-nums" :style="{ color: bandSolid(displayFlowBandLabel(reach)) }">
         {{ displayCfs(reach) != null ? displayCfs(reach)!.toLocaleString() : '—' }}
         <span class="text-xs font-normal text-neutral-400">cfs</span>
       </span>
@@ -98,7 +98,7 @@
             v-if="displayFlowStatus(reach) !== 'unknown' || displayFlowBandLabel(reach)"
             :class="['inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shrink-0', bandBadgeClass(displayFlowBandLabel(reach), displayFlowStatus(reach))]"
           >{{ flowBandLabel(displayFlowBandLabel(reach), displayFlowStatus(reach)) }}</span>
-          <span class="text-lg font-bold tabular-nums shrink-0 leading-none" :class="cfsColorClass(reach)">
+          <span class="text-lg font-bold tabular-nums shrink-0 leading-none" :style="{ color: bandSolid(displayFlowBandLabel(reach)) }">
             {{ displayCfs(reach) != null ? displayCfs(reach)!.toLocaleString() : '—' }}
           </span>
           <span class="text-xs text-neutral-400 shrink-0">cfs</span>
@@ -154,7 +154,7 @@
           <!-- Right: CFS + remove -->
           <div class="flex items-start gap-1 shrink-0">
             <div class="text-right">
-              <div class="font-bold tabular-nums leading-none" :class="[density === 'comfortable' ? 'text-2xl' : 'text-3xl', cfsColorClass(reach)]">
+              <div class="font-bold tabular-nums leading-none" :class="density === 'comfortable' ? 'text-2xl' : 'text-3xl'" :style="{ color: bandSolid(displayFlowBandLabel(reach)) }">
                 {{ displayCfs(reach) != null ? displayCfs(reach)!.toLocaleString() : '—' }}
               </div>
               <div class="text-xs text-neutral-400 mt-0.5">cfs</div>
@@ -178,7 +178,7 @@
 <script setup lang="ts">
 import { reactive, onMounted, watch } from 'vue'
 import type { WatchedGauge } from '~/stores/watchlist'
-import { flowBandLabel, flowBandCfsClass } from '~/utils/flowBand'
+import { flowBandLabel } from '~/utils/flowBand'
 
 const props = defineProps<{
   reaches: WatchedGauge[]
@@ -232,7 +232,4 @@ function sparklineColor(reach: WatchedGauge): string {
   return bandSolid(displayFlowBandLabel(reach))
 }
 
-function cfsColorClass(reach: WatchedGauge): string {
-  return flowBandCfsClass(displayFlowBandLabel(reach))
-}
 </script>
