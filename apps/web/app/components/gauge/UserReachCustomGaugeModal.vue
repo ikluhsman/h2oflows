@@ -177,6 +177,9 @@ function buildChart() {
   )
 }
 
+// immediate: true catches the case where the component mounts with open already
+// true (v-if becomes active in the same tick as open = true, so the non-immediate
+// watcher never sees the false→true transition on first open).
 watch(open, async (v) => {
   if (v) {
     await nextTick()
@@ -186,7 +189,7 @@ watch(open, async (v) => {
     chart = null
     readings.value = []
   }
-})
+}, { immediate: true })
 
 // If UModal renders body lazily, container ref becomes non-null after load() resolves.
 // Rebuild chart whenever the container element mounts.
