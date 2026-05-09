@@ -17,6 +17,11 @@ const readingRetention = 7 * 24 * time.Hour
 // backfillWindow is how far back to seed readings for a gauge that has none.
 const backfillWindow = 7 * 24 * time.Hour
 
+// backfillInterval is how often the backfiller re-scans for gauges with missing
+// or gappy history. Running it periodically (not just at startup) ensures gauges
+// added to polled_gauge_ids after server start get their 7-day history filled in.
+const backfillInterval = 6 * time.Hour
+
 // pollConcurrency is the max number of parallel FetchReading calls per source.
 // Keeps us from hammering USGS or DWR with hundreds of simultaneous requests.
 const pollConcurrency = 10
@@ -62,7 +67,9 @@ func (p *Poller) Run(ctx context.Context) {
 	go p.syncAllMetadata(ctx)
 
 	// Backfill 7 days of history for any gauges with no recent readings.
+	// Also runs on a periodic schedule so gauges added after startup get history.
 	go p.backfillAll(ctx)
+	go p.runBackfiller(ctx)
 
 	// One goroutine per source, plus the pruner.
 	for _, sc := range p.sources {
@@ -289,6 +296,23 @@ func (p *Poller) runHealthLogger(ctx context.Context) {
 				}
 			}
 			rows.Close()
+		}
+	}
+}
+
+// runBackfiller re-scans for gauges with missing or gappy history every
+// backfillInterval. Catches gauges that enter polled_gauge_ids after startup
+// (e.g. newly watched gauges) so they get 7-day history without waiting for
+// a server restart.
+func (p *Poller) runBackfiller(ctx context.Context) {
+	ticker := time.NewTicker(backfillInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			p.backfillAll(ctx)
 		}
 	}
 }
