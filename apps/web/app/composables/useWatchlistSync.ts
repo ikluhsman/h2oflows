@@ -58,7 +58,7 @@ export function useWatchlistSync() {
     const allItems: { gauge_id: string | null; custom_gauge_id: string | null; reach_slug: string | null }[] = data.items ?? []
 
     const customGaugeIds = allItems
-      .filter(item => item.custom_gauge_id != null)
+      .filter(item => item.custom_gauge_id != null && item.reach_slug == null)
       .map(item => item.custom_gauge_id as string)
 
     // reach_slug items (gauge_id + reach_slug) represent user reaches on this dashboard.

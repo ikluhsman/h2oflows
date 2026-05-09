@@ -76,19 +76,6 @@
       <!-- Page-level action buttons -->
       <slot name="actions" />
 
-      <!-- Find a gauge button — right side -->
-      <button
-        class="shrink-0 hidden sm:flex items-center gap-1 p-1.5 rounded-md text-neutral-500 dark:text-neutral-400 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors"
-        title="Find a gauge"
-        @click="gaugeSearchOpen = true"
-      >
-        <svg class="w-4.5 h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-          <path d="M11 8v6M8 11h6"/>
-        </svg>
-        <span class="text-xs font-medium">Gauge</span>
-      </button>
-
       <!-- Hamburger — mobile only -->
       <button
         class="sm:hidden shrink-0 p-1.5 rounded-md text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
@@ -316,16 +303,6 @@
           </svg>
           Ask AI
         </button>
-        <!-- Find a gauge — mobile -->
-        <button
-          class="w-full text-left px-3 py-2 rounded-md text-sm text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-900 transition-colors flex items-center gap-2"
-          @click="menuOpen = false; gaugeSearchOpen = true"
-        >
-          <svg class="w-4 h-4 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/>
-          </svg>
-          Find a gauge
-        </button>
       </div>
       <div class="border-t border-neutral-100 dark:border-neutral-800 mt-1 pt-2">
         <button
@@ -342,9 +319,6 @@
       </div>
     </div>
   </header>
-
-  <!-- Global gauge search modal -->
-  <GaugeSearchModal v-model:open="gaugeSearchOpen" @add="handleGaugeAdd" @added-external="onAddedExternal" />
 
   <!-- Global Ask modal (Teleport so it's above everything) -->
   <Teleport to="body">
@@ -429,7 +403,6 @@
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import MarkdownIt from 'markdown-it'
-import type { WatchedGauge } from '~/stores/watchlist'
 import { PALETTES } from '../../app.config'
 import type { PaletteId } from '../../app.config'
 import { useThemeStore } from '~/stores/theme'
@@ -477,20 +450,6 @@ async function handleSignOut() {
   menuOpen.value = false
   await signOut()
   router.push('/')
-}
-
-// ── Find a gauge ─────────────────────────────────────────────────────────────
-const { addAndSync, loadForDashboard } = useWatchlistSync()
-const dashboardsForAdd = useDashboards()
-const gaugeSearchOpen = ref(false)
-function handleGaugeAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dashboardId: string | null) {
-  addAndSync(gauge, dashboardId)
-}
-async function onAddedExternal() {
-  // User reach or custom gauge added directly to watchlist via API — reload
-  // the active dashboard so the new item shows up immediately.
-  const id = dashboardsForAdd.activeDashboard.value?.id
-  if (id) await loadForDashboard(id)
 }
 
 // ── Global Ask ────────────────────────────────────────────────────────────────

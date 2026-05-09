@@ -417,7 +417,7 @@ async function addUserReach(r: ReachSummary) {
     if (r.gauge_id) {
       await addUserReachToWatchlist(r.gauge_id, r.slug, selectedDashboardId.value)
     } else {
-      await addCustomGaugeToWatchlist(r.custom_gauge_id!, selectedDashboardId.value)
+      await addCustomGaugeToWatchlist(r.custom_gauge_id!, selectedDashboardId.value, r.slug)
     }
     emit('addedExternal')
     open.value = false

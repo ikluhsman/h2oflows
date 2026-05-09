@@ -373,9 +373,7 @@ const { isDataAdmin, isAuthenticated, getToken } = useAuth()
 const mode = ref<'curated' | 'user'>('curated')
 const mapToken = ref<string | null>(null)
 
-const mapSourceUrl = computed(() =>
-  mode.value === 'user' ? `${apiBase}/api/v1/me/reaches/map/all` : null
-)
+const mapSourceUrl = ref<string | null>(null)
 const mapSourceHeaders = computed((): Record<string, string> =>
   mapToken.value ? { Authorization: `Bearer ${mapToken.value}` } : {}
 )
@@ -435,6 +433,7 @@ async function loadUserReaches() {
     const token = await getToken()
     mapToken.value = token
     if (!token) { userReachesError.value = 'Sign in to view your reaches.'; return }
+    mapSourceUrl.value = `${apiBase}/api/v1/me/reaches/map/all`
     const res = await fetch(`${apiBase}/api/v1/me/reaches`, {
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -447,7 +446,10 @@ async function loadUserReaches() {
   }
 }
 
-watch(mode, m => { if (m === 'user') loadUserReaches() })
+watch(mode, m => {
+  if (m === 'user') loadUserReaches()
+  else { mapSourceUrl.value = null; mapToken.value = null }
+})
 
 // ── Search ────────────────────────────────────────────────────────────────────
 const query = ref('')
