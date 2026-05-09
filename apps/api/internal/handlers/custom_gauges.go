@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -560,6 +561,19 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 	}
 	slug := chi.URLParam(r, "slug")
 
+	window := 48 * time.Hour
+	if s := r.URL.Query().Get("since"); s != "" {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			d := time.Since(t)
+			if d < time.Hour {
+				d = time.Hour
+			} else if d > 30*24*time.Hour {
+				d = 30 * 24 * time.Hour
+			}
+			window = d
+		}
+	}
+
 	type reading struct {
 		Timestamp time.Time `json:"timestamp"`
 		CFS       float64   `json:"cfs"`
@@ -578,13 +592,13 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 		bucketed AS (
 			SELECT
 				date_trunc('minute', gr.timestamp)
-					- ((EXTRACT(MINUTE FROM gr.timestamp)::int % 15) * INTERVAL '1 minute') AS bucket,
+					- ((EXTRACT(MINUTE FROM gr.timestamp)::int % 30) * INTERVAL '1 minute') AS bucket,
 				inp.gauge_id,
 				AVG(gr.value) AS avg_val,
 				inp.sign
 			FROM inputs inp
 			JOIN gauge_readings gr ON gr.gauge_id = inp.gauge_id
-			WHERE gr.timestamp > NOW() - INTERVAL '48 hours'
+			WHERE gr.timestamp > NOW() - $3::interval
 			GROUP BY bucket, inp.gauge_id, inp.sign
 		)
 		SELECT bucket, SUM(avg_val * sign) AS cfs
@@ -593,7 +607,7 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 		HAVING COUNT(DISTINCT gauge_id) = (SELECT n FROM input_count)
 		ORDER BY bucket DESC
 		LIMIT 500
-	`, slug, ownerID)
+	`, slug, ownerID, fmt.Sprintf("%d seconds", int(window.Seconds())))
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "query failed")
 		return
