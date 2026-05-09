@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -548,10 +549,14 @@ func (h *CustomGaugeHandler) Import(w http.ResponseWriter, r *http.Request) {
 
 // ── Readings ──────────────────────────────────────────────────────────────────
 
-// GET /api/v1/me/custom-gauges/{slug}/readings
+// GET /api/v1/me/custom-gauges/{slug}/readings?since=<rfc3339>
 // Returns a combined time-series by bucketing component gauge readings into
-// 15-minute intervals and summing them with their signs. Only buckets where all
-// input gauges have a reading are included.
+// 15-minute intervals and summing them with their signs. The `since` query
+// param defines the window (defaults to 48h, clamped to [1h, 30d]).
+//
+// Buckets where some inputs lag are still included with a partial sum so the
+// sparkline stays continuous; otherwise inputs polling on different cadences
+// would produce empty windows even when data exists.
 func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 	ownerID, ok := h.ownerID(r)
 	if !ok {
@@ -559,6 +564,20 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	slug := chi.URLParam(r, "slug")
+
+	// Resolve window. Default to 48h if missing/invalid; clamp to [1h, 30d].
+	window := 48 * time.Hour
+	if s := r.URL.Query().Get("since"); s != "" {
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			d := time.Since(t)
+			if d < time.Hour {
+				d = time.Hour
+			} else if d > 30*24*time.Hour {
+				d = 30 * 24 * time.Hour
+			}
+			window = d
+		}
+	}
 
 	type reading struct {
 		Timestamp time.Time `json:"timestamp"`
@@ -574,7 +593,6 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 			FROM custom_gauge_inputs cgi
 			WHERE cgi.custom_gauge_id = (SELECT id FROM cg)
 		),
-		input_count AS (SELECT COUNT(*) AS n FROM inputs),
 		bucketed AS (
 			SELECT
 				date_trunc('minute', gr.timestamp)
@@ -584,16 +602,15 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 				inp.sign
 			FROM inputs inp
 			JOIN gauge_readings gr ON gr.gauge_id = inp.gauge_id
-			WHERE gr.timestamp > NOW() - INTERVAL '48 hours'
+			WHERE gr.timestamp > NOW() - $3::interval
 			GROUP BY bucket, inp.gauge_id, inp.sign
 		)
 		SELECT bucket, SUM(avg_val * sign) AS cfs
 		FROM bucketed
 		GROUP BY bucket
-		HAVING COUNT(DISTINCT gauge_id) = (SELECT n FROM input_count)
 		ORDER BY bucket DESC
 		LIMIT 500
-	`, slug, ownerID)
+	`, slug, ownerID, fmt.Sprintf("%d seconds", int(window.Seconds())))
 	if err != nil {
 		errorResponse(w, http.StatusInternalServerError, "query failed")
 		return

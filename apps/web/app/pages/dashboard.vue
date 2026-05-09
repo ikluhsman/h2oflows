@@ -20,7 +20,7 @@
       :class="db.dashboards.value.length ? 'top-24' : 'top-12.75'"
     >
       <div class="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2">
-        <div v-if="store.gauges.length > 0" class="flex items-center gap-2">
+        <div v-if="hasAnyContent" class="flex items-center gap-2">
           <!-- View mode toggle -->
           <div class="flex items-center gap-0.5 bg-neutral-100 dark:bg-neutral-800 rounded-lg p-1">
             <button
@@ -68,6 +68,7 @@
           </button>
           <!-- Expand / Collapse all -->
           <button
+            v-if="byStateTree.length > 0"
             class="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 font-medium transition-colors whitespace-nowrap"
             @click="toggleAllSections"
           >{{ allExpanded ? 'Collapse all' : 'Expand all' }}</button>
@@ -82,7 +83,7 @@
     <main class="max-w-5xl mx-auto px-2 sm:px-4 py-6 pb-20 sm:pb-6 space-y-8">
 
       <!-- Empty state -->
-      <div v-if="store.gauges.length === 0 && activeCustomGauges.length === 0 && activeUserReaches.length === 0" class="mt-20 flex flex-col items-center gap-4 text-center">
+      <div v-if="!hasAnyContent" class="mt-20 flex flex-col items-center gap-4 text-center">
         <div class="text-5xl">🌊</div>
         <h2 class="text-xl font-semibold">No reaches yet</h2>
         <p class="text-neutral-500 max-w-sm text-sm">
@@ -92,7 +93,7 @@
       </div>
 
       <!-- Reaches grouped by basin → river -->
-      <template v-if="store.gauges.length > 0 || activeCustomGauges.length > 0 || activeUserReaches.length > 0">
+      <template v-if="hasAnyContent">
 
         <section v-for="stateGroup in byStateTree" :key="stateGroup.name" class="mb-4">
           <!-- State header: large, collapsible, h1+hr style -->
@@ -279,7 +280,7 @@
         </section>
 
         <!-- My Reaches section — all on primary; watchlist-filtered on secondary dashboards -->
-        <section v-if="activeUserReaches.length > 0">
+        <section v-if="visibleUserReaches.length > 0">
           <div class="flex items-center gap-2 mb-3">
             <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">My Reaches</h2>
             <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
@@ -326,6 +327,9 @@
               <div class="flex items-center gap-2 shrink-0">
                 <div v-if="r.gauge_id" class="w-32 shrink-0 hidden sm:block">
                   <GaugeSparkline :gauge-id="r.gauge_id" :flow-status="(r.flow_status as any)" :flow-band-label="r.flow_band ?? null" compact class="h-full w-full" />
+                </div>
+                <div v-else-if="r.custom_gauge_slug" class="w-32 shrink-0 hidden sm:block">
+                  <CustomGaugeSparkline :gauge-slug="r.custom_gauge_slug" compact class="h-full w-full" />
                 </div>
                 <span
                   v-if="r.flow_status !== 'unknown' || r.flow_band"
@@ -400,7 +404,7 @@
         </section>
 
         <!-- Custom Gauges section — shows active-dashboard gauges on all tabs -->
-        <section v-if="activeCustomGauges.length > 0">
+        <section v-if="visibleCustomGauges.length > 0">
           <div class="flex items-center gap-2 mb-3">
             <h2 class="text-sm font-semibold text-neutral-500 uppercase tracking-wide">Custom Gauges</h2>
             <div class="flex-1 h-px bg-neutral-200 dark:bg-neutral-800" />
@@ -436,6 +440,9 @@
                 <svg class="w-3.5 h-3.5 text-neutral-400/40 dark:text-neutral-500/30 shrink-0 hidden sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="14" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="14" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="14" y1="18" x2="16" y2="18"/></svg>
                 <span class="text-sm font-medium truncate">{{ cg.name }}</span>
                 <span v-if="cg.any_input_unhealthy" class="hidden sm:inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 shrink-0">Stale</span>
+              </div>
+              <div class="w-32 shrink-0 hidden sm:block">
+                <CustomGaugeSparkline :gauge-slug="cg.slug" compact class="h-full w-full" />
               </div>
               <span class="text-base font-bold tabular-nums text-neutral-900 dark:text-white shrink-0">
                 {{ cg.last_value_cfs != null ? cg.last_value_cfs.toLocaleString() : '—' }}<span class="text-xs font-normal text-neutral-400 ml-0.5">{{ cg.unit }}</span>
@@ -720,15 +727,17 @@ async function loadUserReaches() {
   userReaches.value = await res.json() ?? []
 }
 
-const HIDDEN_REACHES_KEY = 'h2oflow_hidden_reaches'
-const HIDDEN_GAUGES_KEY  = 'h2oflow_hidden_custom_gauges'
-
 function loadSet(key: string): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem(key) ?? '[]')) } catch { return new Set() }
 }
 function saveSet(key: string, s: Set<string>) {
   localStorage.setItem(key, JSON.stringify([...s]))
 }
+
+// Per-dashboard hidden sets — keyed by dashboardId so trashing on secondary
+// doesn't bleed into primary and vice-versa.
+const hiddenReachesKey = computed(() => `h2oflow_hidden_reaches_${db.activeDashboard.value?.id ?? 'default'}`)
+const hiddenGaugesKey  = computed(() => `h2oflow_hidden_custom_gauges_${db.activeDashboard.value?.id ?? 'default'}`)
 
 const hiddenReaches      = ref<Set<string>>(new Set())
 const hiddenCustomGauges = ref<Set<string>>(new Set())
@@ -738,25 +747,31 @@ const reachAddWrap       = ref<HTMLElement | null>(null)
 const gaugeAddWrap       = ref<HTMLElement | null>(null)
 
 onMounted(() => {
-  hiddenReaches.value      = loadSet(HIDDEN_REACHES_KEY)
-  hiddenCustomGauges.value = loadSet(HIDDEN_GAUGES_KEY)
+  hiddenReaches.value      = loadSet(hiddenReachesKey.value)
+  hiddenCustomGauges.value = loadSet(hiddenGaugesKey.value)
+})
+
+// Reload per-dashboard hidden sets when user switches tabs.
+watch(() => db.activeDashboard.value?.id, () => {
+  hiddenReaches.value      = loadSet(hiddenReachesKey.value)
+  hiddenCustomGauges.value = loadSet(hiddenGaugesKey.value)
 })
 
 function hideReach(id: string) {
   hiddenReaches.value = new Set([...hiddenReaches.value, id])
-  saveSet(HIDDEN_REACHES_KEY, hiddenReaches.value)
+  saveSet(hiddenReachesKey.value, hiddenReaches.value)
 }
 function showReach(id: string) {
   const s = new Set(hiddenReaches.value); s.delete(id)
-  hiddenReaches.value = s; saveSet(HIDDEN_REACHES_KEY, s)
+  hiddenReaches.value = s; saveSet(hiddenReachesKey.value, s)
 }
 function hideCustomGauge(id: string) {
   hiddenCustomGauges.value = new Set([...hiddenCustomGauges.value, id])
-  saveSet(HIDDEN_GAUGES_KEY, hiddenCustomGauges.value)
+  saveSet(hiddenGaugesKey.value, hiddenCustomGauges.value)
 }
 function showCustomGauge(id: string) {
   const s = new Set(hiddenCustomGauges.value); s.delete(id)
-  hiddenCustomGauges.value = s; saveSet(HIDDEN_GAUGES_KEY, s)
+  hiddenCustomGauges.value = s; saveSet(hiddenGaugesKey.value, s)
 }
 
 // Close add-dropdowns on outside click
@@ -774,16 +789,23 @@ const customGauges = ref<CustomGaugeSummary[]>([])
 const dashboardCustomGaugeIds = ref<string[]>([])
 const dashboardReachSlugs     = ref<string[]>([])
 
-// Items visible on the active dashboard: all on primary, watchlist-filtered on others.
+// Items visible on the active dashboard — always filtered by watchlist.
+// Every tab (including primary) uses its own watchlist entries so that
+// adding a reach to secondary doesn't bleed it onto primary.
 const activeCustomGauges = computed(() =>
-  isDefaultDashboard.value
-    ? customGauges.value
-    : customGauges.value.filter(cg => dashboardCustomGaugeIds.value.includes(cg.id))
+  customGauges.value.filter(cg => dashboardCustomGaugeIds.value.includes(cg.id))
 )
 const activeUserReaches = computed(() =>
-  isDefaultDashboard.value
-    ? userReaches.value
-    : userReaches.value.filter(r => dashboardReachSlugs.value.includes(r.slug))
+  userReaches.value.filter(r => dashboardReachSlugs.value.includes(r.slug))
+)
+
+// After applying the localStorage hidden-set: what actually renders.
+const visibleUserReaches  = computed(() => activeUserReaches.value.filter(r => !hiddenReaches.value.has(r.id)))
+const visibleCustomGauges = computed(() => activeCustomGauges.value.filter(cg => !hiddenCustomGauges.value.has(cg.id)))
+
+// Whether there's anything to render anywhere on the page.
+const hasAnyContent = computed(() =>
+  store.gauges.length > 0 || visibleUserReaches.value.length > 0 || visibleCustomGauges.value.length > 0
 )
 
 async function loadCustomGauges() {
@@ -1003,17 +1025,43 @@ onMounted(() => {
 })
 watch(mapVisible, val => localStorage.setItem(MAP_VIS_KEY, String(val)))
 
-function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dashboardId: string | null) {
-  addAndSync(gauge, dashboardId ?? db.activeDashboard.value?.id ?? null)
+async function handleAdd(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dashboardId: string | null) {
+  const targetId = dashboardId ?? db.activeDashboard.value?.id ?? null
+  await addAndSync(gauge, targetId)
+  // Re-hydrate from server so we know the gauge persisted under the right dashboard.
+  // Without this round-trip, a stale unique constraint or wrong dashboard_id silently
+  // drops the gauge on the next refresh, surfacing as "appears, then disappears."
+  if (targetId) {
+    await activateDashboard(targetId)
+    await refresh()
+  }
 }
 
-async function onAddedExternal() {
+interface AddedExternalPayload {
+  kind: 'reach' | 'custom_gauge'
+  reachId?: string
+  reachSlug?: string
+  customGaugeId?: string
+}
+
+async function onAddedExternal(payload?: AddedExternalPayload) {
+  // Re-adding via the modal should clear the local trash-hidden flag — otherwise
+  // the section gate (visibleUserReaches/visibleCustomGauges) keeps the row hidden
+  // and the click looks like a no-op.
+  if (payload?.kind === 'reach' && payload.reachId && hiddenReaches.value.has(payload.reachId)) {
+    showReach(payload.reachId)
+  }
+  if (payload?.kind === 'custom_gauge' && payload.customGaugeId && hiddenCustomGauges.value.has(payload.customGaugeId)) {
+    showCustomGauge(payload.customGaugeId)
+  }
+
+  await loadUserReaches()
+  await loadCustomGauges()
   const id = db.activeDashboard.value?.id
   if (id) {
     await activateDashboard(id)
     await refresh()
   }
-  await loadUserReaches()
 }
 
 const detailOpen  = ref(false)
