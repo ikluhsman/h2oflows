@@ -554,9 +554,9 @@ func (h *CustomGaugeHandler) Import(w http.ResponseWriter, r *http.Request) {
 // 15-minute intervals and summing them with their signs. The `since` query
 // param defines the window (defaults to 48h, clamped to [1h, 30d]).
 //
-// Buckets where some inputs lag are still included with a partial sum so the
-// sparkline stays continuous; otherwise inputs polling on different cadences
-// would produce empty windows even when data exists.
+// Only buckets where ALL inputs have a reading are returned (HAVING clause).
+// Partial sums with mixed signs produce nonsense values (e.g. -100 cfs when
+// only the subtracted gauge has a reading in that bucket).
 func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 	ownerID, ok := h.ownerID(r)
 	if !ok {
@@ -608,6 +608,7 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 		SELECT bucket, SUM(avg_val * sign) AS cfs
 		FROM bucketed
 		GROUP BY bucket
+		HAVING COUNT(DISTINCT gauge_id) = (SELECT COUNT(*) FROM inputs)
 		ORDER BY bucket DESC
 		LIMIT 500
 	`, slug, ownerID, fmt.Sprintf("%d seconds", int(window.Seconds())))
