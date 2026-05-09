@@ -551,12 +551,9 @@ func (h *CustomGaugeHandler) Import(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/v1/me/custom-gauges/{slug}/readings?since=<rfc3339>
 // Returns a combined time-series by bucketing component gauge readings into
-// 15-minute intervals and summing them with their signs. The `since` query
+// 15-minute intervals and summing them with their signs. Only buckets where all
+// input gauges have a reading are included (HAVING clause). The `since` query
 // param defines the window (defaults to 48h, clamped to [1h, 30d]).
-//
-// Buckets where some inputs lag are still included with a partial sum so the
-// sparkline stays continuous; otherwise inputs polling on different cadences
-// would produce empty windows even when data exists.
 func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 	ownerID, ok := h.ownerID(r)
 	if !ok {
@@ -565,7 +562,6 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 	}
 	slug := chi.URLParam(r, "slug")
 
-	// Resolve window. Default to 48h if missing/invalid; clamp to [1h, 30d].
 	window := 48 * time.Hour
 	if s := r.URL.Query().Get("since"); s != "" {
 		if t, err := time.Parse(time.RFC3339, s); err == nil {
