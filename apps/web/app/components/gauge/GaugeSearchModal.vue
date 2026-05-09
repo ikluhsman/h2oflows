@@ -271,9 +271,15 @@ import type { WatchedGauge } from '~/stores/watchlist'
 import { featureToWatchedGauge } from '~/composables/useWatchlistSync'
 
 const open = defineModel<boolean>('open', { default: false })
+interface AddedExternalPayload {
+  kind: 'reach' | 'custom_gauge'
+  reachId?: string
+  reachSlug?: string
+  customGaugeId?: string
+}
 const emit = defineEmits<{
   (e: 'add', gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dashboardId: string | null): void
-  (e: 'addedExternal'): void
+  (e: 'addedExternal', payload?: AddedExternalPayload): void
 }>()
 
 const { apiBase } = useRuntimeConfig().public
@@ -419,7 +425,7 @@ async function addUserReach(r: ReachSummary) {
     } else {
       await addCustomGaugeToWatchlist(r.custom_gauge_id!, selectedDashboardId.value, r.slug)
     }
-    emit('addedExternal')
+    emit('addedExternal', { kind: 'reach', reachId: r.id, reachSlug: r.slug })
     open.value = false
   } finally {
     adding.value = null
@@ -430,7 +436,7 @@ async function addCustomGauge(cg: GaugeSummary) {
   adding.value = cg.id
   try {
     await addCustomGaugeToWatchlist(cg.id, selectedDashboardId.value)
-    emit('addedExternal')
+    emit('addedExternal', { kind: 'custom_gauge', customGaugeId: cg.id })
     open.value = false
   } finally {
     adding.value = null

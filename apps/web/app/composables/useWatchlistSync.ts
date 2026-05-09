@@ -15,17 +15,24 @@ export function useWatchlistSync() {
   async function addAndSync(gauge: Omit<WatchedGauge, 'watchState' | 'activeSince'>, dashboardId?: string | null) {
     store.addGauge(gauge)
     const token = await getToken()
-    if (token) {
-      fetch(`${apiBase}/api/v1/watchlist`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gauge_id: gauge.id,
-          reach_slug: gauge.contextReachSlug ?? null,
-          dashboard_id: dashboardId ?? null,
-        }),
-      }).catch(() => {})
+    if (!token) return
+    let resolvedId = dashboardId ?? null
+    if (!resolvedId) {
+      const db = useDashboards()
+      if (!db.loaded.value) await db.load()
+      resolvedId = db.activeDashboard.value?.id ?? null
     }
+    // Await — callers re-fetch the dashboard immediately after; without this
+    // the GET races the insert and the gauge disappears until manual refresh.
+    await fetch(`${apiBase}/api/v1/watchlist`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gauge_id: gauge.id,
+        reach_slug: gauge.contextReachSlug ?? null,
+        dashboard_id: resolvedId,
+      }),
+    }).catch(() => {})
   }
 
   async function removeAndSync(gaugeId: string, contextReachSlug?: string | null) {
@@ -136,6 +143,9 @@ export function useWatchlistSync() {
   async function pushLocalToServer() {
     const token = await getToken()
     if (!token) return
+    const db = useDashboards()
+    if (!db.loaded.value) await db.load()
+    const dashboardId = db.activeDashboard.value?.id ?? null
     for (const gauge of store.gauges) {
       fetch(`${apiBase}/api/v1/watchlist`, {
         method: 'POST',
@@ -143,6 +153,7 @@ export function useWatchlistSync() {
         body: JSON.stringify({
           gauge_id: gauge.id,
           reach_slug: gauge.contextReachSlug ?? null,
+          dashboard_id: dashboardId,
         }),
       }).catch(() => {})
     }
