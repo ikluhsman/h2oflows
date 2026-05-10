@@ -162,7 +162,10 @@ func (h *GaugeHandler) GetReadings(w http.ResponseWriter, r *http.Request) {
 
 	var since *time.Time
 	if raw := q.Get("since"); raw != "" {
-		t, err := time.Parse(time.RFC3339, raw)
+		t, err := time.Parse(time.RFC3339Nano, raw)
+		if err != nil {
+			t, err = time.Parse(time.RFC3339, raw)
+		}
 		if err != nil {
 			errorResponse(w, http.StatusBadRequest, "since must be RFC3339 (e.g. 2024-01-01T00:00:00Z)")
 			return
