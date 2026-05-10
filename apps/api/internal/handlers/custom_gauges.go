@@ -596,7 +596,7 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 		bucketed AS (
 			SELECT
 				date_trunc('minute', gr.timestamp)
-					- ((EXTRACT(MINUTE FROM gr.timestamp)::int % 30) * INTERVAL '1 minute') AS bucket,
+					- ((EXTRACT(MINUTE FROM gr.timestamp)::int % 60) * INTERVAL '1 minute') AS bucket,
 				inp.gauge_id,
 				AVG(gr.value) AS avg_val,
 				inp.sign
