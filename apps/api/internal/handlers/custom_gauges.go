@@ -608,6 +608,7 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 		SELECT bucket, SUM(avg_val * sign) AS cfs
 		FROM bucketed
 		GROUP BY bucket
+		HAVING COUNT(DISTINCT gauge_id) = (SELECT COUNT(*) FROM inputs)
 		ORDER BY bucket DESC
 		LIMIT 500
 	`, slug, ownerID, fmt.Sprintf("%d seconds", int(window.Seconds())))
