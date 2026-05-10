@@ -564,7 +564,11 @@ func (h *CustomGaugeHandler) Readings(w http.ResponseWriter, r *http.Request) {
 
 	window := 48 * time.Hour
 	if s := r.URL.Query().Get("since"); s != "" {
-		if t, err := time.Parse(time.RFC3339, s); err == nil {
+		t, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			t, err = time.Parse(time.RFC3339, s)
+		}
+		if err == nil {
 			d := time.Since(t)
 			if d < time.Hour {
 				d = time.Hour
