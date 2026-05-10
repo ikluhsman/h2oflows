@@ -26,9 +26,11 @@ const backfillInterval = 15 * time.Minute
 // Keeps us from hammering USGS or DWR with hundreds of simultaneous requests.
 const pollConcurrency = 10
 
-// consecutiveFailuresThreshold is the number of consecutive poll failures before
-// a gauge is automatically marked 'inactive' by the poller.
-const consecutiveFailuresThreshold = 5
+// autoInactiveDuration: auto_managed gauges with no successful poll in this
+// window are marked inactive. Long enough to survive seasonal gaps (frozen rivers,
+// off-season sensors). 14 days is the threshold; the gauge can be manually
+// re-activated or will auto-recover on next successful poll.
+const autoInactiveDuration = 14 * 24 * time.Hour
 
 // poll_health thresholds (in number of consecutive failures, assuming 15-min cadence).
 const (
@@ -255,7 +257,8 @@ func (p *Poller) recordFailure(ctx context.Context, gaugeID string, fetchErr err
 		    END,
 		    status                    = CASE
 		        WHEN auto_managed = TRUE
-		             AND consecutive_poll_failures + 1 >= $5
+		             AND last_poll_success_at IS NOT NULL
+		             AND last_poll_success_at < NOW() - $5::interval
 		             AND status NOT IN ('retired', 'seasonal')
 		        THEN 'inactive'
 		        ELSE status
@@ -263,7 +266,7 @@ func (p *Poller) recordFailure(ctx context.Context, gaugeID string, fetchErr err
 		WHERE id = $1
 	`, gaugeID,
 		healthUnreachableThreshold, healthStaleThreshold, healthDegradedThreshold,
-		consecutiveFailuresThreshold)
+		autoInactiveDuration.String())
 	if err != nil {
 		log.Printf("poller: record failure for %s: %v", gaugeID, err)
 	}
