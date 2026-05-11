@@ -628,9 +628,52 @@ Old tables (`trip_reports`, `hazards`, `reach_conditions`) remain through 2b. A 
 ### Deferred from 2b
 
 - **Proximity events + passive telemetry** — backend route exists; resume when mobile PWA work begins (Phase 10 territory).
-- **Google Earth picture layer** — design coupled to photos-on-map; revisit after Reports + photo upload are live and we know which EXIF metadata users actually attach.
-- **QR sharing** for custom gauges (already deferred in Phase 2.3) and for reports.
+- **QR sharing** for custom gauges, reaches, and reports — nice-to-have for parking-lot communication; revisit post-1.0 once link/JSON sharing has usage data.
 - **Discord bot ingestion** of report posts — folded into Phase 7.
+- **Google Earth picture layer** — moved to Future ideas at the end of this roadmap.
+
+---
+
+## Demo Pack (0.3.0)
+
+*Pre-pilot feature extraction + new build to make the app demo-ready for the six pilot contacts. Each item below is either a polish-and-surface pass on an existing feature or a small new build. Lands as `0.3.0` once all four ship.*
+
+### 3.1 — Basin Maps for dashboards
+
+Dendritic tree view of a dashboard's reaches + gauges showing upstream→downstream topology. Distinct from the existing curated basin detail page (which is a fixed curated basin). This one renders per-user-dashboard from the watchlist contents.
+
+- Pulls reaches + custom gauges + user reaches from active dashboard
+- Resolves geometric relationships via existing reach lng/lat ordering (Colorado: lng ascending = downstream)
+- Tree layout: tributaries branch off mainstems, custom gauges shown at confluence points
+- Tap a node → opens reach/gauge detail
+- Same theming/dark-mode integration as the rest of the app
+- The visual hook of the demo — Nik / Tim / Matt see this and the "build your own" pitch lands
+
+### 3.2 — AW trip-report HTTP preview window
+
+Generate the AW trip-report submission form structure (gathered by inspecting AW's submit form as a logged-in member). On "submit", show the constructed HTTP request + body in a modal instead of posting. User can copy the body and paste it into AW manually.
+
+- Unblocks demos to Owen + Greg (AW tech team + AW Stream Team) without needing prior AW board approval to actually POST
+- Sets the table for Phase 5 outbound AW integration once approval is in hand — same payload, different submit handler
+- Form schema lives in `/me/preferences` `aw_band_mapping` adjacent (already shipped 2b.3); add `aw_form_schema` JSONB if needed
+
+### 3.3 — Share custom gauges + user reaches via link / JSON
+
+Generate a portable share payload for a custom gauge or user reach so a recipient can clone it into their own dashboard.
+
+- Two transports: signed link (`/share/{token}` → recipient logs in → "Add to dashboard?") and a copyable JSON snippet (recipient pastes into an Add → Import dialog)
+- Recipient gets a clone, not a reference — payload includes formula (custom gauge) or geometry (user reach) + display metadata
+- No DB-level sharing; per private-content rule (see `feedback_user_content_private.md`)
+- QR generation pulled out — deferred (see "Deferred from 2b")
+
+### 3.4 — SEO blocking until 1.0
+
+Block search engines from indexing curated reach + report pages until 1.0 ships. Pilot is private validation, not a public launch — we don't want half-finished pages cached in Google.
+
+- `robots.txt` disallow all
+- `<meta name="robots" content="noindex, nofollow">` on layout default
+- Pulled in the 1.0 release as part of the launch checklist
+- Trivial; ships with whichever PR is first to merge after this section starts
 
 ---
 
@@ -690,14 +733,15 @@ Repos can ship patches independently (`api@v0.2.1` for a poller fix without touc
 
 ### Order of operations
 
-1. Phase 2b feature work completes in the monorepo (avoid restructuring mid-flight)
+1. Phase 2b + Demo Pack (3.1–3.4) ship in the monorepo (avoid restructuring mid-flight)
 2. Confirm domain + create `h2oflows` org
-3. Stand up `apps/docs` inside the monorepo first (so its history exists to be split)
-4. Filter-split into three repos in one sitting; freeze monorepo writes during the cut
+3. Filter-split monorepo into `h2oflows/api` + `h2oflows/web` in one sitting; freeze monorepo writes during the cut
+4. Stand up `h2oflows/docs` fresh post-split (no history to preserve — scaffolded directly in its own repo from a Nuxt docs template)
 5. Reconfigure CI/CD per repo
 6. Update local dev docs in each `CLAUDE.md`
-7. Tag `0.2.0` across all three repos as the first post-split product release
-8. Begin pilot outreach against the new topology
+7. Tag `0.3.0` across all three repos as the first post-split product release (Demo Pack + split)
+8. Build docs pages per feature in `h2oflows/docs`
+9. Begin pilot outreach against the new topology
 
 ### Risks + mitigations
 
@@ -1066,3 +1110,12 @@ New sources require one file in `packages/gauge-core`:
 | Environment Canada | Medium | BC, Alberta, Quebec paddling |
 | USGS stage-only gauges | Medium | Parameter `00065` instead of `00060` |
 | Manual / community gauge | Low | Spreadsheet-defined readings for ungauged runs |
+
+---
+
+## Future ideas
+
+*Speculative or low-priority concepts kept on the roadmap for memory but not scheduled. Revisit only when adjacent phases create the right conditions.*
+
+- **Google Earth picture layer** — overlay user photos at their EXIF GPS points on a 3D terrain view. Design coupled to photos-on-map; only worth revisiting once Reports photo upload has enough data to know what EXIF metadata users actually attach. Originally scoped in 2b, moved here as not pilot-relevant.
+- Other speculative ideas land here as they come up.
