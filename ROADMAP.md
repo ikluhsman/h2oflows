@@ -640,14 +640,20 @@ Old tables (`trip_reports`, `hazards`, `reach_conditions`) remain through 2b. A 
 
 ### 3.1 — Basin Maps for dashboards
 
-Dendritic tree view of a dashboard's reaches + gauges showing upstream→downstream topology. Distinct from the existing curated basin detail page (which is a fixed curated basin). This one renders per-user-dashboard from the watchlist contents.
+Dendritic tree view of the real gauges behind a dashboard, accessed via a link/button that opens a modal or dedicated page. Not a dashboard mode toggle. A "neat" visualization that shows the user where their selected rivers sit in the watershed — nice to have for the demo, easy to build since `BasinTree.vue` already exists as the rendering pattern.
 
-- Pulls reaches + custom gauges + user reaches from active dashboard
-- Resolves geometric relationships via existing reach lng/lat ordering (Colorado: lng ascending = downstream)
-- Tree layout: tributaries branch off mainstems, custom gauges shown at confluence points
-- Tap a node → opens reach/gauge detail
-- Same theming/dark-mode integration as the rest of the app
-- The visual hook of the demo — Nik / Tim / Matt see this and the "build your own" pitch lands
+**What renders in the tree:**
+
+- Real gauges from the dashboard watchlist (reach-associated USGS/DWR gauges, user reach primary gauges)
+- Custom gauges are **not** shown as nodes — they are exploded into their input gauges. Each input gauge is labeled with the custom gauge name it contributes to (e.g. PLAGRACO and PLAWATCO nodes both tagged "Foxton Calculated"). This keeps the tree grounded in actual measurement points and avoids a derived value "throwing a wrench" in the topology.
+- Upstream→downstream order resolved via reach lng/lat (Colorado convention: ascending lng = downstream)
+- Tap a node → opens the gauge/reach detail modal
+
+**Implementation notes:**
+
+- `BasinTree.vue` exists and handles d3-hierarchy SVG rendering; this is an adapter job
+- New component feeds `WatchedGauge[]` from `store.gauges` + custom gauge input expansion from the API
+- Modal wrapper or `/dashboard/tree` page — no dashboard view-mode toggle needed
 
 ### 3.2 — AW trip-report HTTP preview window
 
